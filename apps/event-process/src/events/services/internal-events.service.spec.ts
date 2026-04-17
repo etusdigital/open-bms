@@ -36,6 +36,8 @@ describe('InternalEventsService', () => {
     getAccountTimeZone: jest.fn(),
     saveEventsLogs: jest.fn(),
     findContactById: jest.fn(),
+    findContactByEmail: jest.fn(),
+    findContactByUuid: jest.fn(),
   };
 
   const mockPubSubProvider = {
@@ -361,6 +363,98 @@ describe('InternalEventsService', () => {
         await service.internalEventsProcess(request);
 
         expect(mockGeolocationService.getLocation).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('contactId resolution', () => {
+      beforeEach(() => {
+        mockMsgopsService.getAccountTimeZone.mockResolvedValue('America/Sao_Paulo');
+        mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
+      });
+
+      it('should resolve contactId from uuid when contactId is missing', async () => {
+        mockMsgopsService.findContactByUuid.mockResolvedValue({ id: 42 });
+        const request = createRequest([
+          { ...baseEvent, contactId: undefined, email: undefined, uuid: '019901e4-773f-7008-ae1e-7842dce2f8c7' },
+        ]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockMsgopsService.findContactByUuid).toHaveBeenCalledWith(1, '019901e4-773f-7008-ae1e-7842dce2f8c7');
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ contact_id: 42 }),
+          undefined,
+        );
+      });
+
+      it('should resolve contactId from email when contactId is missing and email is present', async () => {
+        mockMsgopsService.findContactByEmail.mockResolvedValue({ id: 99 });
+        const request = createRequest([
+          { ...baseEvent, contactId: undefined, uuid: 'uuid-value', email: 'lookup@example.com' },
+        ]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockMsgopsService.findContactByEmail).toHaveBeenCalledWith(1, 'lookup@example.com');
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ contact_id: 99 }),
+          undefined,
+        );
+      });
+
+      it('should prefer email lookup over uuid lookup when both are present', async () => {
+        mockMsgopsService.findContactByEmail.mockResolvedValue({ id: 99 });
+        const request = createRequest([
+          { ...baseEvent, contactId: undefined, uuid: 'uuid-value', email: 'lookup@example.com' },
+        ]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockMsgopsService.findContactByEmail).toHaveBeenCalled();
+        expect(mockMsgopsService.findContactByUuid).not.toHaveBeenCalled();
+      });
+
+      it('should not perform lookup when contactId is already present', async () => {
+        const request = createRequest([{ ...baseEvent, contactId: 12345, uuid: 'uuid-value' }]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockMsgopsService.findContactByEmail).not.toHaveBeenCalled();
+        expect(mockMsgopsService.findContactByUuid).not.toHaveBeenCalled();
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ contact_id: 12345 }),
+          undefined,
+        );
+      });
+
+      it('should keep event with contactId null when uuid lookup returns no contact', async () => {
+        mockMsgopsService.findContactByUuid.mockResolvedValue(null);
+        const request = createRequest([{ ...baseEvent, contactId: undefined, email: undefined, uuid: 'unknown-uuid' }]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockMsgopsService.findContactByUuid).toHaveBeenCalledWith(1, 'unknown-uuid');
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ contactId: null, uuid: 'unknown-uuid' }),
+          undefined,
+        );
+      });
+
+      it('should fall back to uuid lookup when email lookup returns no contact', async () => {
+        mockMsgopsService.findContactByEmail.mockResolvedValue(null);
+        mockMsgopsService.findContactByUuid.mockResolvedValue({ id: 77 });
+        const request = createRequest([
+          { ...baseEvent, contactId: undefined, uuid: 'uuid-value', email: 'missing@example.com' },
+        ]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockMsgopsService.findContactByEmail).toHaveBeenCalledWith(1, 'missing@example.com');
+        expect(mockMsgopsService.findContactByUuid).toHaveBeenCalledWith(1, 'uuid-value');
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ contact_id: 77 }),
+          undefined,
+        );
       });
     });
 

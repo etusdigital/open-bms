@@ -83,6 +83,20 @@ export class InternalEventsService extends EventsService {
         geoData = await this.getGeoIpInfo(event.ip);
       }
 
+      if (!event.contactId && event.email && event.email !== '') {
+        const contact = await this.msgOpsService.findContactByEmail(accountId, event.email);
+        if (contact) {
+          event.contactId = contact.id;
+        }
+      }
+
+      if (!event.contactId && event.uuid && event.uuid !== '') {
+        const contact = await this.msgOpsService.findContactByUuid(accountId, event.uuid);
+        if (contact) {
+          event.contactId = contact.id;
+        }
+      }
+
       eventsProcess.push({
         accountId,
         time: timestamp,
