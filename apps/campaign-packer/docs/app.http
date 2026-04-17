@@ -1,0 +1,87 @@
+# How to get campaign data?
+# msgops-campaign-trigger
+# {DEBUG} TRIGGER CAMPAIGN
+POST http://localhost:3005/trigger/shun-teste-balestrin?debug=true
+content-type: application/json
+
+###
+
+POST http://localhost:3001?debug=true
+content-type: application/json
+
+{
+    "contentType": "automation-messages",
+    "id": "shun-teste-balestrin",
+    "status": 1,
+    "createdAt": "2022-01-31T13:28:47.679Z",
+    "scheduleTo": "2022-01-31T14:00:00.000Z",
+    "tags": [
+      "dev"
+    ],
+    "deleted": false,
+    "emailTemplates": [
+      {
+        "createdAt": "2021-10-19T23:21:56.000Z",
+        "ippool": "dev_test_mail_only",
+        "automationMessageAccount": [
+          {
+            "createdAt": "2021-10-19T23:22:01.000Z",
+            "testId": "2021-10-19-20:22:03:132t",
+            "providerAccountId": "plusdin",
+            "id": 14,
+            "updatedAt": "2022-01-25T22:51:37.000Z",
+            "deletedAt": null
+          },
+          {
+            "deletedAt": null,
+            "id": 15,
+            "updatedAt": "2022-01-25T22:51:37.000Z",
+            "providerAccountId": "plusdin",
+            "createdAt": "2021-10-19T23:22:01.000Z",
+            "testId": "2021-10-19-20:22:03:132t"
+          }
+        ],
+        "content": "Saved to bucket only: msgops-assets-stg.etus.digital templates/campaign_messages/shun-teste-balestrin/template.txt",
+        "templateUrl": "https://storage.cloud.google.com/msgops-assets-stg.etus.digital/templates/campaign_messages/shun-teste-balestrin/template.txt",
+        "title": "shun-teste-email-batch",
+        "account": {
+          "sendgridKey": "SG.asdf324123asdf",
+          "description": "Plusdin é a nossa conta principal",
+          "defaultSenderName": "Equipe Plusdin",
+          "name": "Plusdin Test",
+          "defaultSenderEmail": "contato@plusdin.com.br",
+          "defaultDomain": "plusdin.com.br",
+          "defaultAddress": null,
+          "domains": [
+            "plusdin.com",
+            "rlcard.com"
+          ],
+          "deletedAt": null,
+          "updatedAt": "2022-01-18T01:34:31.000Z",
+          "id": 1,
+          "createdAt": "2022-01-18T01:13:41.000Z",
+          "settings": []
+        },
+        "replyTo": null,
+        "messageId": null,
+        "priority": "normal",
+        "id": "shun-teste-email-batch",
+        "previewText": null,
+        "fileName": "templates/campaign_messages/shun-teste-balestrin/template.txt",
+        "subject": "Olá %FIRSTNAME%! 🥶",
+        "bucketName": "msgops-assets-stg.etus.digital",
+        "isTested": true,
+        "text": "",
+        "version": null,
+        "content_json": null,
+        "fromMail": "contato@plusdinmail.com.br",
+        "updatedAt": "2022-01-25T22:51:21.000Z",
+        "fromName": "Plusdin Teste",
+        "deletedAt": null
+      }
+    ],
+    "audiences": [],
+    "scheduleToCloudTaskId": "projects/etus-media-development-staging/locations/us-east1/queues/message-trigger-timer-teste/tasks/09335258826448268601",
+    "title": "shun-teste-balestrin",
+    "publisher": "plusdin"
+  }

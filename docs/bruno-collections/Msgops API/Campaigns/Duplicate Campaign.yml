@@ -1,0 +1,15 @@
+info:
+  name: Duplicate Campaign
+  type: http
+  seq: 7
+
+http:
+  method: POST
+  url: "{{msgops-api-url}}/campaigns/duplicate/1"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

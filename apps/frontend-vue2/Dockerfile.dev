@@ -1,0 +1,17 @@
+FROM node:16.20.2-alpine
+
+WORKDIR /app
+
+RUN apk add --no-cache python3 make g++ git
+
+COPY package.json yarn.lock ./
+
+RUN yarn install --frozen-lockfile
+
+COPY . .
+
+EXPOSE 44357
+
+ENV NODE_OPTIONS=--max-old-space-size=4096
+
+CMD ["yarn", "serve"]

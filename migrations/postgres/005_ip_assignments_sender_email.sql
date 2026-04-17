@@ -1,0 +1,1 @@
+ALTER TABLE ip_assignments ADD COLUMN IF NOT EXISTS sender_email VARCHAR(255) NULL;

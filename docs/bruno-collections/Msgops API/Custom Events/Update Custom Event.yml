@@ -1,0 +1,21 @@
+info:
+  name: Update Custom Event
+  type: http
+  seq: 5
+
+http:
+  method: PUT
+  url: "{{msgops-api-url}}/custom-events/1"
+  body:
+    type: json
+    json: |
+      {
+        "name": "updated-event"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

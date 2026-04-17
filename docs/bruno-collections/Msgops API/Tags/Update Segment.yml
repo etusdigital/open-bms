@@ -1,0 +1,21 @@
+info:
+  name: Update Segment
+  type: http
+  seq: 9
+
+http:
+  method: PUT
+  url: "{{msgops-api-url}}/tags/segment/1"
+  body:
+    type: json
+    json: |
+      {
+        "name": "Updated Segment"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,23 @@
+info:
+  name: Process Page
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{campaign-packer-url}}/process-page"
+  body:
+    type: json
+    json: |
+      {
+        "campaignId": 1,
+        "batchId": 1,
+        "page": 1
+      }
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

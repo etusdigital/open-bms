@@ -1,0 +1,7 @@
+info:
+  name: Monitor Targets
+  type: folder
+  seq: 8
+
+request:
+  auth: inherit

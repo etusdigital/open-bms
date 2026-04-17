@@ -1,0 +1,24 @@
+info:
+  name: List Automations
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{msgops-api-url}}/automations"
+  params:
+    - name: page
+      value: "1"
+    - name: itemsPerPage
+      value: "20"
+    - name: sortBy
+      value: "createdAt"
+    - name: order
+      value: "DESC"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

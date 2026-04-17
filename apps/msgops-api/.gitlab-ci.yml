@@ -1,0 +1,108 @@
+stages:
+  - test
+  # - code_quality_check
+  - build
+  - deploy
+
+test_code:
+  stage: test
+  image: node:24-slim
+  before_script:
+    - corepack enable && corepack prepare pnpm@10.22.0 --activate
+    - pnpm install --frozen-lockfile
+  script:
+    - pnpm test:cov
+  artifacts:
+    name: "%CI_JOB_STAGE%-%CI_COMMIT_REF_NAME%"
+    untracked: true
+    paths:
+      - coverage/
+    expire_in: 7 days
+  only:
+    - merge_requests
+    - master
+    - staging
+
+# code_quality_check_staging:
+#   stage: code_quality_check
+#   environment:
+#     name: staging
+#   image:
+#     name: sonarsource/sonar-scanner-cli:latest
+#     entrypoint: [""]
+#   cache:
+#     key: "${CI_JOB_NAME}"
+#     paths:
+#       - .sonar/cache
+#   variables:
+#     GIT_DEPTH: 0
+#     SONAR_USER_HOME:  "${CI_PROJECT_DIR}/.sonar"
+#   script:
+#     - sonar-scanner -Dsonar.qualitygate.wait=true  -Dproject.settings=.sonarcloud.properties
+#   allow_failure: true
+#   only:
+#     - merge_requests
+#     - master
+#     - staging
+
+build_staging:
+  stage: build
+  environment:
+    name: staging
+  image: google/cloud-sdk:slim
+  before_script:
+    - gcloud auth activate-service-account --key-file $GCP_SERVICE_KEY
+    - gcloud config set project $GCP_PROJECT_REPOSITORY
+  script:
+    - gcloud config set gcloudignore/enabled false
+    - gcloud builds submit . --timeout 1h --tag $GCP_IMAGE-$CI_COMMIT_REF_SLUG:$VERSION
+  only:
+    - staging
+
+deploy_staging:
+  stage: deploy
+  environment:
+    name: staging
+  image: google/cloud-sdk:slim
+  before_script:
+    - gcloud auth activate-service-account --key-file $GCP_SERVICE_KEY
+    - gcloud config set project $GCP_PROJECT
+    - gcloud config set run/region $GCP_REGION
+    - gcloud config set run/platform $GCP_RUN_PLATFORM
+    - export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+  script:
+    - gcloud alpha run deploy $GCP_RUN_SERVICE_NAME --image $GCP_IMAGE-$CI_COMMIT_REF_SLUG:$VERSION --allow-unauthenticated --port=5000
+  only:
+    - staging
+
+build_production:
+  stage: build
+  environment:
+    name: production
+  image: google/cloud-sdk:slim
+  before_script:
+    - gcloud auth activate-service-account --key-file $GCP_SERVICE_KEY
+    - gcloud config set project $GCP_PROJECT_REPOSITORY
+  script:
+    - gcloud config set gcloudignore/enabled false
+    - gcloud builds submit . --timeout 1h --tag $GCP_IMAGE-$CI_COMMIT_REF_SLUG:$VERSION
+  only:
+    - master
+  when: manual
+
+deploy_production:
+  stage: deploy
+  environment:
+    name: production
+  image: google/cloud-sdk:slim
+  before_script:
+    - gcloud auth activate-service-account --key-file $GCP_SERVICE_KEY
+    - gcloud config set project $GCP_PROJECT
+    - gcloud config set run/region $GCP_REGION
+    - gcloud config set run/platform $GCP_RUN_PLATFORM
+    - export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+  script:
+    - gcloud alpha run deploy $GCP_RUN_SERVICE_NAME --image $GCP_IMAGE-$CI_COMMIT_REF_SLUG:$VERSION --port=5000
+  only:
+    - master
+  needs: ["build_production"]

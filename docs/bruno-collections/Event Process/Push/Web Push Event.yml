@@ -1,0 +1,28 @@
+info:
+  name: Web Push Event
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{event-process-url}}/push"
+  headers:
+    - name: platform
+      value: "web-push"
+    - name: x-goog-pubsub-message-id
+      value: "test-webpush-event-001"
+  body:
+    type: json
+    json: |
+      {
+        "event": "delivered",
+        "contactId": 1,
+        "messageId": 1
+      }
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

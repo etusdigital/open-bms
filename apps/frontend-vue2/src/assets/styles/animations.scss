@@ -1,0 +1,84 @@
+@import '@/assets/styles/variables.scss';
+
+@keyframes dotFlashing {
+	0% {
+		background-color: $neutral-gray-800;
+	}
+	50%, 100% {
+		background-color: $neutral-gray-400;
+	}
+}
+
+@keyframes fadeout {
+  to {
+    opacity: 0.1;
+    visibility: hidden;
+  }
+}
+
+.loading-dot-flashing {
+	position: relative;
+  display: inline-flex;
+	width: 10px;
+	height: 10px;
+  margin: 0 20px;
+	border-radius: 5px;
+	background-color: $neutral-gray-800;
+	color: $neutral-gray-800;
+	animation: dotFlashing 1s infinite linear alternate;
+	animation-delay: .5s;
+	&::before {
+		content: '';
+		display: inline-block;
+		position: absolute;
+		top: 0;
+		left: -15px;
+		width: 10px;
+		height: 10px;
+		border-radius: 5px;
+		background-color: $neutral-gray-800;
+		color: $neutral-gray-800;
+		animation: dotFlashing 1s infinite alternate;
+		animation-delay: 0s;
+	}
+	&::after {
+		content: '';
+		display: inline-block;
+		position: absolute;
+		top: 0;
+		left: 15px;
+		width: 10px;
+		height: 10px;
+		border-radius: 5px;
+		background-color: $neutral-gray-800;
+		color: $neutral-gray-800;
+		animation: dotFlashing 1s infinite alternate;
+		animation-delay: 1s;
+	}
+}
+
+@keyframes flashUpdate {
+  0%, 100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(217, 217, 217, 0.3);
+  }
+}
+
+@keyframes flashUpdateAction {
+  0%, 100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(217, 217, 217, 0.1);
+  }
+}
+
+.row-updated {
+  animation: flashUpdate 1s ease-in-out 1;
+	
+	& > .action-cell > .action-row {
+		animation: flashUpdateAction 1s ease-in-out 1;		
+	}
+}

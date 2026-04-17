@@ -1,0 +1,62 @@
+name: Deploy message-trigger
+
+on:
+  push:
+    branches: [master, staging]
+    paths: ['apps/message-trigger/**']
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Force deploy (skip change detection)
+        type: boolean
+        default: false
+
+jobs:
+  changes:
+    name: Detect changes
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/_detect-changes.yml
+    with:
+      package-name: msgops-message-trigger
+    secrets: inherit
+
+  deploy-staging:
+    needs: changes
+    if: |
+      always() &&
+      github.ref_name == 'staging' &&
+      (needs.changes.outputs.affected == 'true' || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/_deploy-cloudrun.yml
+    with:
+      app-name: message-trigger
+      image-name: message-trigger
+      docker-context: '.'
+      dockerfile: apps/message-trigger/Dockerfile
+      cloud-run-services: '[{"service": "msgops-message-trigger", "port": 8080}]'
+      environment: staging
+      registry: us-east1-docker.pkg.dev/etus-media-development-staging/msgops
+    secrets:
+      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY_STAGING }}
+
+  deploy-production:
+    needs: changes
+    if: |
+      always() &&
+      github.ref_name != 'staging' &&
+      (needs.changes.outputs.affected == 'true' || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/_deploy-cloudrun.yml
+    with:
+      app-name: message-trigger
+      image-name: message-trigger
+      docker-context: '.'
+      dockerfile: apps/message-trigger/Dockerfile
+      cloud-run-services: |
+        [
+          {"service": "msgops-message-trigger", "port": 8080},
+          {"service": "msgops-message-trigger-low", "port": 8080},
+          {"service": "msgops-message-trigger-high", "port": 8080},
+          {"service": "msgops-message-trigger-transactional", "port": 8080},
+          {"service": "msgops-message-trigger-campaign", "port": 8080}
+        ]
+    secrets:
+      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}

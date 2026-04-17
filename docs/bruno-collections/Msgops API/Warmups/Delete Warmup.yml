@@ -1,0 +1,15 @@
+info:
+  name: Delete Warmup
+  type: http
+  seq: 5
+
+http:
+  method: DELETE
+  url: "{{msgops-api-url}}/warmups/1"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

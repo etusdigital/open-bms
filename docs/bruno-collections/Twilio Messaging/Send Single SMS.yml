@@ -1,0 +1,24 @@
+info:
+  name: Send Single SMS
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{twilio-messaging-url}}/single"
+  body:
+    type: json
+    json: |
+      {
+        "contactId": 1,
+        "messageId": 1,
+        "automationId": 1,
+        "accountId": 1
+      }
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

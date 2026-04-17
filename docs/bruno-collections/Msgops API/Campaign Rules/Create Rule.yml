@@ -1,0 +1,22 @@
+info:
+  name: Create Rule
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{msgops-api-url}}/campaigns-rules/rules"
+  body:
+    type: json
+    json: |
+      {
+        "name": "Test Rule",
+        "description": "Test rule description"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

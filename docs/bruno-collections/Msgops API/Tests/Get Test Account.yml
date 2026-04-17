@@ -1,0 +1,15 @@
+info:
+  name: Get Test Account
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{msgops-api-url}}/tests/account"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

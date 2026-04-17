@@ -1,0 +1,23 @@
+info:
+  name: Update Permissions
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{msgops-api-url}}/users/permissions"
+  body:
+    type: json
+    json: |
+      {
+        "userId": 1,
+        "accountId": 1,
+        "permissions": []
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

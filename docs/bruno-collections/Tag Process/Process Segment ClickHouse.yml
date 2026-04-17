@@ -1,0 +1,22 @@
+info:
+  name: Process Segment ClickHouse
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{tag-process-url}}/process-segment-clickhouse"
+  body:
+    type: json
+    json: |
+      {
+        "segmentId": 1,
+        "accountId": 1
+      }
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

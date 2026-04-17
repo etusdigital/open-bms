@@ -1,0 +1,15 @@
+info:
+  name: Refresh Session
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{backoffice-url}}/api/auth/refresh"
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

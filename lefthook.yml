@@ -1,0 +1,17 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: eslint
+      glob: '*.{js,jsx,ts,tsx,mjs,cjs,vue}'
+      run: tools/lint-staged-eslint.sh {staged_files}
+      stage_fixed: true
+
+    - name: prettier
+      glob: '*.{json,yml,yaml,md,css,scss,html}'
+      run: pnpm exec prettier --write --ignore-unknown {staged_files}
+      stage_fixed: true
+
+pre-push:
+  commands:
+    turbo-validate:
+      run: pnpm exec turbo run lint type-check --filter='[HEAD^1]'

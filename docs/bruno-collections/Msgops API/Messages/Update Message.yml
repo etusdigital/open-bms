@@ -1,0 +1,22 @@
+info:
+  name: Update Message
+  type: http
+  seq: 5
+
+http:
+  method: PUT
+  url: "{{msgops-api-url}}/messages/1"
+  body:
+    type: json
+    json: |
+      {
+        "title": "Updated Message",
+        "subject": "Updated Subject"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,23 @@
+info:
+  name: Events Trigger
+  type: http
+  seq: 9
+
+http:
+  method: POST
+  url: "{{tag-process-url}}/events-trigger"
+  body:
+    type: json
+    json: |
+      {
+        "eventName": "test-event",
+        "contactId": 1,
+        "accountId": 1
+      }
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

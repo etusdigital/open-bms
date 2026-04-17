@@ -1,0 +1,7 @@
+info:
+  name: Campaign Packer
+  type: folder
+  seq: 4
+
+request:
+  auth: none

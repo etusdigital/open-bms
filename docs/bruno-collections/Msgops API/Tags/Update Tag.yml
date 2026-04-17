@@ -1,0 +1,21 @@
+info:
+  name: Update Tag
+  type: http
+  seq: 5
+
+http:
+  method: PUT
+  url: "{{msgops-api-url}}/tags/1"
+  body:
+    type: json
+    json: |
+      {
+        "name": "updated-tag"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

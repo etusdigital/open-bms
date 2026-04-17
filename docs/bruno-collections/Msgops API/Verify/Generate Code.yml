@@ -1,0 +1,23 @@
+info:
+  name: Generate Code
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{msgops-api-url}}/verify/generate"
+  body:
+    type: json
+    json: |
+      {
+        "to": "+5511999999999",
+        "method": "SMS",
+        "expiration": 300
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

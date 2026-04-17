@@ -1,0 +1,59 @@
+# Git
+.git
+.gitignore
+
+# Node modules (reinstalled in Docker)
+**/node_modules
+
+# Build artifacts (rebuilt in Docker)
+**/dist
+**/.next
+**/out
+
+# Turbo cache
+**/.turbo
+
+# Environment files
+**/.env
+**/.env.*
+
+# Logs
+**/*.log
+
+# Test files
+**/test/
+**/e2e/
+**/coverage/
+**/playwright-report/
+**/test-results/
+**/*.spec.ts
+**/*.test.ts
+**/vitest.config.ts
+**/playwright.config.ts
+
+# Editor / OS
+.idea
+.vscode
+**/.DS_Store
+*.sw?
+
+# Docker files (avoid recursive builds)
+**/Dockerfile
+**/.dockerignore
+**/cloudbuild.yaml
+
+# Documentation & scripts (not needed at runtime)
+docs/
+scripts/
+migrations/
+**/*.md
+
+# Claude config
+.claude/
+
+# Misc
+.prettierrc
+**/*.sqlite
+**/*.db
+**/storybook-static/
+**/.storybook/

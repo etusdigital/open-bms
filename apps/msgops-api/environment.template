@@ -1,0 +1,35 @@
+# auth
+IDP_ISSUER
+IDP_AUDIENCE
+JWKS_PATH
+IDP_SCOPE
+
+# cors
+ALLOWED_ORIGIN
+
+# server
+PORT
+API_DOCS
+API_PREFIX
+
+# database
+DB_HOST_1
+DB_PORT
+DB_USER
+DB_PASSWORD
+
+# glock
+GLOCK_API_KEY
+
+# bucket
+BUCKET_NAME
+SERVICE_ACCOUNT
+
+OBS: (isso dá-se pela forma como cada identity provider decide devolver o uri issuer em seu jwt)
+-   Usando o identityServer4, o issuer precisa termina sem '/' e o jwks começar com '/'.
+-   Usando auth0, o issuer tem que terminar com '/' e o jwks começar sem '/'.
+
+# ongage
+ONGAGE_USERNAME
+ONGAGE_PASSWORD
+ONGAGE_ACCOUNT_CODE

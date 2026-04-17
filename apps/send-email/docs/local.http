@@ -1,0 +1,10 @@
+#Get Hello World
+#Model: /
+###Endpoint Rules:
+#1 - Returns 
+GET http://localhost:3000/
+
+###
+
+#Post Batch Emails
+POST http://localhost:3000/batch

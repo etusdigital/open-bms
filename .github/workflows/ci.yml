@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master, staging]
+
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: team_retention
+  TURBO_API: ${{ secrets.TURBO_API_URL }}
+
+jobs:
+  quality:
+    name: Lint, Type-check & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm turbo lint --filter='...[origin/master]'
+
+      - name: Type-check
+        run: pnpm turbo type-check --filter='...[origin/master]'
+
+      - name: Test
+        run: pnpm turbo test --filter='...[origin/master]'

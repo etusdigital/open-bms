@@ -1,0 +1,106 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    container_name: clickhouse
+    ports:
+      - '8123:8123'
+      - '9000:9000'
+    environment:
+      CLICKHOUSE_DB: BMS
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ''
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: '1'
+      CLICKHOUSE_SKIP_USER_SETUP: '1'
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./infra/clickhouse-init:/docker-entrypoint-initdb.d
+
+  msgops-api:
+    build:
+      context: .
+      dockerfile: apps/msgops-api/Dockerfile
+    container_name: msgops-api
+    ports:
+      - '5001:5001'
+    env_file:
+      - apps/msgops-api/.env
+    environment:
+      NODE_ENV: development
+      TYPEORM_HOST: host.docker.internal
+      REDIS_HOST: host.docker.internal
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
+  frontend-vue2:
+    build:
+      context: apps/frontend-vue2
+      dockerfile: Dockerfile.dev
+    container_name: frontend-vue2
+    ports:
+      - '44357:44357'
+    env_file:
+      - apps/frontend-vue2/.env
+    volumes:
+      - ./apps/frontend-vue2/src:/app/src
+      - ./apps/frontend-vue2/public:/app/public
+      - ./apps/frontend-vue2/babel.config.js:/app/babel.config.js
+      - ./apps/frontend-vue2/tsconfig.json:/app/tsconfig.json
+      - ./apps/frontend-vue2/postcss.config.js:/app/postcss.config.js
+      - ./apps/frontend-vue2/vue.config.js:/app/vue.config.js
+      - /app/node_modules
+    stdin_open: true
+    tty: true
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
+  backoffice-api:
+    build:
+      context: .
+      dockerfile: apps/backoffice-api/Dockerfile
+    container_name: backoffice-api
+    ports:
+      - '3001:3001'
+    env_file:
+      - apps/backoffice-api/.env
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      TYPEORM_HOST: host.docker.internal
+      TYPEORM_PORT: '5432'
+      TYPEORM_DATABASE: msgops_prd
+      CLICKHOUSE_HOST: http://clickhouse:8123
+      CLICKHOUSE_DATABASE: BMS
+      CLICKHOUSE_USERNAME: default
+      CLICKHOUSE_PASSWORD: ''
+      REDIS_URL: redis://host.docker.internal:6379
+      CORS_ORIGIN: http://localhost:3000
+    depends_on:
+      - clickhouse
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
+  backoffice-frontend:
+    build:
+      context: .
+      dockerfile: apps/backoffice-frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_BACKEND_URL: http://localhost:3001
+    container_name: backoffice-frontend
+    ports:
+      - '3000:3000'
+    env_file:
+      - apps/backoffice-frontend/.env
+    environment:
+      PORT: '3000'
+      HOSTNAME: '0.0.0.0'
+      APP_BASE_URL: http://localhost:3000
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:3001
+    depends_on:
+      - backoffice-api
+
+volumes:
+  clickhouse-data:

@@ -1,0 +1,65 @@
+stages:
+  - build
+  - deploy
+
+build_staging:
+  stage: build
+  environment:
+    name: staging
+  image: google/cloud-sdk:slim
+  before_script:
+    - gcloud auth activate-service-account --key-file $GCP_SERVICE_KEY
+    - gcloud config set project $GCP_PROJECT_REPOSITORY
+  script:
+    - gcloud config set gcloudignore/enabled false
+    - gcloud builds submit . --tag $GCP_IMAGE-$CI_COMMIT_REF_SLUG:$VERSION
+  only:
+    - staging
+
+deploy_staging:
+  stage: deploy
+  environment:
+    name: staging
+  image: google/cloud-sdk:slim
+  before_script:
+    - gcloud auth activate-service-account --key-file $GCP_SERVICE_KEY
+    - gcloud config set project $GCP_PROJECT
+    - gcloud config set run/region $GCP_REGION
+    - gcloud config set run/platform $GCP_RUN_PLATFORM
+    - export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+  script:
+    - gcloud alpha run deploy $GCP_RUN_SERVICE_NAME --image $GCP_IMAGE-$CI_COMMIT_REF_SLUG:$VERSION  --allow-unauthenticated --port=3000
+  only:
+    - staging
+
+build_production:
+  stage: build
+  environment:
+    name: production
+  image: google/cloud-sdk:slim
+  before_script:
+    - gcloud auth activate-service-account --key-file $GCP_SERVICE_KEY
+    - gcloud config set project $GCP_PROJECT_REPOSITORY
+  script:
+    - gcloud config set gcloudignore/enabled false
+    - gcloud builds submit . --tag $GCP_IMAGE-$CI_COMMIT_REF_SLUG:$VERSION
+  only:
+    - master
+  when: manual
+
+deploy_production:
+  stage: deploy
+  environment:
+    name: production
+  image: google/cloud-sdk:slim
+  before_script:
+    - gcloud auth activate-service-account --key-file $GCP_SERVICE_KEY
+    - gcloud config set project $GCP_PROJECT
+    - gcloud config set run/region $GCP_REGION
+    - gcloud config set run/platform $GCP_RUN_PLATFORM
+    - export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+  script:
+    - gcloud alpha run deploy $GCP_RUN_SERVICE_NAME --image $GCP_IMAGE-$CI_COMMIT_REF_SLUG:$VERSION --port=3000
+  only:
+    - master
+  needs: ["build_production"]

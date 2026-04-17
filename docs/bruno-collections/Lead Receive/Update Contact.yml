@@ -1,0 +1,23 @@
+info:
+  name: Update Contact
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{lead-receive-url}}/contacts"
+  body:
+    type: json
+    json: |
+      {
+        "email": "user@example.com",
+        "firstName": "Updated",
+        "accountId": 1
+      }
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

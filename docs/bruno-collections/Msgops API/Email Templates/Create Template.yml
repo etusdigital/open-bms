@@ -1,0 +1,23 @@
+info:
+  name: Create Template
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{msgops-api-url}}/email-template"
+  body:
+    type: json
+    json: |
+      {
+        "name": "Test Template",
+        "subject": "Test Subject",
+        "content": "<html><body>Hello</body></html>"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

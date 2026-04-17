@@ -1,0 +1,7 @@
+info:
+  name: Message Trigger
+  type: folder
+  seq: 8
+
+request:
+  auth: none

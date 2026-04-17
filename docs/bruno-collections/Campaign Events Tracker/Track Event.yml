@@ -1,0 +1,23 @@
+info:
+  name: Track Event
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{campaign-events-tracker-url}}/"
+  body:
+    type: json
+    json: |
+      {
+        "campaignId": 1,
+        "event": "sent",
+        "count": 100
+      }
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

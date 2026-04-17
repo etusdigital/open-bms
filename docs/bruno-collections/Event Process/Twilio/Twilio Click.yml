@@ -1,0 +1,28 @@
+info:
+  name: Twilio Click
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{event-process-url}}/twilio"
+  headers:
+    - name: platform
+      value: "twilio"
+    - name: x-goog-pubsub-message-id
+      value: "test-twilio-click-001"
+  body:
+    type: json
+    json: |
+      {
+        "SmsSid": "SM00000000000000000000000000000000",
+        "SmsStatus": "clicked",
+        "To": "+5511999999999"
+      }
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

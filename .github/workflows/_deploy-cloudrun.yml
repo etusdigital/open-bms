@@ -1,0 +1,136 @@
+# Reusable workflow: Build Docker image + Deploy to Cloud Run
+#
+# Called by per-service deploy-*.yml workflows.
+# Supports single-service and multi-service (matrix) deploys from one image.
+
+name: _deploy-cloudrun
+
+on:
+  workflow_call:
+    inputs:
+      app-name:
+        description: Directory name under apps/
+        required: true
+        type: string
+      image-name:
+        description: Image name in the Artifact Registry
+        required: true
+        type: string
+      cloud-run-services:
+        description: 'JSON array of deploys, e.g. [{"service":"msgops-foo","port":3000}]'
+        required: true
+        type: string
+      docker-context:
+        description: Docker build context path (default = apps/<app-name>)
+        required: false
+        type: string
+        default: ''
+      dockerfile:
+        description: Path to Dockerfile (default = apps/<app-name>/Dockerfile)
+        required: false
+        type: string
+        default: ''
+      docker-build-args:
+        description: Newline-separated build args for docker build
+        required: false
+        type: string
+        default: ''
+      environment:
+        description: 'Deploy environment: staging or production'
+        required: false
+        type: string
+        default: 'production'
+      gcp-project:
+        description: GCP project for Cloud Run deploy
+        required: false
+        type: string
+        default: etus-media-prod
+      gcp-region:
+        description: GCP region
+        required: false
+        type: string
+        default: us-east1
+      registry:
+        description: Artifact Registry path
+        required: false
+        type: string
+        default: us-east1-docker.pkg.dev/etus-media-mgmt/msgops
+    secrets:
+      GCP_SA_KEY:
+        required: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build: Docker image → Artifact Registry
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build image
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.image-tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure Docker for Artifact Registry
+        uses: google-github-actions/setup-gcloud@v2
+
+      - run: gcloud auth configure-docker ${{ inputs.gcp-region }}-docker.pkg.dev --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute image metadata
+        id: meta
+        env:
+          SUFFIX: ${{ inputs.environment == 'staging' && '-staging' || '' }}
+        run: |
+          echo "image-tag=${{ inputs.registry }}/${{ inputs.image-name }}${SUFFIX}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "cache-tag=${{ inputs.registry }}/${{ inputs.image-name }}${SUFFIX}:buildcache" >> "$GITHUB_OUTPUT"
+          echo "latest-tag=${{ inputs.registry }}/${{ inputs.image-name }}${SUFFIX}:latest" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.docker-context != '' && inputs.docker-context || format('apps/{0}', inputs.app-name) }}
+          file: ${{ inputs.dockerfile != '' && inputs.dockerfile || format('apps/{0}/Dockerfile', inputs.app-name) }}
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image-tag }}
+            ${{ steps.meta.outputs.latest-tag }}
+          build-args: ${{ inputs.docker-build-args }}
+          cache-from: type=registry,ref=${{ steps.meta.outputs.cache-tag }}
+          cache-to: type=registry,ref=${{ steps.meta.outputs.cache-tag }},mode=max
+
+  # ---------------------------------------------------------------------------
+  # Deploy: fan-out to N Cloud Run services via matrix
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy ${{ matrix.target.service }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: ${{ fromJSON(inputs.cloud-run-services) }}
+    steps:
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ matrix.target.service }}
+          region: ${{ inputs.gcp-region }}
+          project_id: ${{ inputs.gcp-project != 'etus-media-prod' && inputs.gcp-project || (inputs.environment == 'staging' && 'etus-media-development-staging' || 'etus-media-prod') }}
+          image: ${{ needs.build.outputs.image-tag }}
+          flags: >-
+            --execution-environment=gen2
+            --cpu-boost
+            --port=${{ matrix.target.port }}
+            ${{ inputs.environment == 'staging' && '--allow-unauthenticated' || '' }}

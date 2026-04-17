@@ -1,0 +1,59 @@
+name: Deploy backoffice backend
+
+on:
+  push:
+    branches: [master, staging]
+    paths:
+      - 'apps/backoffice-api/**'
+      - 'packages/database/**'
+      - 'packages/shared/**'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Force deploy (skip change detection)
+        type: boolean
+        default: false
+
+jobs:
+  changes:
+    name: Detect changes
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/_detect-changes.yml
+    with:
+      package-name: '@backoffice/api'
+    secrets: inherit
+
+  deploy-staging:
+    needs: changes
+    if: |
+      always() &&
+      github.ref_name == 'staging' &&
+      (needs.changes.outputs.affected == 'true' || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/_deploy-cloudrun.yml
+    with:
+      app-name: backoffice-api
+      image-name: backoffice-backend
+      cloud-run-services: '[{"service": "msgops-backoffice-api", "port": 8080}]'
+      docker-context: '.'
+      dockerfile: apps/backoffice-api/Dockerfile
+      environment: staging
+      registry: us-east1-docker.pkg.dev/etus-media-development-staging/msgops
+    secrets:
+      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY_STAGING }}
+
+  deploy-production:
+    needs: changes
+    if: |
+      always() &&
+      github.ref_name != 'staging' &&
+      (needs.changes.outputs.affected == 'true' || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/_deploy-cloudrun.yml
+    with:
+      app-name: backoffice-api
+      image-name: backoffice-backend
+      cloud-run-services: '[{"service": "msgops-backoffice-api", "port": 8080}]'
+      docker-context: '.'
+      dockerfile: apps/backoffice-api/Dockerfile
+      environment: production
+    secrets:
+      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}

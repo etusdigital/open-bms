@@ -1,0 +1,46 @@
+// distances
+$spacing-zero: 0px;
+$spacing-xxs: 4px;
+$spacing-xs: 8px;
+$spacing-sm: 16px;
+$spacing-md: 24px;
+$spacing-lg: 32px;
+$spacing-xl: 64px;
+
+//colors
+$neutral-basic-white: #ffffff;
+$neutral-basic-Black: #000;
+
+$neutral-gray-100: #fcfbfa;
+$neutral-gray-200: #f7f6f5;
+$neutral-gray-300: #ebe9e8;
+$neutral-gray-400: #cacacc;
+$neutral-gray-500: #a6a6ab;
+$neutral-gray-600: #7f7f85;
+$neutral-gray-700: #54545c;
+$neutral-gray-800: #35353b;
+
+$neutral-error-red: #d21c1c;
+$neutral-warning-orange: #f9971e;
+
+$ds-blue: #0057f4;
+$ds-blue-dark: #00228D;
+$ds-green: #0FB75C;
+$ds-green-dark: #076e62;
+$ds-light-green: #F2FFF8;
+$ds-light-blue: #00CEFC;
+$ds-blue-100: #F4F8FF;
+$ds-purple: #7B61FF;
+$ds-light-purple: #F2EFFF;
+$ds-red: #F03232;
+$ds-orange: #FF9654;
+$ds-gray: #5C5C5C;
+$ds-gray-100: #F5F5F5;
+$ds-gray-200: #EAEAEA;
+$ds-gray-300: #D9D9D9;
+$ds-gray-400: #A6A6A6;
+
+
+$shadow-base: 0px 1px 3px 0px rgba(0, 0, 0, 0.10), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+
+$progress-circular-underlay-stroke: rgba($ds-red, 0.4) !default;

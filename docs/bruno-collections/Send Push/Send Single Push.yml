@@ -1,0 +1,24 @@
+info:
+  name: Send Single Push
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{send-push-url}}/single"
+  body:
+    type: json
+    json: |
+      {
+        "contactId": 1,
+        "messageId": 1,
+        "automationId": 1,
+        "accountId": 1
+      }
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

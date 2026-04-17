@@ -1,0 +1,15 @@
+info:
+  name: Get Sending Limits
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{msgops-api-url}}/pools/get_sending_limits"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

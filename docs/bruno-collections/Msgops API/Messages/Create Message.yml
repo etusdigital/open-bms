@@ -1,0 +1,27 @@
+info:
+  name: Create Message
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{msgops-api-url}}/messages"
+  body:
+    type: json
+    json: |
+      {
+        "title": "Test Email Message",
+        "type": "email",
+        "fromName": "Test Sender",
+        "fromMail": "sender@example.com",
+        "subject": "Test Subject",
+        "content": "<html><body>Hello</body></html>",
+        "text": "Hello"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

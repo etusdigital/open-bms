@@ -1,0 +1,15 @@
+info:
+  name: Get Audit Log
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{msgops-api-url}}/audits/1"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

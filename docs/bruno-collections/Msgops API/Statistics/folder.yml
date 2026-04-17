@@ -1,0 +1,7 @@
+info:
+  name: Statistics
+  type: folder
+  seq: 18
+
+request:
+  auth: inherit

@@ -1,0 +1,22 @@
+info:
+  name: Update Accounts
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{backoffice-url}}/api/auth/update-accounts"
+  body:
+    type: json
+    json: |
+      {
+        "accounts": [1, 2],
+        "selectedAccountId": 1
+      }
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

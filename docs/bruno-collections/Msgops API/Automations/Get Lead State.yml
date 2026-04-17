@@ -1,0 +1,22 @@
+info:
+  name: Get Lead State
+  type: http
+  seq: 13
+
+http:
+  method: GET
+  url: "{{msgops-api-url}}/automations/lead-state"
+  params:
+    - name: automationTitle
+      value: "test-automation"
+    - name: automationId
+      value: "1"
+    - name: stepId
+      value: "1"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

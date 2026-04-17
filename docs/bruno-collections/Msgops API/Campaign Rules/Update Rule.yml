@@ -1,0 +1,21 @@
+info:
+  name: Update Rule
+  type: http
+  seq: 5
+
+http:
+  method: PUT
+  url: "{{msgops-api-url}}/campaigns-rules/rules/1"
+  body:
+    type: json
+    json: |
+      {
+        "name": "Updated Rule"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

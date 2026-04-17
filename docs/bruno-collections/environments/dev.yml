@@ -1,0 +1,47 @@
+name: dev
+variables:
+  # Auth tokens (secrets - set at runtime)
+  - name: backoffice-token
+    secret: true
+  - name: cron-secret
+    secret: true
+  - name: msgops-api-token
+    secret: true
+  # Service URLs
+  # Ports match each service's .env PORT configuration
+  - name: backoffice-api-url
+    value: http://localhost:3001
+  - name: backoffice-url
+    value: http://localhost:3000
+  - name: msgops-api-url
+    value: http://localhost:5001
+  - name: campaign-packer-url
+    value: http://localhost:3003
+  - name: campaign-events-tracker-url
+    value: http://localhost:3004
+  - name: email-validation-url
+    value: http://localhost:3007
+  - name: event-process-url
+    value: http://localhost:3008
+  - name: event-receiver-url
+    value: http://localhost:3011
+  - name: lead-conception-url
+    value: http://localhost:3009
+  - name: lead-receive-url
+    value: http://localhost:8080
+  - name: message-trigger-url
+    value: http://localhost:3006
+  - name: send-email-url
+    value: http://localhost:3005
+  - name: send-push-url
+    value: http://localhost:3012
+  - name: send-whatsapp-url
+    value: http://localhost:3013
+  - name: tag-process-url
+    value: http://localhost:3014
+  - name: tracker-url
+    value: http://localhost:3015
+  - name: twilio-messaging-url
+    value: http://localhost:3016
+  - name: warmup-tracker-url
+    value: http://localhost:3010

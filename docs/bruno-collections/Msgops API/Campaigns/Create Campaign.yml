@@ -1,0 +1,27 @@
+info:
+  name: Create Campaign
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{msgops-api-url}}/campaigns"
+  body:
+    type: json
+    json: |
+      {
+        "title": "Test Campaign",
+        "name": "test-campaign",
+        "description": "Test description",
+        "type": "email",
+        "status": "draft",
+        "messageType": "email",
+        "sendToAll": false
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

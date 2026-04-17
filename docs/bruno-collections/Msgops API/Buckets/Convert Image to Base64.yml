@@ -1,0 +1,21 @@
+info:
+  name: Convert Image to Base64
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{msgops-api-url}}/buckets/base64"
+  body:
+    type: json
+    json: |
+      {
+        "url": "https://example.com/image.png"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

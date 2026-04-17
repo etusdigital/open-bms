@@ -1,0 +1,1066 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://bms.bri.us/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["trigger"]
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["tag", "web-push", "mobile-push", "events", "custom_events"]
+        },
+        "timePeriod": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "eventType": {
+          "type": "string",
+          "enum": ["open", "click", "first_open_30_days"]
+        },
+        "typeMultiply": {
+          "type": "string",
+          "enum": ["days", "hours", "minutes", ""]
+        },
+        "applyFrequency": {
+          "type": "string",
+          "enum": ["multiply-period", "multiply", "unique"]
+        },
+        "conditional": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/definitions/obj_conditional_interaction"
+              },
+              {
+                "$ref": "#/definitions/obj_conditional_custom_fields"
+              },
+              {
+                "$ref": "#/definitions/obj_conditional_tag"
+              },
+              {
+                "$ref": "#/definitions/obj_conditional_user_fields"
+              },
+              {
+                "$ref": "#/definitions/obj_conditional_lead_fields"
+              },
+              {
+                "$ref": "#/definitions/obj_conditional_automation_entry"
+              },
+              {
+                "$ref": "#/definitions/obj_conditional_custom_event"
+              }
+            ]
+          }
+        }
+      },
+      "required": ["id", "type", "timePeriod", "typeMultiply", "applyFrequency"],
+      "errorMessage": "error_trigger"
+    },
+    "child": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/obj_child"
+      }
+    }
+  },
+  "required": ["id", "type", "settings", "child"],
+  "definitions": {
+    "obj_remove_automation": {
+      "$id": "#obj_removeAutomation",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "name", "title"],
+      "additionalProperties": false,
+      "errorMessage": "error_remove_automation"
+    },
+    "obj_add_removeTag": {
+      "$id": "#obj_removeTag",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "name"],
+      "additionalProperties": false,
+      "errorMessage": "error_tag"
+    },
+    "obj_message": {
+      "$id": "#obj_message",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "subject": {
+          "type": ["string", "null"]
+        },
+        "fromMail": {
+          "type": ["string", "null"]
+        },
+        "links": {
+          "type": ["array", "null"]
+        }
+      },
+      "required": ["id", "name", "title", "subject"],
+      "additionalProperties": true,
+      "errorMessage": "error_message"
+    },
+    "obj_random_message": {
+      "$id": "#obj_random_message",
+      "type": "object",
+      "properties": {
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/obj_message"
+          },
+          "minItems": 1,
+          "additionalProperties": true
+        }
+      },
+      "required": ["messages"],
+      "additionalProperties": true,
+      "errorMessage": "error_random_message"
+    },
+    "obj_contactTransfer": {
+      "$id": "#obj_contactTransfer",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "integer"
+        },
+        "accountName": {
+          "type": "string"
+        },
+        "tagId": {
+          "type": "integer"
+        },
+        "tagName": {
+          "type": "string"
+        },
+        "apiKey": {
+          "type": "string"
+        }
+      },
+      "required": ["accountId", "accountName", "tagId", "tagName", "apiKey"],
+      "additionalProperties": false,
+      "errorMessage": "error_contact_transfer"
+    },
+    "obj_testab": {
+      "$id": "#obj_testab",
+      "type": "object",
+      "properties": {
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/obj_message"
+          },
+          "minItems": 2,
+          "additionalProperties": true
+        },
+        "winnerCriteria": {
+          "type": "string",
+          "enum": ["click", "open"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["notStarted", "running", "finished"]
+        },
+        "duration": {
+          "type": "integer"
+        },
+        "durationType": {
+          "type": "string",
+          "enum": ["day", "hour"]
+        },
+        "startDate": {
+          "type": ["string", "null"]
+        },
+        "endDate": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["messages", "winnerCriteria", "status", "duration", "durationType"],
+      "additionalProperties": true,
+      "errorMessage": "error_testab"
+    },
+    "obj_updateCustomField": {
+      "$id": "#obj_updateCustomField",
+      "type": "object",
+      "properties": {
+        "customFieldValue": {
+          "type": "string"
+        },
+        "customFieldSelected": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer"
+            },
+            "title": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "required": ["id", "title", "type"]
+        }
+      },
+      "required": ["customFieldValue", "customFieldSelected"],
+      "additionalProperties": false,
+      "errorMessage": "error_update_custom_fields"
+    },
+    "obj_wait": {
+      "$id": "#obj_wait",
+      "type": "object",
+      "properties": {
+        "timer": {
+          "type": ["string", "number"]
+        },
+        "timerType": {
+          "type": "string",
+          "enum": ["hours", "minutes"]
+        }
+      },
+      "required": ["timerType", "timer"],
+      "additionalProperties": false,
+      "errorMessage": "error_wait"
+    },
+    "obj_conditionalTime": {
+      "$id": "#obj_conditionalTime",
+      "type": "object",
+      "properties": {
+        "initialTime": {
+          "type": ["string", "number"],
+          "pattern": "^(0?[0-9]|1[0-9]|2[0-3])$"
+        },
+        "endTime": {
+          "type": ["string", "number"],
+          "pattern": "^(0?[0-9]|1[0-9]|2[0-3])$"
+        }
+      },
+      "required": ["initialTime", "endTime"],
+      "additionalProperties": false,
+      "errorMessage": "error_conditional_time"
+    },
+    "obj_splitPath": {
+      "$id": "#obj_splitPath",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^[1-5]$"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": ["path", "value"],
+      "additionalProperties": false,
+      "errorMessage": "error_split"
+    },
+    "obj_split": {
+      "$id": "#obj_split",
+      "type": "object",
+      "properties": {
+        "1": {
+          "type": "integer"
+        },
+        "2": {
+          "type": "integer"
+        },
+        "3": {
+          "type": "integer"
+        },
+        "4": {
+          "type": "integer"
+        },
+        "5": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 2,
+      "maxProperties": 5,
+      "propertyNames": {
+        "pattern": "^[1-5]$"
+      },
+      "errorMessage": "error_split"
+    },
+    "obj_activeCampaign": {
+      "$id": "#obj_activeCampaign",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["createContact"]
+        },
+        "list": {
+          "type": "string"
+        },
+        "apiKey": {
+          "type": "string"
+        },
+        "accountName": {
+          "type": "string"
+        }
+      },
+      "required": ["type", "list", "apiKey", "accountName"],
+      "additionalProperties": false,
+      "errorMessage": "error_active_campaigns"
+    },
+    "obj_httpRequest": {
+      "$id": "#obj_httpRequest",
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": ["get", "post", "put", "delete"]
+        },
+        "url": {
+          "type": "string"
+        },
+        "queryString": {
+          "type": "string"
+        },
+        "newTry": {
+          "type": "boolean"
+        },
+        "quantityTry": {
+          "type": "integer"
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/obj_httpRequest_headers_body"
+          }
+        },
+        "body": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/obj_httpRequest_headers_body"
+          }
+        }
+      },
+      "required": ["operation", "url", "newTry", "headers", "body"],
+      "additionalProperties": false,
+      "errorMessage": "error_http_request"
+    },
+    "obj_httpRequest_headers_body": {
+      "$id": "#obj_httpRequest_headers_body",
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "value": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["custom", "replace"]
+            }
+          },
+          "required": ["id", "description", "type"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["key", "value"],
+      "additionalProperties": false,
+      "errorMessage": "error_http_request"
+    },
+    "obj_conditional": {
+      "$id": "#obj_conditional",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "oneOf": [
+          {
+            "type": "null"
+          },
+          {
+            "$ref": "#/definitions/obj_conditional_interaction"
+          },
+          {
+            "$ref": "#/definitions/obj_conditional_custom_fields"
+          },
+          {
+            "$ref": "#/definitions/obj_conditional_tag"
+          },
+          {
+            "$ref": "#/definitions/obj_conditional_user_fields"
+          },
+          {
+            "$ref": "#/definitions/obj_conditional_lead_fields"
+          },
+          {
+            "$ref": "#/definitions/obj_conditional_automation_entry"
+          },
+          {
+            "$ref": "#/definitions/obj_conditional_custom_event"
+          }
+        ]
+      },
+      "errorMessage": "error_conditional"
+    },
+    "obj_conditional_interaction": {
+      "$id": "#obj_conditional_interaction",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["interation"]
+        },
+        "event_type": {
+          "type": "string",
+          "enum": ["email", "web-push", "mobile-push", "sms", "whatsapp"]
+        },
+        "event": {
+          "type": "string",
+          "enum": [
+            "last_open_date",
+            "last_click_date",
+            "last_sent_date",
+            "last_delivered_date",
+            "sms_last_delivered",
+            "sms_last_click",
+            "sms_last_sent",
+            "whatsapp_last_open",
+            "whatsapp_last_delivered",
+            "whatsapp_last_click",
+            "whatsapp_last_sent"
+          ]
+        },
+        "conditional_interation": {
+          "type": "string",
+          "enum": ["yes", "not"]
+        },
+        "conditional": {
+          "type": "string"
+        },
+        "time": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string",
+              "pattern": "^-?[0-9]+$"
+            },
+            {
+              "type": "string",
+              "enum": ["all"]
+            }
+          ]
+        },
+        "custom_times_value": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string",
+          "enum": ["any"]
+        }
+      },
+      "required": ["type", "event_type", "event", "conditional_interation", "time"],
+      "additionalProperties": false
+    },
+    "obj_conditional_custom_fields": {
+      "$id": "#obj_conditional_custom_fields",
+      "type": "object",
+      "properties": {
+        "conditional_custom_field": {
+          "type": "string",
+          "enum": ["=", "!=", ">", ">=", "<", "<=", "iLike"]
+        },
+        "custom_field_id": {
+          "type": ["string", "integer"]
+        },
+        "custom_field_name": {
+          "type": "string"
+        },
+        "conditional": {
+          "type": "string"
+        },
+        "custom_field_name_2": {
+          "type": "string"
+        },
+        "custom_field_type": {
+          "type": "string",
+          "enum": ["text", "number", "date", "boolean", "list"]
+        },
+        "filter_custom_field": {
+          "type": "string"
+        },
+        "custom_field_value": {
+          "type": ["string", "integer"]
+        },
+        "type": {
+          "type": "string",
+          "enum": ["custom_field"]
+        }
+      },
+      "required": ["conditional_custom_field", "custom_field_id", "custom_field_name", "type"],
+      "additionalProperties": false
+    },
+    "obj_conditional_tag": {
+      "$id": "#obj_conditional_tag",
+      "type": "object",
+      "properties": {
+        "conditional_tag": {
+          "type": "string",
+          "enum": ["in", "not in"]
+        },
+        "conditional": {
+          "type": "string"
+        },
+        "tag_id": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer"
+          }
+        },
+        "tag_info": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["tag", "segment"]
+              }
+            },
+            "required": ["id", "name", "type"],
+            "additionalProperties": false
+          }
+        },
+        "type": {
+          "type": "string",
+          "enum": ["tag"]
+        }
+      },
+      "required": ["conditional_tag", "tag_id", "tag_info", "type"],
+      "additionalProperties": false
+    },
+    "obj_conditional_user_fields": {
+      "$id": "#obj_conditional_user_fields",
+      "type": "object",
+      "properties": {
+        "conditional_user_field": {
+          "type": "string",
+          "enum": ["=", "!=", ">", ">=", "<", "<=", "-", "true", "false"]
+        },
+        "conditional": {
+          "type": "string"
+        },
+        "user_field_key": {
+          "type": "string",
+          "enum": ["created_at_date", "email_provider", "communication_channels"]
+        },
+        "user_field_value": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["user_field"]
+        }
+      },
+      "required": ["conditional_user_field", "user_field_key", "user_field_value", "type"],
+      "additionalProperties": false
+    },
+    "obj_conditional_lead_fields": {
+      "$id": "#obj_conditional_lead_fields",
+      "type": "object",
+      "properties": {
+        "conditional_lead_field": {
+          "type": "string",
+          "enum": ["=", "!="]
+        },
+        "conditional": {
+          "type": "string"
+        },
+        "lead_field_key": {
+          "type": "string",
+          "enum": ["utm_campaign", "campaign_id", "engaged", "lead_source", "utm_source", "status"]
+        },
+        "lead_field_value": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["lead"]
+        }
+      },
+      "required": ["conditional_lead_field", "lead_field_key", "lead_field_value", "type"],
+      "additionalProperties": false
+    },
+    "obj_conditional_custom_event": {
+      "$id": "#obj_conditional_custom_event",
+      "type": "object",
+      "properties": {
+        "conditional_user_field": {
+          "type": "string",
+          "enum": ["=", "!=", ">", ">=", "<", "<=", "-"]
+        },
+        "conditional": {
+          "type": "string"
+        },
+        "event": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer"
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        "time_type": {
+          "type": "string"
+        },
+        "conditional_event_type": {
+          "type": "string",
+          "enum": ["in", "not in"]
+        }
+      },
+      "required": ["event", "time_type", "conditional_event_type"],
+      "additionalProperties": true
+    },
+    "obj_conditional_automation_entry": {
+      "$id": "#obj_conditional_automation_entry",
+      "type": "object",
+      "properties": {
+        "conditional_user_field": {
+          "type": "string",
+          "enum": [">="]
+        },
+        "user_field_key": {
+          "type": "string",
+          "enum": ["automation_entry", "last_automation_date"]
+        },
+        "conditional": {
+          "type": "string"
+        },
+        "user_field_value": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]?|90)$"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["automation"]
+        },
+        "user_field_automation": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "title"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["conditional_user_field", "user_field_key", "user_field_value", "user_field_automation", "type"],
+      "additionalProperties": false
+    },
+    "obj_child": {
+      "$id": "#obj_child",
+      "type": "object",
+      "properties": {
+        "id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string",
+              "pattern": "^path"
+            },
+            {
+              "type": "string",
+              "pattern": "^conditional"
+            }
+          ]
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "activeCampaign",
+            "httpRequest",
+            "email",
+            "webPush",
+            "mobilePush",
+            "whatsapp",
+            "sms",
+            "testAB",
+            "contactValidate",
+            "removeTag",
+            "addTag",
+            "updateCustomField",
+            "wait",
+            "conditionalTime",
+            "end",
+            "splitPath",
+            "split",
+            "conditional",
+            "conditionalTrue",
+            "conditionalFalse",
+            "randomMessage",
+            "randomMobilePush",
+            "randomWebPush",
+            "contactTransfer",
+            "removeAutomation"
+          ]
+        },
+        "child": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/obj_child"
+          }
+        },
+        "settings": {}
+      },
+      "if": {
+        "properties": {
+          "type": {
+            "enum": ["removeTag", "addTag"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/obj_add_removeTag"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/obj_add_removeTag"
+                },
+                "minItems": 1
+              }
+            ]
+          }
+        }
+      },
+      "else": {
+        "if": {
+          "properties": {
+            "type": {
+              "const": "activeCampaign"
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "settings": {
+              "$ref": "#/definitions/obj_activeCampaign"
+            }
+          }
+        },
+        "else": {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "httpRequest"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "settings": {
+                "$ref": "#/definitions/obj_httpRequest"
+              }
+            }
+          },
+          "else": {
+            "if": {
+              "properties": {
+                "type": {
+                  "enum": ["email", "webPush", "whatsapp", "sms", "mobilePush"]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "settings": {
+                  "$ref": "#/definitions/obj_message"
+                }
+              }
+            },
+            "else": {
+              "if": {
+                "properties": {
+                  "type": {
+                    "const": "testAB"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "settings": {
+                    "$ref": "#/definitions/obj_testab"
+                  }
+                }
+              },
+              "else": {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "updateCustomField"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "settings": {
+                      "$ref": "#/definitions/obj_updateCustomField"
+                    }
+                  }
+                },
+                "else": {
+                  "if": {
+                    "properties": {
+                      "type": {
+                        "const": "wait"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "settings": {
+                        "$ref": "#/definitions/obj_wait"
+                      }
+                    }
+                  },
+                  "else": {
+                    "if": {
+                      "properties": {
+                        "type": {
+                          "const": "conditionalTime"
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "settings": {
+                          "$ref": "#/definitions/obj_conditionalTime"
+                        }
+                      }
+                    },
+                    "else": {
+                      "if": {
+                        "properties": {
+                          "type": {
+                            "enum": ["splitPath", "split"]
+                          }
+                        }
+                      },
+                      "then": {
+                        "properties": {
+                          "settings": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/definitions/obj_split"
+                              },
+                              {
+                                "$ref": "#/definitions/obj_splitPath"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "else": {
+                        "if": {
+                          "properties": {
+                            "type": {
+                              "enum": ["conditional", "conditionalTrue"]
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "settings": {
+                              "$ref": "#/definitions/obj_conditional"
+                            }
+                          }
+                        },
+                        "else": {
+                          "if": {
+                            "properties": {
+                              "type": {
+                                "enum": ["end", "contactValidate", "conditionalFalse"]
+                              }
+                            }
+                          },
+                          "then": {
+                            "properties": {
+                              "settings": {
+                                "type": "object",
+                                "properties": {},
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "else": {
+                            "if": {
+                              "properties": {
+                                "type": {
+                                  "enum": ["randomMessage", "randomMobilePush", "randomWebPush"]
+                                }
+                              }
+                            },
+                            "then": {
+                              "properties": {
+                                "settings": {
+                                  "$ref": "#/definitions/obj_random_message"
+                                }
+                              }
+                            },
+                            "else": {
+                              "if": {
+                                "properties": {
+                                  "type": {
+                                    "const": "contactTransfer"
+                                  }
+                                }
+                              },
+                              "then": {
+                                "properties": {
+                                  "settings": {
+                                    "$ref": "#/definitions/obj_contactTransfer"
+                                  }
+                                }
+                              },
+                              "else": {
+                                "if": {
+                                  "properties": {
+                                    "type": {
+                                      "const": "removeAutomation"
+                                    }
+                                  }
+                                },
+                                "then": {
+                                  "properties": {
+                                    "settings": {
+                                      "type": "object",
+                                      "properties": {
+                                        "automations": {
+                                          "type": "array",
+                                          "items": {
+                                            "$ref": "#/definitions/obj_remove_automation"
+                                          },
+                                          "minItems": 1
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "else": {
+                                  "properties": {
+                                    "settings": {
+                                      "type": "null"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "required": ["id", "type", "child", "settings"],
+      "additionalProperties": false
+    }
+  }
+}

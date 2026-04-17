@@ -1,0 +1,7 @@
+info:
+  name: Verify
+  type: folder
+  seq: 22
+
+request:
+  auth: inherit

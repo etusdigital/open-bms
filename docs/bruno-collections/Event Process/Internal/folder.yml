@@ -1,0 +1,7 @@
+info:
+  name: Internal
+  type: folder
+  seq: 6
+
+request:
+  auth: none

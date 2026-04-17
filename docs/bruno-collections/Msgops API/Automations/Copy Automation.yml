@@ -1,0 +1,15 @@
+info:
+  name: Copy Automation
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{msgops-api-url}}/automations/1/copy"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

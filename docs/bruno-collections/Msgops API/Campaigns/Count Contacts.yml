@@ -1,0 +1,22 @@
+info:
+  name: Count Contacts
+  type: http
+  seq: 12
+
+http:
+  method: POST
+  url: "{{msgops-api-url}}/campaigns/count-contacts"
+  body:
+    type: json
+    json: |
+      {
+        "title": "Test Campaign",
+        "sendToAll": true
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

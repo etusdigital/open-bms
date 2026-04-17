@@ -1,0 +1,52 @@
+name: _detect-changes
+
+on:
+  workflow_call:
+    inputs:
+      package-name:
+        description: 'Turbo package name (from package.json "name" field)'
+        required: true
+        type: string
+    outputs:
+      affected:
+        description: 'true if the package or its dependencies changed'
+        value: ${{ jobs.check.outputs.affected }}
+
+jobs:
+  check:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      affected: ${{ steps.turbo-check.outputs.affected }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check if package is affected
+        id: turbo-check
+        env:
+          BASE_SHA: ${{ github.event.before }}
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: team_retention
+          TURBO_API: ${{ secrets.TURBO_API_URL }}
+        run: |
+          if [[ "$BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+            echo "affected=true" >> "$GITHUB_OUTPUT"
+            echo "First push to branch — deploying by default"
+            exit 0
+          fi
+          affected=$(pnpm turbo build \
+            --filter="${{ inputs.package-name }}...[${BASE_SHA}]" \
+            --dry-run=json | jq '.tasks | length > 0')
+          echo "affected=$affected" >> "$GITHUB_OUTPUT"
+          echo "Package ${{ inputs.package-name }} affected: $affected"

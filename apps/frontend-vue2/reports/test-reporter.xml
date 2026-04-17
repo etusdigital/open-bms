@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testExecutions version="1">
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\write-email.spec.ts">
+        <testCase name="WriteEmail encountered a declaration exception" duration="4">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\write-email.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\write-email.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\new-email.spec.ts">
+        <testCase name="NewEmail encountered a declaration exception" duration="3">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\new-email.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\new-email.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\select-base-audience.spec.ts">
+        <testCase name="SelectAccountAndAudience encountered a declaration exception" duration="3">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\select-base-audience.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\select-base-audience.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\duplicate-email.spec.ts">
+        <testCase name="WriteEmail encountered a declaration exception" duration="3">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\duplicate-email.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\duplicate-email.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\automation-hover.spec.ts">
+        <testCase name="Automations encountered a declaration exception" duration="3">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\automation-hover.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\automation-hover.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\Automations.spec.ts">
+        <testCase name="Automations encountered a declaration exception" duration="5">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\Automations.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\Automations.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\edit.spec.ts">
+        <testCase name="Automations encountered a declaration exception" duration="4">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\edit.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\edit.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\create-campaign.spec.ts">
+        <testCase name="CreateCampaign encountered a declaration exception" duration="1">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\create-campaign.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\create-campaign.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\new.spec.ts">
+        <testCase name="Automations encountered a declaration exception" duration="1">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\new.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\new.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\edit-email.spec.ts">
+        <testCase name="WriteEmail encountered a declaration exception" duration="1">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\edit-email.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\edit-email.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\switch.spec.ts">
+        <testCase name="Automations encountered a declaration exception" duration="2">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\switch.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\switch.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\campaign-list.spec.ts">
+        <testCase name="CampaignList encountered a declaration exception" duration="2">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\campaign-list.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\campaign-list.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\schedule-campaign.spec.ts">
+        <testCase name="ScheduleCampaign encountered a declaration exception" duration="2">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\schedule-campaign.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\schedule-campaign.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\filter.spec.ts">
+        <testCase name="Automations Filters encountered a declaration exception" duration="1">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\filter.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\filter.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\delete.spec.ts">
+        <testCase name="Automations encountered a declaration exception" duration="1">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\delete.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\delete.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\deliverability-test.spec.ts">
+        <testCase name="DeliverabilityTest encountered a declaration exception" duration="1">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\deliverability-test.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\deliverability-test.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\list-automations-message.spec.ts">
+        <testCase name="ListAutomationsMessage encountered a declaration exception" duration="1">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\list-automations-message.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\list-automations-message.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\deliverability-test.spec.ts">
+        <testCase name="DeliverabilityTest encountered a declaration exception" duration="1">
+            <failure message="ReferenceError: before is not defined"><![CDATA[ReferenceError: before is not defined
+    at Suite.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\deliverability-test.spec.ts:4:3)
+    at addSpecsToSuite (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:444:51)
+    at Env.describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\Env.js:414:11)
+    at describe (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\jasmine\jasmineLight.js:88:18)
+    at Object.<anonymous> (C:\Workspace\msgops\msgops-frontend\cypress\integration\automations\deliverability-test.spec.ts:3:1)
+    at Runtime._execModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:1299:24)
+    at Runtime._loadModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:898:12)
+    at Runtime.requireModule (C:\Workspace\msgops\msgops-frontend\node_modules\jest-runtime\build\index.js:746:10)
+    at jasmine2 (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-jasmine2\build\index.js:230:13)
+    at runTestInternal (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:380:22)
+    at processTicksAndRejections (node:internal/process/task_queues:94:5)
+    at runTest (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\runTest.js:472:34)
+    at Object.worker (C:\Workspace\msgops\msgops-frontend\node_modules\@jest\core\node_modules\jest-runner\build\testWorker.js:133:12)]]></failure>
+        </testCase>
+    </file>
+    <file path="C:\Workspace\msgops\msgops-frontend\cypress\integration\select-silo-audience.spec.ts">
+    </file>
+</testExecutions>

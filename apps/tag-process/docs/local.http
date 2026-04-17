@@ -1,0 +1,26 @@
+
+#Get Hello World
+#Model: /
+###Endpoint Rules:
+#1 - Returns 
+
+GET http://localhost:3000/
+
+###
+
+#Post Consume Batch 
+POST http://localhost:3000/plusdin
+content-type: application/json
+
+{
+    "add_tag": false
+}
+###
+
+#{PREVIEW} Post Consume Batch 
+POST http://localhost:3000/plusdin?preview=true
+content-type: application/json
+
+{
+    "add_tag": true
+}

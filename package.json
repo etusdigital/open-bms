@@ -1,0 +1,49 @@
+{
+  "name": "etus-retention-backoffice",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "test:e2e": "pnpm --filter @backoffice/api test:e2e",
+    "type-check": "turbo type-check",
+    "clean": "turbo clean",
+    "prepare": "lefthook install"
+  },
+  "devDependencies": {
+    "@clickhouse/client-web": "^1.8.1",
+    "@types/pg": "^8.16.0",
+    "eslint": "^9.39.4",
+    "lefthook": "^2.1.5",
+    "pg": "^8.16.3",
+    "prettier": "^3.2.5",
+    "prettier-plugin-tailwindcss": "^0.7.2",
+    "tsx": "^4.19.0",
+    "turbo": "^2.9.5",
+    "wrangler": "^4.81.1"
+  },
+  "packageManager": "pnpm@10.22.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/uuid": "10.0.0",
+      "fastify": ">=5.8.1",
+      "ajv@>=7.0.0-alpha.0 <8.18.0": ">=8.18.0"
+    },
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "protobufjs",
+      "unrs-resolver"
+    ],
+    "ignoredBuiltDependencies": [
+      "@nestjs/core",
+      "protobufjs"
+    ]
+  },
+  "dependencies": {
+    "recharts": "^3.8.0"
+  }
+}

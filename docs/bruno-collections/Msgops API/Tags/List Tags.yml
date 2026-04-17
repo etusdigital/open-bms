@@ -1,0 +1,20 @@
+info:
+  name: List Tags
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{msgops-api-url}}/tags"
+  params:
+    - name: page
+      value: "1"
+    - name: itemsPerPage
+      value: "20"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

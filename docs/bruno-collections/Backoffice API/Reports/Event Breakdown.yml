@@ -1,0 +1,24 @@
+info:
+  name: Event Breakdown
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{backoffice-api-url}}/reports/event-breakdown"
+  params:
+    - name: eventType
+      value: "delivered"
+    - name: from
+      value: "2025-01-01"
+    - name: to
+      value: "2025-01-31"
+    - name: timezone
+      value: "UTC"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

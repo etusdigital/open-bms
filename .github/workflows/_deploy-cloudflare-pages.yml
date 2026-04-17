@@ -1,0 +1,160 @@
+# Reusable workflow: Build static assets + Deploy to Cloudflare Pages
+#
+# Called by deploy-frontend-react.yml (and any future static-site deploys to CF Pages).
+# Uses Direct Upload — no wrangler.toml needed.
+
+name: _deploy-cloudflare-pages
+
+on:
+  workflow_call:
+    inputs:
+      app-name:
+        description: Directory name under apps/
+        required: true
+        type: string
+      project-name:
+        description: Cloudflare Pages project name
+        required: true
+        type: string
+      branch:
+        description: Branch name for CF Pages (omit for production deploy)
+        required: false
+        type: string
+        default: ''
+      turbo-filter:
+        description: Turbo filter expression for the app package
+        required: true
+        type: string
+      environment:
+        description: 'staging or production'
+        required: true
+        type: string
+      alias-url:
+        description: Stable alias URL to register as the GitHub Deployment URL (overrides the commit-hash URL)
+        required: false
+        type: string
+        default: ''
+    secrets:
+      CF_PAGES_API_TOKEN:
+        required: true
+      CF_ACCOUNT_ID:
+        required: true
+      VITE_AUTH0_DOMAIN:
+        required: true
+      VITE_AUTH0_CLIENT_ID:
+        required: true
+      VITE_AUTH0_AUDIENCE:
+        required: true
+      VITE_API_URL:
+        required: true
+      VITE_REDIRECT_MANAGER_URL:
+        required: true
+      VITE_SENTRY_DSN:
+        required: false
+      VITE_CLARITY_PROJECT_ID:
+        required: false
+      SENTRY_AUTH_TOKEN:
+        required: false
+      SENTRY_ORG:
+        required: false
+      SENTRY_PROJECT:
+        required: false
+      TURBO_TOKEN:
+        required: false
+      TURBO_API_URL:
+        required: false
+
+jobs:
+  build-and-deploy:
+    name: Build & deploy (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+      pull-requests: write
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: team_retention
+      TURBO_API: ${{ secrets.TURBO_API_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Validate required environment variables
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_AUTH0_DOMAIN: ${{ secrets.VITE_AUTH0_DOMAIN }}
+          VITE_AUTH0_CLIENT_ID: ${{ secrets.VITE_AUTH0_CLIENT_ID }}
+        run: |
+          : "${VITE_API_URL:?VITE_API_URL is required}"
+          : "${VITE_AUTH0_DOMAIN:?VITE_AUTH0_DOMAIN is required}"
+          : "${VITE_AUTH0_CLIENT_ID:?VITE_AUTH0_CLIENT_ID is required}"
+
+      - name: Build
+        env:
+          VITE_AUTH0_DOMAIN: ${{ secrets.VITE_AUTH0_DOMAIN }}
+          VITE_AUTH0_CLIENT_ID: ${{ secrets.VITE_AUTH0_CLIENT_ID }}
+          VITE_AUTH0_AUDIENCE: ${{ secrets.VITE_AUTH0_AUDIENCE }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_REDIRECT_MANAGER_URL: ${{ secrets.VITE_REDIRECT_MANAGER_URL }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENABLED: 'true'
+          VITE_CLARITY_PROJECT_ID: ${{ secrets.VITE_CLARITY_PROJECT_ID }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        run: pnpm turbo build --filter=${{ inputs.turbo-filter }}... --output-logs=new-only
+
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_PAGES_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy apps/${{ inputs.app-name }}/dist --project-name=${{ inputs.project-name }} ${{ inputs.branch && format('--branch={0}', inputs.branch) || '' }}
+          packageManager: pnpm
+
+      - name: Create GitHub Deployment with stable alias URL
+        if: inputs.alias-url != ''
+        uses: actions/github-script@v7
+        env:
+          ALIAS_URL: ${{ inputs.alias-url }}
+          ENVIRONMENT: ${{ inputs.environment }}-preview
+        with:
+          script: |
+            const aliasUrl = process.env.ALIAS_URL;
+            const environment = process.env.ENVIRONMENT;
+
+            const ref = context.payload.pull_request
+              ? context.payload.pull_request.head.sha
+              : context.sha;
+
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref,
+              environment,
+              auto_merge: false,
+              required_contexts: [],
+              transient_environment: true,
+              production_environment: false,
+              description: 'Cloudflare Pages preview deployment',
+            });
+
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: 'success',
+              environment_url: aliasUrl,
+              log_url: aliasUrl,
+              description: 'Deployed to Cloudflare Pages',
+            });

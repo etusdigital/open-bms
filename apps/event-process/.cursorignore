@@ -1,0 +1,14 @@
+# Ignore all files in the `dist` directory
+dist/
+
+# Ignore all `.log` files
+*.log
+
+# Ignore specific file `config.json`
+config.json
+
+node_modules/
+
+.yarn/
+
+.cursorrules

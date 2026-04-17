@@ -1,0 +1,101 @@
+# Reusable workflow: Build static assets + Deploy to GCS + Purge Cloudflare CDN
+#
+# Used by frontend-vue2 (and any future static-site deploys).
+
+name: _deploy-gcs
+
+on:
+  workflow_call:
+    inputs:
+      app-name:
+        description: Directory name under apps/
+        required: true
+        type: string
+      node-version:
+        description: Node.js version for the build
+        required: false
+        type: string
+        default: '16'
+      build-command:
+        description: Command to build assets
+        required: false
+        type: string
+        default: yarn build
+      gcs-bucket:
+        description: 'GCS bucket path (e.g. gs://my-bucket)'
+        required: true
+        type: string
+      cloudflare-purge-url:
+        description: 'URL prefix to purge from Cloudflare (optional)'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      GCP_SA_KEY:
+        required: true
+      VUE_APP_API_URL:
+        required: true
+      VUE_APP_AUTH0_DOMAIN:
+        required: true
+      VUE_APP_AUTH0_CLIENT_ID:
+        required: true
+      VUE_APP_AUTH0_AUDIENCE:
+        required: true
+      VUE_APP_REDIRECT_MANAGER:
+        required: true
+      CF_ZONE_ID:
+        required: false
+      CF_API_TOKEN:
+        required: false
+
+jobs:
+  build-and-deploy:
+    name: Build & deploy to GCS
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/${{ inputs.app-name }}
+    env:
+      VUE_APP_API_URL: ${{ secrets.VUE_APP_API_URL }}
+      VUE_APP_AUTH0_DOMAIN: ${{ secrets.VUE_APP_AUTH0_DOMAIN }}
+      VUE_APP_AUTH0_CLIENT_ID: ${{ secrets.VUE_APP_AUTH0_CLIENT_ID }}
+      VUE_APP_AUTH0_AUDIENCE: ${{ secrets.VUE_APP_AUTH0_AUDIENCE }}
+      VUE_APP_REDIRECT_MANAGER: ${{ secrets.VUE_APP_REDIRECT_MANAGER }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: yarn
+          cache-dependency-path: apps/${{ inputs.app-name }}/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build
+        run: ${{ inputs.build-command }}
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to GCS
+        run: gsutil -h "Cache-Control:no-cache,no-store,max-age=0" -m rsync -dr dist/ ${{ inputs.gcs-bucket }}
+
+      - name: Purge Cloudflare cache
+        if: inputs.cloudflare-purge-url != ''
+        env:
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          curl --fail --output /dev/null --silent --show-error \
+            -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"prefixes": ["${{ inputs.cloudflare-purge-url }}"]}'

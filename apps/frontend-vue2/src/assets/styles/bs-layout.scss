@@ -1,0 +1,200 @@
+@import '@/assets/styles/variables.scss';
+
+html,
+body {
+  font-size: 10px;
+}
+
+.title-route {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 1em;
+  margin-bottom: 16px;
+  margin-top: -20px;
+}
+.title-position {
+  margin-top: -22px !important;
+}
+.label-title {
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: 0.07em;
+}
+
+.label-sub-title {
+  font-weight: 400;
+  font-style: normal;
+  font-size: 12px;
+}
+
+.label-title-all {
+  font-weight: 600;
+  font-style: normal;
+  font-size: 12px;
+}
+
+.margin-title-min {
+  margin-top: -4px !important;
+}
+
+.margin-title-max {
+  margin-top: -50px !important;
+  display: flex;
+  flex-direction: column;
+}
+.font-8 {
+  font-size: 8px !important;
+}
+
+.font-10 {
+  font-size: 10px !important;
+}
+.font-12 {
+  font-size: 12px !important;
+}
+.font-14 {
+  font-size: 14px !important;
+}
+.font-16 {
+  font-size: 16px !important;
+}
+.font-18 {
+  font-size: 18px !important;
+}
+.font-20 {
+  font-size: 20px !important;
+}
+.font-24 {
+  font-size: 24px !important;
+}
+.font-28 {
+  font-size: 28px !important;
+}
+.font-32 {
+  font-size: 32px !important;
+}
+.font-36 {
+  font-size: 36px !important;
+}
+.font-title {
+  font-size: clamp(1.2rem, 1vw, 1.4rem) !important;
+}
+
+.icon-size {
+  width: clamp(20px, 1.5vw, 24px);
+  height: clamp(20px, 1.5vw, 24px);
+}
+
+.title-button {
+  display: flex;
+  flex-direction: row;
+  gap: 1em;
+  align-items: baseline;
+  width: fit-content !important;
+}
+.div-column {
+  display: flex;
+  flex-direction: column;
+}
+.div-row {
+  display: flex;
+  flex-direction: row;
+}
+
+.ds-white-color {
+  color: $neutral-basic-white !important;
+}
+
+.ds-blue-color {
+  color: $ds-blue !important;
+}
+
+.ds-gray-color {
+  color: $ds-gray;
+}
+.ds-light-gray-color {
+  color: $ds-gray-400;
+}
+
+.ds-lighter-gray-color {
+  color: #d9d9d9;
+}
+
+.ds-red-color {
+  color: #f03232;
+}
+
+.ds-green-color {
+  color: $ds-green;
+}
+
+.ds-cyan-color {
+  color: $ds-light-blue;
+}
+
+.ds-orange-color {
+  color: $ds-orange;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  border-radius: 10px;
+  background: #d9d9d9;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #a6a6a6;
+  border-radius: 10px;
+}
+
+.text-400 {
+  font-weight: 400;
+  font-style: normal;
+}
+
+.text-600 {
+  font-weight: 600;
+  font-style: normal;
+}
+
+.text-700 {
+  font-weight: 700;
+  font-style: normal;
+}
+.gap-5 {
+  gap: 5px;
+}
+
+.gap-8 {
+  gap: 8px;
+}
+
+.gap-10 {
+  gap: 10px;
+}
+
+.gap-15 {
+  gap: 15px;
+}
+
+.gap-16 {
+  gap: 16px;
+}
+
+.gap-20 {
+  gap: 20px;
+}
+
+.card-name-description {
+  padding: 20px;
+}
+
+.decoration-none:hover {
+  text-decoration: none;
+}

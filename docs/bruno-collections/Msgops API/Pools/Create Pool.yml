@@ -1,0 +1,21 @@
+info:
+  name: Create Pool
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{msgops-api-url}}/pools"
+  body:
+    type: json
+    json: |
+      {
+        "name": "Test Pool"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

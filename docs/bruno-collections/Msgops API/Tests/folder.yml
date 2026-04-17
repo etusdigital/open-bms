@@ -1,0 +1,7 @@
+info:
+  name: Tests
+  type: folder
+  seq: 20
+
+request:
+  auth: inherit

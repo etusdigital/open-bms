@@ -1,0 +1,22 @@
+info:
+  name: Update Template
+  type: http
+  seq: 5
+
+http:
+  method: PUT
+  url: "{{msgops-api-url}}/email-template/1"
+  body:
+    type: json
+    json: |
+      {
+        "name": "Updated Template",
+        "subject": "Updated Subject"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,15 @@
+
+POST
+content-type: application/json
+
+{
+  "contact": {
+    "email": "jonathan.shun+teste@brius.com.br",
+    "phone": "31973650997",
+    "hashedEmail": "03cd5f4df96fb9ee12c8ffd4d2185961a0ec34a510ba7708c86d1b7604c46b27",
+    "firstName": "Jonathan",
+    "lastName": "Shun",
+  },
+  "tagName": "shun_teste_version_cc",
+  "startDate": 1644608497893
+} 

@@ -1,0 +1,15 @@
+info:
+  name: Create Contacts Send
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{campaign-packer-url}}/create-contacts-send/1"
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+.env
+.env.local
+.dev.vars
+.wrangler/
+*.log
+*.tsbuildinfo
+.DS_Store
+
+# TanStack Router (auto-generated)
+.tanstack/
+routeTree.gen.ts
+
+# Playwright
+playwright-report/
+test-results/
+**/e2e/.auth/

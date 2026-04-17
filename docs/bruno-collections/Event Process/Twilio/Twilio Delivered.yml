@@ -1,0 +1,29 @@
+info:
+  name: Twilio Delivered
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{event-process-url}}/twilio"
+  headers:
+    - name: platform
+      value: "twilio"
+    - name: x-goog-pubsub-message-id
+      value: "test-twilio-delivered-001"
+  body:
+    type: json
+    json: |
+      {
+        "SmsSid": "SM00000000000000000000000000000000",
+        "SmsStatus": "delivered",
+        "To": "+5511999999999",
+        "MessageStatus": "delivered"
+      }
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
