@@ -197,7 +197,7 @@ Timeout excedido → fecha connection à força (msgs in-flight voltam pra queue
 - Response:
   - `2xx` → Consumer ack
   - `4xx` (exceto 429) → Consumer **ack** (descarta, é erro de contrato) + log warn
-  - `429` → Consumer `requeue` (rate-limit)
+  - `429` → Consumer `nack` (entra no retry com backoff exponencial — `requeue` imediato causava hot-loop em rate-limit persistente; revisado 2026-04-22)
   - `5xx` → Consumer `nack` (entra no retry com backoff)
 
 ---

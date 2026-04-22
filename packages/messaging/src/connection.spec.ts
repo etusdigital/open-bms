@@ -1,5 +1,9 @@
 import * as amqplib from 'amqplib';
-import { AmqpConnection, ConnectionClosedError } from './connection';
+import {
+  AmqpConnection,
+  ConnectionClosedError,
+  redactAmqpUrl,
+} from './connection';
 
 jest.mock('amqplib');
 const mockConnect = amqplib.connect as jest.Mock;
@@ -264,5 +268,61 @@ describe('AmqpConnection', () => {
 
       expect(mockConnect).toHaveBeenCalledTimes(2);
     });
+  });
+
+  describe('credential redaction', () => {
+    it('redacts the password in connect failure messages', async () => {
+      const url = 'amqp://admin:supersecret@broker.prod:5672/app';
+      mockConnect.mockRejectedValue(new Error(`Cannot reach ${url}`));
+
+      const c = new AmqpConnection({ url }, FAST_RETRY);
+      const caught = await c.getConnection().catch((e: Error) => e);
+
+      expect(caught).toBeInstanceOf(Error);
+      expect(caught.message).not.toContain('supersecret');
+      expect(caught.message).toContain('***');
+      expect(caught.name).toBe('AmqpConnectError');
+    });
+
+    it('redacts the password in the wrapped error stack', async () => {
+      const url = 'amqp://admin:leaky-token@broker.prod:5672/';
+      const cause = new Error('boom');
+      cause.stack = `Error: boom\n    at connect(${url})`;
+      mockConnect.mockRejectedValue(cause);
+
+      const c = new AmqpConnection({ url }, FAST_RETRY);
+      const caught = await c.getConnection().catch((e: Error) => e);
+
+      expect(caught.stack).toBeDefined();
+      expect(caught.stack).not.toContain('leaky-token');
+    });
+  });
+});
+
+describe('redactAmqpUrl', () => {
+  it('replaces the password with asterisks', () => {
+    expect(redactAmqpUrl('amqp://user:secret@host:5672/')).toBe(
+      'amqp://user:***@host:5672/',
+    );
+  });
+
+  it('leaves URLs without password unchanged', () => {
+    expect(redactAmqpUrl('amqp://host:5672/')).toBe('amqp://host:5672/');
+  });
+
+  it('leaves user-only URLs unchanged', () => {
+    expect(redactAmqpUrl('amqp://user@host:5672/')).toBe(
+      'amqp://user@host:5672/',
+    );
+  });
+
+  it('returns a placeholder for unparseable input', () => {
+    expect(redactAmqpUrl('not a url')).toBe('[invalid amqp url]');
+  });
+
+  it('preserves the vhost path', () => {
+    expect(redactAmqpUrl('amqp://u:p@host:5672/vhost')).toBe(
+      'amqp://u:***@host:5672/vhost',
+    );
   });
 });

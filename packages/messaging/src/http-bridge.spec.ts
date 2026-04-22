@@ -88,7 +88,7 @@ describe('createHttpBridgeHandler', () => {
       [404, 'ack'],
       [422, 'ack'],
       [428, 'ack'],
-      [429, 'requeue'],
+      [429, 'nack'],
       [500, 'nack'],
       [502, 'nack'],
       [503, 'nack'],
@@ -116,6 +116,100 @@ describe('createHttpBridgeHandler', () => {
       });
 
       await expect(handler({}, makeCtx())).rejects.toThrow('ECONNREFUSED');
+    });
+  });
+
+  describe('timeout', () => {
+    it("returns 'nack' when fetch is aborted due to timeout", async () => {
+      mockFetch.mockImplementation(
+        (_url: string, init: { signal?: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => {
+              const err = new Error('aborted');
+              err.name = 'AbortError';
+              reject(err);
+            });
+          }),
+      );
+
+      const handler = createHttpBridgeHandler({
+        endpoint: 'http://test',
+        token: 't',
+        fetchImpl: mockFetch,
+        timeoutMs: 10,
+      });
+
+      const result = await handler({}, makeCtx());
+      expect(result).toBe('nack');
+    });
+
+    it('does not abort a fast request', async () => {
+      mockFetch.mockResolvedValue({ status: 200 });
+      const handler = createHttpBridgeHandler({
+        endpoint: 'http://test',
+        token: 't',
+        fetchImpl: mockFetch,
+        timeoutMs: 1000,
+      });
+
+      const result = await handler({}, makeCtx());
+      expect(result).toBe('ack');
+    });
+
+    it('passes an AbortSignal on every fetch call', async () => {
+      mockFetch.mockResolvedValue({ status: 200 });
+      const handler = createHttpBridgeHandler({
+        endpoint: 'http://test',
+        token: 't',
+        fetchImpl: mockFetch,
+      });
+
+      await handler({}, makeCtx());
+      const init = mockFetch.mock.calls[0]![1];
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+    });
+  });
+
+  describe('response body handling', () => {
+    it('drains the response body to release the socket', async () => {
+      const cancel = jest.fn().mockResolvedValue(undefined);
+      mockFetch.mockResolvedValue({
+        status: 200,
+        body: { cancel },
+      });
+      const handler = createHttpBridgeHandler({
+        endpoint: 'http://test',
+        token: 't',
+        fetchImpl: mockFetch,
+      });
+
+      await handler({}, makeCtx());
+      expect(cancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('tolerates a missing body', async () => {
+      mockFetch.mockResolvedValue({ status: 200, body: null });
+      const handler = createHttpBridgeHandler({
+        endpoint: 'http://test',
+        token: 't',
+        fetchImpl: mockFetch,
+      });
+
+      const result = await handler({}, makeCtx());
+      expect(result).toBe('ack');
+    });
+
+    it('tolerates a cancel rejection (body already consumed)', async () => {
+      const cancel = jest.fn().mockRejectedValue(new Error('already cancelled'));
+      mockFetch.mockResolvedValue({ status: 200, body: { cancel } });
+      const handler = createHttpBridgeHandler({
+        endpoint: 'http://test',
+        token: 't',
+        fetchImpl: mockFetch,
+      });
+
+      const result = await handler({}, makeCtx());
+      expect(result).toBe('ack');
     });
   });
 

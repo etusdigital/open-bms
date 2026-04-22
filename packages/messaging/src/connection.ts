@@ -10,6 +10,43 @@ export class ConnectionClosedError extends Error {
   }
 }
 
+/**
+ * Replace the password in an AMQP URL with `***`. Returns a synthetic
+ * placeholder for unparseable input. Exposed for consumers that want to
+ * build their own logs without leaking credentials.
+ */
+export function redactAmqpUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.password) u.password = '***';
+    return u.toString();
+  } catch {
+    return '[invalid amqp url]';
+  }
+}
+
+async function connectRedacted(url: string): Promise<ChannelModel> {
+  try {
+    return await amqplib.connect(url);
+  } catch (err) {
+    throw wrapConnectError(url, err);
+  }
+}
+
+function wrapConnectError(url: string, cause: unknown): Error {
+  const redacted = redactAmqpUrl(url);
+  const rawMsg = cause instanceof Error ? cause.message : String(cause);
+  const scrubbedMsg = rawMsg.split(url).join(redacted);
+  const wrapped = new Error(
+    `AMQP connect to ${redacted} failed: ${scrubbedMsg}`,
+  );
+  wrapped.name = 'AmqpConnectError';
+  if (cause instanceof Error && cause.stack) {
+    wrapped.stack = cause.stack.split(url).join(redacted);
+  }
+  return wrapped;
+}
+
 export interface RetryConfig {
   baseMs?: number;
   maxMs?: number;
@@ -95,7 +132,7 @@ export class AmqpConnection {
     let lastError: unknown;
     for (let i = 0; i < this.retry.maxInitialRetries; i++) {
       try {
-        const conn = await amqplib.connect(this.opts.url);
+        const conn = await connectRedacted(this.opts.url);
         this.bindConnectionEvents(conn);
         this.reconnectAttempt = 0;
         return conn;
@@ -149,7 +186,7 @@ export class AmqpConnection {
 
   private async attemptReconnect(): Promise<void> {
     try {
-      const conn = await amqplib.connect(this.opts.url);
+      const conn = await connectRedacted(this.opts.url);
       if (this.closed) {
         try {
           await conn.close();

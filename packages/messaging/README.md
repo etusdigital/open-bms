@@ -49,12 +49,16 @@ await consumer.consume(
   },
 );
 
-process.on('SIGTERM', () => consumer.shutdown());
+process.on('SIGTERM', async () => {
+  await consumer.shutdown();
+  await publisher.close();
+  process.exit(0);
+});
 ```
 
 ### HTTP bridge handler
 
-For the common pattern of "consume AMQP → call internal HTTP endpoint → translate response", use `createHttpBridgeHandler`. Implements the contract from the decision doc: POST with `X-Internal-Token`, maps `5xx → 'nack'`, `429 → 'requeue'`, everything else → `'ack'`.
+For the common pattern of "consume AMQP → call internal HTTP endpoint → translate response", use `createHttpBridgeHandler`. Implements the contract from the decision doc: POST with `X-Internal-Token`, maps `5xx` and `429` → `'nack'` (retry via the Consumer's Layer 1 with exponential backoff), everything else → `'ack'`. Abort-on-timeout defaults to 30s.
 
 ```typescript
 import { AmqpConsumer, createHttpBridgeHandler, EXCHANGES } from '@bms/messaging';
@@ -62,6 +66,7 @@ import { AmqpConsumer, createHttpBridgeHandler, EXCHANGES } from '@bms/messaging
 const handler = createHttpBridgeHandler({
   endpoint: 'http://localhost:3000/internal/email/send',
   token: process.env.INTERNAL_AUTH_TOKEN!,
+  timeoutMs: 15_000, // optional, defaults to 30_000
 });
 
 const consumer = new AmqpConsumer({ url: process.env.AMQP_URL! });
@@ -75,7 +80,7 @@ await consumer.consume(
 );
 ```
 
-Tracing headers `X-Bms-Attempt` and `X-Bms-Routing-Key` are added automatically. Apps that need custom semantics (different status mappings, alternative auth, non-HTTP handlers) can skip this helper and pass their own `Handler` to `consume()`.
+Tracing headers `X-Bms-Attempt` and `X-Bms-Routing-Key` are added automatically. Timed-out requests return `'nack'` so the AMQP retry applies. Apps that need custom semantics (different status mappings, alternative auth, non-HTTP handlers) can skip this helper and pass their own `Handler` to `consume()`.
 
 ## Conventions
 
@@ -122,3 +127,5 @@ pnpm --filter @bms/messaging build
 ```
 
 Integration tests require Docker running locally; they boot a throwaway `rabbitmq:3.13-management` container.
+
+> **Known teardown flake:** the integration suite exits with code 1 and reports "Test suite failed to run" with the message `Socket closed abruptly during opening handshake`, even when all 7 tests pass. The event is emitted by amqplib when an in-flight socket races with `container.stop()` in afterAll and is caught by jest-circus at a layer below any `process.on(...)` handler we can register. All tests are correct; grep for `Tests: X passed` in the output to verify. Tracking as infrastructure noise, not a library bug.

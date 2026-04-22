@@ -20,9 +20,7 @@ let amqpUrl: string;
 beforeAll(async () => {
   container = await new GenericContainer('rabbitmq:3.13-management')
     .withExposedPorts(5672, 15672)
-    .withWaitStrategy(
-      Wait.forLogMessage(/Server startup complete/, 1),
-    )
+    .withWaitStrategy(Wait.forLogMessage(/Server startup complete/, 1))
     .start();
   const host = container.getHost();
   const port = container.getMappedPort(5672);
@@ -61,12 +59,35 @@ interface DlqInspection {
   headers: Record<string, unknown>;
 }
 
+async function closeSilently(conn: {
+  close: () => Promise<void>;
+}): Promise<void> {
+  try {
+    await conn.close();
+  } catch {
+    // ignore
+  }
+}
+
+async function openInspectionConn(): Promise<{
+  conn: amqplib.ChannelModel;
+  ch: amqplib.Channel;
+}> {
+  const conn = await amqplib.connect(amqpUrl);
+  // Short-lived inspection conns race with container.stop() in afterAll;
+  // amqplib emits 'error' on abrupt socket close. A no-op listener avoids
+  // surfacing the event as uncaughtException and flipping the suite result.
+  conn.on('error', () => {});
+  const ch = await conn.createChannel();
+  ch.on('error', () => {});
+  return { conn, ch };
+}
+
 async function popFromQueue(
   queueName: string,
   timeoutMs = 5000,
 ): Promise<DlqInspection> {
-  const conn = await amqplib.connect(amqpUrl);
-  const ch = await conn.createChannel();
+  const { conn, ch } = await openInspectionConn();
   try {
     return await new Promise<DlqInspection>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -87,18 +108,17 @@ async function popFromQueue(
       );
     });
   } finally {
-    await conn.close();
+    await closeSilently(conn);
   }
 }
 
 async function queueDepth(queueName: string): Promise<number> {
-  const conn = await amqplib.connect(amqpUrl);
-  const ch = await conn.createChannel();
+  const { conn, ch } = await openInspectionConn();
   try {
     const info = await ch.checkQueue(queueName);
     return info.messageCount;
   } finally {
-    await conn.close();
+    await closeSilently(conn);
   }
 }
 

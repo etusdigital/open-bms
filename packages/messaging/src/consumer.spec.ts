@@ -76,6 +76,7 @@ interface FakeMessage {
   properties: {
     contentType?: string;
     headers?: Record<string, unknown>;
+    deliveryMode?: number;
   };
   content: Buffer;
 }
@@ -87,6 +88,7 @@ function makeMessage(
     routingKey?: string;
     rawContent?: Buffer;
     contentType?: string;
+    deliveryMode?: number;
   } = {},
 ): FakeMessage {
   const payload = opts.payload ?? { hello: 'world' };
@@ -101,6 +103,9 @@ function makeMessage(
     properties: {
       contentType: opts.contentType ?? 'application/json',
       headers: opts.headers ?? {},
+      // Default to persistent (deliveryMode=2) since the Publisher defaults
+      // persistent=true, matching the most common production case.
+      deliveryMode: opts.deliveryMode ?? 2,
     },
     content: opts.rawContent ?? Buffer.from(JSON.stringify(payload), 'utf8'),
   };
@@ -320,6 +325,41 @@ describe('AmqpConsumer', () => {
           'x-bms-last-error': 'handler returned nack',
         }),
       });
+    });
+
+    it('preserves original deliveryMode when republishing for retry', async () => {
+      const { channel, publishChannel, consumer } = setup();
+      await consumer.consume(DEFAULT_OPTS, async () => 'nack');
+
+      // Volatile message (deliveryMode=1) should not be promoted to persistent
+      channel.deliver(makeMessage({ deliveryMode: 1 }));
+      await waitTick();
+
+      const opts = publishChannel.publish.mock.calls[0]?.[3] as {
+        persistent: boolean;
+      };
+      expect(opts.persistent).toBe(false);
+    });
+
+    it('preserves original deliveryMode when routing to DLQ', async () => {
+      const { channel, publishChannel, consumer } = setup();
+      await consumer.consume(DEFAULT_OPTS, async () => {
+        throw new Error('always fails');
+      });
+
+      // Volatile message at max retries → DLQ should stay volatile
+      channel.deliver(
+        makeMessage({
+          deliveryMode: 1,
+          headers: { 'x-bms-attempt': 3 },
+        }),
+      );
+      await waitTick();
+
+      const opts = publishChannel.publish.mock.calls[0]?.[3] as {
+        persistent: boolean;
+      };
+      expect(opts.persistent).toBe(false);
     });
 
     it('captures thrown error message as first + last error', async () => {

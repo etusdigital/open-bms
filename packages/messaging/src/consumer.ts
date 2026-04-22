@@ -373,7 +373,7 @@ export class AmqpConsumer implements Consumer {
         msg.fields.routingKey,
         msg.content,
         {
-          persistent: true,
+          persistent: wasPersistent(msg),
           contentType: msg.properties.contentType ?? 'application/json',
           headers,
         },
@@ -400,7 +400,7 @@ export class AmqpConsumer implements Consumer {
     };
 
     this.publishChannel.publish(DLX, msg.fields.routingKey, msg.content, {
-      persistent: true,
+      persistent: wasPersistent(msg),
       contentType: msg.properties.contentType ?? 'application/json',
       headers,
     });
@@ -418,7 +418,7 @@ export class AmqpConsumer implements Consumer {
     };
 
     this.publishChannel.publish(DLX, msg.fields.routingKey, msg.content, {
-      persistent: true,
+      persistent: wasPersistent(msg),
       contentType: msg.properties.contentType ?? 'application/octet-stream',
       headers,
     });
@@ -463,4 +463,11 @@ function coerceValue(v: unknown): unknown {
 function errorToString(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+function wasPersistent(msg: ConsumeMessage): boolean {
+  // AMQP deliveryMode: 2 = persistent, 1 or undefined = volatile.
+  // Preserving the original intent so retry/DLQ doesn't silently
+  // promote volatile messages to durable.
+  return msg.properties.deliveryMode === 2;
 }
