@@ -1,6 +1,6 @@
 export { AmqpPublisher, PublisherClosedError, SerializationError } from './publisher';
 export { AmqpConsumer } from './consumer';
-export { AmqpConnection, ConnectionClosedError } from './connection';
+export { AmqpConnection, ConnectionClosedError, redactAmqpUrl } from './connection';
 export type { RetryConfig } from './connection';
 export { computeBackoffMs } from './retry';
 export { createHttpBridgeHandler } from './http-bridge';
