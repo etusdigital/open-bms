@@ -1,16 +1,24 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppService } from './app.service';
-import { PubSubService } from './pubsub.service';
+import { EventPublisherService } from './event-publisher.service';
 import { FastifyRequest } from 'fastify';
+
+jest.mock('@bms/messaging', () => ({
+  AmqpPublisher: jest.fn().mockImplementation(() => ({
+    publish: jest.fn().mockResolvedValue(undefined),
+    close: jest.fn().mockResolvedValue(undefined),
+  })),
+  EXCHANGES: { events: 'bms.events' },
+}));
 
 describe('AppService', () => {
   let service: AppService;
-  let pubSubService: jest.Mocked<PubSubService>;
+  let eventPublisherService: jest.Mocked<EventPublisherService>;
   let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(async () => {
-    const mockPubSubService = {
-      sendAsyncMessage: jest.fn().mockResolvedValue(undefined),
+    const mockEventPublisherService = {
+      publish: jest.fn().mockResolvedValue(undefined),
     };
 
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -19,14 +27,14 @@ describe('AppService', () => {
       providers: [
         AppService,
         {
-          provide: PubSubService,
-          useValue: mockPubSubService,
+          provide: EventPublisherService,
+          useValue: mockEventPublisherService,
         },
       ],
     }).compile();
 
     service = module.get<AppService>(AppService);
-    pubSubService = module.get(PubSubService);
+    eventPublisherService = module.get(EventPublisherService);
   });
 
   afterEach(() => {
@@ -53,7 +61,7 @@ describe('AppService', () => {
       const result = await service.handleMessage(mockRequest, mockRequest.headers);
 
       expect(result).toEqual({ response: 'ok' });
-      expect(pubSubService.sendAsyncMessage).toHaveBeenCalledWith(
+      expect(eventPublisherService.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           source: 'web',
           timestamp: expect.any(Number),
@@ -95,7 +103,7 @@ describe('AppService', () => {
       const result = await service.handleMessage(mockRequest, mockRequest.headers);
 
       expect(result).toEqual({ response: 'ok' });
-      expect(pubSubService.sendAsyncMessage).toHaveBeenCalledWith(
+      expect(eventPublisherService.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           payload: {
             type: 'test',
@@ -122,7 +130,7 @@ describe('AppService', () => {
       const result = await service.handleMessage(mockRequest, mockRequest.headers);
 
       expect(result).toEqual({ response: 'ok' });
-      expect(pubSubService.sendAsyncMessage).toHaveBeenCalledWith(
+      expect(eventPublisherService.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           payload: expect.arrayContaining([expect.objectContaining(customEvent)]),
           client_info: expect.objectContaining({
@@ -147,7 +155,7 @@ describe('AppService', () => {
       const result = await service.handleMessage(mockRequest, mockRequest.headers);
 
       expect(result).toEqual({ response: 'ok' });
-      expect(pubSubService.sendAsyncMessage).toHaveBeenCalledWith(
+      expect(eventPublisherService.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           payload: {
             MessageStatus: 'delivered',
@@ -180,7 +188,7 @@ describe('AppService', () => {
       const result = await service.handleMessage(mockRequest, mockRequest.headers);
 
       expect(result).toEqual({ response: 'ok' });
-      expect(pubSubService.sendAsyncMessage).toHaveBeenCalledWith(
+      expect(eventPublisherService.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           payload: expect.arrayContaining([
             expect.objectContaining({
