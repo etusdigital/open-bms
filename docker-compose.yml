@@ -1,4 +1,36 @@
 services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'check_port_connectivity']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  event-receiver:
+    build:
+      context: .
+      dockerfile: apps/event-receiver/Dockerfile
+    container_name: event-receiver
+    ports:
+      - '3011:3011'
+    environment:
+      NODE_ENV: development
+      PORT: 3011
+      AMQP_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
   clickhouse:
     image: clickhouse/clickhouse-server:24.8-alpine
     container_name: clickhouse
@@ -104,3 +136,4 @@ services:
 
 volumes:
   clickhouse-data:
+  rabbitmq-data:
