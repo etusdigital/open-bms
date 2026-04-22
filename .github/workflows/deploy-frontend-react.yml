@@ -65,8 +65,6 @@ jobs:
       project-name: bms-frontend-react
       turbo-filter: '@msgops/frontend-react'
       environment: production
-      gcp-project: ${{ vars.GCP_PROJECT_PRODUCTION }}
-      registry: us-east1-docker.pkg.dev/${{ vars.GCP_PROJECT_PRODUCTION }}/${{ vars.ARTIFACT_REPO }}
     secrets:
       CF_PAGES_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
       CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
