@@ -1,5 +1,5 @@
 <script setup lang="ts">
-export type BriusSidebarItemProps = {
+export type BmsSidebarItemProps = {
   name: string;
   icon: unknown;
   active?: boolean;
@@ -7,7 +7,7 @@ export type BriusSidebarItemProps = {
   hideFromRoles?: string[];
 };
 
-const props = defineProps<BriusSidebarItemProps>();
+const props = defineProps<BmsSidebarItemProps>();
 </script>
 
 <template>

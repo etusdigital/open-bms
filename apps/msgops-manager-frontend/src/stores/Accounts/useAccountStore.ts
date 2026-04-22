@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { Storekeys } from '../Stores.types';
 import { accountHttpGateway } from '../../gateways/Account';
 import type { AccountsState } from './useAccountStore.types';
-import { BriusHttpParams } from '../../gateways/_common/Brius';
+import { BmsHttpParams } from '../../gateways/_common/Bms';
 import { CreateAccount, EditAccount } from '../../entities/Account';
 
 export const useAccountStore = defineStore(Storekeys.ACCOUNTS, {
@@ -23,7 +23,7 @@ export const useAccountStore = defineStore(Storekeys.ACCOUNTS, {
     },
   },
   actions: {
-    async fetchAccounts(params?: BriusHttpParams) {
+    async fetchAccounts(params?: BmsHttpParams) {
       this.accounts = {
         itemsPerPage: '',
         page: '',

@@ -3,7 +3,7 @@ import { toRef } from 'vue';
 import { useField } from 'vee-validate';
 import { ChevronDownOutline } from '@vicons/ionicons5';
 
-interface BriusTextFieldProps {
+interface BmsTextFieldProps {
   value?: string;
   name: string;
   label: string;
@@ -12,7 +12,7 @@ interface BriusTextFieldProps {
   placeholder?: string;
 }
 
-const props = withDefaults(defineProps<BriusTextFieldProps>(), { value: '', placeholder: '' });
+const props = withDefaults(defineProps<BmsTextFieldProps>(), { value: '', placeholder: '' });
 
 // Use `toRef` to create reactive references to `name` prop which is passed to `useField`
 // this is important because vee-validte needs to know if the field name changes

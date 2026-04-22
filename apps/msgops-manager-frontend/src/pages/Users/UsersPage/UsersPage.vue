@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n';
 import _ from 'lodash';
 import { SearchOutline } from '@vicons/ionicons5';
 import { useUserStore } from '../../../stores';
-import { BriusPageBase, BriusPageTitleWithPlusAction } from '../../../components';
+import { BmsPageBase, BmsPageTitleWithPlusAction } from '../../../components';
 import { dateWithTimeFormatter } from '../../../utils';
 import { Pagination } from '../../../utils/pagination';
 
@@ -140,10 +140,10 @@ const onChangeOptions = async (sortBy: sortBy[]) => {
 </script>
 
 <template>
-  <BriusPageBase>
-    <BriusPageTitleWithPlusAction @click-plus="handlePlusClick">
+  <BmsPageBase>
+    <BmsPageTitleWithPlusAction @click-plus="handlePlusClick">
       {{$t('userPage.users').toLocaleLowerCase()}}
-    </BriusPageTitleWithPlusAction>
+    </BmsPageTitleWithPlusAction>
     <div>
       <form
         class="tw-mt-3 tw-max-w-[283px] tw-max-h-10 tw-p-1 tw-flex tw-flex-row tw-border tw-border-gray-light tw-bg-white tw-rounded-lg focus-within:tw-outline focus-within:tw-outline-primary"
@@ -197,5 +197,5 @@ const onChangeOptions = async (sortBy: sortBy[]) => {
         ></v-pagination>
       </div>
     </div>
-  </BriusPageBase>
+  </BmsPageBase>
 </template>

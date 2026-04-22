@@ -1,9 +1,9 @@
 <script setup lang="ts">
-interface BriusFormProps {
+interface BmsFormProps {
   onSubmit: (e?: Event | undefined) => Promise<Promise<void> | undefined>;
 }
 
-const props = defineProps<BriusFormProps>();
+const props = defineProps<BmsFormProps>();
 </script>
 
 <template>

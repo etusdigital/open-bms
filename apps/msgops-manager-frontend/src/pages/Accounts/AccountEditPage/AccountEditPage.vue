@@ -3,7 +3,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useForm, InvalidSubmissionHandler } from 'vee-validate';
 import { useI18n } from 'vue-i18n';
-import { BriusPageBase, BriusPageTitleWithPlusAction, BriusButton, BriusTextField } from '../../../components';
+import { BmsPageBase, BmsPageTitleWithPlusAction, BmsButton, BmsTextField } from '../../../components';
 import { useAccountStore } from '../../../stores';
 import { EditAccount, accountEditZodValidation } from '../../../entities/Account';
 import { showToast } from '../../../utils/showToast';
@@ -64,11 +64,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <BriusPageBase>
-    <BriusPageTitleWithPlusAction>
+  <BmsPageBase>
+    <BmsPageTitleWithPlusAction>
       <template #subtitle>{{ $t('accountPage.accounts') }}</template>
       {{ $t('accountPage.editAccount').toLocaleLowerCase() }}
-    </BriusPageTitleWithPlusAction>
+    </BmsPageTitleWithPlusAction>
     <p v-if="loading">{{ $t('accountPage.loadingAccount') }}</p>
     <p v-if="error">{{ error?.message }}</p>
     <div v-if="account">
@@ -77,8 +77,8 @@ onBeforeUnmount(() => {
           class="tw-mb-[26px] tw-rounded-2xl tw-border tw-border-gray-light tw-bg-white tw-px-5 tw-pb-1 tw-pt-5 tw-shadow-md"
         >
           <div class="tw-grid tw-grid-cols-1 tw-gap-1">
-            <BriusTextField :value="account?.name" name="name" :label="$t('name')" type="text" />
-            <BriusTextField
+            <BmsTextField :value="account?.name" name="name" :label="$t('name')" type="text" />
+            <BmsTextField
               :value="account?.description"
               name="description"
               :label="$t('accountPage.description')"
@@ -88,17 +88,17 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="tw-flex tw-justify-end tw-gap-4">
-          <BriusButton name="back-page" type="button" variant="secondary" :disabled="isSubmitting" @click="onCancel">
+          <BmsButton name="back-page" type="button" variant="secondary" :disabled="isSubmitting" @click="onCancel">
             {{ $t('cancel') }}
-          </BriusButton>
-          <BriusButton name="delete-account" type="button" variant="delete" :disabled="isSubmitting" @click="onDelete">
+          </BmsButton>
+          <BmsButton name="delete-account" type="button" variant="delete" :disabled="isSubmitting" @click="onDelete">
             {{ $t('delete') }}
-          </BriusButton>
-          <BriusButton name="edit-account" type="submit" :disabled="isSubmitting">{{ $t('save') }}</BriusButton>
+          </BmsButton>
+          <BmsButton name="edit-account" type="submit" :disabled="isSubmitting">{{ $t('save') }}</BmsButton>
         </div>
       </form>
     </div>
-  </BriusPageBase>
+  </BmsPageBase>
 </template>
 
 <style scoped></style>

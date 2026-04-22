@@ -1,7 +1,7 @@
 import { User } from '../../entities/User';
-import { BriusHttpParams, BriusHttpResponse } from '../_common/Brius';
+import { BmsHttpParams, BmsHttpResponse } from '../_common/Bms';
 
 export interface UserGateway {
-  getAll(params?: BriusHttpParams): Promise<BriusHttpResponse<User[]>>;
+  getAll(params?: BmsHttpParams): Promise<BmsHttpResponse<User[]>>;
   getById(id: number): Promise<User>;
 }

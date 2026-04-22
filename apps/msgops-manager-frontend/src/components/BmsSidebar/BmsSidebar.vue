@@ -2,16 +2,16 @@
 import type { Ref } from 'vue';
 import { ref, computed } from 'vue';
 import { ChevronForward, ChevronBack } from '@vicons/ionicons5';
-import type { SidebarItem } from './BriusSidebar.types';
-import BriusSidebarItem from './BriusSidebarItem.vue';
+import type { SidebarItem } from './BmsSidebar.types';
+import BmsSidebarItem from './BmsSidebarItem.vue';
 import { useUserStore } from '../../stores';
 
-interface BriusSidebarProps {
+interface BmsSidebarProps {
   items: SidebarItem[];
   activeValue?: string;
 }
 
-const props = defineProps<BriusSidebarProps>();
+const props = defineProps<BmsSidebarProps>();
 const size: Ref<'small' | 'large'> = ref('small');
 const userStore = useUserStore();
 
@@ -35,7 +35,7 @@ const visibleItems: any = computed(() => {
     :class="{ 'collapsed-sidebar': size === 'small' }"
   >
     <div class="tw-mb-2 tw-flex tw-h-16 tw-items-end tw-px-4 tw-py-2">
-      <img class="logo" src="../../assets/brand-brius-sm.svg" alt="BMS - Brius Message System Logo" />
+      <img class="logo" src="../../assets/brand-brius-sm.svg" alt="BMS Admin Logo" />
       <Transition
         enter-from-class="tw-translate-x-[100%] tw-opacity-0"
         leave-to-class="tw-translate-x-[100%] tw-opacity-0"
@@ -51,7 +51,7 @@ const visibleItems: any = computed(() => {
       </Transition>
     </div>
     <div class="tw-ml-4 tw-flex tw-flex-1 tw-flex-col">
-      <BriusSidebarItem
+      <BmsSidebarItem
         v-for="item in visibleItems"
         :key="item.value"
         :name="item.name"

@@ -4,7 +4,7 @@ import { useField } from 'vee-validate';
 import { useI18n } from 'vue-i18n';
 import { RefreshOutline, Copy } from '@vicons/ionicons5';
 
-interface BriusTextFieldProps {
+interface BmsTextFieldProps {
   type?: 'text' | 'number' | 'email' | 'password';
   value?: string;
   name: string;
@@ -14,7 +14,7 @@ interface BriusTextFieldProps {
   successMessage?: string;
   placeholder?: string;
   size?: number;
-  characters?: string; 
+  characters?: string;
 }
 
 const { t } = useI18n();
@@ -22,7 +22,7 @@ const { t } = useI18n();
 const initialTooltipText = t('userPage.beforeCopy');
 const tooltipText = ref(initialTooltipText);
 
-const props = withDefaults(defineProps<BriusTextFieldProps>(), {
+const props = withDefaults(defineProps<BmsTextFieldProps>(), {
   type: 'text',
   value: '',
   placeholder: '',
@@ -62,11 +62,11 @@ const getStyleDisabled = (disabled: boolean) => {
 const handleCopy = () => {
   navigator.clipboard.writeText(inputValue.value);
   tooltipText.value = t('userPage.afterCopy');
-  
+
   setTimeout(() => {
     tooltipText.value = initialTooltipText;
   }, 3000);
-}
+};
 
 const generatePassword = () => {
   const charactersArray = props.characters?.split(',');
@@ -77,12 +77,12 @@ const generatePassword = () => {
     if (charactersArray.indexOf('a-z') >= 0) characterSet += 'abcdefghijklmnopqrstuvwxyz';
 
     if (charactersArray.indexOf('A-Z') >= 0) characterSet += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    
+
     if (charactersArray.indexOf('0-9') >= 0) characterSet += '0123456789';
-    
+
     if (charactersArray.indexOf('#') >= 0) characterSet += '![]{}()%&*$#^<>~@|';
   }
-  
+
   if (props.size) {
     for (let i = 0; i < props.size; i++) {
       newPassword += characterSet.charAt(Math.floor(Math.random() * characterSet.length));
@@ -90,14 +90,13 @@ const generatePassword = () => {
   }
 
   inputValue.value = newPassword;
-}
+};
 
 generatePassword();
 
 onMounted(() => {
   inputValue.value = props.value;
-})
-
+});
 </script>
 
 <template>

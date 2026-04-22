@@ -1,23 +1,23 @@
-import BriusButton from './BriusButton.vue';
-import BriusForm from './BriusForm.vue';
-import BriusHeader from './BriusHeader.vue';
-import BriusLoadingPage from './BriusLoadingPage.vue';
-import BriusPageBase from './BriusPageBase.vue';
-import BriusPageTitleWithPlusAction from './BriusPageTitleWithPlusAction.vue';
-import BriusSelect from './BriusSelect.vue';
-import BriusTextField from './BriusTextField.vue';
-import BriusSidebar from './BriusSidebar/BriusSidebar.vue';
-import BriusDataLoader from './BriusDataLoader.vue';
+import BmsButton from './BmsButton.vue';
+import BmsForm from './BmsForm.vue';
+import BmsHeader from './BmsHeader.vue';
+import BmsLoadingPage from './BmsLoadingPage.vue';
+import BmsPageBase from './BmsPageBase.vue';
+import BmsPageTitleWithPlusAction from './BmsPageTitleWithPlusAction.vue';
+import BmsSelect from './BmsSelect.vue';
+import BmsTextField from './BmsTextField.vue';
+import BmsSidebar from './BmsSidebar/BmsSidebar.vue';
+import BmsDataLoader from './BmsDataLoader.vue';
 
 export {
-  BriusButton,
-  BriusForm,
-  BriusHeader,
-  BriusLoadingPage,
-  BriusPageBase,
-  BriusPageTitleWithPlusAction,
-  BriusSelect,
-  BriusTextField,
-  BriusSidebar,
-  BriusDataLoader,
+  BmsButton,
+  BmsForm,
+  BmsHeader,
+  BmsLoadingPage,
+  BmsPageBase,
+  BmsPageTitleWithPlusAction,
+  BmsSelect,
+  BmsTextField,
+  BmsSidebar,
+  BmsDataLoader,
 };

@@ -2,24 +2,24 @@ import type { Account, CreateAccount, EditAccount, SendgridDns } from '../../ent
 import type { AccountGateway } from './AccountGateway.types';
 import { HttpClient, axiosAdapter } from '../../infra/HttpClient';
 import {
-  BriusHttpParams,
-  BriusHttpResponse,
-  briusHttpParamsDefault,
-  getBriusHttpParamsToString,
-} from '../_common/Brius';
+  BmsHttpParams,
+  BmsHttpResponse,
+  bmsHttpParamsDefault,
+  getBmsHttpParamsToString,
+} from '../_common/Bms';
 
 export class AccountHttpGateway implements AccountGateway {
   constructor(readonly httpClient: HttpClient, readonly baseUrl: string) {}
 
-  async getAll(params: BriusHttpParams): Promise<BriusHttpResponse<Account[]>> {
-    const mergedParams = { ...briusHttpParamsDefault, ...params };
-    return this.httpClient.get<BriusHttpResponse<Account[]>>(
-      `${this.baseUrl}/accounts?${getBriusHttpParamsToString(mergedParams)}`,
+  async getAll(params: BmsHttpParams): Promise<BmsHttpResponse<Account[]>> {
+    const mergedParams = { ...bmsHttpParamsDefault, ...params };
+    return this.httpClient.get<BmsHttpResponse<Account[]>>(
+      `${this.baseUrl}/accounts?${getBmsHttpParamsToString(mergedParams)}`,
     );
   }
 
-  async getAllAccounts(): Promise<BriusHttpResponse<Account[]>> {
-    return this.httpClient.get<BriusHttpResponse<Account[]>>(`${this.baseUrl}/accounts/all`);
+  async getAllAccounts(): Promise<BmsHttpResponse<Account[]>> {
+    return this.httpClient.get<BmsHttpResponse<Account[]>>(`${this.baseUrl}/accounts/all`);
   }
 
   async getById(id: number): Promise<Account> {

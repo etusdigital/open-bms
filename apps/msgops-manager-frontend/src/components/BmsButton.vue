@@ -1,5 +1,5 @@
 <script setup lang="ts">
-interface BriusButtonProps {
+interface BmsButtonProps {
   type?: 'button' | 'reset' | 'submit';
   variant?: 'primary' | 'secondary' | 'delete';
   name: string;
@@ -9,7 +9,7 @@ interface BriusButtonProps {
   click?: (payload: MouseEvent) => void;
 }
 
-const props = withDefaults(defineProps<BriusButtonProps>(), {
+const props = withDefaults(defineProps<BmsButtonProps>(), {
   type: 'button',
   disabled: false,
   variant: 'primary',
@@ -37,7 +37,7 @@ const styleDisabledButton = {
   'tw-bg-opacity-80': true,
 };
 
-const getStyleVariant = (variant: BriusButtonProps['variant']) => {
+const getStyleVariant = (variant: BmsButtonProps['variant']) => {
   if (variant === 'secondary') {
     return styleButtonSecondary;
   }

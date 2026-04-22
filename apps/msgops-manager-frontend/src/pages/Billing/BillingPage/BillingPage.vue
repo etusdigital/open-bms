@@ -5,9 +5,9 @@ import { ref, watch, computed, onBeforeMount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import _ from 'lodash';
 import { useAccountStore, useBillingStore, useUserStore } from '../../../stores';
-import { BriusPageBase, BriusPageTitleWithPlusAction } from '../../../components';
+import { BmsPageBase, BmsPageTitleWithPlusAction } from '../../../components';
 import { numberFormatter } from '../../../utils/numberFormatter';
-import BriusDataLoader from '../../../components/BriusDataLoader.vue';
+import BmsDataLoader from '../../../components/BmsDataLoader.vue';
 import type { Account } from '../../../entities/Account';
 const userStore = useUserStore();
 const { push } = useRouter();
@@ -291,10 +291,10 @@ const billingCards = [
 </script>
 
 <template>
-  <BriusPageBase>
-    <BriusPageTitleWithPlusAction>
+  <BmsPageBase>
+    <BmsPageTitleWithPlusAction>
       {{ t('billingPage.billing').toLocaleLowerCase() }}
-    </BriusPageTitleWithPlusAction>
+    </BmsPageTitleWithPlusAction>
     <div class="mt-3 tw-flex tw-items-center" :class="{ 'tw-gap-3': !uniqueAccount, 'tw-mb-5': !chipItems.length }">
       <v-menu v-if="!uniqueAccount" v-model="accountMenu" :close-on-content-click="false">
         <template #activator="{ props }">
@@ -473,7 +473,7 @@ const billingCards = [
     </div>
     <div v-if="isDataSelected" class="tw-container tw-max-w-[-webkit-fill-available]">
       <div class="tw-grid tw-grid-cols-3 tw-gap-4 tw-pb-4 xl:tw-grid-cols-5">
-        <BriusDataLoader
+        <BmsDataLoader
           v-for="cards in billingCards"
           :key="`loader-${cards}`"
           :is-loading="loading"
@@ -503,7 +503,7 @@ const billingCards = [
         </div>
       </div>
     </div>
-    <BriusDataLoader
+    <BmsDataLoader
       v-if="isDataSelected"
       :is-loading="loading"
       :type="'text, text'"
@@ -548,7 +548,7 @@ const billingCards = [
         }}</span>
       </div>
       <p v-if="error">{{ error?.message }}</p>
-      <BriusDataLoader
+      <BmsDataLoader
         :is-loading="loading"
         :type="'table-tbody'"
         :class="'tw-mt-1 tw-rounded-2xl tw-text-main-gray'"
@@ -663,5 +663,5 @@ const billingCards = [
         </tfoot>
       </table>
     </div>
-  </BriusPageBase>
+  </BmsPageBase>
 </template>

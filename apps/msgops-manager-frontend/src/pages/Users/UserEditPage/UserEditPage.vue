@@ -5,7 +5,7 @@ import { storeToRefs } from 'pinia';
 import { useForm, InvalidSubmissionHandler } from 'vee-validate';
 import { useI18n } from 'vue-i18n';
 import { TrashOutline } from '@vicons/ionicons5';
-import { BriusPageBase, BriusPageTitleWithPlusAction, BriusButton, BriusTextField } from '../../../components';
+import { BmsPageBase, BmsPageTitleWithPlusAction, BmsButton, BmsTextField } from '../../../components';
 import { useAccountStore, useUserStore } from '../../../stores';
 import { EditUser, userEditZodValidation } from '../../../entities/User';
 import { dateFormatter } from '../../../utils';
@@ -119,12 +119,12 @@ const handleDeleteRow = (index: number) => {
 </script>
 
 <template>
-  <BriusPageBase>
+  <BmsPageBase>
     <div>
-      <BriusPageTitleWithPlusAction>
+      <BmsPageTitleWithPlusAction>
         <template #subtitle>{{ $t('userPage.users') }}</template>
         {{ $t('userPage.editUser').toLocaleLowerCase() }}
-      </BriusPageTitleWithPlusAction>
+      </BmsPageTitleWithPlusAction>
     </div>
     <p v-if="loading">{{ $t('userPage.loadingUser') }}</p>
     <p v-if="error">{{ error?.message }}</p>
@@ -135,8 +135,8 @@ const handleDeleteRow = (index: number) => {
           class="tw-mb-[26px] tw-mt-2 tw-rounded-2xl tw-border tw-border-gray-light tw-bg-white tw-px-5 tw-pt-5 tw-shadow-md"
         >
           <div class="tw-grid tw-grid-cols-2 tw-gap-4">
-            <BriusTextField :value="userEdit?.name" name="name" :label="$t('name')" type="text" />
-            <BriusTextField :value="userEdit?.email" name="email" :label="$t('email')" type="email" />
+            <BmsTextField :value="userEdit?.name" name="name" :label="$t('name')" type="text" />
+            <BmsTextField :value="userEdit?.email" name="email" :label="$t('email')" type="email" />
           </div>
         </div>
 
@@ -188,7 +188,7 @@ const handleDeleteRow = (index: number) => {
               />
             </div>
           </div>
-          <BriusButton
+          <BmsButton
             name="back-page"
             type="button"
             variant="primary"
@@ -196,7 +196,7 @@ const handleDeleteRow = (index: number) => {
             @click="handleAddRow()"
           >
             {{ $t('addNewAccount') }}
-          </BriusButton>
+          </BmsButton>
         </div>
 
         <div class="tw-flex tw-items-center tw-justify-between">
@@ -204,7 +204,7 @@ const handleDeleteRow = (index: number) => {
             {{ $t('createdOn') + ' ' + dateFormatter(userEdit?.createdAt, userEdit?.settings.language) }}
           </p>
           <div class="tw-flex tw-justify-end tw-gap-4">
-            <BriusButton
+            <BmsButton
               class="-tw-mr-2"
               name="back-page"
               type="button"
@@ -213,16 +213,16 @@ const handleDeleteRow = (index: number) => {
               @click="onCancel"
             >
               {{ $t('cancel') }}
-            </BriusButton>
-            <BriusButton name="delete-user" type="button" variant="delete" :disabled="isSubmitting" @click="onDelete">
+            </BmsButton>
+            <BmsButton name="delete-user" type="button" variant="delete" :disabled="isSubmitting" @click="onDelete">
               {{ $t('delete') }}
-            </BriusButton>
-            <BriusButton name="edit-user" type="submit" :disabled="isSubmitting">{{ $t('save') }}</BriusButton>
+            </BmsButton>
+            <BmsButton name="edit-user" type="submit" :disabled="isSubmitting">{{ $t('save') }}</BmsButton>
           </div>
         </div>
       </form>
     </div>
-  </BriusPageBase>
+  </BmsPageBase>
 </template>
 
 <style scoped></style>

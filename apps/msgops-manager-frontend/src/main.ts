@@ -31,12 +31,6 @@ export const vuetify = createVuetify({
       mdi,
     },
   },
-  // theme: {
-  //   defaultTheme: 'briusLightTheme',
-  //   themes: {
-  //     briusLightTheme,
-  //   },
-  // },
 });
 
 const options: PluginOptions = {

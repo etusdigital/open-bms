@@ -3,7 +3,7 @@ import { Storekeys } from '../Stores.types';
 import { UsersState } from './useUserStore.types';
 import { userHttpGateway } from '../../gateways/User';
 import { CreateUser, EditUser, User } from '../../entities/User';
-import { BriusHttpParams } from '../../gateways/_common/Brius';
+import { BmsHttpParams } from '../../gateways/_common/Bms';
 
 export const useUserStore = defineStore(Storekeys.USERS, {
   state: (): UsersState => ({
@@ -29,7 +29,7 @@ export const useUserStore = defineStore(Storekeys.USERS, {
     },
   },
   actions: {
-    async fetchUsers(params: BriusHttpParams) {
+    async fetchUsers(params: BmsHttpParams) {
       this.users.results = [];
       this.loading = true;
       this.error = undefined;

@@ -3,11 +3,11 @@ import { InvalidSubmissionHandler, useForm } from 'vee-validate';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
-  BriusPageBase,
-  BriusPageTitleWithPlusAction,
-  BriusButton,
-  BriusTextField,
-  BriusSelect,
+  BmsPageBase,
+  BmsPageTitleWithPlusAction,
+  BmsButton,
+  BmsTextField,
+  BmsSelect,
 } from '../../../components';
 import { useAccountStore } from '../../../stores';
 import { CreateAccount, accountCreateZodValidation, SendgridDns, Account } from '../../../entities/Account';
@@ -100,18 +100,18 @@ const onCancel = () => {
 </script>
 
 <template>
-  <BriusPageBase>
-    <BriusPageTitleWithPlusAction>
+  <BmsPageBase>
+    <BmsPageTitleWithPlusAction>
       <template #subtitle>{{ $t('accountPage.accounts') }}</template>
       {{ $t('accountPage.addAccount').toLocaleLowerCase() }}
-    </BriusPageTitleWithPlusAction>
+    </BmsPageTitleWithPlusAction>
     <form v-if="!shouldShowDnsTable" id="create-user" @submit.prevent="onSubmit">
       <div
         class="tw-mb-[26px] tw-rounded-2xl tw-border tw-border-gray-light tw-bg-white tw-px-5 tw-pb-1 tw-pt-5 tw-shadow-md"
       >
         <div class="tw-grid tw-grid-cols-1 tw-gap-1">
-          <BriusTextField name="name" :label="$t('name')" :placeholder="$t('typeHere')" type="text" />
-          <BriusTextField
+          <BmsTextField name="name" :label="$t('name')" :placeholder="$t('typeHere')" type="text" />
+          <BmsTextField
             name="description"
             :label="$t('accountPage.description')"
             :placeholder="$t('typeHere')"
@@ -158,13 +158,13 @@ const onCancel = () => {
             </div>
           </div>
 
-          <BriusTextField
+          <BmsTextField
             name="defaultDomain"
             :label="$t('accountPage.defaultDomain')"
             placeholder="https://domain.com"
             type="text"
           />
-          <BriusTextField
+          <BmsTextField
             name="unsubscribeRedirectUrl"
             :label="$t('accountPage.unsubscribeRedirectUrl')"
             placeholder="https://domain.com/unsubscribe"
@@ -233,7 +233,7 @@ const onCancel = () => {
             Create a new sendgrid's subuser or...
           </label>
 
-          <BriusSelect
+          <BmsSelect
             v-if="!createSendgridAccount"
             name="sendgridUser"
             :label="$t('accountPage.sendgridUser')"
@@ -245,9 +245,9 @@ const onCancel = () => {
                 {{ user }}
               </option>
             </slot>
-          </BriusSelect>
+          </BmsSelect>
 
-          <BriusTextField
+          <BmsTextField
             name="linkBranding"
             :label="$t('accountPage.linkBranding')"
             :placeholder="$t('accountPage.linkBrandingPlaceholder')"
@@ -292,10 +292,10 @@ const onCancel = () => {
       </div>
 
       <div class="tw-flex tw-justify-end tw-gap-4">
-        <BriusButton name="back-page" type="button" variant="secondary" :disabled="isSubmitting" @click="onCancel">
+        <BmsButton name="back-page" type="button" variant="secondary" :disabled="isSubmitting" @click="onCancel">
           {{ $t('cancel') }}
-        </BriusButton>
-        <BriusButton name="create-account" type="submit" :disabled="isSubmitting">{{ $t('save') }}</BriusButton>
+        </BmsButton>
+        <BmsButton name="create-account" type="submit" :disabled="isSubmitting">{{ $t('save') }}</BmsButton>
       </div>
     </form>
 
@@ -333,5 +333,5 @@ const onCancel = () => {
         </div>
       </div>
     </div>
-  </BriusPageBase>
+  </BmsPageBase>
 </template>

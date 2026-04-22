@@ -1,20 +1,20 @@
 import { CreateUser, EditUser, User } from '../../entities/User';
 import { HttpClient, axiosAdapter } from '../../infra/HttpClient';
 import {
-  BriusHttpParams,
-  BriusHttpResponse,
-  briusHttpParamsDefault,
-  getBriusHttpParamsToString,
-} from '../_common/Brius';
+  BmsHttpParams,
+  BmsHttpResponse,
+  bmsHttpParamsDefault,
+  getBmsHttpParamsToString,
+} from '../_common/Bms';
 import { UserGateway } from './UserGateway.types';
 
 export class UserHttpGateway implements UserGateway {
   constructor(readonly httpClient: HttpClient, readonly baseUrl: string) {}
 
-  async getAll(params: BriusHttpParams): Promise<BriusHttpResponse<User[]>> {
-    const mergedParams = { ...briusHttpParamsDefault, ...params };
-    return this.httpClient.get<BriusHttpResponse<User[]>>(
-      `${this.baseUrl}/users?${getBriusHttpParamsToString(mergedParams)}`,
+  async getAll(params: BmsHttpParams): Promise<BmsHttpResponse<User[]>> {
+    const mergedParams = { ...bmsHttpParamsDefault, ...params };
+    return this.httpClient.get<BmsHttpResponse<User[]>>(
+      `${this.baseUrl}/users?${getBmsHttpParamsToString(mergedParams)}`,
     );
   }
 

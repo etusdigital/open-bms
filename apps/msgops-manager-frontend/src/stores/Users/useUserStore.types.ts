@@ -1,8 +1,8 @@
-import { BriusHttpResponse } from '../../gateways/_common/Brius';
+import { BmsHttpResponse } from '../../gateways/_common/Bms';
 import { User } from '../../entities/User';
 
 export type UsersState = {
-  users: BriusHttpResponse<User[]>;
+  users: BmsHttpResponse<User[]>;
   user?: User;
   userEdit?: User;
   loading: boolean;

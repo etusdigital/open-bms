@@ -4,7 +4,7 @@ import { InvalidSubmissionHandler, useForm } from 'vee-validate';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
-import { BriusPageBase, BriusPageTitleWithPlusAction, BriusButton, BriusTextField } from '../../../components';
+import { BmsPageBase, BmsPageTitleWithPlusAction, BmsButton, BmsTextField } from '../../../components';
 import { TrashOutline } from '@vicons/ionicons5';
 import { useUserStore, useAccountStore } from '../../../stores';
 import { CreateUser, userCreateZodValidation } from '../../../entities/User';
@@ -93,12 +93,12 @@ const handleDeleteRow = (index: number) => {
 </script>
 
 <template>
-  <BriusPageBase>
+  <BmsPageBase>
     <div>
-      <BriusPageTitleWithPlusAction>
+      <BmsPageTitleWithPlusAction>
         <template #subtitle>{{ $t('userPage.users') }}</template>
         {{ $t('userPage.addUser').toLocaleLowerCase() }}
-      </BriusPageTitleWithPlusAction>
+      </BmsPageTitleWithPlusAction>
     </div>
     <form id="create-user" @submit.prevent="onSubmit">
       <p class="tw-mt-4 tw-font-semibold tw-text-main-gray">{{ $t('information') }}</p>
@@ -106,9 +106,9 @@ const handleDeleteRow = (index: number) => {
         class="tw-mb-[26px] tw-mt-2 tw-rounded-2xl tw-border tw-border-gray-light tw-bg-white tw-px-5 tw-pt-5 tw-shadow-md"
       >
         <div class="tw-grid tw-grid-cols-4 tw-gap-4">
-          <BriusTextField name="name" :label="$t('name')" :placeholder="$t('typeHere')" type="text" />
-          <BriusTextField name="email" :label="$t('email')" :placeholder="$t('typeHere')" type="email" />
-          <BriusTextField
+          <BmsTextField name="name" :label="$t('name')" :placeholder="$t('typeHere')" type="text" />
+          <BmsTextField name="email" :label="$t('email')" :placeholder="$t('typeHere')" type="email" />
+          <BmsTextField
             :password="true"
             name="password"
             :label="$t('userPage.password')"
@@ -163,21 +163,21 @@ const handleDeleteRow = (index: number) => {
             />
           </div>
         </div>
-        <BriusButton name="back-page" type="button" variant="primary" :disabled="isSubmitting" @click="handleAddRow()">
+        <BmsButton name="back-page" type="button" variant="primary" :disabled="isSubmitting" @click="handleAddRow()">
           {{ $t('addNewAccount') }}
-        </BriusButton>
+        </BmsButton>
       </div>
 
       <div class="tw-flex tw-justify-end tw-gap-4">
-        <BriusButton name="back-page" type="button" variant="secondary" :disabled="isSubmitting" @click="onCancel">
+        <BmsButton name="back-page" type="button" variant="secondary" :disabled="isSubmitting" @click="onCancel">
           {{ $t('cancel') }}
-        </BriusButton>
-        <BriusButton name="create-user" type="submit" :disabled="isSubmitting">{{
+        </BmsButton>
+        <BmsButton name="create-user" type="submit" :disabled="isSubmitting">{{
           $t('userPage.addAndInvite')
-        }}</BriusButton>
+        }}</BmsButton>
       </div>
     </form>
-  </BriusPageBase>
+  </BmsPageBase>
 </template>
 
 <style scoped></style>

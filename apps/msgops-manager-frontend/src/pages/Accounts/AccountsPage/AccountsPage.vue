@@ -6,11 +6,11 @@ import { useI18n } from 'vue-i18n';
 import _ from 'lodash';
 import { SearchOutline } from '@vicons/ionicons5';
 import { useAccountStore, useUserStore } from '../../../stores';
-import { BriusPageBase, BriusPageTitleWithPlusAction } from '../../../components';
+import { BmsPageBase, BmsPageTitleWithPlusAction } from '../../../components';
 import { dateWithTimeFormatter } from '../../../utils';
 import { Pagination } from '../../../utils/pagination';
 import { computed } from 'vue';
-import { BriusHttpResponse } from '../../../gateways/_common/Brius';
+import { BmsHttpResponse } from '../../../gateways/_common/Bms';
 import { Account } from '../../../entities/Account';
 
 type sortBy = {
@@ -34,7 +34,7 @@ const totalAccountData = ref(0);
 const initialSortByValue = [{ key: '', order: '' }];
 const sortByRef = ref(initialSortByValue);
 
-const accountsList = computed(() => accounts.value as BriusHttpResponse<Account[]>);
+const accountsList = computed(() => accounts.value as BmsHttpResponse<Account[]>);
 
 const setValuesUrl = () => {
   if (pagination.page === 1 && (query.page === undefined || pagination.page === Number(query.page))) {
@@ -149,10 +149,10 @@ const onChangeOptions = async (sortBy: sortBy[]) => {
 </script>
 
 <template>
-  <BriusPageBase>
-    <BriusPageTitleWithPlusAction @click-plus="handlePlusClick">
+  <BmsPageBase>
+    <BmsPageTitleWithPlusAction @click-plus="handlePlusClick">
       {{ $t('accountPage.accounts').toLocaleLowerCase() }}
-    </BriusPageTitleWithPlusAction>
+    </BmsPageTitleWithPlusAction>
     <div>
       <form
         class="tw-mt-3 tw-flex tw-max-h-10 tw-max-w-[283px] tw-flex-row tw-rounded-lg tw-border tw-border-gray-light tw-bg-white tw-p-1 focus-within:tw-outline focus-within:tw-outline-primary"
@@ -222,7 +222,7 @@ const onChangeOptions = async (sortBy: sortBy[]) => {
         ></v-pagination>
       </div>
     </div>
-  </BriusPageBase>
+  </BmsPageBase>
 </template>
 
 <style scoped></style>

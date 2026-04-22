@@ -1,12 +1,12 @@
 <script setup lang="ts">
-interface BriusDataLoaderProps {
+interface BmsDataLoaderProps {
   isLoading?: boolean;
   type?: string;
   height?: string;
   class?: string;
 }
 
-const props = defineProps<BriusDataLoaderProps>();
+const props = defineProps<BmsDataLoaderProps>();
 </script>
 
 <template>

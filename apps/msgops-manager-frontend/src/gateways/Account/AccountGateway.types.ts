@@ -1,7 +1,7 @@
 import { Account } from '../../entities/Account';
-import { BriusHttpParams, BriusHttpResponse } from '../_common/Brius';
+import { BmsHttpParams, BmsHttpResponse } from '../_common/Bms';
 
 export interface AccountGateway {
-  getAll(params?: BriusHttpParams): Promise<BriusHttpResponse<Account[]>>;
+  getAll(params?: BmsHttpParams): Promise<BmsHttpResponse<Account[]>>;
   getById(id: number): Promise<Account>;
 }

@@ -2,13 +2,13 @@
 import { ref } from 'vue';
 import { AddOutline } from '@vicons/ionicons5';
 
-interface BriusPageTitleWithPlusActionProps {
+interface BmsPageTitleWithPlusActionProps {
   onClickPlus?: (event: MouseEvent) => void;
 }
 
 const isHovering = ref(false);
 
-const props = defineProps<BriusPageTitleWithPlusActionProps>();
+const props = defineProps<BmsPageTitleWithPlusActionProps>();
 </script>
 
 <template>

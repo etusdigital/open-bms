@@ -2,13 +2,13 @@
 import { ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAuth0 } from '@auth0/auth0-vue';
-import { BriusHeader, BriusSidebar, BriusLoadingPage } from './components';
+import { BmsHeader, BmsSidebar, BmsLoadingPage } from './components';
 import { loginHttpGateway } from './gateways/Login';
 import { useUserStore } from './stores';
 import { User } from './entities/User';
 import { useI18n } from 'vue-i18n';
 import { routes } from './pages';
-import { SidebarItem } from './components/BriusSidebar/BriusSidebar.types';
+import { SidebarItem } from './components/BmsSidebar/BmsSidebar.types';
 import router from './router';
 
 const { isAuthenticated, isLoading, loginWithRedirect, user: authUser } = useAuth0();
@@ -46,17 +46,17 @@ watch(authUser, async (newValue) => {
 </script>
 
 <template>
-  <BriusHeader></BriusHeader>
+  <BmsHeader></BmsHeader>
   <div>
     <div v-if="isLoading">
-      <BriusLoadingPage :is-loading="isLoading" />
+      <BmsLoadingPage :is-loading="isLoading" />
     </div>
     <div v-else>
-      <BriusLoadingPage v-if="!setLogin" :is-loading="!setLogin" />
+      <BmsLoadingPage v-if="!setLogin" :is-loading="!setLogin" />
 
       <div v-else>
         <div class="tw-mx-10 tw-grid tw-grid-cols-content">
-          <BriusSidebar :items="sidebarItems" :active-value="location.name?.toString()"></BriusSidebar>
+          <BmsSidebar :items="sidebarItems" :active-value="location.name?.toString()"></BmsSidebar>
           <div class="tw-px-5">
             <router-view></router-view>
           </div>
