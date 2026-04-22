@@ -52,6 +52,31 @@ await consumer.consume(
 process.on('SIGTERM', () => consumer.shutdown());
 ```
 
+### HTTP bridge handler
+
+For the common pattern of "consume AMQP → call internal HTTP endpoint → translate response", use `createHttpBridgeHandler`. Implements the contract from the decision doc: POST with `X-Internal-Token`, maps `5xx → 'nack'`, `429 → 'requeue'`, everything else → `'ack'`.
+
+```typescript
+import { AmqpConsumer, createHttpBridgeHandler, EXCHANGES } from '@bms/messaging';
+
+const handler = createHttpBridgeHandler({
+  endpoint: 'http://localhost:3000/internal/email/send',
+  token: process.env.INTERNAL_AUTH_TOKEN!,
+});
+
+const consumer = new AmqpConsumer({ url: process.env.AMQP_URL! });
+await consumer.consume(
+  {
+    exchange: EXCHANGES.email,
+    routingKey: 'email.send',
+    queue: 'send-email.email.send',
+  },
+  handler,
+);
+```
+
+Tracing headers `X-Bms-Attempt` and `X-Bms-Routing-Key` are added automatically. Apps that need custom semantics (different status mappings, alternative auth, non-HTTP handlers) can skip this helper and pass their own `Handler` to `consume()`.
+
 ## Conventions
 
 | Item        | Pattern                             | Example                     |

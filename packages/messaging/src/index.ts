@@ -3,6 +3,8 @@ export { AmqpConsumer } from './consumer';
 export { AmqpConnection, ConnectionClosedError } from './connection';
 export type { RetryConfig } from './connection';
 export { computeBackoffMs } from './retry';
+export { createHttpBridgeHandler } from './http-bridge';
+export type { HttpBridgeConfig } from './http-bridge';
 export { EXCHANGES, DLX } from './exchanges';
 export type { ExchangeName } from './exchanges';
 export type {

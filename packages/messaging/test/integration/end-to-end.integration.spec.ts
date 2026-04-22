@@ -1,3 +1,5 @@
+import { createServer, type Server } from 'http';
+import type { AddressInfo } from 'net';
 import * as amqplib from 'amqplib';
 import {
   GenericContainer,
@@ -7,6 +9,7 @@ import {
 import {
   AmqpConsumer,
   AmqpPublisher,
+  createHttpBridgeHandler,
   DLX,
   EXCHANGES,
 } from '../../src';
@@ -330,4 +333,116 @@ describe('AmqpPublisher + AmqpConsumer integration', () => {
     await publisher.close();
     await freshConsumer.shutdown();
   }, 45_000);
+
+  it('T6 — createHttpBridgeHandler routes AMQP msg through local HTTP service and acks on 2xx', async () => {
+    const queue = uniqueQueue('t6.email.send');
+    const routingKey = 'email.send';
+
+    let receivedPath: string | undefined;
+    let receivedToken: string | undefined;
+    let receivedAttempt: string | undefined;
+    let receivedBody: unknown;
+
+    const server: Server = createServer((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (c) => chunks.push(c as Buffer));
+      req.on('end', () => {
+        receivedPath = req.url;
+        receivedToken = req.headers['x-internal-token'] as string | undefined;
+        receivedAttempt = req.headers['x-bms-attempt'] as string | undefined;
+        receivedBody = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        res.statusCode = 200;
+        res.end('ok');
+      });
+    });
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as AddressInfo).port;
+
+    const publisher = new AmqpPublisher({ url: amqpUrl });
+    const consumer = new AmqpConsumer({ url: amqpUrl }, 5000);
+
+    const handler = createHttpBridgeHandler({
+      endpoint: `http://127.0.0.1:${port}/internal/email/send`,
+      token: 'bridge-token',
+    });
+
+    await consumer.consume(
+      { exchange: EXCHANGES.email, routingKey, queue },
+      handler,
+    );
+
+    await publisher.publish({
+      exchange: EXCHANGES.email,
+      routingKey,
+      payload: { id: 't6' },
+    });
+
+    await waitUntil(() => receivedBody != null, 5000);
+
+    expect(receivedPath).toBe('/internal/email/send');
+    expect(receivedToken).toBe('bridge-token');
+    expect(receivedAttempt).toBe('1');
+    expect(receivedBody).toEqual({ id: 't6' });
+
+    await waitUntil(async () => (await queueDepth(queue)) === 0, 3000);
+    expect(await queueDepth(queue)).toBe(0);
+
+    await publisher.close();
+    await consumer.shutdown();
+    await new Promise<void>((r) => server.close(() => r()));
+  }, 30_000);
+
+  it('T7 — createHttpBridgeHandler retries on 5xx and eventually acks', async () => {
+    const queue = uniqueQueue('t7.email.send');
+    const routingKey = 'email.send';
+
+    const seenAttempts: string[] = [];
+    const server: Server = createServer((req, res) => {
+      const attempt = req.headers['x-bms-attempt'] as string;
+      seenAttempts.push(attempt);
+      req.on('data', () => {});
+      req.on('end', () => {
+        // Fail the first attempt with 503, succeed on the second
+        res.statusCode = seenAttempts.length === 1 ? 503 : 200;
+        res.end('');
+      });
+    });
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as AddressInfo).port;
+
+    const publisher = new AmqpPublisher({ url: amqpUrl });
+    const consumer = new AmqpConsumer({ url: amqpUrl }, 5000);
+
+    const handler = createHttpBridgeHandler({
+      endpoint: `http://127.0.0.1:${port}/`,
+      token: 't',
+    });
+
+    await consumer.consume(
+      {
+        exchange: EXCHANGES.email,
+        routingKey,
+        queue,
+        maxRetries: 3,
+        backoffBaseMs: 50,
+        backoffMaxMs: 100,
+      },
+      handler,
+    );
+
+    await publisher.publish({
+      exchange: EXCHANGES.email,
+      routingKey,
+      payload: { id: 't7' },
+    });
+
+    await waitUntil(() => seenAttempts.length >= 2, 5000);
+
+    expect(seenAttempts).toEqual(['1', '2']);
+    await waitUntil(async () => (await queueDepth(queue)) === 0, 3000);
+
+    await publisher.close();
+    await consumer.shutdown();
+    await new Promise<void>((r) => server.close(() => r()));
+  }, 30_000);
 });
