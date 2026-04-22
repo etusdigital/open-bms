@@ -1,0 +1,67 @@
+name: Deploy frontend-vue2
+
+on:
+  push:
+    branches: [master, staging]
+    paths: ['apps/frontend-vue2/**']
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Force deploy (skip change detection)
+        type: boolean
+        default: false
+
+jobs:
+  changes:
+    name: Detect changes
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/_detect-changes.yml
+    with:
+      package-name: frontend-vue2
+    secrets: inherit
+
+  deploy-staging:
+    needs: changes
+    if: |
+      always() &&
+      github.ref_name == 'staging' &&
+      (needs.changes.outputs.affected == 'true' || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/_deploy-gcs.yml
+    with:
+      app-name: frontend-vue2
+      node-version: '16'
+      build-command: yarn build
+      gcs-bucket: ${{ vars.GCS_BUCKET_FRONTEND_VUE2_STAGING }}
+      cloudflare-purge-url: ${{ vars.CF_PURGE_PREFIX_STAGING }}
+    secrets:
+      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY_STAGING }}
+      VUE_APP_API_URL: ${{ secrets.VUE_APP_API_URL_STAGING }}
+      VUE_APP_AUTH0_DOMAIN: ${{ secrets.VUE_APP_AUTH0_DOMAIN }}
+      VUE_APP_AUTH0_CLIENT_ID: ${{ secrets.VUE_APP_AUTH0_CLIENT_ID_STAGING }}
+      VUE_APP_AUTH0_AUDIENCE: ${{ secrets.VUE_APP_AUTH0_AUDIENCE_STAGING }}
+      VUE_APP_REDIRECT_MANAGER: ${{ secrets.VUE_APP_REDIRECT_MANAGER_STAGING }}
+      CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+
+  deploy-production:
+    needs: changes
+    if: |
+      always() &&
+      github.ref_name != 'staging' &&
+      (needs.changes.outputs.affected == 'true' || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/_deploy-gcs.yml
+    with:
+      app-name: frontend-vue2
+      node-version: '16'
+      build-command: yarn build
+      gcs-bucket: ${{ vars.GCS_BUCKET_FRONTEND_VUE2_PRODUCTION }}
+      cloudflare-purge-url: ${{ vars.CF_PURGE_PREFIX_PRODUCTION }}
+    secrets:
+      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+      VUE_APP_API_URL: ${{ secrets.VUE_APP_API_URL }}
+      VUE_APP_AUTH0_DOMAIN: ${{ secrets.VUE_APP_AUTH0_DOMAIN }}
+      VUE_APP_AUTH0_CLIENT_ID: ${{ secrets.VUE_APP_AUTH0_CLIENT_ID }}
+      VUE_APP_AUTH0_AUDIENCE: ${{ secrets.VUE_APP_AUTH0_AUDIENCE }}
+      VUE_APP_REDIRECT_MANAGER: ${{ secrets.VUE_APP_REDIRECT_MANAGER }}
+      CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
