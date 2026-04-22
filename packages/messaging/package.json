@@ -1,0 +1,43 @@
+{
+  "name": "@bms/messaging",
+  "version": "0.0.1",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "test": "jest",
+    "test:integration": "jest --config jest.integration.config.js",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.4"
+  },
+  "devDependencies": {
+    "@retention/typescript-config": "workspace:*",
+    "@types/amqplib": "^0.10.5",
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "testcontainers": "^10.13.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.8.0"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.ts$": "ts-jest"
+    },
+    "testEnvironment": "node"
+  }
+}
