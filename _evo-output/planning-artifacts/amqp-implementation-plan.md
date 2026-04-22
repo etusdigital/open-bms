@@ -1,8 +1,10 @@
 # AMQP Publisher + Consumer — Implementation Plan
 
+> **⚠️ Supersession note (2026-04-22)** — The "HTTP bridge" bullet in §5 Non-goals has been **reversed**. After a scope review, Layer 2 of the bridge was implemented inside the lib as the `createHttpBridgeHandler` helper (`packages/messaging/src/http-bridge.ts`) rather than deferred to EVO-943 as application code. §5 is preserved below for historical accuracy of the original plan; treat that specific bullet as **done, not deferred**. See the scope-adjustment comment on EVO-940 (2026-04-22) for context.
+
 | Field               | Value                                                                                                                                         |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**          | PROPOSED (ready for implementation)                                                                                                           |
+| **Status**          | IMPLEMENTED 2026-04-22 (originally proposed same day)                                                                                         |
 | **Issue**           | [EVO-940](https://linear.app/evoai/issue/EVO-940) — Fase 1 — Lib `@bms/messaging`                                                             |
 | **Depends on**      | `amqp-nomenclature-decision.md` (frozen 2026-04-20)                                                                                           |
 | **Plan decided**    | 2026-04-22                                                                                                                                    |
@@ -356,7 +358,7 @@ Explicitly **out of scope** for this implementation. Do NOT extend without a new
 - **Per-service retry queues** (`.retry` queue with TTL + DLX back to main). Ruled out by decision doc for v0.1.0; in-process `setTimeout` retry is the chosen mechanism.
 - **Exchange versioning** (`bms.email.v1`). Deferred to v0.2. Current EXCHANGES const has no version suffix and that's intentional.
 - **Circuit breaker.** EVO-940 mentions the phrase but Checkpoint 1 list is narrower ("Publisher + Consumer + bridge HTTP double retry + DLQ + graceful shutdown"). Circuit breaker is a separate issue.
-- **HTTP bridge.** Consuming app (EVO-943) owns the Consumer→HTTP loopback. The lib provides Consumer; the bridge is application code.
+- ~~**HTTP bridge.** Consuming app (EVO-943) owns the Consumer→HTTP loopback. The lib provides Consumer; the bridge is application code.~~ **[REVERSED 2026-04-22 — see supersession note at top of doc.]** `createHttpBridgeHandler` now ships inside the lib and implements the decision-doc contract directly; consuming apps (EVO-943 and migration waves) import it rather than writing the HTTP glue inline.
 - **Multi-tenancy / vhost routing.** Single vhost assumed. `ConnectionOptions` has `url` which includes vhost if needed.
 - **Handler timeout enforcement.** If a handler hangs, it hangs. Caller responsibility. Document as known limitation.
 - **Multiple `consume()` per AmqpConsumer instance.** One queue per instance; caller creates N instances for N queues. Keeps shutdown semantics clean.
