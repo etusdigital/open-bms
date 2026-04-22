@@ -37,7 +37,8 @@ jobs:
       docker-context: '.'
       dockerfile: apps/backoffice-api/Dockerfile
       environment: staging
-      registry: us-east1-docker.pkg.dev/etus-media-development-staging/msgops
+      gcp-project: ${{ vars.GCP_PROJECT_STAGING }}
+      registry: us-east1-docker.pkg.dev/${{ vars.GCP_PROJECT_STAGING }}/${{ vars.ARTIFACT_REPO }}
     secrets:
       GCP_SA_KEY: ${{ secrets.GCP_SA_KEY_STAGING }}
 
@@ -55,5 +56,7 @@ jobs:
       docker-context: '.'
       dockerfile: apps/backoffice-api/Dockerfile
       environment: production
+      gcp-project: ${{ vars.GCP_PROJECT_PRODUCTION }}
+      registry: us-east1-docker.pkg.dev/${{ vars.GCP_PROJECT_PRODUCTION }}/${{ vars.ARTIFACT_REPO }}
     secrets:
       GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}

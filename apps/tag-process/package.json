@@ -18,12 +18,10 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
-    "script:fill": "export GOOGLE_APPLICATION_CREDENTIALS='./key.json' && node ./scripts/fill_subscription.js"
+    "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
     "@clickhouse/client": "^1.18.2",
-    "@google-cloud/datastore": "^10.1.0",
     "@google-cloud/logging": "^11.2.1",
     "@google-cloud/pubsub": "^5.3.0",
     "@google-cloud/tasks": "^6.2.1",

@@ -1,17 +1,30 @@
 import type { CorsOptions } from 'cors';
 
-const ALLOWED_ORIGINS = ['https://bms.bri.us', 'https://bms-new.bri.us', 'https://bms-stg.bri.us', 'https://admin.bri.us'];
-
-const CF_PAGES_PATTERN = /^https:\/\/.*\.bms-frontend-react\.pages\.dev$/;
 const LOCALHOST_PATTERN = /^https?:\/\/localhost(:\d+)?$/;
+
+function parseList(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function buildCloudflarePagesPattern(projectName: string | undefined): RegExp | null {
+  if (!projectName) return null;
+  const escaped = projectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^https:\\/\\/.*\\.${escaped}\\.pages\\.dev$`);
+}
 
 export function isOriginAllowed(origin: string | undefined, nodeEnv: string | undefined): boolean {
   // Allow requests with no origin (server-to-server, curl, health checks)
   if (!origin) return true;
 
-  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  const allowedOrigins = parseList(process.env.CORS_ORIGINS);
+  if (allowedOrigins.includes(origin)) return true;
 
-  if (CF_PAGES_PATTERN.test(origin)) return true;
+  const cfPagesPattern = buildCloudflarePagesPattern(process.env.CORS_CF_PAGES_PROJECT);
+  if (cfPagesPattern && cfPagesPattern.test(origin)) return true;
 
   // Allow localhost in development
   if (nodeEnv !== 'production' && LOCALHOST_PATTERN.test(origin)) return true;

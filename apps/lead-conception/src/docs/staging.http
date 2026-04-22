@@ -1,17 +1,17 @@
 
-POST https://msgops-lead-conception-p6tcfyf7qa-ue.a.run.app/workflow?preview=true
+POST https://your-lead-conception.example.com/workflow?preview=true
 content-type: application/json
 
 {
   "contact": {
-    "email": "jonathan.shun+teste@brius.com.br",
-    "phone": "31973650997",
+    "email": "contact@example.com",
+    "phone": "5511999999999",
     "hashedEmail": "03cd5f4df96fb9ee12c8ffd4d2185961a0ec34a510ba7708c86d1b7604c46b27",
-    "firstName": "Jonathan",
-    "lastName": "Shun",
-    "audienceName": "shun_teste_version_cc",
-    "audienceUrl": "shun_teste_version_cc"
+    "firstName": "Example",
+    "lastName": "Contact",
+    "audienceName": "test_audience",
+    "audienceUrl": "test_audience"
   },
-  "listId": "shun_teste_version_cc",
+  "listId": "test_audience",
   "startDate": 1644608497893
-} 
+}

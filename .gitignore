@@ -3,10 +3,29 @@ dist/
 .next/
 .turbo/
 coverage/
+
+# Environment files — allow only .env.example
 .env
-.env.local
+.env.*
+!.env.example
+!.env.*.example
 .dev.vars
 .wrangler/
+
+# Credentials / keys — never commit
+*.pem
+*.key
+*.p12
+*.pfx
+key.json
+*-key.json
+new-key.json
+service-account*.json
+*firebase*adminsdk*.json
+gcp-*.json
+credentials*.json
+development-staging.json
+
 *.log
 *.tsbuildinfo
 .DS_Store

@@ -63,8 +63,15 @@ describe('TrackerService', () => {
       expect(newService.logLevel).toBe('DEBUG');
     });
 
-    it('should set uri to hardcoded pixel event store URL', () => {
-      expect(service.uri).toBe('https://us-east1-brius-prod.cloudfunctions.net/pixel-event-store?namespace=msgops&dataframe=msgops_tracker');
+    it('should read uri from PIXEL_EVENT_STORE_URL env var', () => {
+      process.env.PIXEL_EVENT_STORE_URL = 'https://pixel.example.com/store';
+      const newService = new TrackerService(httpService);
+      expect(newService.uri).toBe('https://pixel.example.com/store');
+      delete process.env.PIXEL_EVENT_STORE_URL;
+    });
+
+    it('should default uri to empty string when PIXEL_EVENT_STORE_URL is not set', () => {
+      expect(service.uri).toBe('');
     });
   });
 
@@ -210,7 +217,7 @@ describe('TrackerService', () => {
   });
 
   describe('getPixel', () => {
-    const baseUri = 'https://us-east1-brius-prod.cloudfunctions.net/pixel-event-store?namespace=msgops&dataframe=msgops_tracker';
+    const baseUri = 'https://pixel.example.com/store?namespace=msgops&dataframe=msgops_tracker';
 
     const mockTrackerParams: TrackerParams = {
       email: 'test@example.com',

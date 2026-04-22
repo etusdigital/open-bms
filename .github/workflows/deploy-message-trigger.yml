@@ -34,7 +34,8 @@ jobs:
       dockerfile: apps/message-trigger/Dockerfile
       cloud-run-services: '[{"service": "msgops-message-trigger", "port": 8080}]'
       environment: staging
-      registry: us-east1-docker.pkg.dev/etus-media-development-staging/msgops
+      gcp-project: ${{ vars.GCP_PROJECT_STAGING }}
+      registry: us-east1-docker.pkg.dev/${{ vars.GCP_PROJECT_STAGING }}/${{ vars.ARTIFACT_REPO }}
     secrets:
       GCP_SA_KEY: ${{ secrets.GCP_SA_KEY_STAGING }}
 
@@ -58,5 +59,7 @@ jobs:
           {"service": "msgops-message-trigger-transactional", "port": 8080},
           {"service": "msgops-message-trigger-campaign", "port": 8080}
         ]
+      gcp-project: ${{ vars.GCP_PROJECT_PRODUCTION }}
+      registry: us-east1-docker.pkg.dev/${{ vars.GCP_PROJECT_PRODUCTION }}/${{ vars.ARTIFACT_REPO }}
     secrets:
       GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}

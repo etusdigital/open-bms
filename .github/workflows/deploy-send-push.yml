@@ -34,7 +34,8 @@ jobs:
       dockerfile: apps/send-push/Dockerfile
       cloud-run-services: '[{"service": "msgops-send-push", "port": 8080}]'
       environment: staging
-      registry: us-east1-docker.pkg.dev/etus-media-development-staging/msgops
+      gcp-project: ${{ vars.GCP_PROJECT_STAGING }}
+      registry: us-east1-docker.pkg.dev/${{ vars.GCP_PROJECT_STAGING }}/${{ vars.ARTIFACT_REPO }}
     secrets:
       GCP_SA_KEY: ${{ secrets.GCP_SA_KEY_STAGING }}
 
@@ -55,5 +56,7 @@ jobs:
           {"service": "msgops-send-push", "port": 8080},
           {"service": "msgops-send-push-campaign", "port": 8080}
         ]
+      gcp-project: ${{ vars.GCP_PROJECT_PRODUCTION }}
+      registry: us-east1-docker.pkg.dev/${{ vars.GCP_PROJECT_PRODUCTION }}/${{ vars.ARTIFACT_REPO }}
     secrets:
       GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}

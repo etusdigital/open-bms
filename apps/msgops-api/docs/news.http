@@ -1,3 +1,0 @@
-# GET TAGS
-GET http://localhost:5000/tags?publisher=plusdin
-content-type: application/json

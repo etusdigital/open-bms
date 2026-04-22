@@ -20,16 +20,16 @@ const mockStep = {
     replyTo: null,
     priority: 'normal',
     location: {
-      bucketName: 'msgops-assets-stg.etus.digital',
+      bucketName: 'msgops-assets-stg.example.com',
       fileName: 'templates/automation_messages/108/template.txt',
     },
     from: {
-      firstName: 'Plusdin',
-      email: 'contato@plusdin.com.br',
+      firstName: 'Example Sender',
+      email: 'sender@example.com',
     },
     to: {
-      firstName: 'Jonathan',
-      email: 'jonathan.shun+teste@brius.com.br',
+      firstName: 'Example Recipient',
+      email: 'recipient@example.com',
     },
   },
 } as Step;

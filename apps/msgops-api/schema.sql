@@ -106,29 +106,14 @@ COMMENT ON EXTENSION postgres_fdw IS 'foreign-data wrapper for remote PostgreSQL
 CREATE SERVER events_logs_bridge FOREIGN DATA WRAPPER postgres_fdw OPTIONS (
   dbname 'msgops_events',
   fetch_size '10000',
-  host '10.67.193.54',
+  host 'events-logs.example.internal',
   port '5432'
 );
 --
--- Name: USER MAPPING clouddb_readonly SERVER events_logs_bridge; Type: USER MAPPING; Schema: -; Owner: -
---
-
-CREATE USER MAPPING FOR clouddb_readonly SERVER events_logs_bridge;
---
--- Name: USER MAPPING filipe SERVER events_logs_bridge; Type: USER MAPPING; Schema: -; Owner: -
---
-
-CREATE USER MAPPING FOR filipe SERVER events_logs_bridge;
---
--- Name: USER MAPPING msgops_user SERVER events_logs_bridge; Type: USER MAPPING; Schema: -; Owner: -
---
-
-CREATE USER MAPPING FOR msgops_user SERVER events_logs_bridge;
---
--- Name: USER MAPPING vinicius_ferreira SERVER events_logs_bridge; Type: USER MAPPING; Schema: -; Owner: -
---
-
-CREATE USER MAPPING FOR vinicius_ferreira SERVER events_logs_bridge;
+-- User mappings for the events_logs_bridge FDW server.
+-- Add one mapping per local role that needs to read the foreign tables:
+--   CREATE USER MAPPING FOR <role> SERVER events_logs_bridge
+--     OPTIONS (user '<remote_user>', password '<remote_password>');
 SET default_tablespace = '';
 SET default_table_access_method = heap;
 --

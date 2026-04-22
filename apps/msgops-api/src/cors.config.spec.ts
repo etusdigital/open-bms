@@ -1,35 +1,53 @@
 import { isOriginAllowed } from './cors.config';
 
 describe('CORS origin validation', () => {
-  describe('allowed production origins', () => {
-    it('allows bms.bri.us', () => {
-      expect(isOriginAllowed('https://bms.bri.us', 'production')).toBe(true);
+  const ORIGINAL_CORS_ORIGINS = process.env.CORS_ORIGINS;
+  const ORIGINAL_CF_PAGES_PROJECT = process.env.CORS_CF_PAGES_PROJECT;
+
+  beforeEach(() => {
+    process.env.CORS_ORIGINS = ['https://app.example.com', 'https://app-new.example.com', 'https://app-stg.example.com', 'https://admin.example.com'].join(',');
+    process.env.CORS_CF_PAGES_PROJECT = 'my-frontend';
+  });
+
+  afterAll(() => {
+    process.env.CORS_ORIGINS = ORIGINAL_CORS_ORIGINS;
+    process.env.CORS_CF_PAGES_PROJECT = ORIGINAL_CF_PAGES_PROJECT;
+  });
+
+  describe('allowed origins from CORS_ORIGINS env var', () => {
+    it('allows configured production origin', () => {
+      expect(isOriginAllowed('https://app.example.com', 'production')).toBe(true);
     });
 
-    it('allows bms-new.bri.us', () => {
-      expect(isOriginAllowed('https://bms-new.bri.us', 'production')).toBe(true);
+    it('allows additional configured origin', () => {
+      expect(isOriginAllowed('https://app-new.example.com', 'production')).toBe(true);
     });
 
-    it('allows bms-stg.bri.us', () => {
-      expect(isOriginAllowed('https://bms-stg.bri.us', 'production')).toBe(true);
+    it('allows staging origin', () => {
+      expect(isOriginAllowed('https://app-stg.example.com', 'production')).toBe(true);
     });
 
-    it('allows admin.bri.us', () => {
-      expect(isOriginAllowed('https://admin.bri.us', 'production')).toBe(true);
+    it('allows admin origin', () => {
+      expect(isOriginAllowed('https://admin.example.com', 'production')).toBe(true);
     });
   });
 
   describe('Cloudflare Pages preview origins', () => {
     it('allows staging preview', () => {
-      expect(isOriginAllowed('https://staging.bms-frontend-react.pages.dev', 'production')).toBe(true);
+      expect(isOriginAllowed('https://staging.my-frontend.pages.dev', 'production')).toBe(true);
     });
 
     it('allows PR preview', () => {
-      expect(isOriginAllowed('https://pr-42.bms-frontend-react.pages.dev', 'production')).toBe(true);
+      expect(isOriginAllowed('https://pr-42.my-frontend.pages.dev', 'production')).toBe(true);
     });
 
     it('allows commit-hash preview', () => {
-      expect(isOriginAllowed('https://abc123.bms-frontend-react.pages.dev', 'production')).toBe(true);
+      expect(isOriginAllowed('https://abc123.my-frontend.pages.dev', 'production')).toBe(true);
+    });
+
+    it('blocks CF Pages when project is not configured', () => {
+      delete process.env.CORS_CF_PAGES_PROJECT;
+      expect(isOriginAllowed('https://any.my-frontend.pages.dev', 'production')).toBe(false);
     });
   });
 
@@ -45,7 +63,7 @@ describe('CORS origin validation', () => {
     });
 
     it('blocks HTTP version of allowed domains', () => {
-      expect(isOriginAllowed('http://bms.bri.us', 'production')).toBe(false);
+      expect(isOriginAllowed('http://app.example.com', 'production')).toBe(false);
     });
 
     it('blocks other pages.dev projects', () => {
@@ -53,11 +71,17 @@ describe('CORS origin validation', () => {
     });
 
     it('blocks subdomains of allowed origins', () => {
-      expect(isOriginAllowed('https://evil.bms.bri.us', 'production')).toBe(false);
+      expect(isOriginAllowed('https://evil.app.example.com', 'production')).toBe(false);
     });
 
     it('blocks localhost in production', () => {
       expect(isOriginAllowed('http://localhost:3000', 'production')).toBe(false);
+    });
+
+    it('blocks everything when CORS_ORIGINS is empty and no CF project', () => {
+      process.env.CORS_ORIGINS = '';
+      delete process.env.CORS_CF_PAGES_PROJECT;
+      expect(isOriginAllowed('https://app.example.com', 'production')).toBe(false);
     });
   });
 

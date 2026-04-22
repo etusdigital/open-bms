@@ -18,7 +18,6 @@ import { UtilsModule } from '../../utils/utils.module';
 import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
 import { GoogleTasksProvider } from 'src/providers/google-tasks.provider';
 import { AccountsModule } from '../accounts/accounts.module';
-import { GoogleBigqueryProvider } from 'src/providers/google-bigquery.provider';
 import { FormatterUtils } from 'src/utils/pubSub/formatter.utils';
 import { ActiveCampaignProvider } from 'src/providers/active-campaign.provider';
 import { CampaignModule } from '../campaigns/campaigns.module';
@@ -53,7 +52,6 @@ import { BucketsService } from '../buckets/buckets.service';
     TwilioHandler,
     EvolutionHandler,
     GoogleTasksProvider,
-    GoogleBigqueryProvider,
     FormatterUtils,
     ActiveCampaignProvider,
     OpenAIProvider,

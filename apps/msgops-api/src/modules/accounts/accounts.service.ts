@@ -215,10 +215,15 @@ export class AccountsService {
 
       let sendgridSubusername = accountDto.sendgridUser || '';
       if (accountDto.createSendgridAccount) {
+        const subuserPrefix = process.env.SENDGRID_SUBUSER_PREFIX || 'bms';
+        const subuserEmail = process.env.SENDGRID_SUBUSER_EMAIL;
+        if (!subuserEmail) {
+          throw new Error('SENDGRID_SUBUSER_EMAIL env var is required to create SendGrid subusers');
+        }
         const sendgridSubUser: SendgridSubUser = {
-          username: `etusdigital-${replaceSpecialChars(accountEntity.name)}`,
+          username: `${subuserPrefix}-${replaceSpecialChars(accountEntity.name)}`,
           password: createHash('sha256').update(`${accountEntity.id}`).digest('base64'),
-          email: 'sre@etus.digital',
+          email: subuserEmail,
           ips: accountDto.sendgridIps,
         };
 

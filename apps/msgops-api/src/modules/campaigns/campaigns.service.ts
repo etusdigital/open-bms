@@ -719,29 +719,19 @@ export class CampaignsService {
   }
 
   async createTask(campaignDto: CampaignDto, campaign: CampaignEntity) {
-    const internalPacker = 'https://msgops-campaign-packer-master-281576158836.us-east1.run.app';
     switch (campaignDto.type) {
       case CampaignsType.SIMPLE:
       case CampaignsType.SPLIT:
       case CampaignsType.RECURRING: {
-        let endpointTask = campaignDto.type === CampaignsType.SPLIT ? env.CAMPAIGN_TEST_AB_ENDPOINT : env.CAMPAIGN_TRIGGER_ENDPOINT;
-        //TODO: REMOVE AFTER APPROVAL CAMPAIGN REORDER CONTACTS
-        if ([19, 159].includes(this.cls.get('accountId'))) {
-          endpointTask = endpointTask.replace('https://msgops-campaign-packer-zmoqw2zpgq-ue.a.run.app', internalPacker);
-        }
+        const endpointTask = campaignDto.type === CampaignsType.SPLIT ? env.CAMPAIGN_TEST_AB_ENDPOINT : env.CAMPAIGN_TRIGGER_ENDPOINT;
         const taskName = campaignDto.type === CampaignsType.SPLIT ? env.GOOGLE_TASK_QUEUE_TEST_AB : env.GOOGLE_TASK_QUEUE;
         const response = await this.googleTasksProvider.create(campaign.id, campaignDto.scheduleTo, endpointTask, taskName);
         campaign.scheduleToCloudTaskId = response[0].name;
         break;
       }
       case CampaignsType.TESTAB: {
-        //TODO: REMOVE AFTER APPROVAL CAMPAIGN REORDER CONTACTS
-        let finalEndpoint = env.CAMPAIGN_TEST_AB_ENDPOINT;
-        let finalResultEndpoint = env.CAMPAIGN_RESULT_TEST_AB_ENDPOINT;
-        if ([19, 159].includes(this.cls.get('accountId'))) {
-          finalEndpoint = finalEndpoint.replace('https://msgops-campaign-packer-zmoqw2zpgq-ue.a.run.app', internalPacker);
-          finalResultEndpoint = finalResultEndpoint.replace('https://msgops-campaign-packer-zmoqw2zpgq-ue.a.run.app', internalPacker);
-        }
+        const finalEndpoint = env.CAMPAIGN_TEST_AB_ENDPOINT;
+        const finalResultEndpoint = env.CAMPAIGN_RESULT_TEST_AB_ENDPOINT;
         const testab = await this.googleTasksProvider.create(campaign.id, campaignDto.testabScheduleTo, finalEndpoint, env.GOOGLE_TASK_QUEUE_TEST_AB);
         campaign.testabScheduleToCloudTaskId = testab[0].name;
         const result = await this.googleTasksProvider.create(campaign.id, campaignDto.scheduleTo, finalResultEndpoint, env.GOOGLE_TASK_QUEUE_TEST_AB);

@@ -1,5 +1,5 @@
 ---
-title: "feat: React 19.2 Frontend with Auth0 Login, Layout & Account Switching"
+title: 'feat: React 19.2 Frontend with Auth0 Login, Layout & Account Switching'
 type: feat
 status: active
 date: 2026-03-10
@@ -83,7 +83,7 @@ apps/frontend-react/
 ├── components.json               # shadcn/ui config
 ├── .env.example
 ├── public/
-│   └── etus-logo.svg
+│   └── bms-logo.svg
 ├── src/
 │   ├── index.css                 # @import "tailwindcss"; @import "tw-animate-css";
 │   ├── main.tsx                  # React root + RouterProvider
@@ -126,22 +126,32 @@ apps/frontend-react/
 
 **Auth0Provider must be INSIDE RouterProvider** (not above it):
 Because `onRedirectCallback` needs `useNavigate()`, which requires router context. Use a layout route:
+
 ```tsx
 const router = createBrowserRouter([
   {
-    element: <Auth0ProviderWithNavigate><Outlet /></Auth0ProviderWithNavigate>,
+    element: (
+      <Auth0ProviderWithNavigate>
+        <Outlet />
+      </Auth0ProviderWithNavigate>
+    ),
     children: [
-      { path: "/login", element: <LoginPage /> },
-      { path: "/callback", element: <AuthCallbackPage /> },
+      { path: '/login', element: <LoginPage /> },
+      { path: '/callback', element: <AuthCallbackPage /> },
       {
-        element: <ProtectedRoute />,  // Single guard component
+        element: <ProtectedRoute />, // Single guard component
         children: [
-          { element: <AppLayout />, children: [/* all app routes */] }
-        ]
-      }
-    ]
-  }
-])
+          {
+            element: <AppLayout />,
+            children: [
+              /* all app routes */
+            ],
+          },
+        ],
+      },
+    ],
+  },
+]);
 ```
 
 **Single Zustand store** (not two):
@@ -161,6 +171,7 @@ Merge into one component: if not authenticated → redirect to login; if authent
 - [ ] **1.1** Scaffold Vite + React 19.2 + TypeScript in `apps/frontend-react/`
 
   `package.json`:
+
   ```json
   {
     "name": "@msgops/frontend-react",
@@ -179,16 +190,17 @@ Merge into one component: if not authenticated → redirect to login; if authent
   ```
 
 - [ ] **1.2** Configure Vite (`vite.config.ts`) with React plugin, Tailwind v4 plugin, path aliases, dev proxy, and **manual chunks for vendor splitting**:
+
   ```typescript
-  import { defineConfig } from 'vite'
-  import react from '@vitejs/plugin-react'
-  import tailwindcss from '@tailwindcss/vite'
-  import path from 'path'
+  import { defineConfig } from 'vite';
+  import react from '@vitejs/plugin-react';
+  import tailwindcss from '@tailwindcss/vite';
+  import path from 'path';
 
   export default defineConfig({
     plugins: [react(), tailwindcss()],
     resolve: {
-      alias: { '@': path.resolve(__dirname, './src') }
+      alias: { '@': path.resolve(__dirname, './src') },
     },
     server: {
       port: 3000,
@@ -196,9 +208,9 @@ Merge into one component: if not authenticated → redirect to login; if authent
         '/api': {
           target: 'http://localhost:5001',
           changeOrigin: true,
-          rewrite: (p) => p.replace(/^\/api/, '')
-        }
-      }
+          rewrite: (p) => p.replace(/^\/api/, ''),
+        },
+      },
     },
     build: {
       rollupOptions: {
@@ -207,20 +219,21 @@ Merge into one component: if not authenticated → redirect to login; if authent
             'vendor-react': ['react', 'react-dom', 'react-router'],
             'vendor-query': ['@tanstack/react-query'],
             'vendor-auth': ['@auth0/auth0-react'],
-          }
-        }
-      }
-    }
-  })
+          },
+        },
+      },
+    },
+  });
   ```
 
   > **Research insight (Performance Oracle):** Separate vendor chunks ensure that app code updates don't invalidate the ~200KB vendor cache. Users only re-download the app chunk on deployments.
 
 - [ ] **1.3** Configure Tailwind CSS v4.2 (`src/index.css`):
+
   ```css
-  @import "tailwindcss";
-  @import "tw-animate-css";
-  @source "../src/**/*.{ts,tsx}";
+  @import 'tailwindcss';
+  @import 'tw-animate-css';
+  @source '../src/**/*.{ts,tsx}';
   ```
 
   > **Research insight (Framework Docs):** Tailwind v4 uses `tw-animate-css` (not `tailwindcss-animate`). No `tailwind.config.js` needed — all config via CSS `@theme`.
@@ -234,17 +247,23 @@ Merge into one component: if not authenticated → redirect to login; if authent
 - [ ] **1.7** Configure TypeScript: strict mode, path aliases matching Vite
 
 - [ ] **1.8** Add `.env.example`:
+
   ```
-  VITE_AUTH0_DOMAIN=brius-com-br.us.auth0.com
+  VITE_AUTH0_DOMAIN=<your-tenant>.us.auth0.com
   VITE_AUTH0_CLIENT_ID=<auth0-spa-client-id>
-  VITE_AUTH0_AUDIENCE=https://msgops-api.etus.digital
+  VITE_AUTH0_AUDIENCE=<your-api-audience>
   VITE_API_URL=http://localhost:5001
   VITE_REDIRECT_MANAGER_URL=<manage-account-external-url>
   ```
 
 - [ ] **1.9** Create `apps/frontend-react/turbo.json` for Turborepo:
+
   ```json
-  { "$schema": "https://turbo.build/schema.json", "extends": ["//"], "tasks": { "build": { "env": ["VITE_*"] } } }
+  {
+    "$schema": "https://turbo.build/schema.json",
+    "extends": ["//"],
+    "tasks": { "build": { "env": ["VITE_*"] } }
+  }
   ```
 
   > **Research insight (Turborepo skill):** The `VITE_*` wildcard ensures env var changes correctly invalidate the build cache. Root `turbo.json` needs no changes — `dist/**` output already matches Vite.
@@ -260,72 +279,132 @@ This phase merges the original Phases 2, 3, and 4 — they are one concern: "use
 **Tasks:**
 
 - [ ] **2.1** Create `src/types.ts` — all TypeScript types in a single file:
+
   ```typescript
   // Derived from backend authz.constants.ts ALL_PERMISSION_KEYS
   export const ALL_PERMISSIONS = [
-    'analytics:dashboard_view', 'analytics:comparison_view', 'analytics:insights_view',
-    'campaigns:view', 'campaigns:create', 'campaigns:update', 'campaigns:delete',
-    'automations:view', 'automations:create', 'automations:update', 'automations:delete',
-    'messages:view', 'messages:create', 'messages:update', 'messages:delete',
-    'audience:contacts_view', 'audience:contacts_create', 'audience:contacts_update',
-    'audience:segments_view', 'audience:segments_create',
-    'audience:tags_view', 'audience:tags_create',
-    'audience:custom_fields_view', 'audience:custom_fields_create',
-    'infra:view', 'infra:create', 'infra:update',
-    'account:settings_view', 'account:settings_update',
-    'account:users_view', 'account:users_invite', 'account:users_update_roles',
-    'account:roles_view', 'account:api_keys_view', 'account:api_keys_create',
-  ] as const
-  export type Permission = (typeof ALL_PERMISSIONS)[number]
+    'analytics:dashboard_view',
+    'analytics:comparison_view',
+    'analytics:insights_view',
+    'campaigns:view',
+    'campaigns:create',
+    'campaigns:update',
+    'campaigns:delete',
+    'automations:view',
+    'automations:create',
+    'automations:update',
+    'automations:delete',
+    'messages:view',
+    'messages:create',
+    'messages:update',
+    'messages:delete',
+    'audience:contacts_view',
+    'audience:contacts_create',
+    'audience:contacts_update',
+    'audience:segments_view',
+    'audience:segments_create',
+    'audience:tags_view',
+    'audience:tags_create',
+    'audience:custom_fields_view',
+    'audience:custom_fields_create',
+    'infra:view',
+    'infra:create',
+    'infra:update',
+    'account:settings_view',
+    'account:settings_update',
+    'account:users_view',
+    'account:users_invite',
+    'account:users_update_roles',
+    'account:roles_view',
+    'account:api_keys_view',
+    'account:api_keys_create',
+  ] as const;
+  export type Permission = (typeof ALL_PERMISSIONS)[number];
 
-  export const ROLE_CODES = ['super_admin', 'admin', 'editor', 'analyst', 'support', 'billing'] as const
-  export type RoleCode = (typeof ROLE_CODES)[number]
+  export const ROLE_CODES = [
+    'super_admin',
+    'admin',
+    'editor',
+    'analyst',
+    'support',
+    'billing',
+  ] as const;
+  export type RoleCode = (typeof ROLE_CODES)[number];
 
   export interface User {
-    id: number; name: string; email: string; profile: string
-    providerId: string; settings: { language: string }
-    globalRole: { id: number; code: RoleCode; name: string } | null
-    status: string
+    id: number;
+    name: string;
+    email: string;
+    profile: string;
+    providerId: string;
+    settings: { language: string };
+    globalRole: { id: number; code: RoleCode; name: string } | null;
+    status: string;
   }
 
   export interface Account {
-    id: number; name: string; description: string
-    isActive: boolean; isInternal: boolean; groupId: number
-    accountConfigs: AccountConfig[]
+    id: number;
+    name: string;
+    description: string;
+    isActive: boolean;
+    isInternal: boolean;
+    groupId: number;
+    accountConfigs: AccountConfig[];
   }
 
   export interface UserAccount {
-    userId: number; accountId: number; isMasterUser: boolean
-    account: Account; roleOverride: { id: number; code: RoleCode; name: string } | null
+    userId: number;
+    accountId: number;
+    isMasterUser: boolean;
+    account: Account;
+    roleOverride: { id: number; code: RoleCode; name: string } | null;
   }
 
-  export interface AccountConfig { id: number; configName: string; configValue: string }
+  export interface AccountConfig {
+    id: number;
+    configName: string;
+    configValue: string;
+  }
 
   export interface AccountChannels {
-    email: boolean; sms: boolean; webPush: boolean; mobilePush: boolean; whatsapp: boolean
+    email: boolean;
+    sms: boolean;
+    webPush: boolean;
+    mobilePush: boolean;
+    whatsapp: boolean;
   }
   ```
 
   > **Research insight (TypeScript Reviewer):** Permission names are typed as a union from the const array — typos like `can('statistics:view')` become compile errors. `AccountChannels` has 5 fields (not 4) matching Vue 2's `hasWebPush`/`hasMobilePush` split.
 
 - [ ] **2.2** Create `src/stores/app-store.ts` — single Zustand v5 store with `persist` middleware for account and sidebar state:
+
   ```typescript
-  import { create } from 'zustand'
-  import { persist, createJSONStorage } from 'zustand/middleware'
+  import { create } from 'zustand';
+  import { persist, createJSONStorage } from 'zustand/middleware';
 
   // Auth lifecycle as discriminated union (prevents impossible states)
   type AuthStatus =
     | { status: 'idle' }
     | { status: 'authenticating' }
-    | { status: 'authenticated'; user: User; account: Account; userAccounts: UserAccount[];
-        permissions: Set<Permission>; effectiveRole: RoleCode; globalRole: RoleCode | null;
-        isMasterUser: boolean; accountConfigs: AccountConfig[]; timezone: string }
+    | {
+        status: 'authenticated';
+        user: User;
+        account: Account;
+        userAccounts: UserAccount[];
+        permissions: Set<Permission>;
+        effectiveRole: RoleCode;
+        globalRole: RoleCode | null;
+        isMasterUser: boolean;
+        accountConfigs: AccountConfig[];
+        timezone: string;
+      }
     | { status: 'switching'; user: User; previousAccountId: number }
-    | { status: 'error'; error: string }
+    | { status: 'error'; error: string };
 
   interface AppState {
-    auth: AuthStatus
-    sidebarCollapsed: boolean
+    auth: AuthStatus;
+    sidebarCollapsed: boolean;
     // Actions...
   }
   ```
@@ -337,52 +416,58 @@ This phase merges the original Phases 2, 3, and 4 — they are one concern: "use
   > **Research insight (Zustand v5 Docs):** Use `partialize` in persist middleware to only persist `sidebarCollapsed` and `auth.account.id` (not the entire auth state). Use `version` + `migrate` for future schema changes.
 
   **Derived values as selectors (not stored state):**
+
   ```typescript
   // These are selectors, NOT stored state
   export const selectIsSuperAdmin = (s: AppState) =>
-    s.auth.status === 'authenticated' && s.auth.effectiveRole === 'super_admin'
+    s.auth.status === 'authenticated' && s.auth.effectiveRole === 'super_admin';
   export const selectIsSupportUser = (s: AppState) =>
-    s.auth.status === 'authenticated' && s.auth.effectiveRole === 'support'
+    s.auth.status === 'authenticated' && s.auth.effectiveRole === 'support';
   export const selectAccountChannels = (s: AppState): AccountChannels => {
-    if (s.auth.status !== 'authenticated') return { email: false, sms: false, webPush: false, mobilePush: false, whatsapp: false }
-    const configs = s.auth.accountConfigs
+    if (s.auth.status !== 'authenticated')
+      return { email: false, sms: false, webPush: false, mobilePush: false, whatsapp: false };
+    const configs = s.auth.accountConfigs;
     // Derive from accountConfigs...
-  }
+  };
   ```
 
 - [ ] **2.3** Create `src/hooks/use-permissions.ts`:
+
   ```typescript
   export function usePermissions() {
     // Read fresh from store at call time to avoid stale closures
     const can = useCallback((permission: Permission) => {
-      const { auth } = useAppStore.getState()
-      if (auth.status !== 'authenticated') return false
-      return auth.effectiveRole === 'super_admin' || auth.permissions.has(permission)
-    }, [])
-    return { can }
+      const { auth } = useAppStore.getState();
+      if (auth.status !== 'authenticated') return false;
+      return auth.effectiveRole === 'super_admin' || auth.permissions.has(permission);
+    }, []);
+    return { can };
   }
   ```
 
   > **Research insight (Frontend Races Reviewer):** Reading from `getState()` inside the callback (not destructuring at hook time) prevents stale closure bugs during account switching. The permission set always reflects the current account's permissions.
 
 - [ ] **2.4** Create `src/lib/api-client.ts` — Axios instance with **token caching** and **mutable ref** for `getAccessTokenSilently`:
+
   ```typescript
   // Module-scoped token cache
-  let cachedToken: string | null = null
-  let tokenExpiresAt = 0
+  let cachedToken: string | null = null;
+  let tokenExpiresAt = 0;
 
   // Mutable ref for the Auth0 token getter (set by Auth0Provider wrapper)
-  let tokenFetcherRef: (() => Promise<string>) | null = null
-  export function setTokenFetcher(fn: () => Promise<string>) { tokenFetcherRef = fn }
+  let tokenFetcherRef: (() => Promise<string>) | null = null;
+  export function setTokenFetcher(fn: () => Promise<string>) {
+    tokenFetcherRef = fn;
+  }
 
   async function getToken(): Promise<string> {
-    if (!tokenFetcherRef) throw new Error('Token fetcher not initialized')
-    const now = Date.now()
-    if (cachedToken && now < tokenExpiresAt - 60_000) return cachedToken
-    cachedToken = await tokenFetcherRef()
-    const payload = JSON.parse(atob(cachedToken.split('.')[1]))
-    tokenExpiresAt = payload.exp * 1000
-    return cachedToken
+    if (!tokenFetcherRef) throw new Error('Token fetcher not initialized');
+    const now = Date.now();
+    if (cachedToken && now < tokenExpiresAt - 60_000) return cachedToken;
+    cachedToken = await tokenFetcherRef();
+    const payload = JSON.parse(atob(cachedToken.split('.')[1]));
+    tokenExpiresAt = payload.exp * 1000;
+    return cachedToken;
   }
 
   // Request interceptor: inject Authorization + Account-Id headers
@@ -403,8 +488,9 @@ This phase merges the original Phases 2, 3, and 4 — they are one concern: "use
   > **Research insight (Frontend Races):** During account switch (`auth.status === 'switching'`), the 401 interceptor must NOT trigger logout. The user isn't logged out — they're switching contexts.
 
 - [ ] **2.5** Create `src/lib/query-client.ts` — module-level singleton with global 401 handling:
+
   ```typescript
-  import { QueryClient, QueryCache } from '@tanstack/react-query'
+  import { QueryClient, QueryCache } from '@tanstack/react-query';
 
   export const queryClient = new QueryClient({
     defaultOptions: {
@@ -412,25 +498,26 @@ This phase merges the original Phases 2, 3, and 4 — they are one concern: "use
         staleTime: 5 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
         retry: (count, error) => {
-          if (error instanceof AxiosError && error.response?.status === 401) return false
-          return count < 2
+          if (error instanceof AxiosError && error.response?.status === 401) return false;
+          return count < 2;
         },
         refetchOnWindowFocus: false,
-      }
+      },
     },
     queryCache: new QueryCache({
       onError: (error) => {
         if (error instanceof AxiosError && error.response?.status === 401) {
           // Trigger logout via store action
         }
-      }
-    })
-  })
+      },
+    }),
+  });
   ```
 
   > **Research insight (Best Practices):** Global 401 handling in QueryCache ensures auth errors are caught regardless of which query triggers them. `useRef` is not needed since this is a module-level singleton in a SPA.
 
 - [ ] **2.6** Create `src/lib/query-keys.ts` — query key factory:
+
   ```typescript
   export const queryKeys = {
     users: {
@@ -440,12 +527,13 @@ This phase merges the original Phases 2, 3, and 4 — they are one concern: "use
     accounts: {
       configs: (accountId: number) => ['accounts', 'configs', { accountId }] as const,
     },
-  } as const
+  } as const;
   ```
 
   > **Research insight (TypeScript Reviewer):** Centralizing keys makes refactoring safe and enables `queryClient.invalidateQueries({ queryKey: queryKeys.users.all })`.
 
 - [ ] **2.7** Create Auth0Provider wrapper as a layout route element (`src/components/layout/app-layout.tsx` will contain this):
+
   ```typescript
   import { Auth0Provider, useAuth0 } from '@auth0/auth0-react'
   import { useNavigate } from 'react-router'
@@ -489,6 +577,7 @@ This phase merges the original Phases 2, 3, and 4 — they are one concern: "use
   > **Research insight (Framework Docs):** `onRedirectCallback` validates `returnTo` — rejects absolute URLs and protocol-relative URLs to prevent open redirect attacks.
 
 - [ ] **2.8** Create `src/hooks/use-auth-init.ts` — post-Auth0 login orchestration **with AbortController for Strict Mode**:
+
   ```
   useEffect(() => {
     const ac = new AbortController()
@@ -517,6 +606,7 @@ This phase merges the original Phases 2, 3, and 4 — they are one concern: "use
   > **Research insight (Architecture Strategist):** Send JWT on `POST /users/login` even though it's `@PublicRoute()`. The Vue 2 app sends it (via `getApi()` which always attaches the token). This allows the backend's `PrincipalContextGuard` to optionally resolve the caller.
 
 - [ ] **2.9** Create `src/hooks/use-account-switch.ts`:
+
   ```typescript
   const abortRef = useRef<AbortController | null>(null)
 
@@ -561,6 +651,7 @@ This phase merges the original Phases 2, 3, and 4 — they are one concern: "use
 - [ ] **2.12** Create `src/components/loading-screen.tsx` — full-page overlay with Etus logo + spinner
 
 - [ ] **2.13** Create `src/lib/strings.ts` — hardcoded pt-BR strings for Phase 1:
+
   ```typescript
   export const S = {
     sidebar: {
@@ -581,7 +672,7 @@ This phase merges the original Phases 2, 3, and 4 — they are one concern: "use
       noAccounts: 'Nenhuma conta atribuída',
     },
     // ...
-  }
+  };
   ```
 
   > **Research insight (Simplicity Reviewer):** Phase 1 has ~40 strings. Full react-i18next setup with namespaces, lazy loading, and locale files is overkill. Hardcode pt-BR in a constants file; add i18n in Phase 2 when porting feature pages with substantial text.
@@ -597,6 +688,7 @@ This phase merges the original Phases 5 and 6.
 **Tasks:**
 
 - [ ] **3.1** Create `src/router.tsx` with `createBrowserRouter` and **lazy-loaded routes**:
+
   ```typescript
   import { createBrowserRouter, Navigate } from 'react-router'
   import { lazy, Suspense } from 'react'
@@ -634,6 +726,7 @@ This phase merges the original Phases 5 and 6.
   > **Research insight (Framework Docs):** React Router v7's `lazy` property on route objects is the cleanest approach — it code-splits the entire route module.
 
 - [ ] **3.2** Create `src/components/protected-route.tsx` — single guard component:
+
   ```typescript
   function ProtectedRoute({ permission }: { permission?: Permission }) {
     const { isAuthenticated, isLoading } = useAuth0()
@@ -681,52 +774,58 @@ This phase merges the original Phases 5 and 6.
 
   **Sidebar menu structure with CORRECT permissions** (from `authz.constants.ts`):
 
-  | Menu Item | Icon | Route | Permission | Internal Only |
-  |---|---|---|---|---|
-  | Estatistica (group) | BarChart3 | — | `analytics:dashboard_view` | No |
-  | ├ Email Statistics | — | `/messages/email/statistics` | `analytics:dashboard_view` | No |
-  | ├ Comparacao | — | `/messages/email/comparison` | `analytics:comparison_view` | No |
-  | ├ Insights | — | `/insights` | `analytics:insights_view` | Yes |
-  | └ Leads | — | `/leads` | `analytics:dashboard_view` | Yes |
-  | Campanhas (group, internal) | Megaphone | — | `campaigns:view` | Yes |
-  | ├ Campanhas | — | `/campaigns` | `campaigns:view` | Yes |
-  | ├ Trigger Campaigns | — | `/trigger-campaign` | `campaigns:view` | Yes |
-  | └ Produtos | — | `/product` | `campaigns:view` | Yes |
-  | Automacoes | Workflow | `/automations/emails` | `automations:view` | No |
-  | Mensagens (group) | Mail | — | `messages:view` | No |
-  | ├ Email | — | `/messages` | `messages:view` | No |
-  | ├ Web Push | — | `/messages/web-push` | `messages:view` | No |
-  | ├ Mobile Push | — | `/messages/mobile-push` | `messages:view` | No |
-  | ├ SMS | — | `/messages/sms` | `messages:view` | No |
-  | ├ WhatsApp | — | `/messages/whatsapp` | `messages:view` | No |
-  | ├ 2FA | — | `/messages/2fa` | `messages:view` | Yes |
-  | └ Postmaster | — | `/messages/postmaster` | `messages:view` | No |
-  | Templates | FileText | `/templates` | `messages:view` | No |
-  | Contatos (group) | Users | — | `audience:contacts_view` | No |
-  | ├ Contatos | — | `/contacts` | `audience:contacts_view` | No |
-  | ├ Segmentos | — | `/segments` | `audience:segments_view` | No |
-  | ├ Tags | — | `/tags` | `audience:tags_view` | No |
-  | ├ Campos Personalizados | — | `/customfields` | `audience:custom_fields_view` | No |
-  | └ Custom Events | — | `/custom-events` | `audience:custom_fields_view` | Yes |
-  | Pools | Server | `/pools` | `infra:view` | No |
-  | Warmups | Flame | `/warmups` | `infra:view` | No |
-  | Campaign Rules | Shield | `/campaign-rules` | `infra:view` | Yes |
-  | Labels | Tag | `/labels` | `infra:view` | Yes |
-  | ─── separator ─── | | | | |
-  | Configuracoes | Settings | `/settings` | `account:settings_view` | No |
+  | Menu Item                   | Icon      | Route                        | Permission                    | Internal Only |
+  | --------------------------- | --------- | ---------------------------- | ----------------------------- | ------------- |
+  | Estatistica (group)         | BarChart3 | —                            | `analytics:dashboard_view`    | No            |
+  | ├ Email Statistics          | —         | `/messages/email/statistics` | `analytics:dashboard_view`    | No            |
+  | ├ Comparacao                | —         | `/messages/email/comparison` | `analytics:comparison_view`   | No            |
+  | ├ Insights                  | —         | `/insights`                  | `analytics:insights_view`     | Yes           |
+  | └ Leads                     | —         | `/leads`                     | `analytics:dashboard_view`    | Yes           |
+  | Campanhas (group, internal) | Megaphone | —                            | `campaigns:view`              | Yes           |
+  | ├ Campanhas                 | —         | `/campaigns`                 | `campaigns:view`              | Yes           |
+  | ├ Trigger Campaigns         | —         | `/trigger-campaign`          | `campaigns:view`              | Yes           |
+  | └ Produtos                  | —         | `/product`                   | `campaigns:view`              | Yes           |
+  | Automacoes                  | Workflow  | `/automations/emails`        | `automations:view`            | No            |
+  | Mensagens (group)           | Mail      | —                            | `messages:view`               | No            |
+  | ├ Email                     | —         | `/messages`                  | `messages:view`               | No            |
+  | ├ Web Push                  | —         | `/messages/web-push`         | `messages:view`               | No            |
+  | ├ Mobile Push               | —         | `/messages/mobile-push`      | `messages:view`               | No            |
+  | ├ SMS                       | —         | `/messages/sms`              | `messages:view`               | No            |
+  | ├ WhatsApp                  | —         | `/messages/whatsapp`         | `messages:view`               | No            |
+  | ├ 2FA                       | —         | `/messages/2fa`              | `messages:view`               | Yes           |
+  | └ Postmaster                | —         | `/messages/postmaster`       | `messages:view`               | No            |
+  | Templates                   | FileText  | `/templates`                 | `messages:view`               | No            |
+  | Contatos (group)            | Users     | —                            | `audience:contacts_view`      | No            |
+  | ├ Contatos                  | —         | `/contacts`                  | `audience:contacts_view`      | No            |
+  | ├ Segmentos                 | —         | `/segments`                  | `audience:segments_view`      | No            |
+  | ├ Tags                      | —         | `/tags`                      | `audience:tags_view`          | No            |
+  | ├ Campos Personalizados     | —         | `/customfields`              | `audience:custom_fields_view` | No            |
+  | └ Custom Events             | —         | `/custom-events`             | `audience:custom_fields_view` | Yes           |
+  | Pools                       | Server    | `/pools`                     | `infra:view`                  | No            |
+  | Warmups                     | Flame     | `/warmups`                   | `infra:view`                  | No            |
+  | Campaign Rules              | Shield    | `/campaign-rules`            | `infra:view`                  | Yes           |
+  | Labels                      | Tag       | `/labels`                    | `infra:view`                  | Yes           |
+  | ─── separator ───           |           |                              |                               |               |
+  | Configuracoes               | Settings  | `/settings`                  | `account:settings_view`       | No            |
 
   Memoize visible menu items:
+
   ```typescript
-  const visibleItems = useMemo(() =>
-    MENU_ITEMS.filter(item =>
-      (!item.permission || can(item.permission)) &&
-      (!item.internalOnly || currentAccount.isInternal)
-    ), [can, currentAccount.isInternal])
+  const visibleItems = useMemo(
+    () =>
+      MENU_ITEMS.filter(
+        (item) =>
+          (!item.permission || can(item.permission)) &&
+          (!item.internalOnly || currentAccount.isInternal),
+      ),
+    [can, currentAccount.isInternal],
+  );
   ```
 
   Sidebar collapse: animate wrapper div (not individual icons). Hide labels with `opacity: 0` at start of collapse, not at end.
 
   **Preload route chunks on sidebar hover:**
+
   ```typescript
   <NavLink to={route} onMouseEnter={() => void import(`@/pages/${chunk}`)} />
   ```
@@ -734,6 +833,7 @@ This phase merges the original Phases 5 and 6.
   > **Research insight (React Best Practices):** Preloading on hover gives the browser a head start on fetching the route chunk before the user clicks.
 
 - [ ] **3.7** Default route logic with **correct permission names**:
+
   ```typescript
   const DEFAULT_ROUTE_MAP: { permission: Permission; route: string }[] = [
     { permission: 'analytics:dashboard_view', route: '/messages/email/statistics' },
@@ -743,7 +843,7 @@ This phase merges the original Phases 5 and 6.
     { permission: 'audience:contacts_view', route: '/contacts' },
     { permission: 'infra:view', route: '/pools' },
     { permission: 'account:settings_view', route: '/settings' },
-  ]
+  ];
   ```
 
 - [ ] **3.8** Create pages: `home.tsx`, `access-denied.tsx`, `not-found.tsx`
@@ -779,18 +879,18 @@ This phase merges the original Phases 5 and 6.
 
 ### Error & Failure Propagation
 
-| Error Source | Handling |
-|---|---|
-| Auth0 SDK init failure | Show error page with "Try Again" |
-| Auth0 callback error | Use `useAuth0().error` (not URL params), show message + "Try Again" |
-| `POST /users/login` failure | Retry once, then show error page with "Logout" |
-| `GET /users/me` returns no accounts | Show "No accounts" page with "Logout" |
-| JWT expired during API call | Token cache check → `getAccessTokenSilently()` → retry; if `login_required` → redirect to Auth0 |
-| 401 during account switch | Do NOT trigger logout (check `auth.status === 'switching'`) |
-| Axios `CancelledError` | Silent — from `cancelQueries()` during account switch |
-| 403 from API | Toast: "Permissão negada" |
-| 5xx from API | Toast: "Não foi possível processar a requisição" |
-| Network error | Toast: "Erro de conexão" |
+| Error Source                        | Handling                                                                                        |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Auth0 SDK init failure              | Show error page with "Try Again"                                                                |
+| Auth0 callback error                | Use `useAuth0().error` (not URL params), show message + "Try Again"                             |
+| `POST /users/login` failure         | Retry once, then show error page with "Logout"                                                  |
+| `GET /users/me` returns no accounts | Show "No accounts" page with "Logout"                                                           |
+| JWT expired during API call         | Token cache check → `getAccessTokenSilently()` → retry; if `login_required` → redirect to Auth0 |
+| 401 during account switch           | Do NOT trigger logout (check `auth.status === 'switching'`)                                     |
+| Axios `CancelledError`              | Silent — from `cancelQueries()` during account switch                                           |
+| 403 from API                        | Toast: "Permissão negada"                                                                       |
+| 5xx from API                        | Toast: "Não foi possível processar a requisição"                                                |
+| Network error                       | Toast: "Erro de conexão"                                                                        |
 
 ### Security Considerations
 
@@ -844,26 +944,26 @@ This phase merges the original Phases 5 and 6.
 
 ## Dependencies & Prerequisites
 
-| Dependency | Status | Notes |
-|---|---|---|
-| msgops-api running at localhost:5001 | Required | Backend must be running for API calls |
-| Auth0 SPA application configured | Required | Need client ID; enable Refresh Token Rotation in Auth0 dashboard |
-| Etus logo SVG | Required | Extract from Vue 2 app or design assets |
-| Backend CORS configuration | Recommended | Currently wide open — should allowlist frontend origin for production |
+| Dependency                           | Status      | Notes                                                                 |
+| ------------------------------------ | ----------- | --------------------------------------------------------------------- |
+| msgops-api running at localhost:5001 | Required    | Backend must be running for API calls                                 |
+| Auth0 SPA application configured     | Required    | Need client ID; enable Refresh Token Rotation in Auth0 dashboard      |
+| Etus logo SVG                        | Required    | Extract from Vue 2 app or design assets                               |
+| Backend CORS configuration           | Recommended | Currently wide open — should allowlist frontend origin for production |
 
 ---
 
 ## Risk Analysis & Mitigation
 
-| Risk | Impact | Mitigation |
-|---|---|---|
-| Auth0 SPA client not configured | Blocks auth | Verify Auth0 dashboard has SPA app with callback URLs; enable Refresh Token Rotation |
-| CORS (React :3000, API :5001) | Blocks dev API calls | Vite proxy `/api` → `:5001`; set `VITE_API_URL` to `/api` in dev |
+| Risk                                              | Impact                                | Mitigation                                                                             |
+| ------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------- |
+| Auth0 SPA client not configured                   | Blocks auth                           | Verify Auth0 dashboard has SPA app with callback URLs; enable Refresh Token Rotation   |
+| CORS (React :3000, API :5001)                     | Blocks dev API calls                  | Vite proxy `/api` → `:5001`; set `VITE_API_URL` to `/api` in dev                       |
 | `cacheLocation: "memory"` loses tokens on refresh | User re-authenticates on page refresh | `useRefreshTokens: true` + `useRefreshTokensFallback: true` silently re-obtains tokens |
-| Zustand v5 `useShallow` omitted | Infinite re-render loops | Lint rule or code review to enforce `useShallow` for object selectors |
-| Permission name typos | Silent auth failures | `Permission` union type catches at compile time |
-| React 19 Strict Mode double-mount | Duplicate API calls in dev | AbortController in all `useEffect` async flows |
-| shadcn/ui + Tailwind v4 | Styling issues | Use `tw-animate-css` (not `tailwindcss-animate`); `new-york` style only |
+| Zustand v5 `useShallow` omitted                   | Infinite re-render loops              | Lint rule or code review to enforce `useShallow` for object selectors                  |
+| Permission name typos                             | Silent auth failures                  | `Permission` union type catches at compile time                                        |
+| React 19 Strict Mode double-mount                 | Duplicate API calls in dev            | AbortController in all `useEffect` async flows                                         |
+| shadcn/ui + Tailwind v4                           | Styling issues                        | Use `tw-animate-css` (not `tailwindcss-animate`); `new-york` style only                |
 
 ---
 

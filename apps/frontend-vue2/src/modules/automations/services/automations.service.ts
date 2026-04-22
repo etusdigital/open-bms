@@ -148,17 +148,6 @@ export default class AutomationsService {
     }
   }
 
-  async getLeadsByAutomationSteps(automationId: number, automationTitle: string, stepId: number) {
-    try {
-      const api = await this.api.getApi();
-      const params = { automationId, automationTitle, stepId };
-
-      return await api.get(`automations/lead-state`, { params });
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
   async getAutomationList() {
     const api = await this.api.getApi();
     return await api.get(`messages/select-message-filter`);

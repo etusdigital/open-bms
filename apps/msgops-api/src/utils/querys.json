@@ -1,3 +1,0 @@
-{
-    "messages": "SELECT * FROM `brius-prod.silver_retention.v_bms_email_database`  where date = current_date()-1 and CAMPAIGN_NAME = 'plusdin-uc-fluxo-cc-e11-novo-v2' LIMIT 1000"
-}

@@ -1,8 +1,8 @@
 {
   "contact": {
-    "email": "jonathan.shun@brius.com.br",
-    "firstName": "Jonathan Cruz",
-    "phone": "31973650997",
+    "email": "contact@example.com",
+    "firstName": "Example Contact",
+    "phone": "5511999999999",
     "grupo": "grupo1",
     "beneficio": "beneficio1",
     "renda": "renda1"

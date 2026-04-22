@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://bms.bri.us/schema",
+  "$id": "https://bms.example.com/schema",
   "type": "object",
   "properties": {
     "id": {

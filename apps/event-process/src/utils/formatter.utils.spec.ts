@@ -237,7 +237,7 @@ describe('FormatterUtils', () => {
         component: 'more_features_list',
         element_text: 'Recompensas',
         action: 'click',
-        filipe: null,
+        extra_field: null,
         timezone: '',
       };
 

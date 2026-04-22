@@ -21,7 +21,6 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
-    "@google-cloud/datastore": "^10.1.0",
     "@google-cloud/tasks": "^6.2.1",
     "@nestjs/common": "^11.1.16",
     "@nestjs/config": "^4.0.3",

@@ -6,14 +6,14 @@
       <label class="font-title font-weight-bold ds-gray-color">{{ $t('datatable.verifiyReputationEmail') }}</label>
       <p class="font-14">{{ $t('datatable.copyEmailPostMaster') }}</p>
       <div class="div-row gap-15 align-items-center my-4">
-        <input class="input-bms" type="text" value="bfp@brius.com.br" />
+        <input class="input-bms" type="text" :value="postmasterEmail" />
         <button class="button-secondary" @click="copyToClipboard">
           {{ $t('button.copy') }}
         </button>
       </div>
 
       <i18n path="chart.postmasterTutorial" tag="p" class="mb-0" for="chart.postmasterTutorialLink">
-        <a href="https://etusmedia.atlassian.net/wiki/spaces/BHC/pages/1755807782/Google+Postmaster" target="_blank">
+        <a :href="postmasterTutorialUrl" target="_blank">
           {{ $t('chart.postmasterTutorialLink') }}
         </a>
       </i18n>
@@ -232,6 +232,9 @@ dayjs.extend(timezone);
 export default class EmailPostMaster extends Vue {
   private readonly postmasterService = new PostmasterService();
   private readonly toastService = new ToastService();
+  public postmasterEmail = process.env.VUE_APP_POSTMASTER_EMAIL || '';
+  public postmasterTutorialUrl =
+    process.env.VUE_APP_POSTMASTER_TUTORIAL_URL || 'https://support.google.com/mail/answer/9981691';
   public tableData!: PostmasterDateDto[];
   public selectedDates: any = [];
   public selectOptions: any = [];
@@ -816,7 +819,7 @@ export default class EmailPostMaster extends Vue {
   }
 
   copyToClipboard() {
-    navigator.clipboard.writeText('bfp@brius.com.br');
+    navigator.clipboard.writeText(this.postmasterEmail);
     this.toastService.show({
       type: 'success',
       text: this.$t('toast.copiedToClipboard') as string,

@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { StatisticsController } from './statistics.controller';
 import { StatisticsService } from './statistics.service';
-import { GoogleBigqueryProvider } from '../../providers/google-bigquery.provider';
 import { ContactsModule } from '../contacts/contacts.module';
 import { AccountsModule } from '../accounts/accounts.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -29,7 +28,7 @@ import { ClickhouseProvider } from 'src/providers/clickhouse.provider';
     TypeOrmModule.forFeature([AccountUsageEntity, EventStatisticsEntity, VerifyStatisticsEntity]),
   ],
   controllers: [StatisticsController],
-  providers: [GoogleBigqueryProvider, GoogleTasksProvider, StatisticsService, StatisticsAggregationService, ClickhouseProvider],
+  providers: [GoogleTasksProvider, StatisticsService, StatisticsAggregationService, ClickhouseProvider],
   exports: [StatisticsService],
 })
 export class StatisticsModule {}

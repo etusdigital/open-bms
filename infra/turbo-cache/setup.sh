@@ -16,9 +16,9 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-GCP_PROJECT="${GCP_PROJECT:-etus-media-prod}"
+GCP_PROJECT="${GCP_PROJECT:?Set GCP_PROJECT env var (GCP project ID to host the cache)}"
 GCP_REGION="${GCP_REGION:-us-east1}"
-GCS_BUCKET="${GCS_BUCKET:-etus-turbo-cache}"
+GCS_BUCKET="${GCS_BUCKET:-bms-turbo-cache}"
 SERVICE_ACCOUNT_NAME="turbo-cache"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT_NAME}@${GCP_PROJECT}.iam.gserviceaccount.com"
 
@@ -107,6 +107,6 @@ echo ""
 echo "  4. For local dev, each developer runs:"
 echo "     # From the repo root:"
 echo "     mkdir -p .turbo"
-echo "     echo '{\"apiurl\": \"<url-from-deploy-output>\", \"teamid\": \"team_retention\", \"token\": \"${TURBO_TOKEN}\"}' > .turbo/config.json"
+echo "     echo '{\"apiurl\": \"<url-from-deploy-output>\", \"teamid\": \"team_bms\", \"token\": \"${TURBO_TOKEN}\"}' > .turbo/config.json"
 echo ""
 echo "============================================"

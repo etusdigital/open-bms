@@ -42,19 +42,22 @@ on:
         default: 'production'
       gcp-project:
         description: GCP project for Cloud Run deploy
-        required: false
+        required: true
         type: string
-        default: etus-media-prod
       gcp-region:
         description: GCP region
         required: false
         type: string
         default: us-east1
       registry:
-        description: Artifact Registry path
+        description: Artifact Registry path (e.g. us-east1-docker.pkg.dev/<project>/<repo>)
+        required: true
+        type: string
+      cloud-run-project:
+        description: Override for the project_id used by deploy-cloudrun (defaults to gcp-project)
         required: false
         type: string
-        default: us-east1-docker.pkg.dev/etus-media-mgmt/msgops
+        default: ''
     secrets:
       GCP_SA_KEY:
         required: true
@@ -127,7 +130,7 @@ jobs:
         with:
           service: ${{ matrix.target.service }}
           region: ${{ inputs.gcp-region }}
-          project_id: ${{ inputs.gcp-project != 'etus-media-prod' && inputs.gcp-project || (inputs.environment == 'staging' && 'etus-media-development-staging' || 'etus-media-prod') }}
+          project_id: ${{ inputs.cloud-run-project != '' && inputs.cloud-run-project || inputs.gcp-project }}
           image: ${{ needs.build.outputs.image-tag }}
           flags: >-
             --execution-environment=gen2

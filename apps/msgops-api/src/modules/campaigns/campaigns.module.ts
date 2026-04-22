@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { GoogleDatastoreProvider } from '../../providers/google-datastore.provider';
 import { GoogleCloudStorageProvider } from '../../providers/google-cloud-storage.provider';
 import { GoogleTasksProvider } from '../../providers/google-tasks.provider';
 import { CampaignsController } from './campaigns.controller';
@@ -35,6 +34,6 @@ import { CampaignsConfigsEntity } from '../../entities/campaigns-configs.entity'
   ],
   controllers: [CampaignsController],
   exports: [CampaignsService],
-  providers: [GoogleDatastoreProvider, CampaignsService, UtilsService, GoogleCloudStorageProvider, GoogleTasksProvider, PubSubProvider, SlackProvider],
+  providers: [CampaignsService, UtilsService, GoogleCloudStorageProvider, GoogleTasksProvider, PubSubProvider, SlackProvider],
 })
 export class CampaignModule {}

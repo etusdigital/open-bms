@@ -9,7 +9,6 @@ import { MessagesModule } from './modules/messages/messages.module';
 import { BucketsModule } from './modules/buckets/buckets.module';
 import { TestsModule } from './modules/tests/tests.module';
 import { ServicesModule } from './modules/services/services.module';
-import { LeadStateModule } from './modules/lead-state/lead-state.module';
 import { CampaignModule } from './modules/campaigns/campaigns.module';
 import { EmailsTemplatesModule } from './modules/emails-templates/emails-templates.module';
 import { AuditsModule } from './modules/audits/audits.module';
@@ -43,7 +42,6 @@ import { AuthzModule } from './modules/authz/authz.module';
     AutomationsModule,
     MessagesModule,
     ServicesModule,
-    LeadStateModule,
     EmailsTemplatesModule,
     AccountsModule,
     AuditsModule,

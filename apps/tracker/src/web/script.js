@@ -1,7 +1,14 @@
 (function () {
-  const msgOpsCookie = 'bmsInfo'; //this name should change
-  const apiKey = 'cbf3883074639ea9e3aced35ac37d707';
-  const quizCookies = ['_plusdin_quiz', 'registeredLead', '_plusdin_recomendation_email', '_quiz_maker_quiz'];
+  // Configuration is provided by the embedding page via a global `window.BMS_CONFIG` object,
+  // or substituted at serve-time by replacing the `__BMS_*__` placeholders.
+  // Example:
+  //   <script>window.BMS_CONFIG = { apiKey: 'your-account-api-key' };</script>
+  //   <script async src="https://your-tracker.example.com/bmstrk.js"></script>
+  const bmsConfig = (typeof window !== 'undefined' && window.BMS_CONFIG) || {};
+  const msgOpsCookie = bmsConfig.cookieName || 'bmsInfo';
+  const apiKey = bmsConfig.apiKey || '__BMS_API_KEY__';
+  const ingestEndpoint = bmsConfig.ingestEndpoint || '__BMS_INGEST_ENDPOINT__';
+  const quizCookies = Array.isArray(bmsConfig.quizCookies) ? bmsConfig.quizCookies : [];
 
   var bmsInfo = bmsInfo || {};
   window.bmsInfo = bmsInfo;
@@ -55,7 +62,7 @@
     };
 
     try {
-      const response = await fetch(`https://in.bri.us/c`, requestOptions);
+      const response = await fetch(ingestEndpoint, requestOptions);
       return await response.json();
     } catch (error) {
       console.log('error', error);

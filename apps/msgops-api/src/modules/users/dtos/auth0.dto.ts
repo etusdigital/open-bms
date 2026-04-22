@@ -10,7 +10,4 @@ export class Auth0Dto {
 
   @JoiSchema(Joi.string().required())
   picture: string;
-
-  @JoiSchema(Joi.array().optional())
-  'https://bri.us/roles'?: string[];
 }

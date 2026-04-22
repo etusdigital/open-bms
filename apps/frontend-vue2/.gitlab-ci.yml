@@ -106,7 +106,7 @@ deploy_production:
     - gsutil -h "Cache-Control:no-cache,no-store,max-age=0" -m rsync -dr dist/ $GCP_BUCKET_NAME
   only:
     - master
-  needs: ["build_production"]
+  needs: ['build_production']
 
 deploy_vue3_production:
   stage: deploy
@@ -120,21 +120,20 @@ deploy_vue3_production:
     - gsutil -h "Cache-Control:no-cache,no-store,max-age=0" -m rsync -dr dist/ $GCP_BUCKET_VUE3_NAME
   only:
     - vue3
-  needs: ["build_production"]
-
+  needs: ['build_production']
 
 flushcache_production:
-    stage: flushcache
-    environment:
-      name: production
-    image: docker:stable
-    before_script:
-        - apk add --update curl && rm -rf /var/cache/apk/*
-    script:
+  stage: flushcache
+  environment:
+    name: production
+  image: docker:stable
+  before_script:
+    - apk add --update curl && rm -rf /var/cache/apk/*
+  script:
     - |
-        curl --fail --output "/dev/null" --silent --show-error -X POST "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/purge_cache" \
-        -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
-        --data '{"prefixes": ["https://bms.bri.us/"]}'
-    only:
-      - master
-    needs: ["deploy_production"]
+      curl --fail --output "/dev/null" --silent --show-error -X POST "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/purge_cache" \
+      -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
+      --data "{\"prefixes\": [\"$CF_PURGE_PREFIX\"]}"
+  only:
+    - master
+  needs: ['deploy_production']

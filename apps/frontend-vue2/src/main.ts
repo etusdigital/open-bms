@@ -166,28 +166,37 @@ Vue.use(auth0Plugin, {
 });
 
 if (process.env.VUE_APP_ENVIRONMENT !== 'development') {
-  Vue.use(VueGtm, {
-    id: 'GTM-MZ3K7JLL',
-    defer: false,
-    compatibility: false,
-    enabled: true,
-    debug: false,
-    vueRouter: router,
-  });
+  if (process.env.VUE_APP_GTM_ID) {
+    Vue.use(VueGtm, {
+      id: process.env.VUE_APP_GTM_ID,
+      defer: false,
+      compatibility: false,
+      enabled: true,
+      debug: false,
+      vueRouter: router,
+    });
+  }
 
-  Sentry.init({
-    Vue,
-    dsn: 'https://REDACTED-SENTRY-DSN',
-    environment: process.env.VUE_APP_ENVIRONMENT,
-    integrations: [
-      new Integrations.BrowserTracing({
-        routingInstrumentation: Sentry.vueRouterInstrumentation(router),
-        tracingOrigins: ['localhost', 'msgops.etus.digital', 'bms.bri.us', /^\//],
-      }),
-    ],
+  if (process.env.VUE_APP_SENTRY_DSN) {
+    const extraTracingOrigins = (process.env.VUE_APP_SENTRY_TRACING_ORIGINS || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-    tracesSampleRate: 0.3,
-  });
+    Sentry.init({
+      Vue,
+      dsn: process.env.VUE_APP_SENTRY_DSN,
+      environment: process.env.VUE_APP_ENVIRONMENT,
+      integrations: [
+        new Integrations.BrowserTracing({
+          routingInstrumentation: Sentry.vueRouterInstrumentation(router),
+          tracingOrigins: ['localhost', ...extraTracingOrigins, /^\//],
+        }),
+      ],
+
+      tracesSampleRate: 0.3,
+    });
+  }
 
   const clarity: ClarityFunction = (...args: any[]): void => {
     (clarity.q = clarity.q || []).push(args);

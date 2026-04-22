@@ -9,8 +9,7 @@ export class TrackerService {
 
   constructor(private httpService: HttpService) {
     this.logLevel = process.env.LOG_LEVEL || null;
-    // this.uri = process.env.BRIUS_PIXEL_EVENT;
-    this.uri = 'https://us-east1-brius-prod.cloudfunctions.net/pixel-event-store?namespace=msgops&dataframe=msgops_tracker';
+    this.uri = process.env.PIXEL_EVENT_STORE_URL || '';
   }
 
   getParameters(event: MsgopsEvent, params: TrackerRequest, started_at: number): TrackerParams {

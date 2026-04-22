@@ -199,7 +199,7 @@ export default class Settings extends Vue {
       };
       window.bmsTrkOptions = bmsTrkOptions;
     <\/script>
-    <script async="true" src="https://assets.bri.us/bms/bmstrk.js"><\/script>`;
+    <script async="true" src="${process.env.VUE_APP_ASSETS_URL}/bms/bmstrk.js"><\/script>`;
     this.webpush_settings = JSON.parse(getAccountConfig(this.currentAccount, 'webpush_settings')) ?? {};
     this.rateLimitUser = getAccountConfig(this.currentAccount, 'send_limit_per_user') ?? 0;
   }
@@ -291,7 +291,7 @@ export default class Settings extends Vue {
   }
 
   async downloadFile() {
-    const fileContent = `importScripts("https://assets.bri.us/bms/push/bmspush-${this.currentAccount.accountHash}.js");`;
+    const fileContent = `importScripts("${process.env.VUE_APP_ASSETS_URL}/bms/push/bmspush-${this.currentAccount.accountHash}.js");`;
 
     const element = document.createElement('a');
     element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(fileContent));
