@@ -17,6 +17,7 @@ describe('AppController', () => {
     appService = {
       findContactsByEmail: jest.fn(),
       processShortLink: jest.fn(),
+      publishRedirectClick: jest.fn().mockResolvedValue(undefined),
     };
 
     controller = new AppController(msgopsService as MsgopsService, appService as AppService);
@@ -182,6 +183,70 @@ describe('AppController', () => {
       await controller.redirect(mockResponse, mockRequest, url, null);
 
       expect(mockResponse.cookie).toHaveBeenCalledWith('bmst', 'token123', expect.any(Object));
+    });
+
+    it('should fire-and-forget publishRedirectClick when bmsUUID and accountId are present', () => {
+      const mockResponse = {
+        cookie: jest.fn(),
+        redirect: jest.fn(),
+      } as any;
+      const mockRequest = {
+        hostname: 'tracker.example.com',
+        ip: '1.2.3.4',
+        headers: { 'user-agent': 'jest-agent' },
+      } as any;
+      const url = Buffer.from(encodeURIComponent('https://example.com/page?bmsu=uuid-123&bmsa=5&utm_source=news')).toString('base64');
+
+      controller.redirect(mockResponse, mockRequest, url, null);
+
+      expect(appService.publishRedirectClick).toHaveBeenCalledTimes(1);
+      expect(appService.publishRedirectClick).toHaveBeenCalledWith({
+        bmsUUID: 'uuid-123',
+        accountId: '5',
+        decodedUrl: expect.any(String),
+        ip: '1.2.3.4',
+        userAgent: 'jest-agent',
+      });
+      const decodedUrlArg = (appService.publishRedirectClick as jest.Mock).mock.calls[0][0].decodedUrl as string;
+      expect(decodeURIComponent(decodedUrlArg)).toContain('https://example.com/page');
+      expect(decodeURIComponent(decodedUrlArg)).toContain('bmsa=5');
+      expect(mockResponse.redirect).toHaveBeenCalledWith(302, expect.any(String));
+    });
+
+    it('should not call publishRedirectClick when accountId (bmsa) is missing', () => {
+      const mockResponse = {
+        cookie: jest.fn(),
+        redirect: jest.fn(),
+      } as any;
+      const mockRequest = {
+        hostname: 'tracker.example.com',
+        ip: '1.2.3.4',
+        headers: { 'user-agent': 'jest-agent' },
+      } as any;
+      const url = Buffer.from(encodeURIComponent('https://example.com/page?bmsu=uuid-123')).toString('base64');
+
+      controller.redirect(mockResponse, mockRequest, url, null);
+
+      expect(appService.publishRedirectClick).not.toHaveBeenCalled();
+      expect(mockResponse.redirect).toHaveBeenCalledWith(302, expect.any(String));
+    });
+
+    it('should not call publishRedirectClick when bmsUUID is missing', () => {
+      const mockResponse = {
+        cookie: jest.fn(),
+        redirect: jest.fn(),
+      } as any;
+      const mockRequest = {
+        hostname: 'tracker.example.com',
+        ip: '1.2.3.4',
+        headers: { 'user-agent': 'jest-agent' },
+      } as any;
+      const url = Buffer.from(encodeURIComponent('https://example.com/page?bmsa=5')).toString('base64');
+
+      controller.redirect(mockResponse, mockRequest, url, null);
+
+      expect(appService.publishRedirectClick).not.toHaveBeenCalled();
+      expect(mockResponse.redirect).toHaveBeenCalledWith(302, expect.any(String));
     });
   });
 
