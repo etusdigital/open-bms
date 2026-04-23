@@ -521,5 +521,132 @@ describe('InternalEventsService', () => {
         );
       });
     });
+
+    // Hop 2 of the email click flow (tracker-redirect). When the user follows
+    // a bmsclick link, apps/tracker publishes a platform='internal' event with
+    // the real end-user IP. These tests guard that bot classification reaches
+    // ClickHouse via Kafka properties, so we can later correlate with hop-1
+    // click-webhook classifications to strip Gmail-prefetch noise.
+    describe('bot signal stamping for tracker-redirect', () => {
+      const trackerRedirectEvent = {
+        accountId: '1',
+        event: 'tracker-redirect',
+        schemaVersion: 1,
+        timestamp: Date.now(),
+        uuid: 'bms-uuid-xyz',
+        url: 'https://example.com/landing',
+        ip: '8.8.8.8',
+        userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0',
+      };
+
+      beforeEach(() => {
+        mockMsgopsService.getAccountTimeZone.mockResolvedValue('America/Sao_Paulo');
+        mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
+      });
+
+      it('stamps is_datacenter=true, is_bot=false, bot_classification="datacenter" for a GCP hosting IP', async () => {
+        mockGeolocationService.getLocation.mockResolvedValueOnce({
+          country: 'US',
+          region: 'CA',
+          city: 'Mountain View',
+          traits: {
+            asn: 396982,
+            asnOrg: 'Google LLC',
+            isp: '',
+            organization: '',
+            userType: 'hosting',
+            connectionType: '',
+            isAnycast: false,
+          },
+        });
+
+        const request = createRequest([trackerRedirectEvent]);
+        await service.internalEventsProcess(request);
+
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalled();
+        const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+        expect(payload.event).toBe('tracker-redirect');
+        expect(payload.properties).toMatchObject({
+          is_bot: false,
+          is_datacenter: true,
+          bot_classification: 'datacenter',
+          asn: 396982,
+          asn_org: 'Google LLC',
+          user_type: 'hosting',
+        });
+      });
+
+      it('UA denylist upgrades a hosting tracker-redirect with curl UA to is_bot=true (script_ua)', async () => {
+        mockGeolocationService.getLocation.mockResolvedValueOnce({
+          country: 'US',
+          traits: {
+            asn: 16509,
+            asnOrg: 'Amazon.com, Inc.',
+            isp: '',
+            organization: '',
+            userType: 'hosting',
+            connectionType: '',
+            isAnycast: false,
+          },
+        });
+
+        const request = createRequest([{ ...trackerRedirectEvent, userAgent: 'curl/8.4.0' }]);
+        await service.internalEventsProcess(request);
+
+        const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+        expect(payload.properties).toMatchObject({
+          is_bot: true,
+          is_datacenter: true,
+          bot_classification: 'script_ua',
+          asn: 16509,
+        });
+      });
+
+      it('stamps residential traits clean for a real user click', async () => {
+        mockGeolocationService.getLocation.mockResolvedValueOnce({
+          country: 'BR',
+          region: 'SP',
+          city: 'São Paulo',
+          traits: {
+            asn: 28573,
+            asnOrg: 'Claro NXT Telecomunicacoes Ltda',
+            isp: '',
+            organization: '',
+            userType: 'residential',
+            connectionType: 'Cable/DSL',
+            isAnycast: false,
+          },
+        });
+
+        const request = createRequest([{ ...trackerRedirectEvent, ip: '177.1.1.1' }]);
+        await service.internalEventsProcess(request);
+
+        const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+        expect(payload.properties).toMatchObject({
+          is_bot: false,
+          is_datacenter: false,
+          bot_classification: null,
+          asn: 28573,
+          user_type: 'residential',
+        });
+      });
+
+      it('returns all-false bot signals when the event has no ip (geoData skipped)', async () => {
+        const { ip: _ip, ...noIpEvent } = trackerRedirectEvent;
+        const request = createRequest([noIpEvent]);
+        await service.internalEventsProcess(request);
+
+        expect(mockGeolocationService.getLocation).not.toHaveBeenCalled();
+        const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+        expect(payload.properties).toMatchObject({
+          is_bot: false,
+          is_datacenter: false,
+          bot_classification: null,
+          asn: 0,
+          asn_org: '',
+          user_type: '',
+        });
+      });
+    });
   });
 });
