@@ -104,8 +104,8 @@
               currentStepRegister.index !== 4
                 ? `${$t('button.advance')}`
                 : isNew
-                ? `${$t('button.create')}`
-                : `${$t('button.save')}`
+                  ? `${$t('button.create')}`
+                  : `${$t('button.save')}`
             "
             type="submit"
             class="btn btn-c btn-lg btn-success btn-success-c float-right"

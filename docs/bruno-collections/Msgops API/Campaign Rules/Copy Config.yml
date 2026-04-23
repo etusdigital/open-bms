@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/campaigns-rules/configs/1/copy"
+  url: '{{msgops-api-url}}/campaigns-rules/configs/1/copy'
   auth: inherit
 
 settings:

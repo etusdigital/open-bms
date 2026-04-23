@@ -5,10 +5,10 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/tags/validate-name"
+  url: '{{msgops-api-url}}/tags/validate-name'
   params:
     - name: name
-      value: "test-tag"
+      value: 'test-tag'
   auth: inherit
 
 settings:

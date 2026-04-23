@@ -1,10 +1,4 @@
-import {
-  getSeverity,
-  ALERT_THRESHOLDS,
-  getSeverityV2,
-  computeZScore,
-  ALERT_THRESHOLDS_V2,
-} from './thresholds';
+import { getSeverity, ALERT_THRESHOLDS, getSeverityV2, computeZScore, ALERT_THRESHOLDS_V2 } from './thresholds';
 import type { StatisticalBaseline } from './types';
 
 describe('ALERT_THRESHOLDS', () => {

@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/custom-events"
+  url: '{{msgops-api-url}}/custom-events'
   body:
     type: json
     json: |

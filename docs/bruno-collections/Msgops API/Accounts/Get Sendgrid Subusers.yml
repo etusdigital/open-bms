@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/accounts/sendgrid-subusers"
+  url: '{{msgops-api-url}}/accounts/sendgrid-subusers'
   auth: inherit
 
 settings:

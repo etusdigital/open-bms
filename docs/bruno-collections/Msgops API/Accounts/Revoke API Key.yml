@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/accounts/1/api-keys/1/revoke"
+  url: '{{msgops-api-url}}/accounts/1/api-keys/1/revoke'
   auth: inherit
 
 settings:

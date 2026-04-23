@@ -1,5 +1,5 @@
 ---
-title: "feat: Add Automation Version History with Preview and Restore"
+title: 'feat: Add Automation Version History with Preview and Restore'
 type: feat
 status: active
 date: 2026-04-02
@@ -16,19 +16,21 @@ Add a version history panel to the automation editor. Users can view all past ve
 **Endpoint:** `GET /audits/:automationId`
 
 **Response:** Array of audit records, newest first:
+
 ```typescript
 interface AuditRecord {
-  id: number
-  entityId: number         // automation ID
-  type: string             // "update"
-  oldValues: any           // full state before change
-  newValues: {             // full state after change
-    steps: ApiStep         // the step tree for this version
-    flowLayout?: FlowLayout
-    [key: string]: unknown
-  }
-  user: string             // JSON string: '{"email":"user@example.com"}'
-  createdAt: string        // ISO timestamp
+  id: number;
+  entityId: number; // automation ID
+  type: string; // "update"
+  oldValues: any; // full state before change
+  newValues: {
+    // full state after change
+    steps: ApiStep; // the step tree for this version
+    flowLayout?: FlowLayout;
+    [key: string]: unknown;
+  };
+  user: string; // JSON string: '{"email":"user@example.com"}'
+  createdAt: string; // ISO timestamp
 }
 ```
 
@@ -44,9 +46,9 @@ interface AuditRecord {
 export function useAutomationAudits(automationId: number) {
   return useQuery<AuditRecord[]>({
     queryKey: ['audits', automationId],
-    queryFn: () => apiClient.get(`/audits/${automationId}`).then(r => r.data),
+    queryFn: () => apiClient.get(`/audits/${automationId}`).then((r) => r.data),
     enabled: automationId > 0,
-  })
+  });
 }
 ```
 
@@ -55,6 +57,7 @@ export function useAutomationAudits(automationId: number) {
 **File:** `editor/panels/version-history-panel.tsx`
 
 A Sheet (right side) containing:
+
 - **Header:** "History" title + close button
 - **Scrollable list** of audit entries, each showing:
   - Timestamp (formatted with `Intl.DateTimeFormat` — full date+time for older, date-only for current)
@@ -72,6 +75,7 @@ A `History` (clock) icon button in the top bar header, between the "last saved" 
 ### Task 4: Preview mode
 
 When a non-current version is clicked:
+
 1. Deserialize `audit.newValues.steps` into React Flow nodes/edges
 2. Pass to the editor with `readOnly={true}`
 3. Show a banner/bar at the top: "Viewing version from {date} — [Restore this version] [Back to current]"
@@ -81,6 +85,7 @@ When a non-current version is clicked:
 ### Task 5: Restore
 
 "Restore this version" button triggers the same `handleSave` flow but with the historic version's steps. After successful save:
+
 - Exit preview mode
 - Reload the automation (invalidate query cache)
 - Show success toast

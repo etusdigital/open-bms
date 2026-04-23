@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{backoffice-api-url}}/ips/refresh-usage"
+  url: '{{backoffice-api-url}}/ips/refresh-usage'
   auth: inherit
 
 settings:

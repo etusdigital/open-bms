@@ -8,7 +8,7 @@
 
 /* customize data-table and pagination */
 .v-table__wrapper {
-  border: 1px solid #D9D9D9;
+  border: 1px solid #d9d9d9;
 }
 
 .v-data-table-header__content {
@@ -33,13 +33,15 @@
 }
 
 .v-field {
-  border: 1px solid #D9D9D9;
+  border: 1px solid #d9d9d9;
   border-radius: 0.5rem;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  box-shadow:
+    0 1px 3px 0 rgb(0 0 0 / 0.1),
+    0 1px 2px -1px rgb(0 0 0 / 0.1);
 }
 
 .v-btn--disabled {
-  color: #A6A6A6;
+  color: #a6a6a6;
   opacity: 100%;
 }
 
@@ -98,8 +100,14 @@
   }
 }
 
-.collapsed-sidebar { @apply tw-w-[72px]; }
+.collapsed-sidebar {
+  @apply tw-w-[72px];
+}
 
-.sidebar-item-active { @apply tw-text-primary tw-font-semibold; }
+.sidebar-item-active {
+  @apply tw-font-semibold tw-text-primary;
+}
 
-.expanded { @apply tw-rotate-180; }
+.expanded {
+  @apply tw-rotate-180;
+}

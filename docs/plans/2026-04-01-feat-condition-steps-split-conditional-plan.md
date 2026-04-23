@@ -1,5 +1,5 @@
 ---
-title: "feat: Add Condition Steps — Split, Conditional, Conditional Time"
+title: 'feat: Add Condition Steps — Split, Conditional, Conditional Time'
 type: feat
 status: active
 date: 2026-04-01
@@ -13,14 +13,14 @@ Add 3 condition step types plus their sub-node types: **split** (traffic split 2
 
 ## Step Types Summary
 
-| Step | Branching | Sub-nodes | Settings |
-|------|:---------:|-----------|----------|
-| `split` | Yes (2-5 paths) | `splitPath` per path | `{ "1": 50, "2": 50 }` (percentage map) |
-| `conditional` | Yes (2 paths) | `conditionalTrue`, `conditionalFalse` | `ConditionalRule[]` (1-10 rules) |
-| `conditionalTime` | No (linear) | None | `{ initialTime: 0-23, endTime: 0-23 }` |
-| `splitPath` | No (container) | — | `{ path: "1", value: 50 }` |
-| `conditionalTrue` | No (container) | — | `ConditionalRule[]` (same as parent) |
-| `conditionalFalse` | No (container) | — | `{}` (empty) |
+| Step               |    Branching    | Sub-nodes                             | Settings                                |
+| ------------------ | :-------------: | ------------------------------------- | --------------------------------------- |
+| `split`            | Yes (2-5 paths) | `splitPath` per path                  | `{ "1": 50, "2": 50 }` (percentage map) |
+| `conditional`      |  Yes (2 paths)  | `conditionalTrue`, `conditionalFalse` | `ConditionalRule[]` (1-10 rules)        |
+| `conditionalTime`  |   No (linear)   | None                                  | `{ initialTime: 0-23, endTime: 0-23 }`  |
+| `splitPath`        | No (container)  | —                                     | `{ path: "1", value: 50 }`              |
+| `conditionalTrue`  | No (container)  | —                                     | `ConditionalRule[]` (same as parent)    |
+| `conditionalFalse` | No (container)  | —                                     | `{}` (empty)                            |
 
 ## React Flow Architecture for Branching
 
@@ -31,6 +31,7 @@ Currently all nodes have a single source handle (bottom) → single target handl
 ### The Solution: Multiple Named Handles
 
 **Split node** — N source handles at the bottom, labeled "A", "B", "C", etc.:
+
 ```tsx
 <Handle type="source" position={Position.Bottom} id="path-1" />
 <Handle type="source" position={Position.Bottom} id="path-2" />
@@ -40,12 +41,14 @@ Currently all nodes have a single source handle (bottom) → single target handl
 Each handle connects to the corresponding `splitPath` node. The edge carries `sourceHandle: "path-1"`.
 
 **Conditional node** — 2 source handles, "Yes" (left) and "No" (right):
+
 ```tsx
 <Handle type="source" position={Position.Bottom} id="yes" style={{ left: '33%' }} />
 <Handle type="source" position={Position.Bottom} id="no" style={{ left: '66%' }} />
 ```
 
 **splitPath / conditionalTrue / conditionalFalse** — These are "container" nodes that act as branch entry points. They have:
+
 - A target handle (top) — connected from the parent split/conditional
 - A source handle (bottom) — connecting to the first step in that branch
 - A label showing the path name ("A: 50%") or "Yes"/"No"
@@ -69,24 +72,26 @@ Currently `onConnect` enforces single-output (removes existing edge from source)
 **File:** `editor/types.ts`
 
 Add step types:
+
 ```typescript
 | 'split' | 'splitPath' | 'conditional' | 'conditionalTrue' | 'conditionalFalse' | 'conditionalTime'
 ```
 
 Add settings interfaces:
+
 ```typescript
 export interface SplitSettings {
-  [key: string]: number  // "1": 50, "2": 50, etc.
+  [key: string]: number; // "1": 50, "2": 50, etc.
 }
 
 export interface SplitPathSettings {
-  path: string   // "1" through "5"
-  value: number  // percentage
+  path: string; // "1" through "5"
+  value: number; // percentage
 }
 
 export interface ConditionalTimeSettings {
-  initialTime: number | string  // 0-23
-  endTime: number | string      // 0-23
+  initialTime: number | string; // 0-23
+  endTime: number | string; // 0-23
 }
 ```
 
@@ -95,28 +100,33 @@ export interface ConditionalTimeSettings {
 ### Task 2: Create node components
 
 **Split node** (`split-node.tsx`):
+
 - Yellow/amber themed
 - Shows percentage distribution: "A: 50%, B: 50%"
 - Multiple source handles at bottom (one per path)
 - Handle positions spread evenly across the bottom
 
 **SplitPath node** (`split-path-node.tsx`):
+
 - Small label node: "Path A: 50%"
 - Target handle (top), source handle (bottom)
 - Not deletable (delete the parent split instead)
 - No delete button
 
 **Conditional node** (`conditional-node.tsx`):
+
 - Orange/red themed
 - Shows summary of first rule
 - 2 source handles: "Yes" (left-ish) and "No" (right-ish)
 
 **ConditionalTrue/False nodes**:
+
 - Small label nodes: "Yes" (green) / "No" (gray)
 - Target + source handles
 - Not deletable
 
 **ConditionalTime node** (`conditional-time-node.tsx`):
+
 - Amber themed
 - Shows time range: "09:00 - 18:00"
 - Single source handle (linear, not branching)
@@ -126,6 +136,7 @@ export interface ConditionalTimeSettings {
 **SplitConfig** — Sliders or number inputs for 2-5 paths, percentages must sum to 100. Add/remove path buttons (min 2, max 5).
 
 **ConditionalConfig** — The rule builder. This is the most complex panel. For Phase 1, support a simplified version:
+
 - A dropdown to select rule type
 - Per-type form fields
 - AND/OR connectors between rules
@@ -140,12 +151,14 @@ export interface ConditionalTimeSettings {
 **File:** `editor/editor-serializer.ts`
 
 Key changes to `deserializeStepsToFlow`:
+
 - When a step has multiple children, create edges with `sourceHandle` IDs
 - For split: `sourceHandle: "path-{index}"`
 - For conditional: `sourceHandle: "yes"` / `sourceHandle: "no"`
 - splitPath/conditionalTrue/conditionalFalse become actual nodes
 
 Key changes to `serializeFlowToSteps`:
+
 - When building the tree, sort children by sourceHandle to maintain path ordering
 - Handle string IDs in the node-to-step mapping
 
@@ -154,19 +167,19 @@ Key changes to `serializeFlowToSteps`:
 **File:** `editor/automation-editor.tsx`
 
 Change `onConnect` to be per-handle for branching nodes:
+
 ```typescript
 // Instead of removing ALL edges from source:
-const filtered = eds.filter((e) => e.source !== connection.source)
+const filtered = eds.filter((e) => e.source !== connection.source);
 
 // Remove only the edge from the SAME source handle:
-const filtered = eds.filter((e) =>
-  !(e.source === connection.source && e.sourceHandle === connection.sourceHandle)
-)
+const filtered = eds.filter((e) => !(e.source === connection.source && e.sourceHandle === connection.sourceHandle));
 ```
 
 ### Task 6: Update sidebar + defaults
 
 Add to sidebar under "Conditions" (wait already there):
+
 - Split
 - Conditional
 - Conditional Time
@@ -176,6 +189,7 @@ Add default settings for all new types.
 ### Task 7: Auto-create sub-nodes on drop
 
 When a user drops a `split` from the sidebar, automatically create:
+
 - The split node
 - 2 splitPath child nodes (positioned below, side by side)
 - 2 end nodes (one per path)
@@ -190,6 +204,7 @@ Add all translation keys. Update serializer tests to cover branching cases.
 ## Tree Structure Examples
 
 ### Split with 3 paths (API format):
+
 ```json
 {
   "id": 42, "type": "split",
@@ -209,6 +224,7 @@ Add all translation keys. Update serializer tests to cover branching cases.
 ```
 
 ### Conditional (API format):
+
 ```json
 {
   "id": 55, "type": "conditional",

@@ -1,5 +1,5 @@
 ---
-title: "feat: Add Multi-Channel Message Steps (Web Push, Mobile Push, SMS, WhatsApp)"
+title: 'feat: Add Multi-Channel Message Steps (Web Push, Mobile Push, SMS, WhatsApp)'
 type: feat
 status: active
 date: 2026-04-01
@@ -14,11 +14,13 @@ Extend the automation editor to support all 5 message channels: email (already d
 ## Current State
 
 **Already implemented:**
+
 - `email` — single message step with searchable select
 - `testAB` — A/B test (email only, max 4 messages)
 - `randomMessage` — random email (max 10 messages)
 
 **Needs adding:**
+
 - `webPush`, `mobilePush`, `sms`, `whatsapp` — single message steps
 - `randomWebPush`, `randomMobilePush` — random message variants
 
@@ -32,15 +34,15 @@ The API schema (`obj_message`) is identical for all 5 channels: `{ id, name, tit
 
 ### 2. Channel-to-API type mapping
 
-| Step type | API `type` param |
-|-----------|-----------------|
-| `email` | `email` |
-| `webPush` | `web-push` |
-| `mobilePush` | `mobile-push` |
-| `sms` | `sms` |
-| `whatsapp` | `whatsapp` |
-| `randomWebPush` | `web-push` |
-| `randomMobilePush` | `mobile-push` |
+| Step type          | API `type` param |
+| ------------------ | ---------------- |
+| `email`            | `email`          |
+| `webPush`          | `web-push`       |
+| `mobilePush`       | `mobile-push`    |
+| `sms`              | `sms`            |
+| `whatsapp`         | `whatsapp`       |
+| `randomWebPush`    | `web-push`       |
+| `randomMobilePush` | `mobile-push`    |
 
 ### 3. Account channel availability
 
@@ -49,6 +51,7 @@ The React app already has `selectAccountChannels` in `app-store.ts` returning `A
 ### 4. Reuse, don't duplicate
 
 Since all channels share the same settings shape, we don't need 5 separate node components or 5 config panels. Instead:
+
 - **One generic `MessageNode`** component that takes channel-specific props (color, icon, label)
 - **One shared `MessageConfig`** (the existing `EmailConfig` renamed) that accepts a `messageType` param for the API query
 - **One shared `RandomMessageConfig`** that accepts a `messageType` param
@@ -61,17 +64,27 @@ Since all channels share the same settings shape, we don't need 5 separate node 
 **File:** `editor/types.ts`
 
 Add new step types to the union:
+
 ```typescript
 export type AutomationStepType =
-  | 'trigger' | 'wait'
-  | 'email' | 'webPush' | 'mobilePush' | 'sms' | 'whatsapp'
-  | 'testAB' | 'randomMessage' | 'randomWebPush' | 'randomMobilePush'
-  | 'end'
+  | 'trigger'
+  | 'wait'
+  | 'email'
+  | 'webPush'
+  | 'mobilePush'
+  | 'sms'
+  | 'whatsapp'
+  | 'testAB'
+  | 'randomMessage'
+  | 'randomWebPush'
+  | 'randomMobilePush'
+  | 'end';
 ```
 
 All message channels reuse `EmailSettings` (same shape). Add step variants to the discriminated union.
 
 Add a `MESSAGE_TYPE_MAP` constant:
+
 ```typescript
 export const MESSAGE_TYPE_MAP: Record<string, string> = {
   email: 'email',
@@ -82,7 +95,7 @@ export const MESSAGE_TYPE_MAP: Record<string, string> = {
   randomMessage: 'email',
   randomWebPush: 'web-push',
   randomMobilePush: 'mobile-push',
-}
+};
 ```
 
 ### Task 2: Create generic message node component
@@ -90,6 +103,7 @@ export const MESSAGE_TYPE_MAP: Record<string, string> = {
 **File:** `editor/nodes/message-node.tsx`
 
 A configurable node component factory:
+
 ```typescript
 export function createMessageNode(config: {
   channelKey: string
@@ -101,6 +115,7 @@ export function createMessageNode(config: {
 ```
 
 Each channel gets a thin export:
+
 ```typescript
 export const EmailNode = createMessageNode({ channelKey: 'email', icon: Mail, borderColor: 'border-green-300', ... })
 export const WebPushNode = createMessageNode({ channelKey: 'webPush', icon: Bell, borderColor: 'border-indigo-300', ... })
@@ -116,6 +131,7 @@ Delete the current `email-node.tsx` — replaced by the generic.
 **File:** `editor/nodes/random-message-node.tsx`
 
 Update to accept a `channelKey` prop via the same factory pattern. Create:
+
 - `RandomMessageNode` (email)
 - `RandomWebPushNode`
 - `RandomMobilePushNode`

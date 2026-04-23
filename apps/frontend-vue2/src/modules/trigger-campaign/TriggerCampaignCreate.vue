@@ -624,7 +624,9 @@ export default class TriggerCampaignCreate extends Vue {
   background-color: white;
   border-radius: 16px;
   padding: 20px;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
   justify-content: space-between;
   flex-grow: 1;
   flex-basis: calc(20% - 15px);

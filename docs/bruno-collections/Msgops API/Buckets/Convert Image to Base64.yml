@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/buckets/base64"
+  url: '{{msgops-api-url}}/buckets/base64'
   body:
     type: json
     json: |

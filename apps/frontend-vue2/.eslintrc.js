@@ -15,8 +15,8 @@ module.exports = {
     {
       files: ['*.json'],
       rules: {
-        'quote-props': 'off'
-      }
-    }
-  ]
+        'quote-props': 'off',
+      },
+    },
+  ],
 };

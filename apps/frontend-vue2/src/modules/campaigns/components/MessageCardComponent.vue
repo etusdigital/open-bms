@@ -83,8 +83,8 @@
                 isLoadingSearch
                   ? $t('input.searching')
                   : searchMessages
-                  ? $t('create.notRegister')
-                  : $t('datatable.noMessages')
+                    ? $t('create.notRegister')
+                    : $t('datatable.noMessages')
               "
               :items="options"
               item-text="title"
@@ -286,7 +286,9 @@ export default class MessageCardComponent extends Vue {
   margin-left: 8px;
 }
 .preview-windows {
-  box-shadow: 0px 1px 2px rgb(0 0 0 / 6%), 0px 1px 3px rgb(0 0 0 / 10%);
+  box-shadow:
+    0px 1px 2px rgb(0 0 0 / 6%),
+    0px 1px 3px rgb(0 0 0 / 10%);
   display: flex;
   flex-direction: row;
   height: fit-content;

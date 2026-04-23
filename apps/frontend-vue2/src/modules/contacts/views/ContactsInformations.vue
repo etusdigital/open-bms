@@ -94,8 +94,8 @@
                 currentContact.isActive
                   ? $t('datatable.active')
                   : currentContact.isBlocked
-                  ? $t('datatable.blocked')
-                  : $t('datatable.inactive')
+                    ? $t('datatable.blocked')
+                    : $t('datatable.inactive')
               }}
             </p>
           </div>
@@ -495,8 +495,8 @@
                         activity.status === 'completed'
                           ? $t('automation.completed')
                           : activity.status === 'canceled'
-                          ? $t('automation.canceled')
-                          : activity.status
+                            ? $t('automation.canceled')
+                            : activity.status
                       }}</span>
                     </div>
                     <div class="div-row align-items-center gap-10 ds-gray-color">
@@ -1529,7 +1529,9 @@ export default class ContactsInformations extends Vue {
 
   h6 {
     margin-bottom: 20px;
-    font: 600 12px/12px 'Inter', sans-serif;
+    font:
+      600 12px/12px 'Inter',
+      sans-serif;
   }
 }
 
@@ -1538,7 +1540,9 @@ export default class ContactsInformations extends Vue {
   max-height: 26.1vh;
 
   h6 {
-    font: 600 12px/12px 'Inter', sans-serif;
+    font:
+      600 12px/12px 'Inter',
+      sans-serif;
   }
 }
 
@@ -1618,7 +1622,9 @@ export default class ContactsInformations extends Vue {
   color: $ds-gray;
   background-color: white;
   border-radius: 16px;
-  box-shadow: 0px 3px 1px -2px rgba(0, 0, 0, 0.2), 0px 2px 2px 0px rgba(0, 0, 0, 0.14),
+  box-shadow:
+    0px 3px 1px -2px rgba(0, 0, 0, 0.2),
+    0px 2px 2px 0px rgba(0, 0, 0, 0.14),
     0px 1px 5px 0px rgba(0, 0, 0, 0.12);
   overflow: hidden;
   max-height: 100vh;
@@ -1913,7 +1919,9 @@ export default class ContactsInformations extends Vue {
   overflow: hidden;
   background-color: white;
   border-radius: 16px;
-  box-shadow: 0px 3px 1px -2px rgba(0, 0, 0, 0.2), 0px 2px 2px 0px rgba(0, 0, 0, 0.14),
+  box-shadow:
+    0px 3px 1px -2px rgba(0, 0, 0, 0.2),
+    0px 2px 2px 0px rgba(0, 0, 0, 0.14),
     0px 1px 5px 0px rgba(0, 0, 0, 0.12);
 }
 
@@ -1944,7 +1952,9 @@ export default class ContactsInformations extends Vue {
     display: flex;
     align-items: center;
     justify-content: center;
-    font: 400 12px/12px 'Inter', sans-serif;
+    font:
+      400 12px/12px 'Inter',
+      sans-serif;
     color: $ds-gray;
   }
 }

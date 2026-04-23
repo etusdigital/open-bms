@@ -107,6 +107,7 @@ Located in `src/msgops/entities/`:
 ### Rate Limiting
 
 Configured via `ThrottlerModule` with Redis storage:
+
 - Default: 10 requests per 10 seconds
 - Scoped per IP address (with proxy support via `ThrottlerBehindProxyGuard`)
 - Key prefix: `tracker-ratelimit:`
@@ -172,12 +173,14 @@ NODE_ENV=production
 Deployed to Google Cloud Run via GitLab CI/CD (`.gitlab-ci.yml`):
 
 **Staging** (auto-deploy on push to `staging` branch):
+
 ```bash
 gcloud builds submit . --tag $GCP_IMAGE-staging:$VERSION
 gcloud run deploy $GCP_RUN_SERVICE_NAME --image ... --port=3000
 ```
 
 **Production** (manual trigger on `master` branch):
+
 - Deploys to two projects: main and Brius
 - Same build artifact, different GCP projects
 
@@ -210,6 +213,7 @@ Returns array of tagIds that match real-time segments cached in Redis.
 ### Contact Details (GET /contacts)
 
 Query params:
+
 - `email`: Contact email (required)
 - `includes`: Comma-separated options: `details`, `tags`, `segments`, `customFields`
 
@@ -228,6 +232,7 @@ Most POST endpoints expect base64-encoded JSON in the body's `data` field. This 
 ### Cookie Domain Logic
 
 Root domain extraction logic handles both 3-level and 4-level domains:
+
 ```typescript
 const domain = hostname.split('.');
 const rootDomain = domain.slice(-(domain.length === 4 ? 3 : 2)).join('.');

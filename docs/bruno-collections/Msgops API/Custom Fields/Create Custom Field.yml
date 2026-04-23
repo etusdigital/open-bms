@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/custom-fields"
+  url: '{{msgops-api-url}}/custom-fields'
   body:
     type: json
     json: |

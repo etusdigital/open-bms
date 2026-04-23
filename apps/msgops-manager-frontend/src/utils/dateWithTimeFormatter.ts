@@ -2,5 +2,5 @@ export const dateWithTimeFormatter = (value: string, timePreposition: string, us
   if (!value) return '';
 
   // Defaults to pt-br as a language while user store isn't complete
-  return new Date(value).toLocaleString(userLanguage ?? "pt-BR").replace(",", timePreposition);
-}
+  return new Date(value).toLocaleString(userLanguage ?? 'pt-BR').replace(',', timePreposition);
+};

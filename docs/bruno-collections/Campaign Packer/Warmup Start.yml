@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{campaign-packer-url}}/warmup-start"
+  url: '{{campaign-packer-url}}/warmup-start'
   body:
     type: json
     json: |

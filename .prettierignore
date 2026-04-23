@@ -10,6 +10,8 @@ dist/
 build/
 out/
 coverage/
+coverage-*/
+**/lcov-report/
 
 # Cloudflare / Wrangler
 .wrangler/
@@ -32,3 +34,10 @@ test-results/
 .idea/
 .vscode/
 .history/
+
+# Upstream reference clone
+bms-reference/
+
+# EVO Method workflows and artifacts
+_evo/
+_evo-output/

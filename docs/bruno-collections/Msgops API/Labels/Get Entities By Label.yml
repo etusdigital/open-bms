@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/labels/1/entities"
+  url: '{{msgops-api-url}}/labels/1/entities'
   auth: inherit
 
 settings:

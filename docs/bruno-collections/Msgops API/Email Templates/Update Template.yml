@@ -5,7 +5,7 @@ info:
 
 http:
   method: PUT
-  url: "{{msgops-api-url}}/email-template/1"
+  url: '{{msgops-api-url}}/email-template/1'
   body:
     type: json
     json: |

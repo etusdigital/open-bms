@@ -25,10 +25,7 @@ export interface MessageContext {
   queue: string;
 }
 
-export type Handler<T = unknown> = (
-  msg: T,
-  ctx: MessageContext,
-) => Promise<HandlerResult | void>;
+export type Handler<T = unknown> = (msg: T, ctx: MessageContext) => Promise<HandlerResult | void>;
 
 export interface Publisher {
   publish(options: PublishOptions): Promise<void>;

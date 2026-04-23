@@ -104,15 +104,10 @@ export class AmqpPublisher implements Publisher {
     return channel;
   }
 
-  private assertExchange(
-    channel: ConfirmChannel,
-    exchange: string,
-  ): Promise<void> {
+  private assertExchange(channel: ConfirmChannel, exchange: string): Promise<void> {
     let p = this.exchangeAssertions.get(exchange);
     if (!p) {
-      p = channel
-        .assertExchange(exchange, 'topic', { durable: true })
-        .then(() => undefined);
+      p = channel.assertExchange(exchange, 'topic', { durable: true }).then(() => undefined);
       this.exchangeAssertions.set(exchange, p);
     }
     return p;

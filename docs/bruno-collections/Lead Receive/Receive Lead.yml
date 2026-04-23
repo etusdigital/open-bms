@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{lead-receive-url}}/lead"
+  url: '{{lead-receive-url}}/lead'
   body:
     type: json
     json: |

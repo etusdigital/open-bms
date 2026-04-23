@@ -5,16 +5,16 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/reports/event-breakdown"
+  url: '{{backoffice-api-url}}/reports/event-breakdown'
   params:
     - name: eventType
-      value: "delivered"
+      value: 'delivered'
     - name: from
-      value: "2025-01-01"
+      value: '2025-01-01'
     - name: to
-      value: "2025-01-31"
+      value: '2025-01-31'
     - name: timezone
-      value: "UTC"
+      value: 'UTC'
   auth: inherit
 
 settings:

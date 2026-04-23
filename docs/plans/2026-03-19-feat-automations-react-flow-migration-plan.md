@@ -1,5 +1,5 @@
 ---
-title: "feat: Migrate Automations Editor to React Flow"
+title: 'feat: Migrate Automations Editor to React Flow'
 type: feat
 status: active
 date: 2026-03-19
@@ -13,6 +13,7 @@ date: 2026-03-19
 **Research agents used:** TypeScript Reviewer, Architecture Strategist, Simplicity Reviewer, Frontend Races Reviewer, Pattern Recognition Specialist, Best Practices Researcher, Framework Docs Researcher, Context7 (React Flow v12 docs)
 
 ### Key Improvements from Research
+
 1. **Discriminated union types** instead of `Record<string, unknown>` — eliminates unsafe casts in every node component
 2. **Simplified Phase 1 state** — use React Flow's built-in `useNodesState`/`useEdgesState` instead of premature useReducer + Immer
 3. **No dagre for Phase 1** — linear flows need only fixed Y offsets (one-liner), defer dagre to Phase 2 branching
@@ -22,6 +23,7 @@ date: 2026-03-19
 7. **Query key factory registration** — fix existing inline keys by adding automations to `query-keys.ts`
 
 ### New Risks Discovered
+
 - **Save race condition**: User edits while save is in-flight → server overwrites local changes (mitigated with save guard)
 - **Load timing**: Deserializing in `useEffect` causes one-frame empty canvas flash (mitigated with synchronous `useMemo`)
 - **nodeTypes re-registration**: Defining `nodeTypes` inside component causes React Flow to unmount/remount all nodes on every render
@@ -150,100 +152,96 @@ pnpm --filter @retention/frontend add @xyflow/react
 > **Research Insight (TypeScript Reviewer):** Use a **discriminated union** on the step type to correlate `type` with `settings`. The original plan used `Record<string, unknown>` which swallows the entire union — TypeScript will never narrow the type for you, and every node component will need unsafe casts.
 
 ```typescript
-import type { Node, Edge } from '@xyflow/react'
+import type { Node, Edge } from '@xyflow/react';
 
 // --- Phase 1 step types ---
-export type AutomationStepType = 'trigger' | 'wait' | 'email' | 'end'
+export type AutomationStepType = 'trigger' | 'wait' | 'email' | 'end';
 
 // --- Settings interfaces (match API exactly) ---
 export interface TriggerSettings {
-  id?: number
-  type?: 'tag' | 'events' | 'custom_events' | 'web-push' | 'mobile-push'
-  name?: string
-  applyFrequency?: 'unique' | 'multiply' | 'multiply-period'
-  timePeriod?: number
-  typeMultiply?: 'days' | 'hours' | 'minutes' | ''
-  eventType?: 'open' | 'click' | 'first_open_30_days'
-  title?: string
-  conditional?: ConditionalRule[]
+  id?: number;
+  type?: 'tag' | 'events' | 'custom_events' | 'web-push' | 'mobile-push';
+  name?: string;
+  applyFrequency?: 'unique' | 'multiply' | 'multiply-period';
+  timePeriod?: number;
+  typeMultiply?: 'days' | 'hours' | 'minutes' | '';
+  eventType?: 'open' | 'click' | 'first_open_30_days';
+  title?: string;
+  conditional?: ConditionalRule[];
 }
 
 export interface WaitSettings {
-  timer: number
-  timerType: 'hours' | 'minutes'
+  timer: number;
+  timerType: 'hours' | 'minutes';
 }
 
 export interface EmailSettings {
-  id?: number
-  name?: string
-  title?: string
-  subject?: string
-  links?: Array<{ url: string; id: string }>
+  id?: number;
+  name?: string;
+  title?: string;
+  subject?: string;
+  links?: Array<{ url: string; id: string }>;
 }
 
-export type EmptySettings = Record<string, never>
+export type EmptySettings = Record<string, never>;
 
 export interface ConditionalRule {
-  type: string
-  conditional?: 'and' | 'or'
-  [key: string]: unknown
+  type: string;
+  conditional?: 'and' | 'or';
+  [key: string]: unknown;
 }
 
 // --- Discriminated union: step type correlates with settings ---
 interface StepBase<T extends AutomationStepType, S> {
-  id: number
-  type: T
-  settings: S
-  child: AutomationStep[]
+  id: number;
+  type: T;
+  settings: S;
+  child: AutomationStep[];
 }
 
 export type AutomationStep =
   | StepBase<'trigger', TriggerSettings>
   | StepBase<'wait', WaitSettings>
   | StepBase<'email', EmailSettings>
-  | StepBase<'end', EmptySettings>
+  | StepBase<'end', EmptySettings>;
 
 // For the serializer to handle unsupported step types from future phases:
 export interface UnsupportedStep {
-  id: number
-  type: string
-  settings: Record<string, unknown>
-  child: UnsupportedStep[]
+  id: number;
+  type: string;
+  settings: Record<string, unknown>;
+  child: UnsupportedStep[];
 }
 
 // Union that handles both known and unknown steps on API responses
-export type ApiStep = AutomationStep | UnsupportedStep
+export type ApiStep = AutomationStep | UnsupportedStep;
 
 // --- Full automation DTO (matches API POST/PUT /automations/complete) ---
 export interface AutomationPayload {
-  id?: number
-  title: string
-  description?: string
-  type?: string                    // 'email'
-  isActive: boolean
-  isRateLimit: boolean
-  stepId: number                   // auto-incrementing counter for step IDs
-  steps: ApiStep                   // the root trigger node (single step, not array)
-  verticalType?: string
-  target?: string
-  labels?: Array<{ id: number; name: string }>
+  id?: number;
+  title: string;
+  description?: string;
+  type?: string; // 'email'
+  isActive: boolean;
+  isRateLimit: boolean;
+  stepId: number; // auto-incrementing counter for step IDs
+  steps: ApiStep; // the root trigger node (single step, not array)
+  verticalType?: string;
+  target?: string;
+  labels?: Array<{ id: number; name: string }>;
 }
 
 // --- React Flow node data (discriminated by step type) ---
-export type TriggerNodeData = { stepId: number; settings: TriggerSettings }
-export type WaitNodeData = { stepId: number; settings: WaitSettings }
-export type EmailNodeData = { stepId: number; settings: EmailSettings }
-export type EndNodeData = { stepId: number; settings: EmptySettings }
+export type TriggerNodeData = { stepId: number; settings: TriggerSettings };
+export type WaitNodeData = { stepId: number; settings: WaitSettings };
+export type EmailNodeData = { stepId: number; settings: EmailSettings };
+export type EndNodeData = { stepId: number; settings: EmptySettings };
 
-export type AutomationNodeData =
-  | TriggerNodeData
-  | WaitNodeData
-  | EmailNodeData
-  | EndNodeData
+export type AutomationNodeData = TriggerNodeData | WaitNodeData | EmailNodeData | EndNodeData;
 
 // --- Typed React Flow node ---
-export type AutomationNode = Node<AutomationNodeData>
-export type AutomationEdge = Edge
+export type AutomationNode = Node<AutomationNodeData>;
+export type AutomationEdge = Edge;
 ```
 
 > **Research Insight (TypeScript Reviewer):** Parameterize React Flow generics (`Node<AutomationNodeData>`) throughout. Otherwise the consumer gets `unknown` for `node.data` and you are back to casting everywhere. Use `satisfies NodeTypes` for the registry to ensure type safety.
@@ -271,9 +269,7 @@ Three main functions:
    - **Return a result type, not just AutomationStep** (can fail if graph is disconnected/cyclic)
 
    ```typescript
-   export type SerializeResult =
-     | { success: true; root: AutomationStep }
-     | { success: false; error: string }
+   export type SerializeResult = { success: true; root: AutomationStep } | { success: false; error: string };
    ```
 
 3. **`layoutLinearFlow(nodes: AutomationNode[]): AutomationNode[]`**
@@ -292,18 +288,18 @@ Write unit tests in `__tests__/editor-serializer.test.ts` that roundtrip from tr
 
 ```typescript
 // nodes/index.ts — DEFINE OUTSIDE ANY COMPONENT
-import type { NodeTypes } from '@xyflow/react'
-import { TriggerNode } from './trigger-node'
-import { WaitNode } from './wait-node'
-import { EmailNode } from './email-node'
-import { EndNode } from './end-node'
+import type { NodeTypes } from '@xyflow/react';
+import { TriggerNode } from './trigger-node';
+import { WaitNode } from './wait-node';
+import { EmailNode } from './email-node';
+import { EndNode } from './end-node';
 
 export const automationNodeTypes = {
   trigger: TriggerNode,
   wait: WaitNode,
   email: EmailNode,
   end: EndNode,
-} as const satisfies NodeTypes
+} as const satisfies NodeTypes;
 ```
 
 Each custom node is a React component with proper typing:
@@ -393,6 +389,7 @@ Use plain controlled components with `useState` for Phase 1 forms. Add react-hoo
 > **Research Insight (Frontend Races Reviewer):** When the user clicks a different node, the panel must update to the new node's settings. Key the panel by `selectedNodeId` to force a remount: `<StepConfigPanel key={selectedNodeId} ... />`. This prevents stale state from the previous node leaking into the new panel.
 
 Also create:
+
 - **`add-step-modal.tsx`** — Dialog listing available step types. Phase 1 shows: wait, email. Clicking one inserts the node between the source and target of the clicked edge.
 
 ##### Task 1.6: Build the main editor component
@@ -457,15 +454,16 @@ export function AutomationEditor(props: AutomationEditorProps) {
 > **Research Insight (Frontend Races Reviewer):** Deserialize the API data synchronously in `useMemo`, NOT in `useEffect`. An effect runs after render, causing a one-frame empty canvas flash before the graph appears.
 >
 > ```typescript
-> const { data: automation, isLoading } = useAutomationDetail(id)
+> const { data: automation, isLoading } = useAutomationDetail(id);
 > const editorState = useMemo(() => {
->   if (!automation?.steps) return null
->   return deserializeStepsToFlow(automation.steps)
-> }, [automation])
+>   if (!automation?.steps) return null;
+>   return deserializeStepsToFlow(automation.steps);
+> }, [automation]);
 > // Only render the editor when editorState is ready
 > ```
 
 Key behaviors:
+
 - Click on a node → open its config panel (Sheet from right side)
 - Click "+" button on an edge → open add-step modal → insert node between source and target
 - Delete a node → reconnect parent to child
@@ -493,6 +491,7 @@ Uses `FormPage` compound component pattern from the codebase.
 > **Research Insight (Pattern Recognition):** The codebase uses **directory-based routing** for create/edit sub-routes, NOT dot-notation. Every entity (campaigns, segments, labels, etc.) uses `create.tsx` and `$entityId.tsx` inside subdirectories. The param should be `$automationId`, not `$id`.
 
 **Files:**
+
 ```
 apps/frontend-react/src/routes/_authenticated/_layout/automations/
   emails/
@@ -502,6 +501,7 @@ apps/frontend-react/src/routes/_authenticated/_layout/automations/
 ```
 
 This matches the existing conventions:
+
 ```
 campaigns/create.tsx, campaigns/$campaignId.tsx
 segments/create.tsx, segments/$segmentId.tsx
@@ -518,7 +518,7 @@ labels/create.tsx, labels/$labelId.tsx
 export const queryKeys = {
   // ... existing entries
   automations: createEntityQueryKeys('automations'),
-}
+};
 ```
 
 **File:** `apps/frontend-react/src/features/automations/use-automations.ts` — extend with:
@@ -530,40 +530,41 @@ export const queryKeys = {
 export function useAutomationDetail(id: number) {
   return useQuery<Automation>({
     queryKey: queryKeys.automations.detail(id),
-    queryFn: () => apiClient.get(`/automations/${id}`).then(r => r.data),
+    queryFn: () => apiClient.get(`/automations/${id}`).then((r) => r.data),
     enabled: !!id,
-  })
+  });
 }
 
 // NEW: Create automation (POST /automations/complete)
 export function useCreateAutomation() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: AutomationPayload) =>
-      apiClient.post<Automation>('/automations/complete', payload).then(r => r.data),
+      apiClient.post<Automation>('/automations/complete', payload).then((r) => r.data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.automations.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.automations.all });
     },
-  })
+  });
 }
 
 // NEW: Update automation (PUT /automations/complete)
 export function useUpdateAutomation() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: AutomationPayload) =>
-      apiClient.put<Automation>('/automations/complete', payload).then(r => r.data),
+      apiClient.put<Automation>('/automations/complete', payload).then((r) => r.data),
     // Invalidation handled by editor save guard, not blindly here
-  })
+  });
 }
 
 // NEW: Validate name uniqueness (debounced query, not mutation)
 export function useValidateAutomationName(title: string, id?: number) {
   return useQuery<{ available: boolean }>({
     queryKey: ['automations', 'validate-name', title, id],
-    queryFn: () => apiClient.get('/automations/validate-name', { params: { titleCreate: title, id } }).then(r => r.data),
+    queryFn: () =>
+      apiClient.get('/automations/validate-name', { params: { titleCreate: title, id } }).then((r) => r.data),
     enabled: title.length >= 3,
-  })
+  });
 }
 ```
 
@@ -584,29 +585,30 @@ export function useValidateAutomationName(title: string, id?: number) {
 Extend the existing minimal `Automation` interface:
 
 ```typescript
-import type { ApiStep } from './editor/types'
+import type { ApiStep } from './editor/types';
 
 export interface Automation {
-  id: number
-  title: string
-  description?: string
-  type: string
-  isActive: boolean
-  isRateLimit: boolean
-  stepId: number
-  steps?: ApiStep                  // the full recursive tree (may contain unknown step types)
-  stepsCount?: number
-  verticalType?: string
-  target?: string
-  labels?: Array<{ id: number; name: string }>
-  createdAt?: string
-  updatedAt?: string
+  id: number;
+  title: string;
+  description?: string;
+  type: string;
+  isActive: boolean;
+  isRateLimit: boolean;
+  stepId: number;
+  steps?: ApiStep; // the full recursive tree (may contain unknown step types)
+  stepsCount?: number;
+  verticalType?: string;
+  target?: string;
+  labels?: Array<{ id: number; name: string }>;
+  createdAt?: string;
+  updatedAt?: string;
 }
 ```
 
 ##### Task 1.12: Add i18n translations
 
 **Files:**
+
 - `apps/frontend-react/src/locales/pt-BR.json`
 - `apps/frontend-react/src/locales/en-US.json`
 
@@ -722,15 +724,15 @@ apps/frontend-react/src/routes/_authenticated/_layout/
 
 ## Risk Analysis & Mitigation
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Serializer bug causes data loss | **High** | Exhaustive roundtrip unit tests; `SerializeResult` error type; read-back verification after save |
-| Save race condition (user edits during in-flight save) | **High** | Save guard state machine (`idle`/`saving`/`dirty-while-saving`); disable save button during save; don't invalidate cache while dirty |
-| React Flow performance with large automations (100+ steps) | Medium | React.memo on all custom nodes; static nodeTypes/edgeTypes; React Flow virtualizes offscreen nodes |
-| Step ID counter desync | Medium | Initialize to `Math.max(...existingIds) + 1` on load; increment only via state setter |
-| Vue 2 creates steps that React doesn't support yet | Low | Render unsupported nodes as generic "unknown" cards with type label |
-| nodeTypes defined inside component | Medium | Static module-level constant; build-time linting to verify |
-| Load timing — empty canvas flash | Medium | Synchronous deserialization in `useMemo`, not `useEffect`; skeleton until ready |
+| Risk                                                       | Impact   | Mitigation                                                                                                                           |
+| ---------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Serializer bug causes data loss                            | **High** | Exhaustive roundtrip unit tests; `SerializeResult` error type; read-back verification after save                                     |
+| Save race condition (user edits during in-flight save)     | **High** | Save guard state machine (`idle`/`saving`/`dirty-while-saving`); disable save button during save; don't invalidate cache while dirty |
+| React Flow performance with large automations (100+ steps) | Medium   | React.memo on all custom nodes; static nodeTypes/edgeTypes; React Flow virtualizes offscreen nodes                                   |
+| Step ID counter desync                                     | Medium   | Initialize to `Math.max(...existingIds) + 1` on load; increment only via state setter                                                |
+| Vue 2 creates steps that React doesn't support yet         | Low      | Render unsupported nodes as generic "unknown" cards with type label                                                                  |
+| nodeTypes defined inside component                         | Medium   | Static module-level constant; build-time linting to verify                                                                           |
+| Load timing — empty canvas flash                           | Medium   | Synchronous deserialization in `useMemo`, not `useEffect`; skeleton until ready                                                      |
 
 ## Sources & References
 

@@ -507,7 +507,9 @@ export default class SegmentCreate extends Vue {
 .container-segment {
   position: relative;
   background-color: white;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
   padding: 1rem;
   border-radius: 16px;
 }

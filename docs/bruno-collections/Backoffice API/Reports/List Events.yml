@@ -5,18 +5,18 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/reports/events"
+  url: '{{backoffice-api-url}}/reports/events'
   params:
     - name: from
-      value: "2025-01-01T00:00:00Z"
+      value: '2025-01-01T00:00:00Z'
     - name: to
-      value: "2025-01-31T23:59:59Z"
+      value: '2025-01-31T23:59:59Z'
     - name: page
-      value: "1"
+      value: '1'
     - name: pageSize
-      value: "50"
+      value: '50'
     - name: timezone
-      value: "UTC"
+      value: 'UTC'
   auth: inherit
 
 settings:

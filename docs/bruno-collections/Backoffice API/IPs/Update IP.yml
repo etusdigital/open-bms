@@ -5,7 +5,7 @@ info:
 
 http:
   method: PATCH
-  url: "{{backoffice-api-url}}/ips/1"
+  url: '{{backoffice-api-url}}/ips/1'
   body:
     type: json
     json: |

@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/alerts/1/metric-history"
+  url: '{{backoffice-api-url}}/alerts/1/metric-history'
   auth: inherit
 
 settings:

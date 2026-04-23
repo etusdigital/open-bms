@@ -5,10 +5,10 @@ info:
 
 http:
   method: GET
-  url: "{{tracker-url}}/redirect"
+  url: '{{tracker-url}}/redirect'
   params:
     - name: url
-      value: "aHR0cHM6Ly9leGFtcGxlLmNvbQ=="
+      value: 'aHR0cHM6Ly9leGFtcGxlLmNvbQ=='
   auth: none
 
 settings:

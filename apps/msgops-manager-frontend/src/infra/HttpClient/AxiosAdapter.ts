@@ -4,7 +4,6 @@ import type { HttpClient } from './HttpClient.types';
 import { useAccountStore, useUserStore } from '../../stores';
 
 export class AxiosAdapter implements HttpClient {
-
   private async getApi() {
     const accountStore = useAccountStore().account?.id;
     const userId = useUserStore().user;

@@ -1,4 +1,4 @@
-version: "3.8"
+version: '3.8'
 
 services:
   msgops:
@@ -6,14 +6,14 @@ services:
     networks:
       - network
     environment:
-      REDIS_HOST: "redis"
-      REDIS_PORT: "6379"
-      DATABASE_HOST: "db"
-      DATABASE_PORT: "5432"
-      DATABASE_DATABASE: "msgops"
-      DATABASE_USERNAME: "user"
+      REDIS_HOST: 'redis'
+      REDIS_PORT: '6379'
+      DATABASE_HOST: 'db'
+      DATABASE_PORT: '5432'
+      DATABASE_DATABASE: 'msgops'
+      DATABASE_USERNAME: 'user'
       DATABASE_PASSWORD: 123456
-      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_BROKERS: 'kafka:9092'
     ports:
       - 3000:3000
     depends_on:
@@ -26,8 +26,8 @@ services:
       - network
     environment:
       POSTGRES_PASSWORD: 123456
-      POSTGRES_USER: "user"
-      POSTGRES_DB: "msgops"
+      POSTGRES_USER: 'user'
+      POSTGRES_DB: 'msgops'
     ports:
       - 5432:5432
   redis:
@@ -44,7 +44,7 @@ services:
     networks:
       - network
     ports:
-      - "2181:2181"
+      - '2181:2181'
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -61,8 +61,8 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - "9092:9092"
-      - "9093:9093"
+      - '9092:9092'
+      - '9093:9093'
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
@@ -73,7 +73,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+      KAFKA_LOG4J_LOGGERS: 'kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO'
     volumes:
       - kafka-data:/var/lib/kafka/data
 
@@ -84,6 +84,3 @@ volumes:
   zookeeper-data:
   zookeeper-logs:
   kafka-data:
-
-
-

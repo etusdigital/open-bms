@@ -5,10 +5,10 @@ info:
 
 http:
   method: GET
-  url: "{{email-validation-url}}/api/validations/email"
+  url: '{{email-validation-url}}/api/validations/email'
   params:
     - name: email
-      value: "user@example.com"
+      value: 'user@example.com'
   auth: none
 
 settings:

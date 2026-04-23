@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/labels/contents"
+  url: '{{msgops-api-url}}/labels/contents'
   body:
     type: json
     json: |

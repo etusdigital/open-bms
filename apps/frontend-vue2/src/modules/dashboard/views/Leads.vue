@@ -1076,7 +1076,9 @@ export default class Leads extends Vue {
   padding-right: 8px;
   padding-left: 8px;
   gap: 4px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 
   &[draggable='true'] {
     cursor: grab;
@@ -1142,7 +1144,9 @@ export default class Leads extends Vue {
 
 .expand-tags {
   margin-top: 8px;
-  transition: width 2s ease-out, height 2s ease-out;
+  transition:
+    width 2s ease-out,
+    height 2s ease-out;
   margin-bottom: 10px;
 }
 

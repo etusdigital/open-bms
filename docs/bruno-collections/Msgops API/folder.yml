@@ -6,4 +6,4 @@ info:
 request:
   auth:
     type: bearer
-    token: "{{msgops-api-token}}"
+    token: '{{msgops-api-token}}'

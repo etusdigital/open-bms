@@ -5,12 +5,12 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/postmaster/reputation"
+  url: '{{backoffice-api-url}}/postmaster/reputation'
   params:
     - name: from
-      value: "2025-01-01"
+      value: '2025-01-01'
     - name: to
-      value: "2025-01-31"
+      value: '2025-01-31'
   auth: inherit
 
 settings:
