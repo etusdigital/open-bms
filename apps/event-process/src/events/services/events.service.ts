@@ -313,11 +313,11 @@ export class EventsService {
       // See docs/plans/2026-04-20-bot-detection-mmdb-refactor.md decision 6.
       if (options.event === 'click') {
         const signals = BotDetector.classify(options.geoData?.traits, options.userAgent);
-        if (signals.is_bot) {
+        if (signals.isBot) {
           pipeline.hincrby(statisticsKey, 'bot_click', 1);
           pipeline.hincrby(globalAccountStatisticsKey, 'bot_click', 1);
         }
-        if (signals.is_datacenter) {
+        if (signals.isDatacenter) {
           pipeline.hincrby(statisticsKey, 'datacenter_click', 1);
           pipeline.hincrby(globalAccountStatisticsKey, 'datacenter_click', 1);
         }
@@ -509,8 +509,14 @@ export class EventsService {
     // see docs/plans/2026-04-20-ua-denylist-for-bot-detection.md.
     const signals = BotDetector.classify(message.traits, message.userAgent ?? message.user_agent);
 
+    // `traits` is an internal-only field carried on the EventLog to feed
+    // BotDetector here; strip it from the outgoing payload because
+    // downstream (Kafka → ClickHouse events_logs_v2) has no `traits` column.
+    // The six derived fields land in `properties` below instead.
+    const { traits: _traits, ...rest } = message;
+
     return {
-      ...message,
+      ...rest,
       account_id: message.accountId || message.account_id,
       message_type: message.messageType || message.message_type,
       contact_id: message.contactId || message.contact_id,
@@ -532,12 +538,12 @@ export class EventsService {
       provider_account: message.providerAccount || message.provider_account,
       properties: {
         ...(message.properties ?? {}),
-        is_bot: signals.is_bot,
-        is_datacenter: signals.is_datacenter,
+        is_bot: signals.isBot,
+        is_datacenter: signals.isDatacenter,
         bot_classification: signals.classification,
         asn: signals.asn,
-        asn_org: signals.asn_org,
-        user_type: signals.user_type,
+        asn_org: signals.asnOrg,
+        user_type: signals.userType,
       },
     };
   }

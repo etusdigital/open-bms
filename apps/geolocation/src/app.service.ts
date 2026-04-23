@@ -67,12 +67,12 @@ export class AppService {
         success: true,
         traits: {
           asn: response?.traits?.autonomous_system_number ?? 0,
-          asn_org: response?.traits?.autonomous_system_organization ?? '',
+          asnOrg: response?.traits?.autonomous_system_organization ?? '',
           isp: response?.traits?.isp ?? '',
           organization: response?.traits?.organization ?? '',
-          user_type: response?.traits?.user_type ?? '',
-          connection_type: response?.traits?.connection_type ?? '',
-          is_anycast: response?.traits?.is_anycast ?? false,
+          userType: response?.traits?.user_type ?? '',
+          connectionType: response?.traits?.connection_type ?? '',
+          isAnycast: response?.traits?.is_anycast ?? false,
         },
       };
     } catch (error) {

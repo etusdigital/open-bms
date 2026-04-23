@@ -15,17 +15,17 @@ describe('GeoIP Interfaces', () => {
     it('should be correctly typed', () => {
       const traits: Traits = {
         asn: 15169,
-        asn_org: 'Google LLC',
+        asnOrg: 'Google LLC',
         isp: 'Google LLC',
         organization: 'Level 3',
-        user_type: 'hosting',
-        connection_type: 'Corporate',
-        is_anycast: true,
+        userType: 'hosting',
+        connectionType: 'Corporate',
+        isAnycast: true,
       };
 
       expect(traits.asn).toBe(15169);
-      expect(traits.user_type).toBe('hosting');
-      expect(traits.is_anycast).toBe(true);
+      expect(traits.userType).toBe('hosting');
+      expect(traits.isAnycast).toBe(true);
     });
   });
 
@@ -59,18 +59,18 @@ describe('GeoIP Interfaces', () => {
         success: true,
         traits: {
           asn: 15169,
-          asn_org: 'Google LLC',
+          asnOrg: 'Google LLC',
           isp: 'Google LLC',
           organization: 'Level 3',
-          user_type: 'hosting',
-          connection_type: 'Corporate',
-          is_anycast: true,
+          userType: 'hosting',
+          connectionType: 'Corporate',
+          isAnycast: true,
         },
       };
 
       expect(successResponse.success).toBe(true);
       expect(successResponse.traits?.asn).toBe(15169);
-      expect(successResponse.traits?.user_type).toBe('hosting');
+      expect(successResponse.traits?.userType).toBe('hosting');
     });
 
     it('should handle error responses', () => {

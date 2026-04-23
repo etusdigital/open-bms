@@ -9,12 +9,12 @@ export type BotClassification =
   | null;
 
 export interface BotSignals {
-  is_bot: boolean;
-  is_datacenter: boolean;
+  isBot: boolean;
+  isDatacenter: boolean;
   classification: BotClassification;
   asn: number;
-  asn_org: string;
-  user_type: string;
+  asnOrg: string;
+  userType: string;
 }
 
 // ASNs that operate email/webmail proxies and link pre-fetchers in
@@ -101,17 +101,17 @@ export function isScriptUserAgent(userAgent: string | undefined | null): boolean
 export class BotDetector {
   static classify(traits: Traits | undefined | null, userAgent?: string | null): BotSignals {
     const asn = traits?.asn ?? 0;
-    const asn_org = traits?.asn_org ?? '';
-    const user_type = traits?.user_type ?? '';
+    const asnOrg = traits?.asnOrg ?? '';
+    const userType = traits?.userType ?? '';
 
-    const is_datacenter = user_type === 'hosting';
+    const isDatacenter = userType === 'hosting';
     const scannerMatch = MAIL_SCANNER_ASNS[asn];
-    const uaScriptMatch = is_datacenter && isScriptUserAgent(userAgent);
-    const is_bot = is_datacenter && (scannerMatch !== undefined || uaScriptMatch);
+    const uaScriptMatch = isDatacenter && isScriptUserAgent(userAgent);
+    const isBot = isDatacenter && (scannerMatch !== undefined || uaScriptMatch);
 
     const classification: BotClassification =
-      scannerMatch !== undefined ? scannerMatch : uaScriptMatch ? 'script_ua' : is_datacenter ? 'datacenter' : null;
+      scannerMatch !== undefined ? scannerMatch : uaScriptMatch ? 'script_ua' : isDatacenter ? 'datacenter' : null;
 
-    return { is_bot, is_datacenter, classification, asn, asn_org, user_type };
+    return { isBot, isDatacenter, classification, asn, asnOrg, userType };
   }
 }

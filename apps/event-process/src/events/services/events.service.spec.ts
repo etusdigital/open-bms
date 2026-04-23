@@ -292,19 +292,17 @@ describe('EventsService', () => {
         city: 'Mountain View',
         traits: {
           asn: 15169,
-          asn_org: 'Google LLC',
+          asnOrg: 'Google LLC',
           isp: 'Google LLC',
           organization: 'Level 3',
-          user_type: 'hosting',
-          connection_type: 'Corporate',
-          is_anycast: true,
+          userType: 'hosting',
+          connectionType: 'Corporate',
+          isAnycast: true,
         },
       });
 
       const result = await service.testGetGeoIpInfo('74.125.1.1');
-      expect(result.traits).toEqual(
-        expect.objectContaining({ asn: 15169, user_type: 'hosting', asn_org: 'Google LLC' }),
-      );
+      expect(result.traits).toEqual(expect.objectContaining({ asn: 15169, userType: 'hosting', asnOrg: 'Google LLC' }));
     });
 
     it('should return empty object and log when geolocationService throws', async () => {
@@ -565,12 +563,12 @@ describe('EventsService', () => {
       country: 'US',
       traits: {
         asn: 15169,
-        asn_org: 'Google LLC',
+        asnOrg: 'Google LLC',
         isp: '',
         organization: '',
-        user_type: 'hosting',
-        connection_type: '',
-        is_anycast: false,
+        userType: 'hosting',
+        connectionType: '',
+        isAnycast: false,
       },
     };
 
@@ -578,12 +576,12 @@ describe('EventsService', () => {
       country: 'US',
       traits: {
         asn: 396982,
-        asn_org: 'Google LLC',
+        asnOrg: 'Google LLC',
         isp: '',
         organization: '',
-        user_type: 'hosting',
-        connection_type: '',
-        is_anycast: false,
+        userType: 'hosting',
+        connectionType: '',
+        isAnycast: false,
       },
     };
 
@@ -591,12 +589,12 @@ describe('EventsService', () => {
       country: 'BR',
       traits: {
         asn: 28573,
-        asn_org: 'Claro',
+        asnOrg: 'Claro',
         isp: '',
         organization: '',
-        user_type: 'residential',
-        connection_type: '',
-        is_anycast: false,
+        userType: 'residential',
+        connectionType: '',
+        isAnycast: false,
       },
     };
 
@@ -713,12 +711,12 @@ describe('EventsService', () => {
 
     const gmailTraits = {
       asn: 15169,
-      asn_org: 'Google LLC',
+      asnOrg: 'Google LLC',
       isp: 'Google LLC',
       organization: 'Level 3',
-      user_type: 'hosting',
-      connection_type: 'Corporate',
-      is_anycast: true,
+      userType: 'hosting',
+      connectionType: 'Corporate',
+      isAnycast: true,
     };
 
     const gcpTraits = { ...gmailTraits, asn: 396982 };
@@ -799,6 +797,12 @@ describe('EventsService', () => {
       const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
       expect(payload.properties.is_bot).toBe(true);
       expect(payload.properties.bot_classification).toBe('script_ua');
+    });
+
+    it('strips top-level traits from the Kafka payload (no column in ClickHouse)', async () => {
+      await service.testSendKafkaMessage([{ accountId: 1, event: 'click', traits: gmailTraits }]);
+      const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+      expect(payload).not.toHaveProperty('traits');
     });
   });
 });

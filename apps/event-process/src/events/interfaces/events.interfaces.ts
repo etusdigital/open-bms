@@ -134,12 +134,12 @@ export interface EventLog {
   city?: string;
   traits?: {
     asn: number;
-    asn_org: string;
+    asnOrg: string;
     isp: string;
     organization: string;
-    user_type: string;
-    connection_type: string;
-    is_anycast: boolean;
+    userType: string;
+    connectionType: string;
+    isAnycast: boolean;
   };
   secondsSinceSent?: number;
   uuid?: string;

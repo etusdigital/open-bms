@@ -432,6 +432,19 @@ describe('MsgopsService', () => {
       expect(query).not.toContain('delivered_id');
     });
 
+    it('should exclude traits (internal bot-detection field) from column list', async () => {
+      mockPgPoolLogs.query.mockResolvedValueOnce({ rows: [] });
+      await service.saveEventsLogs([
+        {
+          accountId: 1,
+          event: 'click',
+          traits: { asn: 15169, asnOrg: 'Google LLC', userType: 'hosting' },
+        },
+      ]);
+      const query = mockPgPoolLogs.query.mock.calls[0][0];
+      expect(query).not.toContain('traits');
+    });
+
     it('should throw Error when query fails', async () => {
       mockPgPoolLogs.query.mockRejectedValueOnce(new Error('db error'));
       await expect(service.saveEventsLogs([{ accountId: 1 }])).rejects.toThrow('Error to save logs');

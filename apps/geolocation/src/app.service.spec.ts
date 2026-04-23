@@ -18,12 +18,12 @@ jest.mock('mmdb-reader', () => {
 
 const emptyTraits = {
   asn: 0,
-  asn_org: '',
+  asnOrg: '',
   isp: '',
   organization: '',
-  user_type: '',
-  connection_type: '',
-  is_anycast: false,
+  userType: '',
+  connectionType: '',
+  isAnycast: false,
 };
 
 describe('AppService', () => {
@@ -104,12 +104,12 @@ describe('AppService', () => {
       expect(result.success).toBe(true);
       expect(result.traits).toEqual({
         asn: 15169,
-        asn_org: 'Google LLC',
+        asnOrg: 'Google LLC',
         isp: 'Google LLC',
         organization: 'Level 3',
-        user_type: 'hosting',
-        connection_type: 'Corporate',
-        is_anycast: true,
+        userType: 'hosting',
+        connectionType: 'Corporate',
+        isAnycast: true,
       });
     });
 
@@ -128,9 +128,9 @@ describe('AppService', () => {
       const result = service.getLocation('40.107.1.1');
 
       expect(result.traits?.asn).toBe(8075);
-      expect(result.traits?.asn_org).toBe('Microsoft Corporation');
-      expect(result.traits?.user_type).toBe('hosting');
-      expect(result.traits?.is_anycast).toBe(false);
+      expect(result.traits?.asnOrg).toBe('Microsoft Corporation');
+      expect(result.traits?.userType).toBe('hosting');
+      expect(result.traits?.isAnycast).toBe(false);
     });
 
     it('should surface residential traits distinctly from hosting', () => {
@@ -146,7 +146,7 @@ describe('AppService', () => {
 
       const result = service.getLocation('177.1.1.1');
 
-      expect(result.traits?.user_type).toBe('residential');
+      expect(result.traits?.userType).toBe('residential');
       expect(result.traits?.asn).toBe(28573);
     });
 
