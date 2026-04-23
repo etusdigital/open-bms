@@ -332,13 +332,14 @@ export class StatisticsAggregationService {
   ): Promise<void> {
     const valuesIndex = records
       .map((_, index) => {
-        const offset = index * 35; // 35 is the number of columns in the events_statistics table
+        const offset = index * 37; // 37 is the number of columns in the events_statistics table
         return `($${1 + offset}, $${2 + offset}, $${3 + offset}, $${4 + offset}, $${5 + offset}, $${6 + offset},
                 $${7 + offset}, $${8 + offset}, $${9 + offset}, $${10 + offset}, $${11 + offset}, $${12 + offset},
                 $${13 + offset}, $${14 + offset}, $${15 + offset}, $${16 + offset}, $${17 + offset}, $${18 + offset},
                 $${19 + offset}, $${20 + offset}, $${21 + offset}, $${22 + offset}, $${23 + offset}, $${24 + offset},
                 $${25 + offset}, $${26 + offset}, $${27 + offset}, $${28 + offset}, $${29 + offset}, $${30 + offset},
-                $${31 + offset}, $${32 + offset}, $${33 + offset}, $${34 + offset}, $${35 + offset})`;
+                $${31 + offset}, $${32 + offset}, $${33 + offset}, $${34 + offset}, $${35 + offset},
+                $${36 + offset}, $${37 + offset})`;
       })
       .join(',');
 
@@ -364,6 +365,8 @@ export class StatisticsAggregationService {
       record.data.unique_click,
       record.data.bounce,
       record.data.blocked,
+      record.data.bot_click,
+      record.data.datacenter_click,
       record.data.spam_report,
       record.data.unsubscribe,
       record.data.deferred,
@@ -380,10 +383,10 @@ export class StatisticsAggregationService {
       JSON.stringify(record.data.region_data),
     ]);
 
-    const upsertQuery = `        
+    const upsertQuery = `
         INSERT INTO events_statistics (
           date, account_id, event_type, type, message_id, automation_id, campaign_id, is_test_ab, event_id, pool, provider, provider_account, utm_campaign,
-          processed, delivered, open, unique_open, click, unique_click, bounce, blocked, spam_report, unsubscribe, deferred, sent, close,
+          processed, delivered, open, unique_open, click, unique_click, bounce, blocked, bot_click, datacenter_click, spam_report, unsubscribe, deferred, sent, close,
           events_count, events_unique,
           click_position, email_provider, browser, os, device, country, region
         ) VALUES ${valuesIndex}`;
@@ -428,6 +431,8 @@ export class StatisticsAggregationService {
       unique_click: parseInt(statistics.unique_click || '0'),
       bounce: parseInt(statistics.bounce || '0'),
       blocked: parseInt(statistics.blocked || '0'),
+      bot_click: parseInt(statistics.bot_click || '0'),
+      datacenter_click: parseInt(statistics.datacenter_click || '0'),
       spam_report: parseInt(statistics.spam_report || '0'),
       unsubscribe: parseInt(statistics.unsubscribe || '0'),
       deferred: parseInt(statistics.deferred || '0'),

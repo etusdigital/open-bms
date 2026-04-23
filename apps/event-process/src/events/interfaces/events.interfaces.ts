@@ -132,6 +132,15 @@ export interface EventLog {
   country?: string;
   region?: string;
   city?: string;
+  traits?: {
+    asn: number;
+    asn_org: string;
+    isp: string;
+    organization: string;
+    user_type: string;
+    connection_type: string;
+    is_anycast: boolean;
+  };
   secondsSinceSent?: number;
   uuid?: string;
   eventId?: number;

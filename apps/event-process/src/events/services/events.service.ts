@@ -9,7 +9,9 @@ import { PubSubProvider } from '../../providers/pubsub.provider';
 import { EventLog, InternalEvent, InternalRequest, SendgridPayload } from '../interfaces/events.interfaces';
 import { CacheService } from '../../msgops/cache.service';
 import { GeolocationService } from '../../utils/geolocation/geolocation.service';
+import type { Traits } from '../../utils/geolocation/geolocation.interface';
 import { KafkaProvider } from '../../providers/kafka.provider';
+import { BotDetector } from '../../utils/bot-detector';
 import crypto from 'crypto';
 
 @Injectable()
@@ -47,7 +49,9 @@ export class EventsService {
     }
   }
 
-  protected async getGeoIpInfo(ip: string): Promise<{ country?: string; region?: string; city?: string }> {
+  protected async getGeoIpInfo(
+    ip: string,
+  ): Promise<{ country?: string; region?: string; city?: string; traits?: Traits }> {
     if (!ip) return {};
     try {
       const location = await this.geolocationService.getLocation(ip);
@@ -56,6 +60,7 @@ export class EventsService {
         country: location.country,
         region: location.region,
         city: location.city,
+        traits: location.traits,
       };
     } catch (error) {
       this.formatterUtils.logInfo(`Error getting GeoIP info for ${ip}: ${error}`);
@@ -189,7 +194,7 @@ export class EventsService {
       batch_spread?: string;
       email?: string;
       uuid?: string;
-      geoData?: { country?: string; region?: string; city?: string };
+      geoData?: { country?: string; region?: string; city?: string; traits?: Traits };
     },
   ): void {
     const currentDate = this.formatterUtils.convertTimestampToTimezone(options.timestamp, options.timeZone);
@@ -299,6 +304,23 @@ export class EventsService {
         if (options.geoData.region)
           pipeline.hincrby(statisticsKey, `region_${options.event}_${options.geoData.region}`, 1);
         if (options.geoData.city) pipeline.hincrby(statisticsKey, `city_${options.event}_${options.geoData.city}`, 1);
+      }
+
+      // Click-only aggregate counters. Opens are NOT aggregated into bot_/
+      // datacenter_ columns: Gmail/Apple-MPP/Outlook image proxies make
+      // prefetch-vs-real-read indistinguishable at the IP layer, so a
+      // bot_open count would imply a misleading "human_open" complement.
+      // See docs/plans/2026-04-20-bot-detection-mmdb-refactor.md decision 6.
+      if (options.event === 'click') {
+        const signals = BotDetector.classify(options.geoData?.traits, options.userAgent);
+        if (signals.is_bot) {
+          pipeline.hincrby(statisticsKey, 'bot_click', 1);
+          pipeline.hincrby(globalAccountStatisticsKey, 'bot_click', 1);
+        }
+        if (signals.is_datacenter) {
+          pipeline.hincrby(statisticsKey, 'datacenter_click', 1);
+          pipeline.hincrby(globalAccountStatisticsKey, 'datacenter_click', 1);
+        }
       }
     }
   }
@@ -477,6 +499,16 @@ export class EventsService {
   }
 
   private processMessageToKafka(message) {
+    // Traits arrive on the message via the upstream getGeoIpInfo() spread
+    // (see event service callers that attach geoData). When absent — e.g.
+    // non-click/open events or lookup failures — BotDetector returns
+    // all-false defaults. Per plan decision 6, stamping is symmetric for
+    // clicks and opens; only Redis/Postgres aggregation is click-only.
+    // userAgent lets BotDetector upgrade is_datacenter hits with
+    // script/bot UAs (Shop Service, curl, Googlebot, etc.) to is_bot;
+    // see docs/plans/2026-04-20-ua-denylist-for-bot-detection.md.
+    const signals = BotDetector.classify(message.traits, message.userAgent ?? message.user_agent);
+
     return {
       ...message,
       account_id: message.accountId || message.account_id,
@@ -498,6 +530,15 @@ export class EventsService {
       value_time: message.valueTime || message.value_time,
       seconds_since_sent: message.secondsSinceSent || message.seconds_since_sent,
       provider_account: message.providerAccount || message.provider_account,
+      properties: {
+        ...(message.properties ?? {}),
+        is_bot: signals.is_bot,
+        is_datacenter: signals.is_datacenter,
+        bot_classification: signals.classification,
+        asn: signals.asn,
+        asn_org: signals.asn_org,
+        user_type: signals.user_type,
+      },
     };
   }
 }

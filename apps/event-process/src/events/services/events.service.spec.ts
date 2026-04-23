@@ -282,7 +282,29 @@ describe('EventsService', () => {
       });
 
       const result = await service.testGetGeoIpInfo('1.2.3.4');
-      expect(result).toEqual({ country: 'US', region: 'CA', city: 'San Francisco' });
+      expect(result).toEqual({ country: 'US', region: 'CA', city: 'San Francisco', traits: undefined });
+    });
+
+    it('should pass traits through from the geolocation service', async () => {
+      mockGeolocationService.getLocation.mockResolvedValueOnce({
+        country: 'US',
+        region: 'CA',
+        city: 'Mountain View',
+        traits: {
+          asn: 15169,
+          asn_org: 'Google LLC',
+          isp: 'Google LLC',
+          organization: 'Level 3',
+          user_type: 'hosting',
+          connection_type: 'Corporate',
+          is_anycast: true,
+        },
+      });
+
+      const result = await service.testGetGeoIpInfo('74.125.1.1');
+      expect(result.traits).toEqual(
+        expect.objectContaining({ asn: 15169, user_type: 'hosting', asn_org: 'Google LLC' }),
+      );
     });
 
     it('should return empty object and log when geolocationService throws', async () => {
@@ -527,10 +549,256 @@ describe('EventsService', () => {
     });
   });
 
+  describe('updateEventStatistics click counters', () => {
+    const baseOptions = {
+      accountId: 288,
+      eventId: 0,
+      contactId: 1,
+      platform: PlatformType.EMAIL,
+      type: 'campaign' as const,
+      timeZone: 'UTC',
+      timestamp: 1700000000,
+      messageId: 42,
+    };
+
+    const gmailGeoData = {
+      country: 'US',
+      traits: {
+        asn: 15169,
+        asn_org: 'Google LLC',
+        isp: '',
+        organization: '',
+        user_type: 'hosting',
+        connection_type: '',
+        is_anycast: false,
+      },
+    };
+
+    const gcpGeoData = {
+      country: 'US',
+      traits: {
+        asn: 396982,
+        asn_org: 'Google LLC',
+        isp: '',
+        organization: '',
+        user_type: 'hosting',
+        connection_type: '',
+        is_anycast: false,
+      },
+    };
+
+    const residentialGeoData = {
+      country: 'BR',
+      traits: {
+        asn: 28573,
+        asn_org: 'Claro',
+        isp: '',
+        organization: '',
+        user_type: 'residential',
+        connection_type: '',
+        is_anycast: false,
+      },
+    };
+
+    beforeEach(() => mockPipeline.hincrby.mockClear());
+
+    it('increments bot_click AND datacenter_click for a Gmail click', () => {
+      service.testUpdateEventStatistics(mockPipeline, {
+        ...baseOptions,
+        event: 'click',
+        geoData: gmailGeoData,
+      });
+      expect(mockPipeline.hincrby).toHaveBeenCalledWith(expect.stringMatching(/^statistics:288:/), 'bot_click', 1);
+      expect(mockPipeline.hincrby).toHaveBeenCalledWith(
+        expect.stringMatching(/^account_events_statistics:288:/),
+        'bot_click',
+        1,
+      );
+      expect(mockPipeline.hincrby).toHaveBeenCalledWith(
+        expect.stringMatching(/^statistics:288:/),
+        'datacenter_click',
+        1,
+      );
+      expect(mockPipeline.hincrby).toHaveBeenCalledWith(
+        expect.stringMatching(/^account_events_statistics:288:/),
+        'datacenter_click',
+        1,
+      );
+    });
+
+    it('increments datacenter_click but NOT bot_click for a GCP click', () => {
+      service.testUpdateEventStatistics(mockPipeline, {
+        ...baseOptions,
+        event: 'click',
+        geoData: gcpGeoData,
+      });
+      expect(mockPipeline.hincrby).toHaveBeenCalledWith(
+        expect.stringMatching(/^statistics:288:/),
+        'datacenter_click',
+        1,
+      );
+      expect(mockPipeline.hincrby).not.toHaveBeenCalledWith(expect.any(String), 'bot_click', 1);
+    });
+
+    it('does NOT increment either counter for a residential click', () => {
+      service.testUpdateEventStatistics(mockPipeline, {
+        ...baseOptions,
+        event: 'click',
+        geoData: residentialGeoData,
+      });
+      expect(mockPipeline.hincrby).not.toHaveBeenCalledWith(expect.any(String), 'bot_click', 1);
+      expect(mockPipeline.hincrby).not.toHaveBeenCalledWith(expect.any(String), 'datacenter_click', 1);
+    });
+
+    it('does NOT increment bot_open or datacenter_open on open events — opens are not aggregated', () => {
+      service.testUpdateEventStatistics(mockPipeline, {
+        ...baseOptions,
+        event: 'open',
+        geoData: gmailGeoData,
+      });
+      expect(mockPipeline.hincrby).not.toHaveBeenCalledWith(expect.any(String), 'bot_open', 1);
+      expect(mockPipeline.hincrby).not.toHaveBeenCalledWith(expect.any(String), 'datacenter_open', 1);
+      expect(mockPipeline.hincrby).not.toHaveBeenCalledWith(expect.any(String), 'bot_click', 1);
+    });
+
+    it('does NOT increment for non-click events even with bot traits', () => {
+      service.testUpdateEventStatistics(mockPipeline, {
+        ...baseOptions,
+        event: 'delivered',
+        geoData: gmailGeoData,
+      });
+      expect(mockPipeline.hincrby).not.toHaveBeenCalledWith(expect.any(String), 'bot_click', 1);
+      expect(mockPipeline.hincrby).not.toHaveBeenCalledWith(expect.any(String), 'datacenter_click', 1);
+    });
+
+    it('does NOT increment when geoData.traits is missing', () => {
+      service.testUpdateEventStatistics(mockPipeline, { ...baseOptions, event: 'click' });
+      expect(mockPipeline.hincrby).not.toHaveBeenCalledWith(expect.any(String), 'bot_click', 1);
+      expect(mockPipeline.hincrby).not.toHaveBeenCalledWith(expect.any(String), 'datacenter_click', 1);
+    });
+
+    it('UA denylist upgrades a GCP click to bot_click when UA is "Shop Service"', () => {
+      service.testUpdateEventStatistics(mockPipeline, {
+        ...baseOptions,
+        event: 'click',
+        geoData: gcpGeoData,
+        userAgent: 'Shop Service',
+      });
+      // Both counters fire: bot_click (narrow, via UA denylist) and datacenter_click (wide).
+      expect(mockPipeline.hincrby).toHaveBeenCalledWith(expect.stringMatching(/^statistics:288:/), 'bot_click', 1);
+      expect(mockPipeline.hincrby).toHaveBeenCalledWith(
+        expect.stringMatching(/^statistics:288:/),
+        'datacenter_click',
+        1,
+      );
+    });
+
+    it('UA denylist does NOT upgrade a residential click even with curl UA', () => {
+      service.testUpdateEventStatistics(mockPipeline, {
+        ...baseOptions,
+        event: 'click',
+        geoData: residentialGeoData,
+        userAgent: 'curl/8.4.0',
+      });
+      expect(mockPipeline.hincrby).not.toHaveBeenCalledWith(expect.any(String), 'bot_click', 1);
+      expect(mockPipeline.hincrby).not.toHaveBeenCalledWith(expect.any(String), 'datacenter_click', 1);
+    });
+  });
+
   describe('sendKafkaMessage', () => {
     it('should send each event to Kafka', async () => {
       await service.testSendKafkaMessage([{ accountId: 1, event: 'test' }]);
       expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalled();
+    });
+
+    const gmailTraits = {
+      asn: 15169,
+      asn_org: 'Google LLC',
+      isp: 'Google LLC',
+      organization: 'Level 3',
+      user_type: 'hosting',
+      connection_type: 'Corporate',
+      is_anycast: true,
+    };
+
+    const gcpTraits = { ...gmailTraits, asn: 396982 };
+
+    it('stamps full bot signals for a Gmail click (narrow is_bot + is_datacenter)', async () => {
+      await service.testSendKafkaMessage([{ accountId: 1, event: 'click', traits: gmailTraits }]);
+      expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalled();
+      const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+      expect(payload.properties).toMatchObject({
+        is_bot: true,
+        is_datacenter: true,
+        bot_classification: 'gmail_prefetch',
+        asn: 15169,
+        asn_org: 'Google LLC',
+        user_type: 'hosting',
+      });
+    });
+
+    it('stamps is_datacenter=true but is_bot=false for a GCP click (Shop app etc.)', async () => {
+      await service.testSendKafkaMessage([{ accountId: 1, event: 'click', traits: gcpTraits }]);
+      const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+      expect(payload.properties).toMatchObject({
+        is_bot: false,
+        is_datacenter: true,
+        bot_classification: 'datacenter',
+        asn: 396982,
+      });
+    });
+
+    it('stamps all-false / zero defaults when traits are missing', async () => {
+      await service.testSendKafkaMessage([{ accountId: 1, event: 'click' }]);
+      const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+      expect(payload.properties).toMatchObject({
+        is_bot: false,
+        is_datacenter: false,
+        bot_classification: null,
+        asn: 0,
+        asn_org: '',
+        user_type: '',
+      });
+    });
+
+    it('preserves existing properties when merging bot fields', async () => {
+      await service.testSendKafkaMessage([
+        {
+          accountId: 1,
+          event: 'bounce',
+          traits: gmailTraits,
+          properties: { bounce_classification: 'Reputation' },
+        },
+      ]);
+      const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+      expect(payload.properties).toMatchObject({
+        bounce_classification: 'Reputation',
+        is_bot: true,
+        is_datacenter: true,
+        bot_classification: 'gmail_prefetch',
+      });
+    });
+
+    it('UA denylist on a GCP click flips is_bot=true with script_ua classification', async () => {
+      await service.testSendKafkaMessage([
+        { accountId: 1, event: 'click', traits: gcpTraits, userAgent: 'Shop Service' },
+      ]);
+      const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+      expect(payload.properties).toMatchObject({
+        is_bot: true,
+        is_datacenter: true,
+        bot_classification: 'script_ua',
+        asn: 396982,
+      });
+    });
+
+    it('reads snake_case user_agent when camelCase userAgent is absent', async () => {
+      await service.testSendKafkaMessage([
+        { accountId: 1, event: 'click', traits: gcpTraits, user_agent: 'curl/8.4.0' },
+      ]);
+      const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+      expect(payload.properties.is_bot).toBe(true);
+      expect(payload.properties.bot_classification).toBe('script_ua');
     });
   });
 });
