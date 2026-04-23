@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{warmup-tracker-url}}/notify"
+  url: '{{warmup-tracker-url}}/notify'
   body:
     type: json
     json: |

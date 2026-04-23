@@ -37,9 +37,7 @@ function wrapConnectError(url: string, cause: unknown): Error {
   const redacted = redactAmqpUrl(url);
   const rawMsg = cause instanceof Error ? cause.message : String(cause);
   const scrubbedMsg = rawMsg.split(url).join(redacted);
-  const wrapped = new Error(
-    `AMQP connect to ${redacted} failed: ${scrubbedMsg}`,
-  );
+  const wrapped = new Error(`AMQP connect to ${redacted} failed: ${scrubbedMsg}`);
   wrapped.name = 'AmqpConnectError';
   if (cause instanceof Error && cause.stack) {
     wrapped.stack = cause.stack.split(url).join(redacted);
@@ -139,11 +137,7 @@ export class AmqpConnection {
       } catch (err) {
         lastError = err;
         if (i < this.retry.maxInitialRetries - 1) {
-          const delay = computeBackoffMs(
-            i + 1,
-            this.retry.baseMs,
-            this.retry.maxMs,
-          );
+          const delay = computeBackoffMs(i + 1, this.retry.baseMs, this.retry.maxMs);
           await sleep(delay);
         }
       }
@@ -171,11 +165,7 @@ export class AmqpConnection {
     if (this.reconnectPending) return;
     this.reconnectPending = true;
     this.reconnectAttempt += 1;
-    const delay = computeBackoffMs(
-      this.reconnectAttempt,
-      this.retry.baseMs,
-      this.retry.maxMs,
-    );
+    const delay = computeBackoffMs(this.reconnectAttempt, this.retry.baseMs, this.retry.maxMs);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.reconnectPending = false;

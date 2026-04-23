@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/postmaster/domains"
+  url: '{{backoffice-api-url}}/postmaster/domains'
   auth: inherit
 
 settings:

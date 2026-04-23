@@ -417,8 +417,8 @@ export default class SegmentLogModal extends Vue {
                   },
                 }
               : item.inInfo
-              ? { inInfo: item.inInfo }
-              : {}),
+                ? { inInfo: item.inInfo }
+                : {}),
             ...(currentEntry.outInfo && item.outInfo
               ? {
                   outInfo: {
@@ -432,8 +432,8 @@ export default class SegmentLogModal extends Vue {
                   },
                 }
               : item.outInfo
-              ? { outInfo: item.outInfo }
-              : {}),
+                ? { outInfo: item.outInfo }
+                : {}),
           };
         }
         dateMap.set(dateOnly, newObject);

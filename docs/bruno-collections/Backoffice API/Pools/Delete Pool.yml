@@ -5,7 +5,7 @@ info:
 
 http:
   method: DELETE
-  url: "{{backoffice-api-url}}/pools/1"
+  url: '{{backoffice-api-url}}/pools/1'
   auth: inherit
 
 settings:

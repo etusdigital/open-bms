@@ -7,7 +7,7 @@ import { BmsPageBase, BmsPageTitleWithPlusAction, BmsButton, BmsTextField } from
 import { useAccountStore } from '../../../stores';
 import { EditAccount, accountEditZodValidation } from '../../../entities/Account';
 import { showToast } from '../../../utils/showToast';
-import {  onBeforeUnmount } from 'vue'
+import { onBeforeUnmount } from 'vue';
 
 const router = useRouter();
 const { params } = useRoute();

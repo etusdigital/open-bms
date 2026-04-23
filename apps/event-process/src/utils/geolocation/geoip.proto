@@ -10,14 +10,25 @@ message IpRequest {
   string ip = 1; // Can be IPv4 or IPv6
 }
 
+message Traits {
+  uint32 asn = 1;
+  string asn_org = 2;
+  string isp = 3;
+  string organization = 4;
+  string user_type = 5;
+  string connection_type = 6;
+  bool is_anycast = 7;
+}
+
 message LocationResponse {
-  string country = 1; // ISO code
-  string region = 2;  // ISO code
+  string country = 1;
+  string region = 2;
   string city = 3;
   string postalCode = 4;
   string timezone = 5;
   double latitude = 6;
   double longitude = 7;
-  bool success = 8;   // To indicate if lookup was successful
-  string error = 9;   // Error message if any
+  bool success = 8;
+  string error = 9;
+  Traits traits = 10;
 }

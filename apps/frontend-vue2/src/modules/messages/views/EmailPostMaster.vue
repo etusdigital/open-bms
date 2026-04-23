@@ -966,7 +966,9 @@ export default class EmailPostMaster extends Vue {
   margin-top: 24px;
   border-radius: 16px;
   background: #fff;
-  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06) !important;
+  box-shadow:
+    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
+    0px 1px 2px 0px rgba(0, 0, 0, 0.06) !important;
 }
 .input-bms {
   height: 36px;
@@ -1144,7 +1146,9 @@ export default class EmailPostMaster extends Vue {
 }
 
 .table-auth {
-  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
+    0px 1px 2px 0px rgba(0, 0, 0, 0.06);
   border-radius: 16px;
 }
 

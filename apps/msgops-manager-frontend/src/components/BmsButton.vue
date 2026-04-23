@@ -61,7 +61,7 @@ const getStyleDisabled = (disabled: boolean) => {
     :name="props.name"
     :type="type"
     :disabled="props.disabled"
-    class="tw-relative tw-inline-flex tw-h-9 tw-min-w-[64px] tw-flex-base tw-cursor-pointer tw-items-center tw-rounded-lg tw-py-2 tw-px-6 tw-align-middle tw-text-sm tw-font-bold tw-tracking-wider tw-uppercase hover:tw-bg-opacity-80 active:tw-shadow-md"
+    class="tw-relative tw-inline-flex tw-h-9 tw-min-w-[64px] tw-flex-base tw-cursor-pointer tw-items-center tw-rounded-lg tw-px-6 tw-py-2 tw-align-middle tw-text-sm tw-font-bold tw-uppercase tw-tracking-wider hover:tw-bg-opacity-80 active:tw-shadow-md"
     :class="{ ...getStyleVariant(props.variant), ...getStyleDisabled(props.disabled) }"
     @click="props.click"
   >

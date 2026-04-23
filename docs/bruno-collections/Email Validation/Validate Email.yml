@@ -5,13 +5,13 @@ info:
 
 http:
   method: GET
-  url: "{{email-validation-url}}/validate"
+  url: '{{email-validation-url}}/validate'
   params:
     - name: email
-      value: "user@example.com"
+      value: 'user@example.com'
   headers:
     - name: api-key
-      value: "{{msgops-api-token}}"
+      value: '{{msgops-api-token}}'
   auth: none
 
 settings:

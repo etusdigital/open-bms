@@ -45,7 +45,7 @@ const routes = baseRoutes.concat(
   campaignRulesRoutes,
   triggerCampaignRoutes,
   productRoutes,
-  labelsRoutes,
+  labelsRoutes
 );
 
 const router = new Router({

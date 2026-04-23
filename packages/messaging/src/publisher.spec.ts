@@ -1,9 +1,5 @@
 import * as amqplib from 'amqplib';
-import {
-  AmqpPublisher,
-  PublisherClosedError,
-  SerializationError,
-} from './publisher';
+import { AmqpPublisher, PublisherClosedError, SerializationError } from './publisher';
 import { DLX, EXCHANGES } from './exchanges';
 
 jest.mock('amqplib');
@@ -75,11 +71,7 @@ describe('AmqpPublisher', () => {
       expect(channel.assertExchange).toHaveBeenCalledWith(DLX, 'topic', {
         durable: true,
       });
-      expect(channel.assertExchange).toHaveBeenCalledWith(
-        EXCHANGES.email,
-        'topic',
-        { durable: true },
-      );
+      expect(channel.assertExchange).toHaveBeenCalledWith(EXCHANGES.email, 'topic', { durable: true });
       expect(channel.assertExchange).toHaveBeenCalledTimes(2);
       expect(channel.publish).toHaveBeenCalledTimes(1);
       expect(channel.publish).toHaveBeenCalledWith(
@@ -128,11 +120,7 @@ describe('AmqpPublisher', () => {
         payload,
       });
 
-      const [, , body] = channel.publish.mock.calls[0] as [
-        string,
-        string,
-        Buffer,
-      ];
+      const [, , body] = channel.publish.mock.calls[0] as [string, string, Buffer];
       expect(body).toBeInstanceOf(Buffer);
       expect(JSON.parse(body.toString('utf8'))).toEqual(payload);
     });
@@ -309,9 +297,7 @@ describe('AmqpPublisher', () => {
       const channel1 = createMockChannel();
       const channel2 = createMockChannel();
       const conn = createMockConn(channel1);
-      conn.createConfirmChannel
-        .mockResolvedValueOnce(channel1)
-        .mockResolvedValueOnce(channel2);
+      conn.createConfirmChannel.mockResolvedValueOnce(channel1).mockResolvedValueOnce(channel2);
       mockConnect.mockResolvedValue(conn);
 
       const publisher = new AmqpPublisher({ url: 'amqp://test' }, FAST_RETRY);

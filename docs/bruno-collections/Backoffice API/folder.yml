@@ -6,7 +6,7 @@ info:
 request:
   auth:
     type: bearer
-    token: "{{backoffice-token}}"
+    token: '{{backoffice-token}}'
   headers:
     - name: account-id
-      value: "1"
+      value: '1'

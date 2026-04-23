@@ -230,7 +230,10 @@ export default class ContactsService {
     }
   }
 
-  async unsubscribe({ pagination, filters }: { pagination?: Pagination; filters?: ContactsFiltersDto }, countOnly = false) {
+  async unsubscribe(
+    { pagination, filters }: { pagination?: Pagination; filters?: ContactsFiltersDto },
+    countOnly = false
+  ) {
     let params = {
       ...filters,
       startDate: filters?.startDate?.toISOString().slice(0, 10),

@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{tracker-url}}/abc123"
+  url: '{{tracker-url}}/abc123'
   auth: none
 
 settings:

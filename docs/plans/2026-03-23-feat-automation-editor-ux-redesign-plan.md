@@ -1,5 +1,5 @@
 ---
-title: "feat: Automation Editor UX Redesign — Fullscreen, Modal Config, Drag-and-Drop Sidebar"
+title: 'feat: Automation Editor UX Redesign — Fullscreen, Modal Config, Drag-and-Drop Sidebar'
 type: feat
 status: active
 date: 2026-03-23
@@ -43,14 +43,14 @@ The current editor wastes vertical space with an inline title input and has no f
 
 A `Dialog` opened by clicking the pencil icon or "Edit details" button. Fields:
 
-| Field | Control | Source | Notes |
-|-------|---------|--------|-------|
-| Name (title) | Text input | — | Max 40 chars. Required. |
-| Description | Textarea | — | Max 255 chars. Optional. |
-| Product (verticalType) | Select | Hardcoded: `cc`, `emp` | Internal accounts only |
-| Target | Select | Hardcoded: `open`, `click` | Internal accounts only |
-| Labels | Multi-select with search | `GET /labels` | Max 10. Uses existing label hooks. |
-| Rate Limit | Switch | — | Internal accounts only |
+| Field                  | Control                  | Source                     | Notes                              |
+| ---------------------- | ------------------------ | -------------------------- | ---------------------------------- |
+| Name (title)           | Text input               | —                          | Max 40 chars. Required.            |
+| Description            | Textarea                 | —                          | Max 255 chars. Optional.           |
+| Product (verticalType) | Select                   | Hardcoded: `cc`, `emp`     | Internal accounts only             |
+| Target                 | Select                   | Hardcoded: `open`, `click` | Internal accounts only             |
+| Labels                 | Multi-select with search | `GET /labels`              | Max 10. Uses existing label hooks. |
+| Rate Limit             | Switch                   | —                          | Internal accounts only             |
 
 ### C. Drag-and-Drop Sidebar
 
@@ -92,9 +92,7 @@ Add a `flow_layout` JSONB column to the `automations` table to store:
     { "id": "1", "position": { "x": 400, "y": 50 } },
     { "id": "2", "position": { "x": 400, "y": 250 } }
   ],
-  "edges": [
-    { "id": "e1-2", "source": "1", "target": "2" }
-  ],
+  "edges": [{ "id": "e1-2", "source": "1", "target": "2" }],
   "viewport": { "x": 0, "y": 0, "zoom": 1 }
 }
 ```
@@ -117,6 +115,7 @@ The current `automation-form-page.tsx` serializes `effectiveNodes`/`effectiveEdg
 #### Task 1: Backend — Add `flow_layout` column
 
 **Files:**
+
 - `msgops-api/src/entities/automation.entity.ts` — add column
 - `msgops-api/src/modules/automations/automation.dto.ts` — add to DTO validation
 - Migration file — `ALTER TABLE automations ADD COLUMN flow_layout jsonb DEFAULT NULL`
@@ -137,15 +136,16 @@ The `stripUnknown: true` on the DTO already drops unknown fields, so the Vue 2 f
 #### Task 2: Frontend types — Add flowLayout to types
 
 **Files:**
+
 - `apps/frontend-react/src/features/automations/types.ts` — add `flowLayout` to `Automation`
 - `apps/frontend-react/src/features/automations/editor/types.ts` — add `FlowLayout` type, add to `AutomationPayload`
 
 ```typescript
 // editor/types.ts
 export interface FlowLayout {
-  nodes: Array<{ id: string; position: { x: number; y: number } }>
-  edges: Array<{ id: string; source: string; target: string; sourceHandle?: string; targetHandle?: string }>
-  viewport?: { x: number; y: number; zoom: number }
+  nodes: Array<{ id: string; position: { x: number; y: number } }>;
+  edges: Array<{ id: string; source: string; target: string; sourceHandle?: string; targetHandle?: string }>;
+  viewport?: { x: number; y: number; zoom: number };
 }
 ```
 
@@ -154,6 +154,7 @@ export interface FlowLayout {
 **File:** `apps/frontend-react/src/features/automations/automation-form-page.tsx`
 
 Replace the current header with a slim bar:
+
 - Close button (✕ or ← arrow) linking to `/automations/emails`
 - Status badge (Draft/Active) — clickable toggle
 - Automation name as text (not input), with pencil icon to open modal
@@ -167,6 +168,7 @@ The page becomes a fullscreen layout: `h-screen flex flex-col` with the top bar 
 **File:** `apps/frontend-react/src/features/automations/editor/panels/automation-details-modal.tsx`
 
 A `Dialog` component with the form fields:
+
 - Name — `<Input>` with max 40 chars
 - Description — `<Textarea>` with max 255 chars
 - Product (verticalType) — `<Select>` with cc/emp options (shown only for internal accounts via `usePermissions` or account check)
@@ -202,6 +204,7 @@ function DraggableBlock({ type, label, icon }: { type: string; label: string; ic
 ```
 
 Categories for Phase 1:
+
 - **Actions**: Email (more channels in future phases)
 - **Timing**: Wait
 - **Logic**: End
@@ -213,6 +216,7 @@ Phase 2+ will add: SMS, Web Push, Mobile Push, WhatsApp, Add Tag, Remove Tag, Up
 **File:** `apps/frontend-react/src/features/automations/editor/automation-editor.tsx`
 
 Major changes:
+
 1. **Remove `AddStepEdge`** — switch all edges to `type: 'smoothstep'`
 2. **Enable `nodesDraggable={true}`** — nodes can be moved freely
 3. **Enable `nodesConnectable={true}`** — users can drag between handles to create edges
@@ -223,42 +227,49 @@ Major changes:
 
 ```typescript
 // onDrop handler
-const onDrop = useCallback((event: React.DragEvent) => {
-  event.preventDefault()
-  const type = event.dataTransfer.getData('application/reactflow')
-  if (!type) return
+const onDrop = useCallback(
+  (event: React.DragEvent) => {
+    event.preventDefault();
+    const type = event.dataTransfer.getData('application/reactflow');
+    if (!type) return;
 
-  const position = screenToFlowPosition({ x: event.clientX, y: event.clientY })
-  const newId = stepIdCounter + 1
+    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+    const newId = stepIdCounter + 1;
 
-  const newNode: AutomationNode = {
-    id: String(newId),
-    type,
-    position,
-    data: { stepId: newId, settings: DEFAULT_SETTINGS[type] ?? {} } as AnyNodeData,
-  }
+    const newNode: AutomationNode = {
+      id: String(newId),
+      type,
+      position,
+      data: { stepId: newId, settings: DEFAULT_SETTINGS[type] ?? {} } as AnyNodeData,
+    };
 
-  setNodes((nds) => [...nds, newNode])
-  setStepIdCounter(newId)
-  markDirty()
-}, [stepIdCounter, screenToFlowPosition, setNodes, markDirty])
+    setNodes((nds) => [...nds, newNode]);
+    setStepIdCounter(newId);
+    markDirty();
+  },
+  [stepIdCounter, screenToFlowPosition, setNodes, markDirty],
+);
 
 const onDragOver = useCallback((event: React.DragEvent) => {
-  event.preventDefault()
-  event.dataTransfer.dropEffect = 'move'
-}, [])
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+}, []);
 ```
 
 ```typescript
 // Expose editor state to parent via ref
-useImperativeHandle(ref, () => ({
-  getState: () => ({
-    nodes,
-    edges,
-    stepIdCounter,
-    viewport: reactFlowInstance?.getViewport(),
+useImperativeHandle(
+  ref,
+  () => ({
+    getState: () => ({
+      nodes,
+      edges,
+      stepIdCounter,
+      viewport: reactFlowInstance?.getViewport(),
+    }),
   }),
-}), [nodes, edges, stepIdCounter, reactFlowInstance])
+  [nodes, edges, stepIdCounter, reactFlowInstance],
+);
 ```
 
 #### Task 7: Update save flow — Use ref, send flowLayout
@@ -266,30 +277,33 @@ useImperativeHandle(ref, () => ({
 **File:** `apps/frontend-react/src/features/automations/automation-form-page.tsx`
 
 ```typescript
-const editorRef = useRef<AutomationEditorHandle>(null)
+const editorRef = useRef<AutomationEditorHandle>(null);
 
 const handleSave = () => {
-  const state = editorRef.current?.getState()
-  if (!state) return
+  const state = editorRef.current?.getState();
+  if (!state) return;
 
-  const result = serializeFlowToSteps(state.nodes, state.edges)
-  if (!result.success) { toast.error(result.error); return }
+  const result = serializeFlowToSteps(state.nodes, state.edges);
+  if (!result.success) {
+    toast.error(result.error);
+    return;
+  }
 
   const flowLayout: FlowLayout = {
-    nodes: state.nodes.map(n => ({ id: n.id, position: n.position })),
-    edges: state.edges.map(e => ({ id: e.id, source: e.source, target: e.target })),
+    nodes: state.nodes.map((n) => ({ id: n.id, position: n.position })),
+    edges: state.edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
     viewport: state.viewport,
-  }
+  };
 
   const payload: AutomationPayload = {
     ...metadata,
     stepId: state.stepIdCounter,
     steps: result.root,
     flowLayout,
-  }
+  };
 
   // create or update...
-}
+};
 ```
 
 #### Task 8: Update deserializer — Restore from flowLayout
@@ -299,34 +313,31 @@ const handleSave = () => {
 Add a new function:
 
 ```typescript
-export function deserializeWithLayout(
-  rootStep: ApiStep,
-  flowLayout: FlowLayout | null,
-): DeserializeResult {
-  const { nodes, edges, maxStepId } = deserializeStepsToFlow(rootStep)
+export function deserializeWithLayout(rootStep: ApiStep, flowLayout: FlowLayout | null): DeserializeResult {
+  const { nodes, edges, maxStepId } = deserializeStepsToFlow(rootStep);
 
-  if (!flowLayout) return { nodes, edges, maxStepId }
+  if (!flowLayout) return { nodes, edges, maxStepId };
 
   // Merge persisted positions into deserialized nodes
-  const positionMap = new Map(flowLayout.nodes.map(n => [n.id, n.position]))
-  const restoredNodes = nodes.map(node => {
-    const pos = positionMap.get(node.id)
-    return pos ? { ...node, position: pos } : node
-  })
+  const positionMap = new Map(flowLayout.nodes.map((n) => [n.id, n.position]));
+  const restoredNodes = nodes.map((node) => {
+    const pos = positionMap.get(node.id);
+    return pos ? { ...node, position: pos } : node;
+  });
 
   // Use persisted edges if available (they may include user-created connections)
   // Fall back to tree-derived edges if not
-  const restoredEdges = flowLayout.edges.length > 0
-    ? flowLayout.edges.map(e => ({ ...e, type: 'smoothstep' as const }))
-    : edges
+  const restoredEdges =
+    flowLayout.edges.length > 0 ? flowLayout.edges.map((e) => ({ ...e, type: 'smoothstep' as const })) : edges;
 
-  return { nodes: restoredNodes, edges: restoredEdges, maxStepId }
+  return { nodes: restoredNodes, edges: restoredEdges, maxStepId };
 }
 ```
 
 #### Task 9: Update i18n
 
 Add keys for the new UI elements in both `pt-BR.json` and `en-US.json`:
+
 - `automations.editor.editDetails` — "Edit details" / "Editar detalhes"
 - `automations.editor.lastSaved` — "Last saved {{time}}" / "Salvo {{time}}"
 - `automations.editor.draft` — "Draft" / "Rascunho"
@@ -403,12 +414,12 @@ msgops-api/src/
 
 ## Risk Analysis
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| `flow_layout` and `steps` tree drift apart | High | Serialize tree from nodes/edges every time (flowLayout is visual-only supplement) |
-| Drag-drop browser compat | Low | HTML5 Drag and Drop is widely supported; React Flow's examples use this pattern |
-| Breaking existing automations | High | `flow_layout` is nullable; null = fallback to auto-layout; Vue 2 is unaffected |
-| Save flow bug masks data loss | High | Fix via imperative ref before any other changes |
+| Risk                                       | Impact | Mitigation                                                                        |
+| ------------------------------------------ | ------ | --------------------------------------------------------------------------------- |
+| `flow_layout` and `steps` tree drift apart | High   | Serialize tree from nodes/edges every time (flowLayout is visual-only supplement) |
+| Drag-drop browser compat                   | Low    | HTML5 Drag and Drop is widely supported; React Flow's examples use this pattern   |
+| Breaking existing automations              | High   | `flow_layout` is nullable; null = fallback to auto-layout; Vue 2 is unaffected    |
+| Save flow bug masks data loss              | High   | Fix via imperative ref before any other changes                                   |
 
 ## Sources & References
 

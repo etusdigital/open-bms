@@ -40,8 +40,8 @@ const __dirname = dirname(__filename);
 interface Config {
   dryRun: boolean;
   today: boolean;
-  from: string;      // YYYY-MM-DD
-  to: string;        // YYYY-MM-DD (inclusive)
+  from: string; // YYYY-MM-DD
+  to: string; // YYYY-MM-DD (inclusive)
   chunkDays: number;
   accountId?: number;
 }
@@ -155,8 +155,8 @@ function minDate(a: string, b: string): string {
 }
 
 interface Chunk {
-  from: string;  // YYYY-MM-DD (inclusive)
-  to: string;    // YYYY-MM-DD (exclusive, for < comparison)
+  from: string; // YYYY-MM-DD (inclusive)
+  to: string; // YYYY-MM-DD (exclusive, for < comparison)
 }
 
 function generateChunks(from: string, to: string, chunkDays: number): Chunk[] {
@@ -185,7 +185,9 @@ async function main() {
   const database = env.CLICKHOUSE_DATABASE;
 
   if (!host || !username || !database) {
-    console.error('Missing ClickHouse credentials. Set CLICKHOUSE_HOST, CLICKHOUSE_USERNAME, CLICKHOUSE_PASSWORD, CLICKHOUSE_DATABASE');
+    console.error(
+      'Missing ClickHouse credentials. Set CLICKHOUSE_HOST, CLICKHOUSE_USERNAME, CLICKHOUSE_PASSWORD, CLICKHOUSE_DATABASE',
+    );
     console.error('Or create apps/backoffice-api/.env with these values.');
     process.exit(1);
   }
@@ -205,7 +207,9 @@ async function main() {
   console.log(`═══════════════════════════════════════════════════════════════`);
   console.log(`  Backfill tb_email_hourly_stats from events_logs_v2`);
   console.log(`═══════════════════════════════════════════════════════════════`);
-  console.log(`  Mode:       ${config.dryRun ? 'DRY RUN (estimate only)' : 'LIVE INSERT'}${config.today ? ' (TODAY)' : ''}`);
+  console.log(
+    `  Mode:       ${config.dryRun ? 'DRY RUN (estimate only)' : 'LIVE INSERT'}${config.today ? ' (TODAY)' : ''}`,
+  );
   console.log(`  Range:      ${config.from} → ${config.to}`);
   console.log(`  Chunk size: ${config.chunkDays} day(s)`);
   console.log(`  Chunks:     ${chunks.length}`);

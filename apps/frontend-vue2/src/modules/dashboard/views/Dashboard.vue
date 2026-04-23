@@ -1696,14 +1696,14 @@ export default class Dashboard extends Vue {
     const campaignsIds = this.isAllCampaigns
       ? 'all'
       : this.selectedCampaigns.length > 0
-      ? this.selectedCampaigns.map((campaign: any) => campaign.id)
-      : this.campaignsIds;
+        ? this.selectedCampaigns.map((campaign: any) => campaign.id)
+        : this.campaignsIds;
 
     const automationsIds = this.isAllAutomations
       ? 'all'
       : this.selectedAutomations.length > 0
-      ? this.selectedAutomations.map((automation: any) => automation.id)
-      : this.automationsIds;
+        ? this.selectedAutomations.map((automation: any) => automation.id)
+        : this.automationsIds;
 
     const messagesIds =
       this.selectedMessages.length > 0 ? this.selectedMessages.map((message: any) => message.id) : this.messagesIds;
@@ -2178,13 +2178,13 @@ export default class Dashboard extends Vue {
       const campaignsIds = this.isAllCampaigns
         ? 'all'
         : this.campaignsIds.length > 0
-        ? this.campaignsIds
-        : this.selectedCampaigns.map((campaign: any) => campaign.id);
+          ? this.campaignsIds
+          : this.selectedCampaigns.map((campaign: any) => campaign.id);
       const automationsIds = this.isAllAutomations
         ? 'all'
         : this.automationsIds.length > 0
-        ? this.automationsIds
-        : this.selectedAutomations.map((automation: any) => automation.id);
+          ? this.automationsIds
+          : this.selectedAutomations.map((automation: any) => automation.id);
       const messages =
         this.messagesIds.length > 0 ? this.messagesIds : this.selectedMessages.map((message: any) => message.id);
       const tags = this.tagsIds.length > 0 ? this.tagsIds : this.selectedTags.map((tag: any) => tag.id);
@@ -3168,7 +3168,9 @@ export default class Dashboard extends Vue {
   font-size: 14px;
 }
 .c-table {
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
   border-radius: 16px;
   margin-top: 1rem;
 }
@@ -3500,7 +3502,9 @@ export default class Dashboard extends Vue {
   border-radius: 16px;
   padding: 15px 20px 5px 20px;
   border-radius: 16px;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1) !important;
   width: auto;
   z-index: 0 !important;
 }
@@ -3511,7 +3515,9 @@ export default class Dashboard extends Vue {
   gap: 18px;
   padding: 20px;
   border-radius: 16px;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1) !important;
   height: 92px;
   width: auto;
   z-index: 0 !important;
@@ -3568,7 +3574,9 @@ export default class Dashboard extends Vue {
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 24px;
-  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
+    0px 1px 2px 0px rgba(0, 0, 0, 0.06);
 }
 
 .messages-pages {
@@ -3602,7 +3610,9 @@ export default class Dashboard extends Vue {
 
 .expand-tags {
   margin-top: -7px;
-  transition: width 2s ease-out, height 2s ease-out;
+  transition:
+    width 2s ease-out,
+    height 2s ease-out;
   margin-bottom: 10px;
 }
 

@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/ips/1/assignments"
+  url: '{{backoffice-api-url}}/ips/1/assignments'
   auth: inherit
 
 settings:

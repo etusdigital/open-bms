@@ -109,7 +109,7 @@ export class MsgopsService {
 
   async findContactByUuid(accountId: number, uuid: string): Promise<Contact> {
     const contactQuery: QueryResult = await this.pgPool.query(
-      'SELECT id FROM contacts WHERE account_id = $1 AND uuid = $2',
+      'SELECT id, email FROM contacts WHERE account_id = $1 AND uuid = $2',
       [accountId, uuid],
     );
     const contact = contactQuery.rows.length ? contactQuery.rows[0] : null;
@@ -318,6 +318,59 @@ export class MsgopsService {
     }
   }
 
+  async findMessageAssociation(
+    accountId: number,
+    messageId: number,
+    name: string,
+  ): Promise<{ campaignId?: number; automationId?: number }> {
+    const cacheKey = `${accountId}:${messageId}:${name}`;
+
+    const cached = this.cacheService.get<{ campaignId?: number; automationId?: number }>(
+      'message_association',
+      cacheKey,
+    );
+    if (cached) {
+      return cached;
+    }
+
+    const redisKey = `message_association:${cacheKey}`;
+    const redisCached = await this.redisClient.get(redisKey);
+    if (redisCached !== null) {
+      const parsed = JSON.parse(redisCached);
+      this.cacheService.set('message_association', cacheKey, parsed);
+      return parsed;
+    }
+
+    const campaignQuery: QueryResult = await this.pgPool.query(
+      `SELECT c.id FROM campaigns c
+       INNER JOIN campaigns_messages cm ON cm.campaign_id = c.id
+       WHERE c.account_id = $1 AND c.name = $2 AND cm.message_id = $3 AND c.deleted_at IS NULL
+       LIMIT 1`,
+      [accountId, name, messageId],
+    );
+
+    let result: { campaignId?: number; automationId?: number } = {};
+    if (campaignQuery.rows.length) {
+      result = { campaignId: campaignQuery.rows[0].id };
+    } else {
+      const automationQuery: QueryResult = await this.pgPool.query(
+        `SELECT id FROM automations
+         WHERE account_id = $1 AND name = $2 AND deleted_at IS NULL AND steps::text LIKE $3
+         LIMIT 1`,
+        [accountId, name, `%"id": ${messageId}%`],
+      );
+      if (automationQuery.rows.length) {
+        result = { automationId: automationQuery.rows[0].id };
+      }
+    }
+
+    const expireInSeconds = result.campaignId || result.automationId ? 60 * 60 * 24 : 60 * 60;
+    await this.redisClient.set(redisKey, JSON.stringify(result), 'EX', expireInSeconds);
+    this.cacheService.set('message_association', cacheKey, result);
+
+    return result;
+  }
+
   async findEvent(name: string, accountId: number) {
     const cacheKey = `${accountId}:${name}`;
 
@@ -356,12 +409,17 @@ export class MsgopsService {
       return { keys: [], values: [] };
     }
 
-    // Get all unique keys in a single pass
+    // Get all unique keys in a single pass. Skip internal-only fields
+    // that don't map to an events_logs column:
+    // - `delivered_id`: legacy join key carried on EventLog for Kafka only.
+    // - `traits`: feeds BotDetector in processMessageToKafka; the six
+    //   derived signals land in `properties` instead.
+    const EXCLUDED_COLUMNS = new Set(['delivered_id', 'traits']);
     const keysMap = new Map<string, string>();
     array.forEach((item) => {
       Object.keys(item).forEach((key) => {
         const snakeKey = this.toSnakeCase(key);
-        if (!keysMap.has(snakeKey) && snakeKey !== 'delivered_id') {
+        if (!keysMap.has(snakeKey) && !EXCLUDED_COLUMNS.has(snakeKey)) {
           keysMap.set(snakeKey, key);
         }
       });

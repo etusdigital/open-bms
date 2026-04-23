@@ -13,8 +13,8 @@
           isLoadingSearch
             ? $t('input.searching')
             : searchOptions
-            ? `${$t('datatable.noData')}`
-            : $t('datatable.noMessages')
+              ? `${$t('datatable.noData')}`
+              : $t('datatable.noMessages')
         "
         :items="optionsSelect"
         :item-text="'name'"

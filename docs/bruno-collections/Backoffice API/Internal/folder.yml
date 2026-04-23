@@ -7,4 +7,4 @@ request:
   auth: none
   headers:
     - name: x-cron-secret
-      value: "{{cron-secret}}"
+      value: '{{cron-secret}}'

@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{campaign-packer-url}}/create-contacts-send/1"
+  url: '{{campaign-packer-url}}/create-contacts-send/1'
   auth: none
 
 settings:

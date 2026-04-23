@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{tag-process-url}}/add"
+  url: '{{tag-process-url}}/add'
   body:
     type: json
     json: |

@@ -5,10 +5,10 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/campaigns-rules/rules/validate-name"
+  url: '{{msgops-api-url}}/campaigns-rules/rules/validate-name'
   params:
     - name: name
-      value: "test-rule"
+      value: 'test-rule'
   auth: inherit
 
 settings:

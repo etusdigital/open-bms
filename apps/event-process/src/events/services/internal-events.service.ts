@@ -3,8 +3,19 @@ import { EventsService } from './events.service';
 import { PlatformType } from '../interfaces/push.interfaces';
 import { EventLog, InternalRequest } from '../interfaces/events.interfaces';
 
+const UTM_CAMPAIGN_PATTERN = /^(.+)_e(\d+)_(\d+)$/;
+const REDUNDANT_PROPERTY_KEYS = ['bmsu', 'bmsa', 'utm_source', 'utm_medium', 'utm_content', 'utm_campaign'];
+
 @Injectable()
 export class InternalEventsService extends EventsService {
+  private parseUtmCampaign(utmCampaign: string): { name: string; position: number; messageId: number } | null {
+    const match = utmCampaign.match(UTM_CAMPAIGN_PATTERN);
+    if (!match) return null;
+    const messageId = Number(match[3]);
+    if (!messageId) return null;
+    return { name: match[1], position: Number(match[2]), messageId };
+  }
+
   async internalEventsProcess(internalEvent: InternalRequest): Promise<any> {
     await this.msgOpsService.checkPostgresConnection();
 
@@ -83,6 +94,53 @@ export class InternalEventsService extends EventsService {
         geoData = await this.getGeoIpInfo(event.ip);
       }
 
+      let utmCampaign: string | null = null;
+      const utmCampaignRaw = event.properties?.utm_campaign;
+      if (utmCampaignRaw) {
+        utmCampaign = String(utmCampaignRaw);
+        const parsed = this.parseUtmCampaign(utmCampaign);
+        if (parsed) {
+          if (!event.messageId) {
+            event.messageId = parsed.messageId;
+          }
+          if (!event.campaignId && !event.automationId) {
+            const association = await this.msgOpsService.findMessageAssociation(
+              accountId,
+              parsed.messageId,
+              parsed.name,
+            );
+            if (association?.campaignId) {
+              event.campaignId = association.campaignId;
+            } else if (association?.automationId) {
+              event.automationId = association.automationId;
+            }
+          }
+        }
+      }
+
+      if (!event.contactId && event.email && event.email !== '') {
+        const contact = await this.msgOpsService.findContactByEmail(accountId, event.email);
+        if (contact) {
+          event.contactId = contact.id;
+        }
+      }
+
+      if (!event.contactId && event.uuid && event.uuid !== '') {
+        const contact = await this.msgOpsService.findContactByUuid(accountId, event.uuid);
+        if (contact) {
+          event.contactId = contact.id;
+          if (!event.email && contact.email) {
+            event.email = contact.email;
+          }
+        }
+      }
+
+      if (event.properties) {
+        for (const key of REDUNDANT_PROPERTY_KEYS) {
+          delete event.properties[key];
+        }
+      }
+
       eventsProcess.push({
         accountId,
         time: timestamp,
@@ -100,6 +158,7 @@ export class InternalEventsService extends EventsService {
         url: event.url || null,
         reason: event.reason || null,
         value: event.properties?.value || null,
+        utmCampaign: utmCampaign,
         ...(event.userAgent ? this.userAgentFormatter(event.userAgent) : {}),
         ...(geoData ? geoData : {}),
       });

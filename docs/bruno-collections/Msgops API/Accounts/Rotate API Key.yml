@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/accounts/1/api-keys/1/rotate"
+  url: '{{msgops-api-url}}/accounts/1/api-keys/1/rotate'
   auth: inherit
 
 settings:

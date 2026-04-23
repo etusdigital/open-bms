@@ -5,7 +5,7 @@ info:
 
 http:
   method: DELETE
-  url: "{{msgops-api-url}}/tags/1"
+  url: '{{msgops-api-url}}/tags/1'
   auth: inherit
 
 settings:

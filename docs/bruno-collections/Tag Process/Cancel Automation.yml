@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{tag-process-url}}/cancel"
+  url: '{{tag-process-url}}/cancel'
   body:
     type: json
     json: |

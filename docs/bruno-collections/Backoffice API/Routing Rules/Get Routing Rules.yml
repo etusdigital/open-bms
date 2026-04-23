@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/routing-rules"
+  url: '{{backoffice-api-url}}/routing-rules'
   auth: inherit
 
 settings:

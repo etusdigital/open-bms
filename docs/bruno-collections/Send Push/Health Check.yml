@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{send-push-url}}/"
+  url: '{{send-push-url}}/'
   auth: none
 
 settings:

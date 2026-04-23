@@ -17,7 +17,9 @@ Cypress.Commands.add('identityServerAPILogin', () => {
   const password = Cypress.env('LOGIN_PASSWORD');
 
   if (!idsrvUrl || !username || !password || !authorizeCallback) {
-    cy.log('identityServerAPILogin skipped: missing CYPRESS_IDSRV_URL / LOGIN_USERNAME / LOGIN_PASSWORD / AUTHORIZE_CALLBACK');
+    cy.log(
+      'identityServerAPILogin skipped: missing CYPRESS_IDSRV_URL / LOGIN_USERNAME / LOGIN_PASSWORD / AUTHORIZE_CALLBACK'
+    );
     return;
   }
 

@@ -1,0 +1,62 @@
+[
+  {
+    "ip": "74.125.1.1",
+    "note": "Gmail / Google link pre-fetcher — ASN 15169 is the MAIL_SCANNER_ASNS gmail_prefetch key",
+    "expect": {
+      "asn": 15169,
+      "user_type": "hosting",
+      "asn_org_contains": "Google"
+    }
+  },
+  {
+    "ip": "40.107.1.1",
+    "note": "Microsoft Exchange Online / Safe Links — ASN 8075 is the MAIL_SCANNER_ASNS outlook_prefetch key",
+    "expect": {
+      "asn": 8075,
+      "user_type": "hosting",
+      "asn_org_contains": "Microsoft"
+    }
+  },
+  {
+    "ip": "98.136.0.1",
+    "note": "Yahoo / Oath — ASN 7233 is a MAIL_SCANNER_ASNS yahoo_prefetch key",
+    "expect": {
+      "asn": 7233,
+      "user_type": "hosting",
+      "asn_org_contains": "Yahoo"
+    }
+  },
+  {
+    "ip": "34.138.1.1",
+    "note": "GCP hosting — catches datacenter classification (user_type=hosting, wide)",
+    "expect": {
+      "asn": 396982,
+      "user_type": "hosting",
+      "asn_org_contains": "Google"
+    }
+  },
+  {
+    "ip": "8.8.8.8",
+    "note": "Google Public DNS — stable sanity check on the Google ASN",
+    "expect": {
+      "asn": 15169,
+      "asn_org_contains": "Google"
+    }
+  },
+  {
+    "ip": "1.1.1.1",
+    "note": "Cloudflare DNS — stable ASN 13335, broad coverage check",
+    "expect": {
+      "asn": 13335,
+      "asn_org_contains": "Cloudflare"
+    }
+  },
+  {
+    "ip": "208.67.222.222",
+    "note": "OpenDNS / Cisco — ASN 36692",
+    "expect": {
+      "asn": 36692,
+      "asn_org_contains": "OpenDNS"
+    }
+  }
+]

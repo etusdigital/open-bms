@@ -321,14 +321,7 @@ This phase merges the original Phases 2, 3, and 4 — they are one concern: "use
   ] as const;
   export type Permission = (typeof ALL_PERMISSIONS)[number];
 
-  export const ROLE_CODES = [
-    'super_admin',
-    'admin',
-    'editor',
-    'analyst',
-    'support',
-    'billing',
-  ] as const;
+  export const ROLE_CODES = ['super_admin', 'admin', 'editor', 'analyst', 'support', 'billing'] as const;
   export type RoleCode = (typeof ROLE_CODES)[number];
 
   export interface User {
@@ -814,9 +807,7 @@ This phase merges the original Phases 5 and 6.
   const visibleItems = useMemo(
     () =>
       MENU_ITEMS.filter(
-        (item) =>
-          (!item.permission || can(item.permission)) &&
-          (!item.internalOnly || currentAccount.isInternal),
+        (item) => (!item.permission || can(item.permission)) && (!item.internalOnly || currentAccount.isInternal),
       ),
     [can, currentAccount.isInternal],
   );

@@ -38,6 +38,7 @@ describe('GeoIP Proto File', () => {
     expect(protoDescriptor['geoip.GeoIpService'].GetLocation).toBeDefined();
     expect(protoDescriptor['geoip.IpRequest']).toBeDefined();
     expect(protoDescriptor['geoip.LocationResponse']).toBeDefined();
+    expect(protoDescriptor['geoip.Traits']).toBeDefined();
 
     // Test message structure
     const ipRequestFields = protoDescriptor['geoip.IpRequest'].type.field;
@@ -53,5 +54,19 @@ describe('GeoIP Proto File', () => {
     expect(locationResponseFields.find((f: any) => f.name === 'longitude')).toBeDefined();
     expect(locationResponseFields.find((f: any) => f.name === 'success')).toBeDefined();
     expect(locationResponseFields.find((f: any) => f.name === 'error')).toBeDefined();
+
+    const traitsField = locationResponseFields.find((f: any) => f.name === 'traits');
+    expect(traitsField).toBeDefined();
+    expect(traitsField.type).toBe('TYPE_MESSAGE');
+    expect(traitsField.typeName).toBe('Traits');
+
+    const traitsFields = protoDescriptor['geoip.Traits'].type.field;
+    expect(traitsFields.find((f: any) => f.name === 'asn')).toBeDefined();
+    expect(traitsFields.find((f: any) => f.name === 'asn_org')).toBeDefined();
+    expect(traitsFields.find((f: any) => f.name === 'isp')).toBeDefined();
+    expect(traitsFields.find((f: any) => f.name === 'organization')).toBeDefined();
+    expect(traitsFields.find((f: any) => f.name === 'user_type')).toBeDefined();
+    expect(traitsFields.find((f: any) => f.name === 'connection_type')).toBeDefined();
+    expect(traitsFields.find((f: any) => f.name === 'is_anycast')).toBeDefined();
   });
 });

@@ -54,15 +54,17 @@ export class AppController {
   }
 
   @Get('/redirect')
-  async redirect(@Res() response: Response, @Req() request: Request, @Query('url') url: string, @Query('bmsu') bmsu: string) {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async redirect(@Res() response: Response, @Req() request: Request, @Query('url') url: string, @Query('bmsu') bmsu: string, @IpAddress() ipAddress?: string) {
     const buff = Buffer.from(url, 'base64');
     const decodedUrl = buff.toString('ascii');
     const parsedUrl = new URL(decodeURIComponent(decodedUrl));
     const urlSearchParams = new URLSearchParams(parsedUrl.search);
     const urlParams = Object.fromEntries(urlSearchParams.entries());
-    let bmsUUID = bmsu;
-    let utmId = null;
-    let bmst = null;
+    let bmsUUID: string | undefined = bmsu;
+    let utmId: string | null = null;
+    let bmst: string | null = null;
+    let accountId: string | null = null;
     if (!bmsu) {
       bmsUUID = urlParams.bmsu || urlParams.bmsuuid;
     }
@@ -75,6 +77,7 @@ export class AppController {
       urlSearchParams.delete('bmst');
     }
     if (urlParams.bmsa) {
+      accountId = urlParams.bmsa;
       urlSearchParams.delete('bmsa');
     }
 
@@ -94,30 +97,15 @@ export class AppController {
       secure: true,
     });
 
-    // don't fetch contact for account Just Great Cards (288), Vouquitar (16), and Mejoresopciones (22)
-    // if (bmsUUID && ['288', '16', '22'].includes(accountId) !== true) {
-    //   try {
-    //     const contact = await this.msgOpsService.findContact('u', bmsUUID, accountId);
-    //     if (contact) {
-    //       /**
-    //        * Since user is comming from email link, we consider this as a valid click event
-    //        * We update the last click and last open timestamps and set a cookie with contact info
-    //        * Contact will be latter updated in the database in the event-process service
-    //        */
-    //       const currentTimestamp = new Date().toISOString();
-    //       contact.lc = currentTimestamp;
-    //       contact.lo = currentTimestamp;
-    //       response.cookie('bmsInfo', JSON.stringify(contact), {
-    //         domain: rootDomain,
-    //         path: '/',
-    //         secure: true,
-    //         maxAge: 2 * 24 * 60 * 60 * 1000, // 2 days
-    //       });
-    //     }
-    //   } catch (error) {
-    //     console.error('Error fetching contact by bmsUUID:', JSON.stringify(error));
-    //   }
-    // }
+    if (bmsUUID && accountId) {
+      void this.appService.publishRedirectClick({
+        bmsUUID,
+        accountId,
+        decodedUrl,
+        ip: ipAddress,
+        userAgent: request.headers['user-agent'],
+      });
+    }
 
     if (utmId) {
       response.cookie('utm_id', `${utmId}`, {

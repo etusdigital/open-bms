@@ -6,10 +6,15 @@ COPY package.json ./
 FROM base AS deps
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/twilio-messaging/package.json ./apps/twilio-messaging/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/url-utils/package.json ./packages/url-utils/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --filter msgops-twilio-messaging
+    pnpm install --frozen-lockfile --filter msgops-twilio-messaging...
 
 FROM deps AS build
+COPY packages/typescript-config ./packages/typescript-config
+COPY packages/url-utils ./packages/url-utils
+RUN pnpm --filter @msgops/url-utils build
 COPY apps/twilio-messaging/ ./apps/twilio-messaging/
 RUN pnpm --filter msgops-twilio-messaging build
 

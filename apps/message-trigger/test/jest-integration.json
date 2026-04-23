@@ -5,12 +5,7 @@
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
-  "collectCoverageFrom": [
-    "../src/**/*.(t|j)s",
-    "!../src/main.ts",
-    "!../src/**/*.interface.ts",
-    "!../src/**/*.dto.ts"
-  ],
+  "collectCoverageFrom": ["../src/**/*.(t|j)s", "!../src/main.ts", "!../src/**/*.interface.ts", "!../src/**/*.dto.ts"],
   "coverageDirectory": "../coverage-integration",
   "testEnvironment": "node",
   "moduleNameMapper": {

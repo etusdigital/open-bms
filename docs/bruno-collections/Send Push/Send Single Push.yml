@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{send-push-url}}/single"
+  url: '{{send-push-url}}/single'
   body:
     type: json
     json: |

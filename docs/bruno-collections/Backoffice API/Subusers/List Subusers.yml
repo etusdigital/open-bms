@@ -5,12 +5,12 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/subusers"
+  url: '{{backoffice-api-url}}/subusers'
   params:
     - name: limit
-      value: "25"
+      value: '25'
     - name: offset
-      value: "0"
+      value: '0'
   auth: inherit
 
 settings:
