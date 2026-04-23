@@ -17,6 +17,7 @@
     "eslint:check": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "eslint:fix": "pnpm run eslint:check -- --fix",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "type-check": "tsc --noEmit",
     "precommit": "lint-staged && pnpm run lint",
     "prepush": "pnpm run lint",
     "prettier:check": "prettier --check ./**/*.{ts,js,json,*rc}",
@@ -29,6 +30,7 @@
   },
   "dependencies": {
     "@google-cloud/pubsub": "^5.3.0",
+    "@msgops/url-utils": "workspace:*",
     "@nestjs/common": "^11.1.16",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.1.16",
