@@ -345,10 +345,11 @@ describe('MsgopsService', () => {
   });
 
   describe('findContactByUuid', () => {
-    it('should return contact when found', async () => {
-      mockPgPool.query.mockResolvedValueOnce({ rows: [{ id: 20 }] });
+    it('should return contact with id and email when found', async () => {
+      mockPgPool.query.mockResolvedValueOnce({ rows: [{ id: 20, email: 'found@test.com' }] });
       const result = await service.findContactByUuid(1, 'uuid-1');
-      expect(result).toEqual({ id: 20 });
+      expect(result).toEqual({ id: 20, email: 'found@test.com' });
+      expect(mockPgPool.query.mock.calls[0][0]).toMatch(/SELECT id, email FROM contacts/);
     });
 
     it('should return null when not found', async () => {

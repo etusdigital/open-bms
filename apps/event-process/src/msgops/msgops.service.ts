@@ -109,7 +109,7 @@ export class MsgopsService {
 
   async findContactByUuid(accountId: number, uuid: string): Promise<Contact> {
     const contactQuery: QueryResult = await this.pgPool.query(
-      'SELECT id FROM contacts WHERE account_id = $1 AND uuid = $2',
+      'SELECT id, email FROM contacts WHERE account_id = $1 AND uuid = $2',
       [accountId, uuid],
     );
     const contact = contactQuery.rows.length ? contactQuery.rows[0] : null;

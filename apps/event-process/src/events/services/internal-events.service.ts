@@ -4,6 +4,7 @@ import { PlatformType } from '../interfaces/push.interfaces';
 import { EventLog, InternalRequest } from '../interfaces/events.interfaces';
 
 const UTM_CAMPAIGN_PATTERN = /^(.+)_e(\d+)_(\d+)$/;
+const REDUNDANT_PROPERTY_KEYS = ['bmsu', 'bmsa', 'utm_source', 'utm_medium', 'utm_content', 'utm_campaign'];
 
 @Injectable()
 export class InternalEventsService extends EventsService {
@@ -128,6 +129,15 @@ export class InternalEventsService extends EventsService {
         const contact = await this.msgOpsService.findContactByUuid(accountId, event.uuid);
         if (contact) {
           event.contactId = contact.id;
+          if (!event.email && contact.email) {
+            event.email = contact.email;
+          }
+        }
+      }
+
+      if (event.properties) {
+        for (const key of REDUNDANT_PROPERTY_KEYS) {
+          delete event.properties[key];
         }
       }
 

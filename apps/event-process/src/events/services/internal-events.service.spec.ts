@@ -271,11 +271,11 @@ describe('InternalEventsService', () => {
         mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
       });
 
-      it('should extract query params from URL and add to properties', async () => {
+      it('should extract query params from URL and add non-redundant ones to properties', async () => {
         const request = createRequest([
           {
             ...baseEvent,
-            url: 'https://example.com/page?utm_source=test&utm_campaign=demo',
+            url: 'https://example.com/page?utm_source=test&utm_campaign=demo&custom=keep',
             properties: { existing: 'value' },
           },
         ]);
@@ -286,8 +286,7 @@ describe('InternalEventsService', () => {
           expect.objectContaining({
             properties: expect.objectContaining({
               existing: 'value',
-              utm_source: 'test',
-              utm_campaign: 'demo',
+              custom: 'keep',
             }),
             url: 'https://example.com/page',
           }),
@@ -384,6 +383,33 @@ describe('InternalEventsService', () => {
         expect(mockMsgopsService.findContactByUuid).toHaveBeenCalledWith(1, '019901e4-773f-7008-ae1e-7842dce2f8c7');
         expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
           expect.objectContaining({ contact_id: 42 }),
+          undefined,
+        );
+      });
+
+      it('should populate email from uuid lookup when event email is missing', async () => {
+        mockMsgopsService.findContactByUuid.mockResolvedValue({ id: 42, email: 'resolved@example.com' });
+        const request = createRequest([{ ...baseEvent, contactId: undefined, email: undefined, uuid: 'abc' }]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ email: 'resolved@example.com', contact_id: 42 }),
+          undefined,
+        );
+      });
+
+      it('should not overwrite email when event already has one', async () => {
+        mockMsgopsService.findContactByUuid.mockResolvedValue({ id: 42, email: 'from-db@example.com' });
+        const request = createRequest([
+          { ...baseEvent, contactId: undefined, email: 'upstream@example.com', uuid: 'abc' },
+        ]);
+        mockMsgopsService.findContactByEmail.mockResolvedValue(null);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ email: 'upstream@example.com' }),
           undefined,
         );
       });
@@ -561,6 +587,45 @@ describe('InternalEventsService', () => {
         await service.internalEventsProcess(request);
 
         expect(mockMsgopsService.findMessageAssociation).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('properties sanitization', () => {
+      beforeEach(() => {
+        mockMsgopsService.getAccountTimeZone.mockResolvedValue('America/Sao_Paulo');
+        mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
+        mockMsgopsService.findMessageAssociation.mockResolvedValue({});
+      });
+
+      it('should strip bmsu, bmsa, and utm_* from properties', async () => {
+        const request = createRequest([
+          {
+            ...baseEvent,
+            url: 'https://x.com/?bmsu=abc&bmsa=10&utm_source=sg&utm_medium=email&utm_content=hero&utm_campaign=camp_e1_111&keep=yes',
+          },
+        ]);
+
+        await service.internalEventsProcess(request);
+
+        const kafkaCall = mockKafkaProvider.sendAsyncMessage.mock.calls[0][0];
+        expect(kafkaCall.properties).not.toHaveProperty('bmsu');
+        expect(kafkaCall.properties).not.toHaveProperty('bmsa');
+        expect(kafkaCall.properties).not.toHaveProperty('utm_source');
+        expect(kafkaCall.properties).not.toHaveProperty('utm_medium');
+        expect(kafkaCall.properties).not.toHaveProperty('utm_content');
+        expect(kafkaCall.properties).not.toHaveProperty('utm_campaign');
+        expect(kafkaCall.properties).toMatchObject({ keep: 'yes' });
+      });
+
+      it('should still emit utm_campaign top-level column after stripping from properties', async () => {
+        const request = createRequest([{ ...baseEvent, url: 'https://x.com/?utm_campaign=camp_e1_111' }]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ utm_campaign: 'camp_e1_111' }),
+          undefined,
+        );
       });
     });
 
