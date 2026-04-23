@@ -7,6 +7,7 @@ export const accountCreateZodValidation = toFormValidator(
     name: zod.string().min(1, i18n.global.t('required')),
     description: zod.string().optional(),
     isActive: zod.boolean().default(true),
+    isInternal: zod.boolean().optional().default(false),
     createSendgridAccount: zod.boolean().optional().default(false),
     linkBranding: zod.string().optional(),
     defaultDomain: zod.string().optional(),
