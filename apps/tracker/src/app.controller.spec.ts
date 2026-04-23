@@ -192,12 +192,11 @@ describe('AppController', () => {
       } as any;
       const mockRequest = {
         hostname: 'tracker.example.com',
-        ip: '1.2.3.4',
         headers: { 'user-agent': 'jest-agent' },
       } as any;
       const url = Buffer.from(encodeURIComponent('https://example.com/page?bmsu=uuid-123&bmsa=5&utm_source=news')).toString('base64');
 
-      controller.redirect(mockResponse, mockRequest, url, null);
+      controller.redirect(mockResponse, mockRequest, url, null, '1.2.3.4');
 
       expect(appService.publishRedirectClick).toHaveBeenCalledTimes(1);
       expect(appService.publishRedirectClick).toHaveBeenCalledWith({
@@ -220,12 +219,11 @@ describe('AppController', () => {
       } as any;
       const mockRequest = {
         hostname: 'tracker.example.com',
-        ip: '1.2.3.4',
         headers: { 'user-agent': 'jest-agent' },
       } as any;
       const url = Buffer.from(encodeURIComponent('https://example.com/page?bmsu=uuid-123')).toString('base64');
 
-      controller.redirect(mockResponse, mockRequest, url, null);
+      controller.redirect(mockResponse, mockRequest, url, null, '1.2.3.4');
 
       expect(appService.publishRedirectClick).not.toHaveBeenCalled();
       expect(mockResponse.redirect).toHaveBeenCalledWith(302, expect.any(String));
@@ -238,12 +236,11 @@ describe('AppController', () => {
       } as any;
       const mockRequest = {
         hostname: 'tracker.example.com',
-        ip: '1.2.3.4',
         headers: { 'user-agent': 'jest-agent' },
       } as any;
       const url = Buffer.from(encodeURIComponent('https://example.com/page?bmsa=5')).toString('base64');
 
-      controller.redirect(mockResponse, mockRequest, url, null);
+      controller.redirect(mockResponse, mockRequest, url, null, '1.2.3.4');
 
       expect(appService.publishRedirectClick).not.toHaveBeenCalled();
       expect(mockResponse.redirect).toHaveBeenCalledWith(302, expect.any(String));

@@ -55,7 +55,7 @@ export class AppController {
 
   @Get('/redirect')
   // eslint-disable-next-line @typescript-eslint/require-await
-  async redirect(@Res() response: Response, @Req() request: Request, @Query('url') url: string, @Query('bmsu') bmsu: string) {
+  async redirect(@Res() response: Response, @Req() request: Request, @Query('url') url: string, @Query('bmsu') bmsu: string, @IpAddress() ipAddress?: string) {
     const buff = Buffer.from(url, 'base64');
     const decodedUrl = buff.toString('ascii');
     const parsedUrl = new URL(decodeURIComponent(decodedUrl));
@@ -102,7 +102,7 @@ export class AppController {
         bmsUUID,
         accountId,
         decodedUrl,
-        ip: request.ip,
+        ip: ipAddress,
         userAgent: request.headers['user-agent'],
       });
     }
