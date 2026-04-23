@@ -127,6 +127,21 @@ describe('EventPublisherService', () => {
         }),
       );
     });
+
+    // AC 6 — each input exercised through .publish() (not just sanitizePlatform),
+    // asserting the routing key published to the broker.
+    it.each<[unknown, string]>([
+      ['sendgrid', 'event.received.sendgrid'],
+      ['TWILIO', 'event.received.twilio'],
+      ['custom_events', 'event.received.custom'],
+      ['HACKER<script>', 'event.received.unknown'],
+      ['malicious-payload-with-very-long-cardinality-explosion', 'event.received.unknown'],
+      [undefined, 'event.received.unknown'],
+      [42, 'event.received.unknown'],
+    ])('publish(%p) → routingKey %s', async (platform, expected) => {
+      await service.publish({ type: 'x' }, { platform } as Record<string, unknown>);
+      expect(publishMock).toHaveBeenCalledWith(expect.objectContaining({ routingKey: expected }));
+    });
   });
 
   describe('lifecycle', () => {

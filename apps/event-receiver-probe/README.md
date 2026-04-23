@@ -37,7 +37,12 @@ Per-request: `X-Probe-Force-Error: 503` header overrides env var for a single ca
 
 ## Guardrails
 
-- Refuses to boot with `NODE_ENV=production` + default `INTERNAL_AUTH_TOKEN=dev-probe-token`.
+- In `NODE_ENV=production`, refuses to boot when `INTERNAL_AUTH_TOKEN` is absent, equals the
+  literal default `dev-probe-token`, or is shorter than 24 chars. The probe is a disposable
+  dev/CI artifact — the guard exists so copy-paste into the 12 Phase-3 apps can't ship a weak
+  token by accident.
+- Shutdown handlers register before `app.listen()` and `consumer.start()`, with a hard
+  12s watchdog (`process.exit(1)` if drain hangs), so SIGTERM during boot doesn't skip drain.
 - `shutdownTimeoutMs=10_000` on the consumer to fit the Kubernetes SIGTERM grace.
 
 ## See also

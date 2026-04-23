@@ -30,7 +30,19 @@ export class EventPublisherService implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    await this.warmup();
+    try {
+      await this.warmup();
+    } catch (err) {
+      // Warmup failure means the broker is unreachable at boot — close the
+      // dangling AMQP connection/channel before Nest aborts, otherwise the
+      // socket leaks across crash-loop restarts.
+      try {
+        await this.publisher.close();
+      } catch {
+        // best-effort
+      }
+      throw err;
+    }
   }
 
   // Forces connect/channel/exchange creation at boot so the first real inbound
