@@ -38,6 +38,7 @@ describe('InternalEventsService', () => {
     findContactById: jest.fn(),
     findContactByEmail: jest.fn(),
     findContactByUuid: jest.fn(),
+    findMessageAssociation: jest.fn(),
   };
 
   const mockPubSubProvider = {
@@ -455,6 +456,111 @@ describe('InternalEventsService', () => {
           expect.objectContaining({ contact_id: 77 }),
           undefined,
         );
+      });
+    });
+
+    describe('utm_campaign enrichment', () => {
+      const urlWithUtm =
+        'https://pecaoseu.com/s1-sg-cartao/?utm_source=sendgrid&utm_campaign=cc_portobnk_hfnc_v1-32_e1_579367&bmsu=abc';
+
+      beforeEach(() => {
+        mockMsgopsService.getAccountTimeZone.mockResolvedValue('America/Sao_Paulo');
+        mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
+        mockMsgopsService.findMessageAssociation.mockResolvedValue({});
+      });
+
+      it('should populate utmCampaign from url query param', async () => {
+        const request = createRequest([{ ...baseEvent, url: urlWithUtm }]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ utm_campaign: 'cc_portobnk_hfnc_v1-32_e1_579367' }),
+          undefined,
+        );
+      });
+
+      it('should extract messageId from utm_campaign when not already provided', async () => {
+        const request = createRequest([{ ...baseEvent, messageId: undefined, url: urlWithUtm }]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ message_id: 579367 }),
+          undefined,
+        );
+      });
+
+      it('should populate campaignId when association resolves a campaign', async () => {
+        mockMsgopsService.findMessageAssociation.mockResolvedValue({ campaignId: 42 });
+        const request = createRequest([
+          { ...baseEvent, messageId: undefined, campaignId: undefined, automationId: undefined, url: urlWithUtm },
+        ]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockMsgopsService.findMessageAssociation).toHaveBeenCalledWith(1, 579367, 'cc_portobnk_hfnc_v1-32');
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ campaign_id: 42, message_id: 579367 }),
+          undefined,
+        );
+      });
+
+      it('should populate automationId when association resolves an automation', async () => {
+        mockMsgopsService.findMessageAssociation.mockResolvedValue({ automationId: 88 });
+        const automationUrl = 'https://pecaoseu.com/x?utm_campaign=pecaoseu-fluxo-cc-e02-t3_e2_108456';
+        const request = createRequest([
+          { ...baseEvent, messageId: undefined, campaignId: undefined, automationId: undefined, url: automationUrl },
+        ]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockMsgopsService.findMessageAssociation).toHaveBeenCalledWith(1, 108456, 'pecaoseu-fluxo-cc-e02-t3');
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ automation_id: 88, message_id: 108456 }),
+          undefined,
+        );
+      });
+
+      it('should skip association lookup when utm_campaign does not match _eN_<id> pattern', async () => {
+        const request = createRequest([
+          { ...baseEvent, messageId: undefined, url: 'https://x.com/?utm_campaign=custom-value' },
+        ]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockMsgopsService.findMessageAssociation).not.toHaveBeenCalled();
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ utm_campaign: 'custom-value', message_id: undefined }),
+          undefined,
+        );
+      });
+
+      it('should not overwrite a messageId already present on the event', async () => {
+        const request = createRequest([{ ...baseEvent, messageId: 111, url: urlWithUtm }]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ message_id: 111 }),
+          undefined,
+        );
+      });
+
+      it('should not call association lookup when campaignId or automationId already present', async () => {
+        const request = createRequest([{ ...baseEvent, messageId: 579367, campaignId: 42, url: urlWithUtm }]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockMsgopsService.findMessageAssociation).not.toHaveBeenCalled();
+      });
+
+      it('should not enrich when url has no utm_campaign', async () => {
+        const request = createRequest([{ ...baseEvent, url: 'https://example.com/page' }]);
+
+        await service.internalEventsProcess(request);
+
+        expect(mockMsgopsService.findMessageAssociation).not.toHaveBeenCalled();
       });
     });
 

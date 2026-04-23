@@ -318,6 +318,59 @@ export class MsgopsService {
     }
   }
 
+  async findMessageAssociation(
+    accountId: number,
+    messageId: number,
+    name: string,
+  ): Promise<{ campaignId?: number; automationId?: number }> {
+    const cacheKey = `${accountId}:${messageId}:${name}`;
+
+    const cached = this.cacheService.get<{ campaignId?: number; automationId?: number }>(
+      'message_association',
+      cacheKey,
+    );
+    if (cached) {
+      return cached;
+    }
+
+    const redisKey = `message_association:${cacheKey}`;
+    const redisCached = await this.redisClient.get(redisKey);
+    if (redisCached !== null) {
+      const parsed = JSON.parse(redisCached);
+      this.cacheService.set('message_association', cacheKey, parsed);
+      return parsed;
+    }
+
+    const campaignQuery: QueryResult = await this.pgPool.query(
+      `SELECT c.id FROM campaigns c
+       INNER JOIN campaigns_messages cm ON cm.campaign_id = c.id
+       WHERE c.account_id = $1 AND c.name = $2 AND cm.message_id = $3 AND c.deleted_at IS NULL
+       LIMIT 1`,
+      [accountId, name, messageId],
+    );
+
+    let result: { campaignId?: number; automationId?: number } = {};
+    if (campaignQuery.rows.length) {
+      result = { campaignId: campaignQuery.rows[0].id };
+    } else {
+      const automationQuery: QueryResult = await this.pgPool.query(
+        `SELECT id FROM automations
+         WHERE account_id = $1 AND name = $2 AND deleted_at IS NULL AND steps::text LIKE $3
+         LIMIT 1`,
+        [accountId, name, `%"id": ${messageId}%`],
+      );
+      if (automationQuery.rows.length) {
+        result = { automationId: automationQuery.rows[0].id };
+      }
+    }
+
+    const expireInSeconds = result.campaignId || result.automationId ? 60 * 60 * 24 : 60 * 60;
+    await this.redisClient.set(redisKey, JSON.stringify(result), 'EX', expireInSeconds);
+    this.cacheService.set('message_association', cacheKey, result);
+
+    return result;
+  }
+
   async findEvent(name: string, accountId: number) {
     const cacheKey = `${accountId}:${name}`;
 

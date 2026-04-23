@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-type CacheType = 'timezone' | 'apiKey' | 'custom_event' | 'userAgent';
+type CacheType = 'timezone' | 'apiKey' | 'custom_event' | 'userAgent' | 'message_association';
 
 @Injectable()
 export class CacheService {
@@ -20,6 +20,9 @@ export class CacheService {
     }
     if (!CacheService.caches.has('userAgent')) {
       CacheService.caches.set('userAgent', new Map());
+    }
+    if (!CacheService.caches.has('message_association')) {
+      CacheService.caches.set('message_association', new Map());
     }
   }
 
