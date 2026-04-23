@@ -148,7 +148,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: ^9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -263,7 +263,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: ^9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -357,7 +357,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)
@@ -481,7 +481,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: ^9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -584,7 +584,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.2.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@22.19.15)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@22.19.15)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(babel-plugin-macros@3.1.0)(node-notifier@8.0.2))(typescript@5.9.3)
       ts-loader:
         specifier: ^9.5.2
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -618,6 +618,9 @@ importers:
       '@sentry/vue':
         specifier: ^6.16.1
         version: 6.19.7(vue@2.7.16)
+      '@vue/compiler-sfc':
+        specifier: ~2.7.16
+        version: 2.7.16
       apexcharts:
         specifier: ^3.48.0
         version: 3.54.1
@@ -720,16 +723,16 @@ importers:
         version: 5.62.0(eslint@8.57.1)(typescript@4.3.5)
       '@vue/cli-plugin-babel':
         specifier: ^4.5.11
-        version: 4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))(core-js@3.49.0)(vue@2.7.16)
+        version: 4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))(core-js@3.49.0)(vue@2.7.16)
       '@vue/cli-plugin-typescript':
         specifier: ^4.5.11
-        version: 4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))(@vue/compiler-sfc@3.5.32)(eslint@8.57.1)(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)
+        version: 4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))(@vue/compiler-sfc@2.7.16)(eslint@8.57.1)(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)
       '@vue/cli-plugin-unit-jest':
         specifier: ^4.5.11
-        version: 4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))(vue-template-compiler@2.7.16)(vue@2.7.16)
+        version: 4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))(vue-template-compiler@2.7.16)(vue@2.7.16)
       '@vue/cli-service':
         specifier: ^4.5.11
-        version: 4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)
+        version: 4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)
       '@vue/runtime-dom':
         specifier: ^3.4.10
         version: 3.5.32
@@ -892,7 +895,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: ^9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -1022,7 +1025,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: 9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -1161,7 +1164,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: ^9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -1300,7 +1303,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: 29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: 9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -1562,7 +1565,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: ^9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -1876,7 +1879,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.1.2
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: ^9.5.1
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -1988,7 +1991,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: ^9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -2094,7 +2097,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: 29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: 9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -2221,7 +2224,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: ^9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -2366,7 +2369,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: ^9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -2478,7 +2481,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: ^9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -2593,7 +2596,7 @@ importers:
         version: 7.2.2
       ts-jest:
         specifier: ^29.4.6
-        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: ^9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.104.1(@swc/core@1.15.18))
@@ -2661,7 +2664,7 @@ importers:
         version: 29.5.14
       jest:
         specifier: ^29.7.0
-        version: 29.7.0(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)
+        version: 29.7.0(@types/node@22.19.15)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@22.19.15)(typescript@5.9.3))
       testcontainers:
         specifier: ^10.13.0
         version: 10.28.0
@@ -2679,7 +2682,7 @@ importers:
         version: 29.5.14
       jest:
         specifier: ^29.7.0
-        version: 29.7.0(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)
+        version: 29.7.0(@types/node@22.19.15)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@22.19.15)(typescript@5.9.3))
       ts-jest:
         specifier: ^29.2.5
         version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(babel-plugin-macros@3.1.0)(node-notifier@8.0.2))(typescript@5.9.3)
@@ -32733,9 +32736,11 @@ snapshots:
       jest-runner: 24.9.0
       jest-runtime: 24.9.0
     transitivePeerDependencies:
+      - bufferutil
       - supports-color
+      - utf-8-validate
 
-  '@jest/test-sequencer@26.6.3':
+  '@jest/test-sequencer@26.6.3(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@20.5.1)(typescript@5.9.3))':
     dependencies:
       '@jest/test-result': 26.6.2
       graceful-fs: 4.2.11
@@ -32743,7 +32748,11 @@ snapshots:
       jest-runner: 26.6.3(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@20.5.1)(typescript@5.9.3))
       jest-runtime: 26.6.3(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@20.5.1)(typescript@5.9.3))
     transitivePeerDependencies:
+      - bufferutil
+      - canvas
       - supports-color
+      - ts-node
+      - utf-8-validate
 
   '@jest/test-sequencer@29.7.0':
     dependencies:
@@ -34382,7 +34391,7 @@ snapshots:
       case-sensitive-paths-webpack-plugin: 2.4.0
       core-js: 3.49.0
       css-loader: 3.6.0(webpack@4.47.0)
-      file-loader: 6.2.0(webpack@5.104.1(@swc/core@1.15.18))
+      file-loader: 6.2.0(webpack@4.47.0)
       find-up: 5.0.0
       fork-ts-checker-webpack-plugin: 4.1.6(eslint@8.57.1)(typescript@4.9.5)(vue-template-compiler@2.7.16)(webpack@4.47.0)
       glob: 7.2.3
@@ -34848,7 +34857,7 @@ snapshots:
       core-js: 3.49.0
       css-loader: 3.6.0(webpack@4.47.0)
       express: 4.22.1
-      file-loader: 6.2.0(webpack@4.47.0)
+      file-loader: 6.2.0(webpack@5.104.1(@swc/core@1.15.18))
       find-up: 5.0.0
       fs-extra: 9.1.0
       html-webpack-plugin: 4.5.2(webpack@4.47.0)
@@ -36408,11 +36417,11 @@ snapshots:
 
   '@vue/cli-overlay@4.5.19': {}
 
-  '@vue/cli-plugin-babel@4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))(core-js@3.49.0)(vue@2.7.16)':
+  '@vue/cli-plugin-babel@4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))(core-js@3.49.0)(vue@2.7.16)':
     dependencies:
       '@babel/core': 7.29.0
       '@vue/babel-preset-app': 4.5.19(@babel/core@7.29.0)(core-js@3.49.0)(vue@2.7.16)
-      '@vue/cli-service': 4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)
+      '@vue/cli-service': 4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)
       '@vue/cli-shared-utils': 4.5.19
       babel-loader: 8.4.1(@babel/core@7.29.0)(webpack@4.47.0)
       cache-loader: 4.1.0(webpack@4.47.0)
@@ -36425,16 +36434,16 @@ snapshots:
       - webpack-cli
       - webpack-command
 
-  '@vue/cli-plugin-router@4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))':
+  '@vue/cli-plugin-router@4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))':
     dependencies:
-      '@vue/cli-service': 4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)
+      '@vue/cli-service': 4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)
       '@vue/cli-shared-utils': 4.5.19
 
-  '@vue/cli-plugin-typescript@4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))(@vue/compiler-sfc@3.5.32)(eslint@8.57.1)(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)':
+  '@vue/cli-plugin-typescript@4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))(@vue/compiler-sfc@2.7.16)(eslint@8.57.1)(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)':
     dependencies:
       '@babel/core': 7.29.0
       '@types/webpack-env': 1.18.8
-      '@vue/cli-service': 4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)
+      '@vue/cli-service': 4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)
       '@vue/cli-shared-utils': 4.5.19
       babel-loader: 8.4.1(@babel/core@7.29.0)(webpack@4.47.0)
       cache-loader: 4.1.0(webpack@4.47.0)
@@ -36448,7 +36457,7 @@ snapshots:
       webpack: 4.47.0
       yorkie: 2.0.0
     optionalDependencies:
-      '@vue/compiler-sfc': 3.5.32
+      '@vue/compiler-sfc': 2.7.16
       fork-ts-checker-webpack-plugin-v5: fork-ts-checker-webpack-plugin@5.2.1(eslint@8.57.1)(typescript@4.3.5)(vue-template-compiler@2.7.16)(webpack@4.47.0)
       vue-template-compiler: 2.7.16
     transitivePeerDependencies:
@@ -36457,12 +36466,12 @@ snapshots:
       - webpack-cli
       - webpack-command
 
-  '@vue/cli-plugin-unit-jest@4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))(vue-template-compiler@2.7.16)(vue@2.7.16)':
+  '@vue/cli-plugin-unit-jest@4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))(vue-template-compiler@2.7.16)(vue@2.7.16)':
     dependencies:
       '@babel/core': 7.29.0
       '@babel/plugin-transform-modules-commonjs': 7.28.6(@babel/core@7.29.0)
       '@types/jest': 24.9.1
-      '@vue/cli-service': 4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)
+      '@vue/cli-service': 4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)
       '@vue/cli-shared-utils': 4.5.19
       babel-core: 7.0.0-bridge.0(@babel/core@7.29.0)
       babel-jest: 24.9.0(@babel/core@7.29.0)
@@ -36483,11 +36492,11 @@ snapshots:
       - vue
       - vue-template-compiler
 
-  '@vue/cli-plugin-vuex@4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))':
+  '@vue/cli-plugin-vuex@4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))':
     dependencies:
-      '@vue/cli-service': 4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)
+      '@vue/cli-service': 4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)
 
-  '@vue/cli-service@4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)':
+  '@vue/cli-service@4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16)':
     dependencies:
       '@intervolga/optimize-cssnano-plugin': 1.0.6(webpack@4.47.0)
       '@soda/friendly-errors-webpack-plugin': 1.8.1(webpack@4.47.0)
@@ -36496,8 +36505,8 @@ snapshots:
       '@types/webpack': 4.41.40
       '@types/webpack-dev-server': 3.11.6(debug@4.4.3)
       '@vue/cli-overlay': 4.5.19
-      '@vue/cli-plugin-router': 4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))
-      '@vue/cli-plugin-vuex': 4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))
+      '@vue/cli-plugin-router': 4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))
+      '@vue/cli-plugin-vuex': 4.5.19(@vue/cli-service@4.5.19(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(sass-loader@10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18)))(typescript@4.3.5)(vue-template-compiler@2.7.16)(vue@2.7.16))
       '@vue/cli-shared-utils': 4.5.19
       '@vue/component-compiler-utils': 3.3.0(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)
       '@vue/preload-webpack-plugin': 1.1.2(html-webpack-plugin@3.2.0(webpack@4.47.0))(webpack@4.47.0)
@@ -36537,7 +36546,7 @@ snapshots:
       terser-webpack-plugin: 1.4.6(webpack@4.47.0)
       thread-loader: 2.1.3(webpack@4.47.0)
       url-loader: 2.3.0(file-loader@4.3.0(webpack@4.47.0))(webpack@4.47.0)
-      vue-loader: 15.11.1(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(cache-loader@4.1.0(webpack@4.47.0))(css-loader@3.6.0(webpack@4.47.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(vue-template-compiler@2.7.16)(webpack@4.47.0)
+      vue-loader: 15.11.1(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(cache-loader@4.1.0(webpack@4.47.0))(css-loader@3.6.0(webpack@4.47.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(vue-template-compiler@2.7.16)(webpack@4.47.0)
       vue-style-loader: 4.1.3
       webpack: 4.47.0
       webpack-bundle-analyzer: 3.9.0
@@ -36545,9 +36554,9 @@ snapshots:
       webpack-dev-server: 3.11.3(webpack@4.47.0)
       webpack-merge: 4.2.2
     optionalDependencies:
-      '@vue/compiler-sfc': 3.5.32
+      '@vue/compiler-sfc': 2.7.16
       sass-loader: 10.5.2(sass@1.32.13)(webpack@5.104.1(@swc/core@1.15.18))
-      vue-loader-v16: vue-loader@16.8.3(@vue/compiler-sfc@3.5.32)(vue@2.7.16)(webpack@4.47.0)
+      vue-loader-v16: vue-loader@16.8.3(@vue/compiler-sfc@2.7.16)(vue@2.7.16)(webpack@4.47.0)
       vue-template-compiler: 2.7.16
     transitivePeerDependencies:
       - arc-templates
@@ -39166,21 +39175,6 @@ snapshots:
       exit: 0.1.2
       graceful-fs: 4.2.11
       jest-config: 29.7.0(@types/node@22.19.15)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@22.19.15)(typescript@5.9.3))
-      jest-util: 29.7.0
-      prompts: 2.4.2
-    transitivePeerDependencies:
-      - '@types/node'
-      - babel-plugin-macros
-      - supports-color
-      - ts-node
-
-  create-jest@29.7.0(babel-plugin-macros@3.1.0):
-    dependencies:
-      '@jest/types': 29.6.3
-      chalk: 4.1.2
-      exit: 0.1.2
-      graceful-fs: 4.2.11
-      jest-config: 29.7.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@22.19.15)(typescript@5.9.3))
       jest-util: 29.7.0
       prompts: 2.4.2
     transitivePeerDependencies:
@@ -43151,27 +43145,6 @@ snapshots:
       - supports-color
       - ts-node
 
-  jest-cli@29.7.0(babel-plugin-macros@3.1.0)(node-notifier@8.0.2):
-    dependencies:
-      '@jest/core': 29.7.0(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@22.19.15)(typescript@5.9.3))
-      '@jest/test-result': 29.7.0
-      '@jest/types': 29.6.3
-      chalk: 4.1.2
-      create-jest: 29.7.0(babel-plugin-macros@3.1.0)
-      exit: 0.1.2
-      import-local: 3.2.0
-      jest-config: 29.7.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@22.19.15)(typescript@5.9.3))
-      jest-util: 29.7.0
-      jest-validate: 29.7.0
-      yargs: 17.7.2
-    optionalDependencies:
-      node-notifier: 8.0.2
-    transitivePeerDependencies:
-      - '@types/node'
-      - babel-plugin-macros
-      - supports-color
-      - ts-node
-
   jest-cli@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)):
     dependencies:
       '@jest/core': 30.3.0(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3))
@@ -43220,7 +43193,7 @@ snapshots:
   jest-config@26.6.3(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@20.5.1)(typescript@5.9.3)):
     dependencies:
       '@babel/core': 7.29.0
-      '@jest/test-sequencer': 26.6.3
+      '@jest/test-sequencer': 26.6.3(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@20.5.1)(typescript@5.9.3))
       '@jest/types': 26.6.2
       babel-jest: 26.6.3(@babel/core@7.29.0)
       chalk: 4.1.2
@@ -43591,9 +43564,7 @@ snapshots:
       pretty-format: 24.9.0
       throat: 4.1.0
     transitivePeerDependencies:
-      - bufferutil
       - supports-color
-      - utf-8-validate
 
   jest-jasmine2@26.6.3(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@20.5.1)(typescript@5.9.3)):
     dependencies:
@@ -44383,20 +44354,6 @@ snapshots:
       '@jest/types': 29.6.3
       import-local: 3.2.0
       jest-cli: 29.7.0(@types/node@22.19.15)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@22.19.15)(typescript@5.9.3))
-    optionalDependencies:
-      node-notifier: 8.0.2
-    transitivePeerDependencies:
-      - '@types/node'
-      - babel-plugin-macros
-      - supports-color
-      - ts-node
-
-  jest@29.7.0(babel-plugin-macros@3.1.0)(node-notifier@8.0.2):
-    dependencies:
-      '@jest/core': 29.7.0(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@22.19.15)(typescript@5.9.3))
-      '@jest/types': 29.6.3
-      import-local: 3.2.0
-      jest-cli: 29.7.0(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)
     optionalDependencies:
       node-notifier: 8.0.2
     transitivePeerDependencies:
@@ -49206,7 +49163,7 @@ snapshots:
       typescript: 4.3.5
       yargs-parser: 20.2.9
 
-  ts-jest@29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(@types/node@22.19.15)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@22.19.15)(typescript@5.9.3)))(typescript@5.9.3):
+  ts-jest@29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(babel-plugin-macros@3.1.0)(node-notifier@8.0.2))(typescript@5.9.3):
     dependencies:
       bs-logger: 0.2.6
       fast-json-stable-stringify: 2.1.0
@@ -49226,27 +49183,7 @@ snapshots:
       babel-jest: 30.3.0(@babel/core@7.29.0)
       jest-util: 30.3.0
 
-  ts-jest@29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@29.7.0(babel-plugin-macros@3.1.0)(node-notifier@8.0.2))(typescript@5.9.3):
-    dependencies:
-      bs-logger: 0.2.6
-      fast-json-stable-stringify: 2.1.0
-      handlebars: 4.7.8
-      jest: 29.7.0(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)
-      json5: 2.2.3
-      lodash.memoize: 4.1.2
-      make-error: 1.3.6
-      semver: 7.7.4
-      type-fest: 4.41.0
-      typescript: 5.9.3
-      yargs-parser: 21.1.1
-    optionalDependencies:
-      '@babel/core': 7.29.0
-      '@jest/transform': 30.3.0
-      '@jest/types': 30.3.0
-      babel-jest: 30.3.0(@babel/core@7.29.0)
-      jest-util: 30.3.0
-
-  ts-jest@29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3):
+  ts-jest@29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(node-notifier@8.0.2)(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@25.5.0)(typescript@5.9.3)))(typescript@5.9.3):
     dependencies:
       bs-logger: 0.2.6
       fast-json-stable-stringify: 2.1.0
@@ -50155,7 +50092,7 @@ snapshots:
     dependencies:
       vue: 2.7.16
 
-  vue-loader@15.11.1(@vue/compiler-sfc@3.5.32)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(cache-loader@4.1.0(webpack@4.47.0))(css-loader@3.6.0(webpack@4.47.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(vue-template-compiler@2.7.16)(webpack@4.47.0):
+  vue-loader@15.11.1(@vue/compiler-sfc@2.7.16)(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(cache-loader@4.1.0(webpack@4.47.0))(css-loader@3.6.0(webpack@4.47.0))(handlebars@4.7.8)(lodash@4.18.1)(prettier@2.8.8)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)(vue-template-compiler@2.7.16)(webpack@4.47.0):
     dependencies:
       '@vue/component-compiler-utils': 3.3.0(babel-core@7.0.0-bridge.0(@babel/core@7.29.0))(handlebars@4.7.8)(lodash@4.18.1)(pug@3.0.4)(react-dom@16.14.0(react@16.14.0))(react@16.14.0)
       css-loader: 3.6.0(webpack@5.104.1(@swc/core@1.15.18))
@@ -50165,7 +50102,7 @@ snapshots:
       vue-style-loader: 4.1.3
       webpack: 4.47.0
     optionalDependencies:
-      '@vue/compiler-sfc': 3.5.32
+      '@vue/compiler-sfc': 2.7.16
       cache-loader: 4.1.0(webpack@4.47.0)
       prettier: 2.8.8
       vue-template-compiler: 2.7.16
@@ -50224,14 +50161,14 @@ snapshots:
       - walrus
       - whiskers
 
-  vue-loader@16.8.3(@vue/compiler-sfc@3.5.32)(vue@2.7.16)(webpack@4.47.0):
+  vue-loader@16.8.3(@vue/compiler-sfc@2.7.16)(vue@2.7.16)(webpack@4.47.0):
     dependencies:
       chalk: 4.1.2
       hash-sum: 2.0.0
       loader-utils: 2.0.4
       webpack: 4.47.0
     optionalDependencies:
-      '@vue/compiler-sfc': 3.5.32
+      '@vue/compiler-sfc': 2.7.16
       vue: 2.7.16
     optional: true
 
