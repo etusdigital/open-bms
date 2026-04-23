@@ -18,10 +18,10 @@
     "test": "jest --config jest.config.ts",
     "test:watch": "jest --watch --config jest.config.ts",
     "test:e2e": "NODE_ENV=test jest --config ./tests/e2e/jest-e2e.json",
-    "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js -d src/database/data-source.ts",
-    "typeorm:migration:generate": "pnpm typeorm -- migration:generate",
-    "typeorm:migration:run": "pnpm typeorm -- migration:run",
-    "typeorm:migration:revert": "pnpm typeorm -- migration:revert",
+    "typeorm": "node ./node_modules/typeorm/cli.js",
+    "typeorm:migration:generate": "pnpm build && pnpm typeorm migration:generate -d dist/database/data-source.js",
+    "typeorm:migration:run": "pnpm build && pnpm typeorm migration:run -d dist/database/data-source.js",
+    "typeorm:migration:revert": "pnpm build && pnpm typeorm migration:revert -d dist/database/data-source.js",
     "test:cov": "jest --coverage --config jest.config.ts"
   },
   "dependencies": {
