@@ -102,9 +102,9 @@ const getUsers = async (params: Pagination) => {
 }
 
 const dataTableHeaders = [
-  { title: t('name'), align: 'start', key: 'name', sortable: true },
-  { title: t('email'), align: 'start', key: 'email', sortable: true },
-  { title: t('createdAt'), align: 'start', key: 'createdAt', sortable: true },
+  { title: t('name'), align: 'start' as const, key: 'name', sortable: true },
+  { title: t('email'), align: 'start' as const, key: 'email', sortable: true },
+  { title: t('createdAt'), align: 'start' as const, key: 'createdAt', sortable: true },
 ];
 
 const handlePlusClick = () => push('/users/create');
@@ -174,15 +174,15 @@ const onChangeOptions = async (sortBy: sortBy[]) => {
             @update:sort-by="onChangeOptions"
           >
             <template #[`item.name`]="{ item }">
-              <RouterLink :to="`/users/edit/${item.value}`" class="tw-text-primary tw-underline tw-font-semibold">{{ item.columns.name }}</RouterLink>
+              <RouterLink :to="`/users/edit/${item.id}`" class="tw-text-primary tw-underline tw-font-semibold">{{ item.name }}</RouterLink>
             </template>
-            
+
             <template #[`item.email`]="{ item }">
-              <p>{{ item.columns.email }}</p>
+              <p>{{ item.email }}</p>
             </template>
-            
+
             <template #[`item.createdAt`]="{ item }">
-              <p>{{ dateWithTimeFormatter(item.columns.createdAt, $t('userPage.timePreposition'), userState?.settings.language) }}</p>
+              <p>{{ dateWithTimeFormatter(item.createdAt, $t('userPage.timePreposition'), userState?.settings.language) }}</p>
             </template>
 
             <template #bottom></template>

@@ -35,6 +35,7 @@
     },
     "onlyBuiltDependencies": [
       "@nestjs/core",
+      "bcrypt",
       "protobufjs",
       "unrs-resolver"
     ],
