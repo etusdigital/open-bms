@@ -1,13 +1,7 @@
 <template>
   <v-app>
-    <div id="app" v-if="loadAuth0 && currentUser.id">
-      <!-- <div class="spinner-wrapper" v-if="spinnerVisible">
-        <svg width="100" height="100" viewBox="-126 -126 252 252" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="0" cy="0" r="8.5" stroke="#0057F4" stroke-width="5" fill="#0057F4" class="circle-3" />
-          <circle cx="0" cy="0" r="72" stroke="#0057F4" stroke-width="25" class="circle-2" />
-          <circle cx="115" cy="0" r="8.5" stroke="#0057F4" stroke-width="5" fill="#0057F4" class="brius-animated-logo" />
-        </svg>
-      </div> -->
+    <router-view v-if="$route && $route.meta && $route.meta.public" />
+    <div id="app" v-else-if="loadAuth0 && currentUser.id">
       <Sidebar>
         <template slot="app-content">
           <Header username="username" />
@@ -17,7 +11,7 @@
       <modals-container />
       <Toast></Toast>
     </div>
-    <div v-if="isLoadingPageVisible" class="div-loading">
+    <div v-if="!($route && $route.meta && $route.meta.public) && isLoadingPageVisible" class="div-loading">
       <LoginUser :isLoading="isLoadingPageVisible" :color="'white'" />
     </div>
   </v-app>
@@ -68,20 +62,22 @@ export default class App extends Vue {
   }
 
   async mounted() {
+    if (this.$route?.meta?.public) {
+      return;
+    }
     const isAuthenticated = await this.auth.getisAuthenticated();
     if (!isAuthenticated) {
-      await this.auth.login();
-    } else {
-      store.commit('setLoadAuth0', true);
+      const redirect = window.location.pathname + window.location.search;
+      this.$router.replace({ name: 'login', query: redirect ? { redirect } : {} }).catch(() => null);
+      return;
     }
+    store.commit('setLoadAuth0', true);
   }
 
   @Watch('loadAuth0')
   async isAuthenticated() {
     if (this.loadAuth0) {
       try {
-        const authUser = await this.auth.getUser();
-        await this.loginService.loginAPI(authUser);
         const savedAccountId = this.currentAccount?.id || undefined;
         const me: any = await this.loginService.getMe(savedAccountId);
 

@@ -24,7 +24,14 @@ import labelsRoutes from './modules/labels/router';
 
 Vue.use(Router);
 
-const baseRoutes: RouteConfig[] = [];
+const baseRoutes: RouteConfig[] = [
+  {
+    path: '/login',
+    name: 'login',
+    component: () => import('@/pages/login/LoginPage.vue'),
+    meta: { public: true },
+  },
+];
 
 const routes = baseRoutes.concat(
   automationRoutes,
@@ -45,7 +52,7 @@ const routes = baseRoutes.concat(
   campaignRulesRoutes,
   triggerCampaignRoutes,
   productRoutes,
-  labelsRoutes,
+  labelsRoutes
 );
 
 const router = new Router({
@@ -193,6 +200,10 @@ router.beforeEach(async (to, from, next) => {
   }
   if (modalBgClick) {
     modalBgClick.remove();
+  }
+
+  if (to.meta?.public) {
+    return next();
   }
 
   await waitForAuthReady();

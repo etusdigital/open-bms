@@ -1,28 +1,53 @@
 import { createRouter, createWebHistory, RouteLocationNormalized } from 'vue-router';
 import { routes } from './pages';
 import { useUserStore } from './stores';
-import { auth0 } from './infra/Auth';
+import { userHttpGateway } from './gateways/User';
+import { bootstrapAuth, useAuth } from './composables/useAuth';
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
 });
 
-const ROLES_CLAIM = import.meta.env.VITE_AUTH0_ROLES_CLAIM || 'https://bms.local/roles';
-const BILLING_ONLY_ROLE = import.meta.env.VITE_AUTH0_BILLING_ONLY_ROLE || 'superbilling';
-
 router.beforeEach(async (to: RouteLocationNormalized) => {
-  if (to.path === '/callback' || to.path === '/login') {
+  if ((to.meta as any)?.public || to.path === '/login') {
     return true;
   }
-  await auth0.checkSession();
 
-  const userStore = useUserStore();
-  if (auth0.user?.value && !userStore.roles.length) {
-    userStore.setRoles(auth0.user.value[ROLES_CLAIM] || []);
+  const { isAuthenticated, refresh } = useAuth();
+  if (!isAuthenticated.value) {
+    await bootstrapAuth();
+  }
+  if (!isAuthenticated.value) {
+    const token = await refresh();
+    if (!token) {
+      return { name: 'login', query: { redirect: to.fullPath } };
+    }
   }
 
-  if (userStore.roles.includes(BILLING_ONLY_ROLE)) {
+  const userStore = useUserStore();
+  if (!userStore.effectiveRole) {
+    try {
+      const me: any = await userHttpGateway.getMe();
+      userStore.setAuthContext(me);
+    } catch {
+      return { name: 'login', query: { redirect: to.fullPath } };
+    }
+  }
+
+  // msgops-manager-frontend is the super-admin console (tenant & global user management).
+  // Non-super-admins belong in the operations app (frontend-vue2). Redirect them there.
+  if (!userStore.isSuperAdmin) {
+    const opsUrl = import.meta.env.VITE_APP_REDIRECT_MSGOPS;
+    if (opsUrl && typeof window !== 'undefined') {
+      window.location.replace(opsUrl);
+      return false;
+    }
+    // Fallback when ops URL isn't configured — send to /login with a flag.
+    return { name: 'login', query: { forbidden: '1' } };
+  }
+
+  if (userStore.effectiveRole === 'billing' && !userStore.isSuperAdmin) {
     if (to.path === '/users' || to.path === '/accounts') {
       return '/billing';
     }

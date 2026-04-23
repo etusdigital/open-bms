@@ -19,7 +19,7 @@ import vuetify from './plugins/vuetify';
 import * as Sentry from '@sentry/vue';
 import { Integrations } from '@sentry/tracing';
 
-import { auth0Plugin } from './auth/auth';
+import { authPlugin } from './auth/auth';
 import VueI18n from 'vue-i18n';
 import VueApexCharts from 'vue-apexcharts';
 import { messages, defaultLocale } from './languages/locales/index';
@@ -156,14 +156,7 @@ Vue.directive('time-mask', {
 
 Vue.component('apexChart', VueApexCharts);
 
-Vue.use(auth0Plugin, {
-  domain: process.env.VUE_APP_AUTH0_DOMAIN,
-  clientId: process.env.VUE_APP_AUTH0_CLIENT_ID,
-  audience: process.env.VUE_APP_AUTH0_AUDIENCE,
-  onRedirectCallback: (appState: any) => {
-    router.push(appState && appState.targetUrl ? appState.targetUrl : window.location.pathname);
-  },
-});
+Vue.use(authPlugin);
 
 if (process.env.VUE_APP_ENVIRONMENT !== 'development') {
   if (process.env.VUE_APP_GTM_ID) {

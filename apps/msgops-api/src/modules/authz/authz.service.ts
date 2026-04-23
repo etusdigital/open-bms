@@ -1,9 +1,7 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, UnauthorizedException, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, MoreThan, Repository } from 'typeorm';
 import { createHash } from 'crypto';
-import * as jwt from 'jsonwebtoken';
-import jwksClient from 'jwks-rsa';
 import { AccountApiKeyEntity } from '../../entities/account-api-key.entity';
 import { AccountConfigEntity } from '../../entities/account-config.entity';
 import { RoleEntity } from '../../entities/role.entity';
@@ -12,18 +10,12 @@ import { UserEntity } from '../../entities/users.entity';
 import { RedisService } from '../../providers/redis.provider';
 import { ALL_PERMISSION_KEYS, ROLE_CODES, ROLE_PERMISSIONS } from './authz.constants';
 import { PrincipalContext } from './authz.types';
+import { AUTH_PROVIDER_TOKEN, IAuthProvider } from '../auth/providers/auth.provider.interface';
 
 const AUTHZ_CACHE_TTL = 300; // 5 minutes
 
 @Injectable()
 export class AuthzService {
-  private readonly jwks = jwksClient({
-    jwksUri: process.env.JWKS_URI || '',
-    cache: true,
-    cacheMaxEntries: 10,
-    cacheMaxAge: 600000,
-  });
-
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
@@ -36,6 +28,8 @@ export class AuthzService {
     @InjectRepository(AccountConfigEntity)
     private readonly accountConfigRepository: Repository<AccountConfigEntity>,
     private readonly redisService: RedisService,
+    @Inject(forwardRef(() => AUTH_PROVIDER_TOKEN))
+    private readonly authProvider: IAuthProvider,
   ) {}
 
   private async getCachedPrincipal(cacheKey: string): Promise<PrincipalContext | null> {
@@ -81,30 +75,8 @@ export class AuthzService {
     return Number.isFinite(parsed) ? parsed : undefined;
   }
 
-  private async getSigningKey(kid: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      this.jwks.getSigningKey(kid, (err, key: any) => {
-        if (err || !key) {
-          reject(err || new Error('Signing key not found'));
-          return;
-        }
-        resolve(key.getPublicKey ? key.getPublicKey() : key.publicKey || key.rsaPublicKey);
-      });
-    });
-  }
-
   private async verifyJwtToken(token: string): Promise<any> {
-    const decoded: any = jwt.decode(token, { complete: true });
-    if (!decoded?.header?.kid) {
-      throw new UnauthorizedException('Invalid token');
-    }
-
-    const signingKey = await this.getSigningKey(decoded.header.kid);
-    return jwt.verify(token, signingKey, {
-      audience: process.env.IDP_AUDIENCE,
-      issuer: process.env.IDP_ISSUER,
-      algorithms: ['RS256'],
-    }) as any;
+    return this.authProvider.verifyToken(token);
   }
 
   private async resolveUserContext(payload: any, requestedAccountId?: number): Promise<PrincipalContext> {

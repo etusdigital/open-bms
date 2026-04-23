@@ -1,31 +1,50 @@
+export interface MeResponse {
+  id: number;
+  email: string;
+  name: string;
+  picture?: string | null;
+  providerId: string;
+  roles?: string[];
+  permissions?: string[];
+  effectiveRole?: string;
+  globalRole?: string;
+  isSuperAdmin?: boolean;
+  canSeeAllAccounts?: boolean;
+}
+
 export class User {
+  id?: number;
   sub = '';
-  names = '';
   name = '';
   nickname = '';
   picture = '';
-  updatedAt = '';
   email = '';
   emailVerified = true;
-
   provider?: string;
-  id?: string;
+  providerId?: string;
+  roles?: string[];
+  permissions?: string[];
+  effectiveRole?: string;
+  globalRole?: string;
+  isSuperAdmin?: boolean;
+  canSeeAllAccounts?: boolean;
+  [key: string]: unknown;
 
-  givenName?: string;
-  familyName?: string;
-  locale?: string;
-  [key: string]: string | boolean | undefined;
-
-  constructor(auth0User: { [key: string]: string | boolean | undefined }) {
-    if (!auth0User) {
-      return;
-    }
-    for (const key of Object.keys(auth0User)) {
-      this[key] = auth0User[key];
-    }
-
-    this.sub = auth0User.sub as string;
-    this.provider = this.sub.split('|')[0];
-    this.id = this.sub.split('|')[1];
+  constructor(me?: MeResponse | null) {
+    if (!me) return;
+    this.id = me.id;
+    this.email = me.email;
+    this.name = me.name;
+    this.nickname = me.name;
+    this.picture = me.picture || '';
+    this.providerId = me.providerId;
+    this.sub = me.providerId;
+    this.provider = me.providerId?.split('|')[0];
+    this.roles = me.roles;
+    this.permissions = me.permissions;
+    this.effectiveRole = me.effectiveRole;
+    this.globalRole = me.globalRole;
+    this.isSuperAdmin = me.isSuperAdmin;
+    this.canSeeAllAccounts = me.canSeeAllAccounts;
   }
 }

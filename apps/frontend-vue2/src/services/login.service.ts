@@ -1,18 +1,13 @@
-import ApiService from '@/services/api.service';
+import { api } from '@/services/api.service';
 
 export default class LoginService {
-  private api = new ApiService();
-
-  async loginAPI(user: any) {
-    if (user) {
-      const clientApi = await this.api.getApi();
-      return await clientApi.post('/users/login', user);
-    }
+  // Kept for backward compat; no-op under local auth (legacy Auth0 lazy-create).
+  async loginAPI(_user: any) {
+    return undefined;
   }
 
   async getMe(accountId?: number) {
-    const clientApi = await this.api.getApi();
     const params = accountId ? `?accountId=${accountId}` : '';
-    return await clientApi.get(`/users/me${params}`);
+    return await api.get(`/users/me${params}`);
   }
 }

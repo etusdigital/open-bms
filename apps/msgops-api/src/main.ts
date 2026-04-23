@@ -1,5 +1,7 @@
 import * as Sentry from '@sentry/node';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import dotenv from 'dotenv';
@@ -8,8 +10,23 @@ import bodyParser from 'body-parser';
 import cors from 'cors';
 import { createCorsOptions } from './cors.config';
 import { JoiPipe } from 'nestjs-joi';
+import { seedAdmin } from './bootstrap/seed-admin';
 
 dotenv.config();
+
+function assertAuthEnvs(): void {
+  const mode = (process.env.AUTH_PROVIDER || 'local').toLowerCase();
+  if (mode === 'local') {
+    if (!process.env.JWT_SECRET) throw new Error('AUTH_PROVIDER=local requires JWT_SECRET');
+    if (!process.env.JWT_AUDIENCE) throw new Error('AUTH_PROVIDER=local requires JWT_AUDIENCE');
+  } else if (mode === 'auth0') {
+    if (!process.env.JWKS_URI) throw new Error('AUTH_PROVIDER=auth0 requires JWKS_URI');
+    if (!process.env.IDP_AUDIENCE) throw new Error('AUTH_PROVIDER=auth0 requires IDP_AUDIENCE');
+    if (!process.env.IDP_ISSUER) throw new Error('AUTH_PROVIDER=auth0 requires IDP_ISSUER');
+  } else {
+    throw new Error(`Invalid AUTH_PROVIDER: ${mode}`);
+  }
+}
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN || 'https://REDACTED-SENTRY-DSN',
@@ -18,6 +35,7 @@ Sentry.init({
 });
 
 async function bootstrap() {
+  assertAuthEnvs();
   const app = await NestFactory.create(AppModule);
 
   if (process.env.NODE_ENV !== 'production') {
@@ -48,6 +66,12 @@ async function bootstrap() {
   app.use(cors(createCorsOptions()));
 
   app.useGlobalPipes(new JoiPipe());
+
+  if ((process.env.AUTH_PROVIDER || 'local').toLowerCase() === 'local') {
+    const envConfig = { get: (key: string, defaultValue?: string) => process.env[key] ?? defaultValue } as any;
+    await seedAdmin(app.get(DataSource), envConfig, new Logger('SeedAdmin'));
+  }
+
   await app.listen(process.env.SERVER_PORT);
 }
 

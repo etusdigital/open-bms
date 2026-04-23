@@ -1,4 +1,4 @@
-import { authGuard } from '@auth0/auth0-vue';
+import { authGuard } from '../../../router/guards';
 import { Receipt } from '@vicons/ionicons5';
 import { i18n } from '../../../i18n';
 import type { PageRouteRecordRaw } from '../../pages.types';

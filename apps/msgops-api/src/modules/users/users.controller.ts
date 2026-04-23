@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpException, HttpStatus, Param, Post, Put, Query, Req } from '@nestjs/common';
 import { AuthUser } from '../../decorators/auth-user.decorator';
 import { PublicRoute } from '../authz/public-route.decorator';
 import { RequirePermission } from '../authz/require-permission.decorator';
@@ -19,12 +19,17 @@ export class UsersController {
 
   @Post('/login')
   @PublicRoute()
-  async login(@Body() auth0Dto: Auth0Dto, @Req() req: any) {
+  async login(@Body() body: Partial<Auth0Dto>, @Req() req: any) {
+    // Short-circuit before DTO validation runs — in local mode this endpoint is retired.
+    if ((process.env.AUTH_PROVIDER || 'local').toLowerCase() !== 'auth0') {
+      throw new HttpException('This endpoint is deprecated under AUTH_PROVIDER=local. Use POST /auth/login.', HttpStatus.GONE);
+    }
+
+    const auth0Dto = body as Auth0Dto;
     const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.ip ?? null;
     const userAgent = (req.headers['user-agent'] as string) ?? null;
     const headers = req.headers as Record<string, string>;
 
-    // Validate Auth0 JWT and extract provider ID (sub claim)
     const { sub } = await this.userService.validateJwtFromRequest(req);
 
     let userId: number | null = null;

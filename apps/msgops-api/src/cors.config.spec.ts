@@ -52,8 +52,13 @@ describe('CORS origin validation', () => {
   });
 
   describe('requests with no origin', () => {
-    it('allows undefined origin (server-to-server)', () => {
-      expect(isOriginAllowed(undefined, 'production')).toBe(true);
+    it('rejects undefined origin in production (cookie credentials demands explicit origin)', () => {
+      expect(isOriginAllowed(undefined, 'production')).toBe(false);
+    });
+
+    it('allows undefined origin outside production (local curl/health)', () => {
+      expect(isOriginAllowed(undefined, 'development')).toBe(true);
+      expect(isOriginAllowed(undefined, 'test')).toBe(true);
     });
   });
 

@@ -3,7 +3,7 @@ import { AuditSubscriber } from './subscribers/audit.subscriber';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JoiPipeModule } from 'nestjs-joi';
 import { dataSourceOptions } from './database/data-source';
-import { AuthModule } from './auth/auth.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { AutomationsModule } from './modules/automations/automations.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { BucketsModule } from './modules/buckets/buckets.module';

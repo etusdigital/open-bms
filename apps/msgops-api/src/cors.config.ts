@@ -17,8 +17,9 @@ function buildCloudflarePagesPattern(projectName: string | undefined): RegExp | 
 }
 
 export function isOriginAllowed(origin: string | undefined, nodeEnv: string | undefined): boolean {
-  // Allow requests with no origin (server-to-server, curl, health checks)
-  if (!origin) return true;
+  // In production with credentials, reject origin-less browser requests — server-to-server
+  // and health checks should hit the API without triggering CORS at all.
+  if (!origin) return nodeEnv !== 'production';
 
   const allowedOrigins = parseList(process.env.CORS_ORIGINS);
   if (allowedOrigins.includes(origin)) return true;
@@ -34,6 +35,7 @@ export function isOriginAllowed(origin: string | undefined, nodeEnv: string | un
 
 export function createCorsOptions(): CorsOptions {
   return {
+    credentials: true,
     origin: (origin, callback) => {
       if (isOriginAllowed(origin, process.env.NODE_ENV)) {
         return callback(null, true);
