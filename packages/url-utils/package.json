@@ -18,6 +18,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "test": "jest",
     "type-check": "tsc --noEmit"
