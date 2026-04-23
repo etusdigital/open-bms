@@ -54,7 +54,7 @@ export class AppController {
   }
 
   @Get('/redirect')
-  async redirect(@Res() response: Response, @Req() request: Request, @Query('url') url: string, @Query('bmsu') bmsu: string) {
+  redirect(@Res() response: Response, @Req() request: Request, @Query('url') url: string, @Query('bmsu') bmsu: string) {
     const buff = Buffer.from(url, 'base64');
     const decodedUrl = buff.toString('ascii');
     const parsedUrl = new URL(decodeURIComponent(decodedUrl));

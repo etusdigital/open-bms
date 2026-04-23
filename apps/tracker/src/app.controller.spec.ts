@@ -88,7 +88,7 @@ describe('AppController', () => {
   });
 
   describe('redirect()', () => {
-    it('should redirect to decoded URL', async () => {
+    it('should redirect to decoded URL', () => {
       const mockResponse = {
         cookie: jest.fn(),
         redirect: jest.fn(),
@@ -98,13 +98,13 @@ describe('AppController', () => {
       } as any;
       const url = Buffer.from(encodeURIComponent('https://example.com/page?bmsu=uuid-123')).toString('base64');
 
-      await controller.redirect(mockResponse, mockRequest, url, null);
+      controller.redirect(mockResponse, mockRequest, url, null);
 
       expect(mockResponse.cookie).toHaveBeenCalledWith('bmsUUID', 'uuid-123', expect.any(Object));
       expect(mockResponse.redirect).toHaveBeenCalledWith(302, expect.any(String));
     });
 
-    it('should use bmsu query param when provided', async () => {
+    it('should use bmsu query param when provided', () => {
       const mockResponse = {
         cookie: jest.fn(),
         redirect: jest.fn(),
@@ -114,12 +114,12 @@ describe('AppController', () => {
       } as any;
       const url = Buffer.from(encodeURIComponent('https://example.com/page')).toString('base64');
 
-      await controller.redirect(mockResponse, mockRequest, url, 'direct-uuid');
+      controller.redirect(mockResponse, mockRequest, url, 'direct-uuid');
 
       expect(mockResponse.cookie).toHaveBeenCalledWith('bmsUUID', 'direct-uuid', expect.any(Object));
     });
 
-    it('should set utm_id cookie when present', async () => {
+    it('should set utm_id cookie when present', () => {
       const mockResponse = {
         cookie: jest.fn(),
         redirect: jest.fn(),
@@ -129,12 +129,12 @@ describe('AppController', () => {
       } as any;
       const url = Buffer.from(encodeURIComponent('https://example.com/page?utm_id=campaign123')).toString('base64');
 
-      await controller.redirect(mockResponse, mockRequest, url, null);
+      controller.redirect(mockResponse, mockRequest, url, null);
 
       expect(mockResponse.cookie).toHaveBeenCalledWith('utm_id', 'campaign123', expect.any(Object));
     });
 
-    it('should set bmsInfo cookie when contact is found by bmsUUID', async () => {
+    it('should set bmsInfo cookie when contact is found by bmsUUID', () => {
       const mockContact = { uuid: 'uuid-123', email: 'test@test.com', lc: null, lo: null };
       (msgopsService.findContact as jest.Mock).mockResolvedValue(mockContact);
       const mockResponse = {
@@ -146,13 +146,13 @@ describe('AppController', () => {
       } as any;
       const url = Buffer.from(encodeURIComponent('https://example.com/page?bmsu=uuid-123')).toString('base64');
 
-      await controller.redirect(mockResponse, mockRequest, url, null);
+      controller.redirect(mockResponse, mockRequest, url, null);
 
       expect(msgopsService.findContact).toHaveBeenCalledWith('u', 'uuid-123');
       expect(mockResponse.cookie).toHaveBeenCalledWith('bmsInfo', expect.any(String), expect.objectContaining({ maxAge: expect.any(Number) }));
     });
 
-    it('should handle error when contact lookup fails', async () => {
+    it('should handle error when contact lookup fails', () => {
       (msgopsService.findContact as jest.Mock).mockRejectedValue(new Error('DB error'));
       const mockResponse = {
         cookie: jest.fn(),
@@ -163,13 +163,13 @@ describe('AppController', () => {
       } as any;
       const url = Buffer.from(encodeURIComponent('https://example.com/page?bmsu=uuid-123')).toString('base64');
 
-      await controller.redirect(mockResponse, mockRequest, url, null);
+      controller.redirect(mockResponse, mockRequest, url, null);
 
       // Should still redirect despite the error
       expect(mockResponse.redirect).toHaveBeenCalledWith(302, expect.any(String));
     });
 
-    it('should set bmst cookie when present', async () => {
+    it('should set bmst cookie when present', () => {
       const mockResponse = {
         cookie: jest.fn(),
         redirect: jest.fn(),
@@ -179,7 +179,7 @@ describe('AppController', () => {
       } as any;
       const url = Buffer.from(encodeURIComponent('https://example.com/page?bmst=token123')).toString('base64');
 
-      await controller.redirect(mockResponse, mockRequest, url, null);
+      controller.redirect(mockResponse, mockRequest, url, null);
 
       expect(mockResponse.cookie).toHaveBeenCalledWith('bmst', 'token123', expect.any(Object));
     });
