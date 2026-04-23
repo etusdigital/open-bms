@@ -10,7 +10,7 @@
     "lint": "vue-cli-service lint",
     "lint:fix": "eslint --cache --fix \"src/**/*.{js,ts,vue}\"",
     "pre-commit": "lint-staged",
-    "prepare": "husky install",
+    "prepare": "husky install || true",
     "build-watch": "vue-cli-service build --watch",
     "run-cypress": "cypress run",
     "test": "vue-cli-service test:unit",

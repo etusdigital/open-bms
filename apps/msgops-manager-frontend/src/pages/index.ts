@@ -5,11 +5,13 @@ import { homePageRouter } from './HomePage';
 import { userRoutes } from './Users';
 import { accountsRoutes } from './Accounts';
 import { billingRoutes } from './Billing';
+import { setupRoute } from './SetupPage';
 
 export type RouterName =
   | 'callbackPage'
   | 'homePage'
   | 'notFoundPage'
+  | 'setupPage'
   | 'userCreatePage'
   | 'userEditPage'
   | 'usersPage'
@@ -23,6 +25,7 @@ export type RouterPath = Record<RouterName, string>;
 export const routes: PageRouteRecordRaw[] = [
   { ...homePageRouter },
   { component: CallbackPage, name: 'callbackPage', path: '/callback' },
+  { ...setupRoute },
   ...userRoutes,
   ...accountsRoutes,
   ...billingRoutes,

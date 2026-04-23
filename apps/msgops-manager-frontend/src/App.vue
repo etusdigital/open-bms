@@ -11,7 +11,7 @@ import { routes } from './pages';
 import { SidebarItem } from './components/BmsSidebar/BmsSidebar.types';
 import router from './router';
 
-const { isAuthenticated, isLoading, loginWithRedirect, user: authUser } = useAuth0();
+const { isLoading, user: authUser } = useAuth0();
 
 const { setUser } = useUserStore();
 const { locale } = useI18n();
@@ -28,42 +28,44 @@ const sidebarItems: SidebarItem[] = routes
     hideFromRoles: route.hideFromRoles || [],
   }));
 
+// Only loads user data — redirect to Auth0 is handled entirely by the router guard
 watch(authUser, async (newValue) => {
-  if (isAuthenticated && newValue && authUser.value) {
-    const req = {
-      name: authUser.value.name ?? '',
-      email: authUser.value.email ?? '',
-      picture: authUser.value.picture ?? '',
-    };
-    const user: User = await loginHttpGateway.loginApi(req);
-    locale.value = user.settings.language;
-    setUser(user);
-    setLogin.value = true;
-  } else {
-    loginWithRedirect();
-  }
+  if (!newValue) return;
+  const req = {
+    name: newValue.name ?? '',
+    email: newValue.email ?? '',
+    picture: newValue.picture ?? '',
+  };
+  const user: User = await loginHttpGateway.loginApi(req);
+  locale.value = user.settings.language;
+  setUser(user);
+  setLogin.value = true;
 });
 </script>
 
 <template>
-  <BmsHeader></BmsHeader>
-  <div>
-    <div v-if="isLoading">
-      <BmsLoadingPage :is-loading="isLoading" />
-    </div>
-    <div v-else>
-      <BmsLoadingPage v-if="!setLogin" :is-loading="!setLogin" />
+  <router-view v-if="location.path.startsWith('/setup')" />
 
+  <template v-else>
+    <BmsHeader></BmsHeader>
+    <div>
+      <div v-if="isLoading">
+        <BmsLoadingPage :is-loading="isLoading" />
+      </div>
       <div v-else>
-        <div class="tw-mx-10 tw-grid tw-grid-cols-content">
-          <BmsSidebar :items="sidebarItems" :active-value="location.name?.toString()"></BmsSidebar>
-          <div class="tw-px-5">
-            <router-view></router-view>
+        <BmsLoadingPage v-if="!setLogin" :is-loading="!setLogin" />
+
+        <div v-else>
+          <div class="tw-mx-10 tw-grid tw-grid-cols-content">
+            <BmsSidebar :items="sidebarItems" :active-value="location.name?.toString()"></BmsSidebar>
+            <div class="tw-px-5">
+              <router-view></router-view>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </template>
 </template>
 
 <style>

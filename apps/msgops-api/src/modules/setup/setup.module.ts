@@ -1,0 +1,17 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { SystemConfigEntity } from '../../entities/system-config.entity';
+import { UserEntity } from '../../entities/users.entity';
+import { RoleEntity } from '../../entities/role.entity';
+import { AccountEntity } from '../../entities/account.entity';
+import { PoolEntity } from '../../entities/pool.entity';
+import { UserAccountEntity } from '../../entities/users-account.entity';
+import { SetupService } from './setup.service';
+import { SetupController } from './setup.controller';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([SystemConfigEntity, UserEntity, RoleEntity, AccountEntity, PoolEntity, UserAccountEntity])],
+  providers: [SetupService],
+  controllers: [SetupController],
+})
+export class SetupModule {}

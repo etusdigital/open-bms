@@ -30,7 +30,7 @@ export class Auth0Provider {
           return users[0];
         }
       }
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(e.message || e.error_description || 'Erro ao criar usuário no Auth0.', e.statusCode || HttpStatus.BAD_GATEWAY);
     }
   }
 
