@@ -38,3 +38,6 @@ routeTree.gen.ts
 playwright-report/
 test-results/
 **/e2e/.auth/
+
+# Upstream reference clone — not part of this repo
+bms-reference/
