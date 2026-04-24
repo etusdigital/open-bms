@@ -93,10 +93,10 @@ export async function bootstrapAuth(): Promise<void> {
   const token = await refresh();
   if (!token) return;
   try {
-    const { data } = await axios.get<AuthUser>(`${baseURL}/users/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-      withCredentials: true,
-    });
+    // Dynamic import to break the AxiosAdapter ↔ useAuth cycle. Using the singleton
+    // gives /users/me the 401→refresh→retry interceptor, matching the rest of the app.
+    const { api } = await import('../infra/HttpClient/AxiosAdapter');
+    const { data } = await api.get<AuthUser>(`${baseURL}/users/me`);
     state.user = data;
   } catch (err) {
     if ((err as AxiosError).response?.status === 401) {

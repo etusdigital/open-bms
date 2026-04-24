@@ -11,6 +11,13 @@ vi.mock('axios', () => {
   };
 });
 
+// bootstrapAuth imports the singleton api from AxiosAdapter (dynamic import) so we
+// mock the module to reuse the same mocked .get() the tests already control.
+vi.mock('../infra/HttpClient/AxiosAdapter', async () => {
+  const axios = (await import('axios')).default as any;
+  return { api: axios, AxiosAdapter: class {} };
+});
+
 import axios from 'axios';
 
 // Import AFTER the mock so the composable picks up the mocked axios module.
