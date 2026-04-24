@@ -35,6 +35,8 @@ export class Step4Data {
 export const step1Schema = Joi.object<Step1Data>({
   name: Joi.string().trim().min(1).required(),
   email: Joi.string()
+    .trim()
+    .lowercase()
     .email({ tlds: { allow: false } })
     .required(),
   password: Joi.string().min(8).required(),

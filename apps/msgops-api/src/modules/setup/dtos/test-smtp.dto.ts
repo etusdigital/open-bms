@@ -20,11 +20,4 @@ export class TestSmtpDto {
       .required(),
   )
   from: string;
-
-  @JoiSchema(
-    Joi.string()
-      .email({ tlds: { allow: false } })
-      .required(),
-  )
-  toEmail: string;
 }

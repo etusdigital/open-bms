@@ -34,8 +34,8 @@ onMounted(async () => {
       return;
     }
     currentStep.value = status.currentStep || 1;
-  } catch {
-    // API unreachable, keep step 1
+  } catch (err) {
+    console.warn('[setup] getStatus failed, starting at step 1', err);
   }
 });
 

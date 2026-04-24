@@ -9,7 +9,6 @@ import { showToast } from '../../../utils/showToast';
 
 const emit = defineEmits<{ (e: 'step-complete'): void }>();
 
-const testEmail = ref('');
 const testingSmtp = ref(false);
 
 const schema = toTypedSchema(
@@ -30,8 +29,8 @@ const { handleSubmit, isSubmitting, values } = useForm({
 async function testSmtp() {
   testingSmtp.value = true;
   try {
-    await setupGateway.testSmtp({ ...values, toEmail: testEmail.value });
-    showToast({ type: 'success', description: 'Email de teste enviado com sucesso!' });
+    await setupGateway.testSmtp({ ...values });
+    showToast({ type: 'success', description: 'Email de teste enviado para o administrador cadastrado no passo 1.' });
   } catch (e: any) {
     showToast({ type: 'error', description: e?.response?.data?.message || 'Falha ao enviar email de teste.' });
   } finally {
@@ -60,20 +59,12 @@ const onSubmit = handleSubmit(async (v) => {
     <BmsTextField name="from" label="Email remetente (from)" type="email" placeholder="noreply@empresa.com" />
 
     <div class="tw-mt-4 tw-mb-[26px] tw-rounded-2xl tw-border tw-border-gray-light tw-bg-white tw-px-5 tw-py-4 tw-shadow-md">
-      <p class="tw-mb-3 tw-text-xs tw-font-bold tw-text-main-gray">Teste de envio</p>
-      <div class="tw-flex tw-items-end tw-gap-3">
-        <div class="tw-flex-1">
-          <label class="tw-mb-1 tw-block tw-text-xs tw-font-bold tw-text-main-gray">Enviar teste para</label>
-          <div class="tw-flex tw-w-full tw-appearance-none tw-items-center tw-rounded-lg tw-border tw-border-gray-light tw-py-2 tw-px-3 tw-shadow">
-            <input
-              v-model="testEmail"
-              type="email"
-              placeholder="teste@empresa.com"
-              class="tw-w-full tw-bg-transparent tw-text-xs tw-text-main-gray focus:tw-outline-none"
-            />
-          </div>
-        </div>
-        <BmsButton name="btn-test" type="button" variant="secondary" :disabled="testingSmtp || !testEmail" @click="testSmtp">
+      <p class="tw-mb-1 tw-text-xs tw-font-bold tw-text-main-gray">Teste de envio</p>
+      <p class="tw-mb-3 tw-text-xs tw-text-gray">
+        O teste envia um email para o endereço do administrador criado no passo 1.
+      </p>
+      <div class="tw-flex tw-justify-end">
+        <BmsButton name="btn-test" type="button" variant="secondary" :disabled="testingSmtp" @click="testSmtp">
           {{ testingSmtp ? 'Enviando...' : 'Enviar teste' }}
         </BmsButton>
       </div>

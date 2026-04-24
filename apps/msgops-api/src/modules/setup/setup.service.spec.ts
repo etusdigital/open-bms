@@ -1,6 +1,6 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import * as nodemailer from 'nodemailer';
 import { SystemConfigEntity } from '../../entities/system-config.entity';
 
@@ -23,6 +23,7 @@ function makeRepo<T = any>(overrides: Partial<T> = {}): any {
     count: jest.fn(),
     create: jest.fn((v) => v),
     save: jest.fn((v) => ({ id: 1, ...v })),
+    remove: jest.fn(),
     ...overrides,
   };
 }
@@ -39,8 +40,31 @@ function makeAuthProvider(overrides: Partial<IAuthProvider> = {}): jest.Mocked<I
   } as any;
 }
 
+/**
+ * Builds a minimal DataSource mock whose `transaction(cb)` runs `cb(em)` with an
+ * EntityManager stub that routes `getRepository(Entity)` to the same repo instances the
+ * service already has injected. This means tests can assert on a single repo across both
+ * transactional and non-transactional code paths without having to track two copies.
+ */
+function makeDataSourceMock(repos: { userRepo: any; roleRepo: any; systemConfigRepo: any }): any {
+  return {
+    transaction: async (cb: (em: any) => Promise<void>) => {
+      const em = {
+        query: jest.fn().mockResolvedValue(undefined),
+        getRepository: (entity: any) => {
+          if (entity === UserEntity) return repos.userRepo;
+          if (entity === RoleEntity) return repos.roleRepo;
+          if (entity === SystemConfigEntity) return repos.systemConfigRepo;
+          throw new Error(`unexpected getRepository in test for ${entity?.name}`);
+        },
+      };
+      await cb(em);
+    },
+  };
+}
+
 async function buildService(
-  repos: {
+  overrides: {
     systemConfigRepo?: any;
     userRepo?: any;
     roleRepo?: any;
@@ -58,17 +82,20 @@ async function buildService(
   poolRepo: any;
   userAccountRepo: any;
   authProvider: jest.Mocked<IAuthProvider>;
+  dataSource: any;
 }> {
-  const systemConfigRepo = repos.systemConfigRepo ?? makeRepo();
-  const userRepo = repos.userRepo ?? makeRepo();
-  const roleRepo = repos.roleRepo ?? makeRepo();
-  const accountRepo = repos.accountRepo ?? makeRepo();
-  const poolRepo = repos.poolRepo ?? makeRepo();
-  const userAccountRepo = repos.userAccountRepo ?? makeRepo();
+  const systemConfigRepo = overrides.systemConfigRepo ?? makeRepo();
+  const userRepo = overrides.userRepo ?? makeRepo();
+  const roleRepo = overrides.roleRepo ?? makeRepo();
+  const accountRepo = overrides.accountRepo ?? makeRepo();
+  const poolRepo = overrides.poolRepo ?? makeRepo();
+  const userAccountRepo = overrides.userAccountRepo ?? makeRepo();
+  const dataSource = makeDataSourceMock({ userRepo, roleRepo, systemConfigRepo });
 
   const moduleRef = await Test.createTestingModule({
     providers: [
       SetupService,
+      { provide: getDataSourceToken(), useValue: dataSource },
       { provide: getRepositoryToken(SystemConfigEntity), useValue: systemConfigRepo },
       { provide: getRepositoryToken(UserEntity), useValue: userRepo },
       { provide: getRepositoryToken(RoleEntity), useValue: roleRepo },
@@ -88,13 +115,15 @@ async function buildService(
     poolRepo,
     userAccountRepo,
     authProvider: authProvider as jest.Mocked<IAuthProvider>,
+    dataSource,
   };
 }
 
 describe('SetupService', () => {
   describe('getStatus', () => {
     it('returns step 1 when no super admin exists in the database', async () => {
-      const { service, roleRepo, userRepo } = await buildService();
+      const { service, roleRepo, userRepo, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue(undefined);
       roleRepo.findOne.mockResolvedValue(SUPER_ADMIN_ROLE);
       userRepo.count.mockResolvedValue(0);
 
@@ -123,13 +152,41 @@ describe('SetupService', () => {
     });
 
     it('returns configured=true once wizard is marked completed', async () => {
-      const { service, roleRepo, userRepo, systemConfigRepo } = await buildService();
-      roleRepo.findOne.mockResolvedValue(SUPER_ADMIN_ROLE);
-      userRepo.count.mockResolvedValue(1);
+      const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: true } });
 
       const status = await service.getStatus();
       expect(status).toEqual({ configured: true, currentStep: 4 });
+    });
+  });
+
+  describe('advanceStep — guards', () => {
+    it('rejects all advance calls with 403 once wizard is completed', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: true } });
+
+      for (const step of [1, 2, 3, 4] as const) {
+        await expect(service.advanceStep({ step, data: {} as any })).rejects.toBeInstanceOf(ForbiddenException);
+      }
+    });
+
+    it('rejects out-of-order steps (POST step=4 when currentStep is still 2)', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 2, completed: false } });
+
+      await expect(
+        service.advanceStep({
+          step: 4,
+          data: { accountName: 'A', poolName: 'P', senderEmail: 'a@b.io', senderName: 'A', replyToEmail: 'a@b.io', sendingLimit: 1 } as any,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('allows resubmitting the current step (idempotent re-run)', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 2, completed: false } });
+
+      await expect(service.advanceStep({ step: 2, data: { host: 'h', port: 25, user: 'u', pass: 'p', from: 'a@b.io' } as any })).resolves.toBeUndefined();
     });
   });
 
@@ -139,9 +196,20 @@ describe('SetupService', () => {
       await expect(service.advanceStep({ step: 1, data: { name: 'A', email: 'a@b.io', password: 'short' } as any })).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('throws BadRequestException on invalid email TLD-free syntax (missing @)', async () => {
+    it('throws BadRequestException on invalid email syntax (missing @)', async () => {
       const { service } = await buildService();
       await expect(service.advanceStep({ step: 1, data: { name: 'A', email: 'not-an-email', password: 'password1' } as any })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('normalizes step1 email to lowercase before lookup and createUser', async () => {
+      const { service, roleRepo, userRepo, authProvider } = await buildService();
+      roleRepo.findOneOrFail.mockResolvedValue(SUPER_ADMIN_ROLE);
+      userRepo.findOne.mockResolvedValue(undefined);
+
+      await service.advanceStep({ step: 1, data: { name: 'Admin', email: '  Admin@BMS.Local  ', password: 'password1' } as any });
+
+      expect(userRepo.findOne).toHaveBeenCalledWith({ where: { email: 'admin@bms.local' } });
+      expect(authProvider.createUser).toHaveBeenCalledWith({ name: 'Admin', email: 'admin@bms.local', password: 'password1' });
     });
 
     it('accepts .local TLD in step1 email', async () => {
@@ -167,21 +235,58 @@ describe('SetupService', () => {
   });
 
   describe('step1 — create admin', () => {
-    it('creates user via authProvider, persists credentials, advances wizard to step 2', async () => {
-      const { service, roleRepo, userRepo, systemConfigRepo, authProvider } = await buildService();
+    it('acquires advisory lock, creates user via authProvider, persists credentials, advances wizard + stores adminUserId', async () => {
+      const systemConfigRepo = makeRepo();
+      const userRepo = makeRepo({ save: jest.fn().mockResolvedValue({ id: 17 }) });
+      const roleRepo = makeRepo();
       roleRepo.findOneOrFail.mockResolvedValue(SUPER_ADMIN_ROLE);
       userRepo.findOne.mockResolvedValue(undefined);
       systemConfigRepo.findOne.mockResolvedValue(undefined);
 
+      const queryMock = jest.fn().mockResolvedValue(undefined);
+      const dataSource = {
+        transaction: async (cb: any) => {
+          await cb({
+            query: queryMock,
+            getRepository: (entity: any) => {
+              if (entity === UserEntity) return userRepo;
+              if (entity === RoleEntity) return roleRepo;
+              if (entity === SystemConfigEntity) return systemConfigRepo;
+              throw new Error('unexpected entity');
+            },
+          });
+        },
+      };
+
+      const authProvider = makeAuthProvider();
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          SetupService,
+          { provide: getDataSourceToken(), useValue: dataSource },
+          { provide: getRepositoryToken(SystemConfigEntity), useValue: systemConfigRepo },
+          { provide: getRepositoryToken(UserEntity), useValue: userRepo },
+          { provide: getRepositoryToken(RoleEntity), useValue: roleRepo },
+          { provide: getRepositoryToken(AccountEntity), useValue: makeRepo() },
+          { provide: getRepositoryToken(PoolEntity), useValue: makeRepo() },
+          { provide: getRepositoryToken(UserAccountEntity), useValue: makeRepo() },
+          { provide: AUTH_PROVIDER_TOKEN, useValue: authProvider },
+        ],
+      }).compile();
+      const service = moduleRef.get(SetupService);
+
       await service.advanceStep({ step: 1, data: { name: 'Admin', email: 'admin@bms.io', password: 'password1' } as any });
 
+      expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_xact_lock'), [834729]);
       expect(authProvider.createUser).toHaveBeenCalledWith({ name: 'Admin', email: 'admin@bms.io', password: 'password1' });
       expect(userRepo.save).toHaveBeenCalledWith(expect.objectContaining({ email: 'admin@bms.io', providerId: 'local|abc', globalRoleId: SUPER_ADMIN_ROLE.id }));
       expect(authProvider.updatePassword).toHaveBeenCalledWith('local|abc', 'password1');
-      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ key: 'setup_wizard_step', value: { currentStep: 2, completed: false } }));
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'setup_wizard_step', value: expect.objectContaining({ currentStep: 2, completed: false, adminUserId: 17 }) }),
+      );
     });
 
-    it('is idempotent when user with same email already exists (no duplicate user + no password reset)', async () => {
+    it('is idempotent when user with same email already exists (no duplicate user + no password reset) and still records adminUserId', async () => {
       const { service, userRepo, systemConfigRepo, authProvider } = await buildService();
       userRepo.findOne.mockResolvedValue({ id: 9, email: 'admin@bms.io' });
       systemConfigRepo.findOne.mockResolvedValue(undefined);
@@ -191,7 +296,7 @@ describe('SetupService', () => {
       expect(authProvider.createUser).not.toHaveBeenCalled();
       expect(userRepo.save).not.toHaveBeenCalled();
       expect(authProvider.updatePassword).not.toHaveBeenCalled();
-      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: { currentStep: 2, completed: false } }));
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: expect.objectContaining({ currentStep: 2, completed: false, adminUserId: 9 }) }));
     });
 
     it('skips credential persistence when auth provider does not support credential login', async () => {
@@ -205,45 +310,62 @@ describe('SetupService', () => {
       expect(authProvider.createUser).toHaveBeenCalled();
       expect(authProvider.updatePassword).not.toHaveBeenCalled();
     });
+
+    it('rolls back the user row when updatePassword fails (no orphan user left behind)', async () => {
+      const authProvider = makeAuthProvider({ updatePassword: jest.fn().mockRejectedValue(new Error('kms unavailable')) } as any);
+      const { service, roleRepo, userRepo } = await buildService({}, authProvider);
+      roleRepo.findOneOrFail.mockResolvedValue(SUPER_ADMIN_ROLE);
+      userRepo.findOne.mockResolvedValue(undefined);
+      userRepo.save.mockResolvedValue({ id: 99, email: 'admin@bms.io' });
+
+      await expect(service.advanceStep({ step: 1, data: { name: 'Admin', email: 'admin@bms.io', password: 'password1' } as any })).rejects.toThrow(/kms unavailable/);
+      expect(userRepo.remove).toHaveBeenCalledWith(expect.objectContaining({ id: 99 }));
+    });
   });
 
   describe('step2 / step3 — config persistence', () => {
     it('step2 persists smtp_settings and advances to step 3', async () => {
       const { service, systemConfigRepo } = await buildService();
-      systemConfigRepo.findOne.mockResolvedValue(undefined);
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 2, completed: false } });
       const smtp = { host: 'smtp.bms.io', port: 587, user: 'u', pass: 'p', from: 'noreply@bms.io' };
 
       await service.advanceStep({ step: 2, data: smtp as any });
       expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ key: 'smtp_settings', value: smtp }));
-      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ key: 'setup_wizard_step', value: { currentStep: 3, completed: false } }));
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'setup_wizard_step', value: expect.objectContaining({ currentStep: 3, completed: false }) }),
+      );
     });
 
     it('step3 persists domain_settings and advances to step 4', async () => {
       const { service, systemConfigRepo } = await buildService();
-      systemConfigRepo.findOne.mockResolvedValue(undefined);
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 3, completed: false } });
 
       await service.advanceStep({ step: 3, data: { baseUrl: 'https://bms.io' } as any });
       expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ key: 'domain_settings', value: { baseUrl: 'https://bms.io' } }));
-      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: { currentStep: 4, completed: false } }));
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: expect.objectContaining({ currentStep: 4, completed: false }) }));
     });
   });
 
   describe('step4 — account + pool', () => {
     it('with skip=true, marks wizard completed without touching account/pool tables', async () => {
       const { service, systemConfigRepo, accountRepo, poolRepo, userAccountRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
 
       await service.advanceStep({ step: 4, data: { skip: true } as any });
 
       expect(accountRepo.save).not.toHaveBeenCalled();
       expect(poolRepo.save).not.toHaveBeenCalled();
       expect(userAccountRepo.save).not.toHaveBeenCalled();
-      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: { currentStep: 4, completed: true } }));
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: expect.objectContaining({ currentStep: 4, completed: true }) }));
     });
 
-    it('creates account, pool, links admin as master user, and marks wizard completed', async () => {
+    it('uses the adminUserId stored in wizard state (not "first super-admin") when linking master user', async () => {
       const { service, roleRepo, userRepo, accountRepo, poolRepo, userAccountRepo, systemConfigRepo } = await buildService();
-      roleRepo.findOne.mockResolvedValue(SUPER_ADMIN_ROLE);
-      userRepo.findOne.mockResolvedValue({ id: 7 });
+      systemConfigRepo.findOne.mockResolvedValue({
+        key: 'setup_wizard_step',
+        value: { currentStep: 4, completed: false, adminUserId: 123 },
+      });
+      userRepo.findOne.mockResolvedValue({ id: 123, email: 'admin@bms.io' });
       accountRepo.save.mockResolvedValue({ id: 100 });
 
       await service.advanceStep({
@@ -259,28 +381,49 @@ describe('SetupService', () => {
         } as any,
       });
 
-      expect(accountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Acme', groupId: 1, isActive: true }));
-      expect(poolRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ accountId: 100, poolName: 'Acme Tx', senderEmail: 'noreply@acme.io', ip: ['192.0.2.10'], sendingLimit: 5000, isDefault: true }),
-      );
-      expect(userAccountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ userId: 7, accountId: 100, isMasterUser: true }));
-      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: { currentStep: 4, completed: true } }));
+      expect(userRepo.findOne).toHaveBeenCalledWith({ where: { id: 123 } });
+      expect(userAccountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ userId: 123, accountId: 100, isMasterUser: true }));
+      // Did NOT fall back to role-based lookup when wizard state already had the id.
+      expect(roleRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the oldest super-admin (ORDER BY id ASC) when wizard state has no adminUserId', async () => {
+      const { service, roleRepo, userRepo, accountRepo, userAccountRepo, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      roleRepo.findOne.mockResolvedValue(SUPER_ADMIN_ROLE);
+      userRepo.findOne.mockResolvedValue({ id: 7 });
+      accountRepo.save.mockResolvedValue({ id: 200 });
+
+      await service.advanceStep({
+        step: 4,
+        data: {
+          accountName: 'Acme',
+          poolName: 'Acme Tx',
+          senderEmail: 'noreply@acme.io',
+          senderName: 'Acme',
+          replyToEmail: 'reply@acme.io',
+          sendingLimit: 5000,
+        } as any,
+      });
+
+      expect(userRepo.findOne).toHaveBeenCalledWith({ where: { globalRoleId: SUPER_ADMIN_ROLE.id }, order: { id: 'ASC' } });
+      expect(userAccountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ userId: 7, accountId: 200, isMasterUser: true }));
     });
 
     it('rejects step4 payload that is neither skip nor full config (Joi or-constraint)', async () => {
-      const { service } = await buildService();
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
       await expect(service.advanceStep({ step: 4, data: {} as any })).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
   describe('upsertWizard — never regresses', () => {
-    it('does not overwrite when the requested step is not greater than the stored one', async () => {
+    it('does not downgrade currentStep on step2 when stored state is already at step 3', async () => {
       const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 3, completed: false } });
 
       await service.advanceStep({ step: 2, data: { host: 's', port: 1, user: 'u', pass: 'p', from: 'a@b.io' } as any });
 
-      // step2 still persists smtp_settings, but should NOT downgrade wizard key
       const wizardSaves = systemConfigRepo.save.mock.calls.filter(([v]: [any]) => v.key === 'setup_wizard_step');
       expect(wizardSaves).toHaveLength(0);
     });
@@ -290,23 +433,81 @@ describe('SetupService', () => {
     const createTransport = nodemailer.createTransport as jest.Mock;
     afterEach(() => createTransport.mockReset());
 
-    it('sends email via nodemailer with provided credentials', async () => {
+    it('rejects testSmtp once wizard is already completed', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: true } });
+
+      await expect(service.testSmtp({ host: 's', port: 1, user: 'u', pass: 'p', from: 'a@b.io' } as any, '1.1.1.1')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rejects testSmtp when no admin has been created yet (step1 not run)', async () => {
+      const { service, systemConfigRepo, roleRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue(undefined);
+      roleRepo.findOne.mockResolvedValue(SUPER_ADMIN_ROLE);
+
+      await expect(service.testSmtp({ host: 's', port: 1, user: 'u', pass: 'p', from: 'a@b.io' } as any, '1.1.1.1')).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('resolves toEmail from the admin user stored in wizard state (not from the client body)', async () => {
+      const { service, systemConfigRepo, userRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({
+        key: 'setup_wizard_step',
+        value: { currentStep: 2, completed: false, adminUserId: 9 },
+      });
+      userRepo.findOne.mockResolvedValue({ id: 9, email: 'admin@bms.io' });
+
       const sendMail = jest.fn().mockResolvedValue({});
       createTransport.mockReturnValue({ sendMail });
 
-      const { service } = await buildService();
-      await service.testSmtp({ host: 's', port: 587, user: 'u', pass: 'p', from: 'a@b.io', toEmail: 'x@y.io' });
+      await service.testSmtp({ host: 's', port: 587, user: 'u', pass: 'p', from: 'noreply@bms.io' } as any, '1.1.1.1');
 
       expect(createTransport).toHaveBeenCalledWith({ host: 's', port: 587, auth: { user: 'u', pass: 'p' } });
-      expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ from: 'a@b.io', to: 'x@y.io', subject: expect.stringContaining('SMTP') }));
+      expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ from: 'noreply@bms.io', to: 'admin@bms.io', subject: expect.stringContaining('SMTP') }));
     });
 
-    it('wraps nodemailer errors in BadRequestException with the original message', async () => {
-      const sendMail = jest.fn().mockRejectedValue(new Error('connect ECONNREFUSED'));
+    it('returns a generic BAD_GATEWAY error on transport failure (does not leak the nodemailer message)', async () => {
+      const { service, systemConfigRepo, userRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({
+        key: 'setup_wizard_step',
+        value: { currentStep: 2, completed: false, adminUserId: 9 },
+      });
+      userRepo.findOne.mockResolvedValue({ id: 9, email: 'admin@bms.io' });
+
+      const sendMail = jest.fn().mockRejectedValue(new Error('connect ECONNREFUSED 10.0.0.3:25'));
       createTransport.mockReturnValue({ sendMail });
 
-      const { service } = await buildService();
-      await expect(service.testSmtp({ host: 's', port: 587, user: 'u', pass: 'p', from: 'a@b.io', toEmail: 'x@y.io' })).rejects.toThrow(/connect ECONNREFUSED/);
+      try {
+        await service.testSmtp({ host: 's', port: 587, user: 'u', pass: 'p', from: 'a@b.io' } as any, '1.1.1.1');
+        throw new Error('expected testSmtp to throw');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect(err.getStatus()).toBe(HttpStatus.BAD_GATEWAY);
+        expect(err.message).not.toMatch(/ECONNREFUSED|10\.0\.0\.3/);
+      }
+    });
+
+    it('applies per-IP rate limit (6th attempt within the window returns 429)', async () => {
+      const { service, systemConfigRepo, userRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({
+        key: 'setup_wizard_step',
+        value: { currentStep: 2, completed: false, adminUserId: 9 },
+      });
+      userRepo.findOne.mockResolvedValue({ id: 9, email: 'admin@bms.io' });
+
+      const sendMail = jest.fn().mockResolvedValue({});
+      createTransport.mockReturnValue({ sendMail });
+
+      const body = { host: 's', port: 587, user: 'u', pass: 'p', from: 'a@b.io' } as any;
+      for (let i = 0; i < 5; i++) {
+        await service.testSmtp(body, '9.9.9.9');
+      }
+      try {
+        await service.testSmtp(body, '9.9.9.9');
+        throw new Error('expected 6th attempt to throw');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect(err.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+      }
     });
   });
 });

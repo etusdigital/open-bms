@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { PublicRoute } from '../authz/public-route.decorator';
+import { IpAddress } from '../../decorators/ip_address.decorator';
 import { SetupService } from './setup.service';
 import { AdvanceStepDto } from './dtos/advance-step.dto';
 import { TestSmtpDto } from './dtos/test-smtp.dto';
@@ -22,7 +23,7 @@ export class SetupController {
 
   @Post('test-smtp')
   @PublicRoute()
-  testSmtp(@Body() dto: TestSmtpDto) {
-    return this.setupService.testSmtp(dto);
+  testSmtp(@Body() dto: TestSmtpDto, @IpAddress() ipAddress?: string) {
+    return this.setupService.testSmtp(dto, ipAddress);
   }
 }
