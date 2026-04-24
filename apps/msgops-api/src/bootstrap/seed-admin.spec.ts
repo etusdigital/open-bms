@@ -62,7 +62,7 @@ describe('seedAdmin', () => {
     expect(runner.commitTransaction).toHaveBeenCalled();
   });
 
-  it('throws when envs are missing and users table is empty', async () => {
+  it('skips silently when envs are missing and users table is empty (setup wizard will handle first admin)', async () => {
     const userRepo = makeRepo();
     const credRepo = makeRepo();
     const roleRepo = makeRepo();
@@ -76,8 +76,9 @@ describe('seedAdmin', () => {
     );
     const dataSource: any = { createQueryRunner: () => runner };
 
-    await expect(seedAdmin(dataSource, makeConfig({}), silentLogger)).rejects.toThrow(/BOOTSTRAP_ADMIN_EMAIL/);
-    expect(runner.rollbackTransaction).toHaveBeenCalled();
+    await expect(seedAdmin(dataSource, makeConfig({}), silentLogger)).resolves.toBeUndefined();
+    expect(runner.commitTransaction).toHaveBeenCalled();
+    expect(runner.rollbackTransaction).not.toHaveBeenCalled();
     expect(userRepo.save).not.toHaveBeenCalled();
   });
 

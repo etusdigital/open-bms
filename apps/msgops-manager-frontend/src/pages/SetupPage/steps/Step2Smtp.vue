@@ -15,7 +15,7 @@ const testingSmtp = ref(false);
 const schema = toTypedSchema(
   z.object({
     host: z.string().min(1, 'Host obrigatório'),
-    port: z.string().min(1, 'Porta obrigatória'),
+    port: z.coerce.number({ invalid_type_error: 'Porta inválida' }).int('Porta deve ser inteiro').min(1, 'Porta obrigatória').max(65535, 'Porta fora do intervalo'),
     user: z.string().min(1, 'Usuário obrigatório'),
     pass: z.string().min(1, 'Senha obrigatória'),
     from: z.string().email('Email inválido'),
@@ -23,14 +23,14 @@ const schema = toTypedSchema(
 );
 
 const { handleSubmit, isSubmitting, values } = useForm({
-  initialValues: { host: '', port: '587', user: '', pass: '', from: '' },
+  initialValues: { host: '', port: 587, user: '', pass: '', from: '' },
   validationSchema: schema,
 });
 
 async function testSmtp() {
   testingSmtp.value = true;
   try {
-    await setupGateway.testSmtp({ ...values, port: Number(values.port), toEmail: testEmail.value });
+    await setupGateway.testSmtp({ ...values, toEmail: testEmail.value });
     showToast({ type: 'success', description: 'Email de teste enviado com sucesso!' });
   } catch (e: any) {
     showToast({ type: 'error', description: e?.response?.data?.message || 'Falha ao enviar email de teste.' });
@@ -41,7 +41,7 @@ async function testSmtp() {
 
 const onSubmit = handleSubmit(async (v) => {
   try {
-    await setupGateway.advanceStep(2, { ...v, port: Number(v.port) });
+    await setupGateway.advanceStep(2, v);
     emit('step-complete');
   } catch (e: any) {
     showToast({ type: 'error', description: e?.response?.data?.message || 'Erro ao salvar configuração SMTP.' });
