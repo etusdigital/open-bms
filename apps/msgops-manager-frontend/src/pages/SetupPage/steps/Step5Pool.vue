@@ -31,7 +31,7 @@ const { handleSubmit, isSubmitting } = useForm({
 async function skip() {
   skipping.value = true;
   try {
-    await setupGateway.advanceStep(4, { skip: true });
+    await setupGateway.advanceStep(5, { skip: true });
     emit('step-complete');
   } catch (e: any) {
     showToast({ type: 'error', description: e?.response?.data?.message || 'Erro ao finalizar setup.' });
@@ -41,7 +41,7 @@ async function skip() {
 
 const onSubmit = handleSubmit(async (values) => {
   try {
-    await setupGateway.advanceStep(4, { ...values, sendingLimit: Number(values.sendingLimit), ips: ips.value });
+    await setupGateway.advanceStep(5, { ...values, sendingLimit: Number(values.sendingLimit), ips: ips.value });
     emit('step-complete');
   } catch (e: any) {
     showToast({ type: 'error', description: e?.response?.data?.message || 'Erro ao criar pool e conta.' });
