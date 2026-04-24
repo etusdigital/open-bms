@@ -1,7 +1,7 @@
 # Migration Pattern: Pub/Sub → `@bms/messaging` [C]
 
 **Status:** Canonical (`[C]`) — piloto `event-receiver` + `event-receiver-probe` (EVO-943, 2026-04-22).
-**Revisado:** 2026-04-23 — ver git log.
+**Revisado:** 2026-04-24 — ver git log. Amendas pós-code-review: `'internal'` no allowlist (H2), AC#2 "métrica" clarificada como headers DLQ + logs estruturados em v0.1.0 (H1 / F23).
 **Audience:** engenheiros migrando os 12 apps da Fase 3.
 **Reading mode:** diff-oriented. Cada padrão tem os deltas exatos já exercitados em produção-shaped imagem do piloto.
 
@@ -575,6 +575,7 @@ Referência completa: `_evo-output/planning-artifacts/amqp-nomenclature-decision
 - **F20 — Boundary `maxRetries`:** `maxRetries: 0` dispara DLQ já na primeira falha (condição é `attempt >= maxRetries`, attempt começa em 1). Use `maxRetries: 1` para "tenta uma vez, depois DLQ"; mínimo útil de retry real é 2. Documentar explícito se alguém configurar `maxRetries < 2`.
 - **F21 — Force-close exit 1:** quando `Consumer.shutdown()` excede `shutdownTimeoutMs`, a lib força close da connection (msgs in-flight voltam pra queue como `unacked → ready`) e o processo sai com exit 1. Handler **tem que ser idempotente** — msgs são redelivered após restart. Documentado em `nomenclature-decision.md:172`.
 - **F22 — Retry republish silencioso:** durante retry, `AmqpConsumer` já deu ack na msg original antes de agendar o republish; se o canal cair no meio, a msg é **perdida** (swallowed por design; tradeoff consumer-local vs retry-queue dedicada). Handler crítico deve ser reentrante/idempotente.
+- **F23 — AC#2 "métrica emitida" (EVO-943):** a AC da issue exige "msg na DLQ + métrica emitida". Em v0.1.0 **métrica = headers DLQ (`x-bms-attempt`, `x-bms-first-error`, `x-bms-last-error`) + logs estruturados do consumer**. Não há counter prom-client nativo ainda. Rastreio pra v0.2.x: emissor de métricas (Prometheus/OTel) em `@bms/messaging` no path DLQ. Enquanto isso, dashboards/alerts consomem headers via logs ou management API do RabbitMQ. Decisão travada 2026-04-24 no code review da PR #3.
 
 ---
 

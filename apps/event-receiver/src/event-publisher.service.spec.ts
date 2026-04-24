@@ -51,6 +51,8 @@ describe('EventPublisherService', () => {
       ['sparkpost', 'sparkpost'],
       ['push', 'push'],
       ['webhook', 'webhook'],
+      ['internal', 'internal'],
+      ['INTERNAL', 'internal'],
     ])('maps %s -> %s', (input, expected) => {
       expect(sanitizePlatform(input)).toBe(expected);
     });
