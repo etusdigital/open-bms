@@ -5,12 +5,12 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/messages/template/emails-labels"
+  url: '{{msgops-api-url}}/messages/template/emails-labels'
   params:
     - name: product
-      value: "email"
+      value: 'email'
     - name: language
-      value: "pt-BR"
+      value: 'pt-BR'
   auth: inherit
 
 settings:

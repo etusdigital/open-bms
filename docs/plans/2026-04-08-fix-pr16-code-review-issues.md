@@ -13,6 +13,7 @@
 ## Task 1: Fix stale module-level date constants (C1)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/email-statistics/components/statistics-filter-bar.tsx:25-40`
 
 **Step 1: Move `TODAY` and `MIN_DATE` inside the component, memoized by day**
@@ -22,8 +23,8 @@ Replace lines 25-40 with a `useMemo` inside the component body. Remove the modul
 In `statistics-filter-bar.tsx`, delete lines 25-26:
 
 ```ts
-const TODAY = startOfDay(new Date())
-const MIN_DATE = subDays(TODAY, 180)
+const TODAY = startOfDay(new Date());
+const MIN_DATE = subDays(TODAY, 180);
 ```
 
 And delete lines 33-40 (the `PRESETS` constant).
@@ -31,20 +32,38 @@ And delete lines 33-40 (the `PRESETS` constant).
 Then inside `StatisticsFilterBar`, after line 46 (`const isInternal = ...`), add:
 
 ```ts
-const today = useMemo(() => startOfDay(new Date()), [
-  // Re-compute daily — key on the date string so it stays stable within a day
-  format(startOfDay(new Date()), 'yyyy-MM-dd'),
-])
-const minDate = useMemo(() => subDays(today, 180), [today])
+const today = useMemo(
+  () => startOfDay(new Date()),
+  [
+    // Re-compute daily — key on the date string so it stays stable within a day
+    format(startOfDay(new Date()), 'yyyy-MM-dd'),
+  ],
+);
+const minDate = useMemo(() => subDays(today, 180), [today]);
 
-const presets: DatePreset[] = useMemo(() => [
-  { labelKey: 'statistics.presetToday', getRange: () => ({ from: today, to: today }) },
-  { labelKey: 'statistics.presetYesterday', getRange: () => { const d = subDays(today, 1); return { from: d, to: d } } },
-  { labelKey: 'statistics.presetLast7Days', getRange: () => ({ from: subDays(today, 7), to: today }) },
-  { labelKey: 'statistics.presetLast15Days', getRange: () => ({ from: subDays(today, 15), to: today }) },
-  { labelKey: 'statistics.presetLast30Days', getRange: () => ({ from: subDays(today, 30), to: today }) },
-  { labelKey: 'statistics.presetLastMonth', getRange: () => { const m = subMonths(today, 1); return { from: startOfMonth(m), to: endOfMonth(m) } } },
-], [today])
+const presets: DatePreset[] = useMemo(
+  () => [
+    { labelKey: 'statistics.presetToday', getRange: () => ({ from: today, to: today }) },
+    {
+      labelKey: 'statistics.presetYesterday',
+      getRange: () => {
+        const d = subDays(today, 1);
+        return { from: d, to: d };
+      },
+    },
+    { labelKey: 'statistics.presetLast7Days', getRange: () => ({ from: subDays(today, 7), to: today }) },
+    { labelKey: 'statistics.presetLast15Days', getRange: () => ({ from: subDays(today, 15), to: today }) },
+    { labelKey: 'statistics.presetLast30Days', getRange: () => ({ from: subDays(today, 30), to: today }) },
+    {
+      labelKey: 'statistics.presetLastMonth',
+      getRange: () => {
+        const m = subMonths(today, 1);
+        return { from: startOfMonth(m), to: endOfMonth(m) };
+      },
+    },
+  ],
+  [today],
+);
 ```
 
 Then update all references: `TODAY` → `today`, `MIN_DATE` → `minDate`, `PRESETS` → `presets` (at lines 137-140 and 145).
@@ -66,6 +85,7 @@ git commit -m "fix(statistics): move date constants inside component to prevent 
 ## Task 2: Stabilize `useParamsWithDefaults` memo (C2)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/email-statistics/email-statistics-page.tsx:37-48`
 
 **Step 1: Use a stable fallback date string**
@@ -79,16 +99,16 @@ function useParamsWithDefaults(searchParams: StatisticsSearchParams): Statistics
   const [fallbackDate] = useState(() => ({
     start: format(subDays(startOfDay(new Date()), 30), 'yyyy-MM-dd'),
     end: format(startOfDay(new Date()), 'yyyy-MM-dd'),
-  }))
+  }));
 
   return useMemo(() => {
-    if (searchParams.startDate && searchParams.endDate) return searchParams
+    if (searchParams.startDate && searchParams.endDate) return searchParams;
     return {
       ...searchParams,
       startDate: searchParams.startDate || fallbackDate.start,
       endDate: searchParams.endDate || fallbackDate.end,
-    }
-  }, [searchParams, fallbackDate])
+    };
+  }, [searchParams, fallbackDate]);
 }
 ```
 
@@ -111,6 +131,7 @@ git commit -m "fix(statistics): stabilize default date params to prevent cascadi
 ## Task 3: Add missing permission to types (I1)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/types.ts:2-39`
 
 **Step 1: Add the missing permission**
@@ -139,6 +160,7 @@ git commit -m "fix(types): add audience:contacts_suppress to ALL_PERMISSIONS"
 ## Task 4: Fix stale `initialIndex` in MessagePreviewDialog (I2)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/campaigns/steps/message-preview-dialog.tsx:57-58`
 
 **Step 1: Add useEffect to sync initialIndex on open**
@@ -148,9 +170,9 @@ Add `useEffect` to the import on line 1 (wherever React imports are).
 After line 58 (`const [currentIndex, setCurrentIndex] = useState(initialIndex)`), add:
 
 ```ts
-  useEffect(() => {
-    if (open) setCurrentIndex(initialIndex)
-  }, [open, initialIndex])
+useEffect(() => {
+  if (open) setCurrentIndex(initialIndex);
+}, [open, initialIndex]);
 ```
 
 **Step 2: Run type check**
@@ -170,6 +192,7 @@ git commit -m "fix(dialog): sync initialIndex when MessagePreviewDialog reopens"
 ## Task 5: Remove extra prop in dashboard route (I4)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/routes/_authenticated/_layout/analytics.dashboard.tsx:12`
 
 **Step 1: Remove the unused `messageType` prop**
@@ -177,13 +200,13 @@ git commit -m "fix(dialog): sync initialIndex when MessagePreviewDialog reopens"
 Replace line 12:
 
 ```tsx
-  return <EmailStatisticsPage searchParams={searchParams} messageType={searchParams.channel} />
+return <EmailStatisticsPage searchParams={searchParams} messageType={searchParams.channel} />;
 ```
 
 With:
 
 ```tsx
-  return <EmailStatisticsPage searchParams={searchParams} />
+return <EmailStatisticsPage searchParams={searchParams} />;
 ```
 
 **Step 2: Run type check**
@@ -203,6 +226,7 @@ git commit -m "fix(route): remove unused messageType prop from dashboard route"
 ## Task 6: Fix Zustand anti-pattern in MessageTypeTabs (W2)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/email-statistics/components/message-type-tabs.tsx:6,16`
 
 **Step 1: Replace `getState()` with idiomatic Zustand selector**
@@ -210,13 +234,13 @@ git commit -m "fix(route): remove unused messageType prop from dashboard route"
 Replace line 16:
 
 ```ts
-  const channels = useMemo(() => selectAccountChannels(useAppStore.getState()), [auth])
+const channels = useMemo(() => selectAccountChannels(useAppStore.getState()), [auth]);
 ```
 
 With:
 
 ```ts
-  const channels = useAppStore(selectAccountChannels)
+const channels = useAppStore(selectAccountChannels);
 ```
 
 Then remove the `useMemo` import from line 1 (if no longer used) and remove the `auth` variable on line 15 since it's no longer needed:
@@ -242,6 +266,7 @@ git commit -m "fix(statistics): use idiomatic Zustand selector instead of getSta
 ## Task 7: Memoize StatsCell (W3)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/email-statistics/components/table/stats-cell.tsx:1,10,32`
 
 **Step 1: Wrap with React.memo**
@@ -249,8 +274,8 @@ git commit -m "fix(statistics): use idiomatic Zustand selector instead of getSta
 Add `memo` to imports at line 1:
 
 ```ts
-import { memo } from 'react'
-import { formatNumber } from '../../utils/format-number'
+import { memo } from 'react';
+import { formatNumber } from '../../utils/format-number';
 ```
 
 Replace line 10:
@@ -288,6 +313,7 @@ git commit -m "perf(statistics): memoize StatsCell to reduce table re-renders"
 ## Task 8: Fix chart memo dependency on `t` function (W4)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/email-statistics/components/chart/statistics-chart.tsx:52-76`
 
 **Step 1: Replace `t` dependency with `i18n.language`**
@@ -326,6 +352,7 @@ git commit -m "perf(statistics): replace t() with locale in chart memo deps to p
 ## Task 9: Fix hardcoded Calendar locale (W5)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/email-statistics/components/statistics-filter-bar.tsx:7,136`
 
 **Step 1: Map i18n language to date-fns locale**
@@ -333,25 +360,25 @@ git commit -m "perf(statistics): replace t() with locale in chart memo deps to p
 Replace line 7:
 
 ```ts
-import { ptBR } from 'date-fns/locale'
+import { ptBR } from 'date-fns/locale';
 ```
 
 With:
 
 ```ts
-import { ptBR, enUS } from 'date-fns/locale'
+import { ptBR, enUS } from 'date-fns/locale';
 ```
 
 Inside the component, after the `locale` variable (around line 110 area, after adding Task 1 changes), add:
 
 ```ts
-const calendarLocale = locale.startsWith('pt') ? ptBR : enUS
+const calendarLocale = locale.startsWith('pt') ? ptBR : enUS;
 ```
 
 Replace `locale={ptBR}` on the Calendar (line 136) with:
 
 ```ts
-locale={calendarLocale}
+locale = { calendarLocale };
 ```
 
 **Step 2: Run type check**
@@ -371,6 +398,7 @@ git commit -m "fix(statistics): use i18n language for calendar locale instead of
 ## Task 10: Clean up debounce timers on unmount (W6)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/email-statistics/components/statistics-filter-panel.tsx:1,79-89`
 
 **Step 1: Add cleanup effect**
@@ -380,13 +408,13 @@ Add `useEffect` to the import on line 1.
 After the `debouncedSetSearch` callback (after line 89), add:
 
 ```ts
-  // Clean up pending debounce timers on unmount
-  useEffect(() => {
-    const ref = debounceRef.current
-    return () => {
-      Object.values(ref).forEach(clearTimeout)
-    }
-  }, [])
+// Clean up pending debounce timers on unmount
+useEffect(() => {
+  const ref = debounceRef.current;
+  return () => {
+    Object.values(ref).forEach(clearTimeout);
+  };
+}, []);
 ```
 
 **Step 2: Run type check**
@@ -406,6 +434,7 @@ git commit -m "fix(statistics): clean up debounce timers on filter panel unmount
 ## Task 11: Add accessibility labels to profile page (W7)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/profile/profile-page.tsx`
 
 **Step 1: Add aria-labels to password toggle buttons and avatar upload**
@@ -413,16 +442,19 @@ git commit -m "fix(statistics): clean up debounce timers on filter panel unmount
 Find the password toggle buttons (the ones with `Eye`/`EyeOff` icons). Add `aria-label` to each:
 
 For the first password toggle (current password), add:
+
 ```tsx
 aria-label={showCurrent ? t('profile.hidePassword') : t('profile.showPassword')}
 ```
 
 For the second password toggle (new password), add:
+
 ```tsx
 aria-label={showNew ? t('profile.hidePassword') : t('profile.showPassword')}
 ```
 
 For the avatar upload button (the camera icon overlay), add:
+
 ```tsx
 aria-label={t('profile.changeAvatar')}
 ```
@@ -430,6 +462,7 @@ aria-label={t('profile.changeAvatar')}
 **Step 2: Add locale keys**
 
 In `apps/frontend-react/src/locales/en-US.json`, add under the `profile` section:
+
 ```json
 "showPassword": "Show password",
 "hidePassword": "Hide password",
@@ -437,6 +470,7 @@ In `apps/frontend-react/src/locales/en-US.json`, add under the `profile` section
 ```
 
 In `apps/frontend-react/src/locales/pt-BR.json`, add under the `profile` section:
+
 ```json
 "showPassword": "Mostrar senha",
 "hidePassword": "Ocultar senha",
@@ -460,6 +494,7 @@ git commit -m "a11y(profile): add aria-labels to password toggles and avatar upl
 ## Task 12: Add ARIA tab semantics to MessagePreviewDialog (W8)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/campaigns/steps/message-preview-dialog.tsx:79-95`
 
 **Step 1: Add proper tab roles**
@@ -516,6 +551,7 @@ git commit -m "a11y(dialog): add ARIA tab semantics to A/B message switcher"
 ## Task 13: Fix `formatCompact` Portuguese "MIL" abbreviation (S4)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/email-statistics/constants.ts:67`
 
 **Step 1: Replace MIL with K**
@@ -523,13 +559,13 @@ git commit -m "a11y(dialog): add ARIA tab semantics to A/B message switcher"
 Replace line 67:
 
 ```ts
-  if (abs >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')} MIL`
+if (abs >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')} MIL`;
 ```
 
 With:
 
 ```ts
-  if (abs >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')}K`
+if (abs >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
 ```
 
 **Step 2: Update test if one exists for formatCompact**
@@ -550,6 +586,7 @@ git commit -m "fix(statistics): use universal K abbreviation instead of Portugue
 ## Task 14: Fix hardcoded i18n strings in chart options and columns (S3)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/email-statistics/components/chart/chart-options.ts:44,63`
 - Modify: `apps/frontend-react/src/features/email-statistics/components/table/use-email-columns.tsx:65,79`
 - Modify: `apps/frontend-react/src/features/email-statistics/components/cards/email-numeric-cards.tsx:75,94`
@@ -574,6 +611,7 @@ At line 65, replace `header: 'CTOR'` with `header: t('statistics.ctor')`.
 At line 79, replace `header: 'UTO'` with `header: t('statistics.uto')`.
 
 Note: Check that `statistics.ctor` and `statistics.uto` exist in both locale files. If `statistics.uto` is missing, add:
+
 - en-US.json: `"uto": "UTO"`
 - pt-BR.json: `"uto": "UTO"`
 
@@ -602,6 +640,7 @@ git commit -m "fix(i18n): replace hardcoded Bounce, CTOR, UTO strings with trans
 ## Task 15: Make PushCards respect metricVisibility (S2)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/email-statistics/components/cards/push-cards.tsx:10-53`
 
 **Step 1: Add visibility checks matching EmailNumericCards pattern**
@@ -609,8 +648,8 @@ git commit -m "fix(i18n): replace hardcoded Bounce, CTOR, UTO strings with trans
 After line 11 (`const ctx = use(StatisticsContext)!`), add:
 
 ```ts
-  const v = ctx.metricVisibility
-  const isVisible = (key: string) => v[key] !== false
+const v = ctx.metricVisibility;
+const isVisible = (key: string) => v[key] !== false;
 ```
 
 Then wrap each `StatCard` with visibility checks:
@@ -649,6 +688,7 @@ git commit -m "fix(statistics): make PushCards respect metricVisibility like Ema
 ## Task 16: Fix leads CSV export comma escaping (S6)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/leads/leads-page.tsx:189-218`
 
 **Step 1: Add proper CSV cell escaping**
@@ -656,38 +696,41 @@ git commit -m "fix(statistics): make PushCards respect metricVisibility like Ema
 In `leads-page.tsx`, replace the `handleExport` function (lines 189-218) with a version that escapes cells. Change the row mapping (lines 204-208):
 
 ```ts
-    const rows = allData.map((item) =>
-      headerKeys.map((key) => {
-        const val = item[key]
-        return val != null ? String(val) : ''
-      }).join(','),
-    )
+const rows = allData.map((item) =>
+  headerKeys
+    .map((key) => {
+      const val = item[key];
+      return val != null ? String(val) : '';
+    })
+    .join(','),
+);
 ```
 
 To:
 
 ```ts
-    const escapeCell = (value: string) =>
-      /[,"\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
+const escapeCell = (value: string) => (/[,"\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
 
-    const rows = allData.map((item) =>
-      headerKeys.map((key) => {
-        const val = item[key]
-        return val != null ? escapeCell(String(val)) : ''
-      }).join(','),
-    )
+const rows = allData.map((item) =>
+  headerKeys
+    .map((key) => {
+      const val = item[key];
+      return val != null ? escapeCell(String(val)) : '';
+    })
+    .join(','),
+);
 ```
 
 Also escape header labels (line 211):
 
 ```ts
-    const csv = [headerLabels.map(escapeCell).join(','), ...rows].join('\n')
+const csv = [headerLabels.map(escapeCell).join(','), ...rows].join('\n');
 ```
 
 Add BOM for Excel compatibility (line 212):
 
 ```ts
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
 ```
 
 **Step 2: Run type check**
@@ -707,6 +750,7 @@ git commit -m "fix(leads): escape commas in CSV export and add BOM for Excel com
 ## Task 17: Remove unused `_timezone` parameter from format-date utils (S9)
 
 **Files:**
+
 - Modify: `apps/frontend-react/src/features/email-statistics/utils/format-date.ts:44,51`
 - Modify: all call sites of `formatDateShort` and `formatDateFull`
 

@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{warmup-tracker-url}}/"
+  url: '{{warmup-tracker-url}}/'
   auth: none
 
 settings:

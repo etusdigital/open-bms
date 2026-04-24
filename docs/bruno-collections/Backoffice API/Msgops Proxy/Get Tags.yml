@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/msgops/tags"
+  url: '{{backoffice-api-url}}/msgops/tags'
   auth: inherit
 
 settings:

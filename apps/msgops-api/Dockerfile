@@ -6,6 +6,7 @@ COPY package.json ./
 FROM base AS deps
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/msgops-api/package.json ./apps/msgops-api/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --filter msgops-api --ignore-scripts
 

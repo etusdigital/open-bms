@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/ip-reputation/sync"
+  url: '{{msgops-api-url}}/ip-reputation/sync'
   auth: none
 
 settings:

@@ -5,12 +5,12 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/campaigns-rules/configs"
+  url: '{{msgops-api-url}}/campaigns-rules/configs'
   params:
     - name: page
-      value: "1"
+      value: '1'
     - name: itemsPerPage
-      value: "10"
+      value: '10'
   auth: inherit
 
 settings:

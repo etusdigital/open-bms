@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/pools/1/dns-file"
+  url: '{{backoffice-api-url}}/pools/1/dns-file'
   auth: inherit
 
 settings:

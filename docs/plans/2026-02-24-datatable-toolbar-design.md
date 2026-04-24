@@ -66,8 +66,8 @@ export interface ColumnDef<T> {
   align?: 'left' | 'right' | 'center';
   format?: (value: string | number) => string;
   className?: string;
-  alwaysVisible?: boolean;  // prevents hiding (identity columns)
-  isNumeric?: boolean;      // enables formatting rules for this column
+  alwaysVisible?: boolean; // prevents hiding (identity columns)
+  isNumeric?: boolean; // enables formatting rules for this column
 }
 ```
 
@@ -79,9 +79,9 @@ export type FormattingRule =
       id: string;
       type: 'color-scale';
       columnKey: string;
-      minColor: string;   // hex
-      midColor: string;   // hex
-      maxColor: string;   // hex
+      minColor: string; // hex
+      midColor: string; // hex
+      maxColor: string; // hex
     }
   | {
       id: string;
@@ -89,9 +89,9 @@ export type FormattingRule =
       columnKey: string;
       operator: 'gt' | 'lt' | 'gte' | 'lte' | 'eq' | 'between';
       value1: number;
-      value2?: number;    // for 'between'
-      backgroundColor: string;  // hex
-      textColor: string;        // hex
+      value2?: number; // for 'between'
+      backgroundColor: string; // hex
+      textColor: string; // hex
     };
 ```
 
@@ -162,31 +162,31 @@ Applied inline on each `<td>` via `getCellStyle(rule, value, columnStats)`:
 
 ## Quick Presets
 
-| Preset | minColor | midColor | maxColor |
-|--------|----------|----------|----------|
-| Heatmap | `#dc2626` | `#fbbf24` | `#16a34a` |
+| Preset      | minColor  | midColor  | maxColor  |
+| ----------- | --------- | --------- | --------- |
+| Heatmap     | `#dc2626` | `#fbbf24` | `#16a34a` |
 | High = Good | `#ef4444` | `#fbbf24` | `#22c55e` |
-| Low = Good | `#22c55e` | `#fbbf24` | `#ef4444` |
+| Low = Good  | `#22c55e` | `#fbbf24` | `#ef4444` |
 
 ## TDD Test Plan
 
-| File | Coverage |
-|------|----------|
-| `color-utils.test.ts` | `interpolateColor`, `interpolateThreeColors`, `isColorDark` |
-| `use-table-settings.test.ts` | Load from localStorage, `toggleColumn`, `addRule`, `removeRule`, writes back to localStorage |
-| `columns-popover.test.tsx` | Renders all columns, checkbox toggles, `alwaysVisible` is disabled |
-| `formatting-modal.test.tsx` | Quick preset, add rule, delete rule, Apply calls callback |
-| `data-table-toolbar.test.tsx` | Columns button opens popover, Formatting button opens modal |
-| `report-table.test.tsx` | No toolbar without `tableId`, toolbar present with `tableId`, hidden column absent from DOM, color-scale style on cell |
+| File                          | Coverage                                                                                                               |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `color-utils.test.ts`         | `interpolateColor`, `interpolateThreeColors`, `isColorDark`                                                            |
+| `use-table-settings.test.ts`  | Load from localStorage, `toggleColumn`, `addRule`, `removeRule`, writes back to localStorage                           |
+| `columns-popover.test.tsx`    | Renders all columns, checkbox toggles, `alwaysVisible` is disabled                                                     |
+| `formatting-modal.test.tsx`   | Quick preset, add rule, delete rule, Apply calls callback                                                              |
+| `data-table-toolbar.test.tsx` | Columns button opens popover, Formatting button opens modal                                                            |
+| `report-table.test.tsx`       | No toolbar without `tableId`, toolbar present with `tableId`, hidden column absent from DOM, color-scale style on cell |
 
 ## Report Page `tableId` Values
 
-| Page | tableId |
-|------|---------|
-| Sender Report | `sender-report` |
-| Account Report | `account-report` |
+| Page            | tableId           |
+| --------------- | ----------------- |
+| Sender Report   | `sender-report`   |
+| Account Report  | `account-report`  |
 | Provider Report | `provider-report` |
-| IP Report | `ip-report` |
-| Volume Report | `volume-report` |
-| Event Details | `event-detail` |
+| IP Report       | `ip-report`       |
+| Volume Report   | `volume-report`   |
+| Event Details   | `event-detail`    |
 | Event Breakdown | `event-breakdown` |

@@ -2,6 +2,16 @@ export interface IpRequest {
   ip: string;
 }
 
+export interface Traits {
+  asn: number;
+  asnOrg: string;
+  isp: string;
+  organization: string;
+  userType: string;
+  connectionType: string;
+  isAnycast: boolean;
+}
+
 export interface LocationResponse {
   country: string;
   region: string;
@@ -12,6 +22,7 @@ export interface LocationResponse {
   longitude: number;
   success: boolean;
   error?: string;
+  traits?: Traits;
 }
 
 export interface GeoIpLookupResult {
@@ -20,4 +31,13 @@ export interface GeoIpLookupResult {
   city?: { names?: { en?: string } };
   postal?: { code?: string };
   location?: { time_zone?: string; latitude?: string; longitude?: string };
+  traits?: {
+    autonomous_system_number?: number;
+    autonomous_system_organization?: string;
+    isp?: string;
+    organization?: string;
+    user_type?: string;
+    connection_type?: string;
+    is_anycast?: boolean;
+  };
 }

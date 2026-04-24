@@ -6,10 +6,15 @@ COPY package.json ./
 FROM base AS deps
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/send-whatsapp/package.json ./apps/send-whatsapp/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/url-utils/package.json ./packages/url-utils/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --filter msgops-send-whatsapp
+    pnpm install --frozen-lockfile --filter msgops-send-whatsapp...
 
 FROM deps AS build
+COPY packages/typescript-config ./packages/typescript-config
+COPY packages/url-utils ./packages/url-utils
+RUN pnpm --filter @msgops/url-utils build
 COPY apps/send-whatsapp/ ./apps/send-whatsapp/
 RUN pnpm --filter msgops-send-whatsapp build
 

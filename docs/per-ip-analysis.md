@@ -9,6 +9,7 @@ The IP report page (`/reports/ips`) is available in the UI but queries `events_l
 **How it works**: Delivered events already carry the `ip` field. For other events (bounces, opens, clicks), the backend joins on `delivered_id` to resolve which IP sent that email.
 
 **Trade-offs**:
+
 - Requires a date range to be selected before querying (no auto-load)
 - Slower than MV-backed reports (seconds vs milliseconds)
 - No IP-level alerting or monitoring (would require pre-aggregation)
@@ -19,17 +20,21 @@ The IP report page (`/reports/ips`) is available in the UI but queries `events_l
 We evaluated pre-aggregating IP stats via ClickHouse MVs but deferred due to:
 
 ### Join Engine Memory Cost
+
 The design requires a `Join(ANY, LEFT, delivered_id)` engine table to map `delivered_id -> sending_ip`. This table loads entirely into RAM:
+
 - ~1.43 billion delivered events with valid IP data
 - Estimated 150-300 GiB RAM consumption
 - Must be rebuilt on ClickHouse restart
 
 ### Write Amplification
+
 - ~28% of all events (17-19M/day) trigger MV updates
 - Each qualifying event causes two writes: main table + MV
 - Adds real cost on ClickHouse Cloud billing
 
 ### Backfill Risk
+
 - Populating 1.43B rows into a Join engine table is operationally risky
 - Could impact cluster performance during backfill
 
@@ -38,6 +43,7 @@ The design requires a `Join(ANY, LEFT, delivered_id)` engine table to map `deliv
 When we need real-time IP monitoring/alerting (e.g., Postmaster integration), revisit with:
 
 ### Option A: Scheduled Queries (Preferred)
+
 ClickHouse Cloud supports scheduled queries. Run a nightly job that populates a regular `MergeTree` table with daily IP stats. No RAM-hungry Join engine needed.
 
 ```sql
@@ -63,14 +69,17 @@ PARTITION BY toYYYYMM(date);
 ```
 
 ### Option B: Delivered-Only MV (Lightweight)
+
 Only materialize delivered events by IP (no lookup table needed since `delivered` events already carry the IP). Bounce/open attribution stays on-demand.
 
 ### Option C: Full MV with ReplacingMergeTree Lookup
+
 If real-time is needed, use `ReplacingMergeTree` instead of `Join` engine for the lookup table. Trade RAM for disk I/O. Note: `joinGet()` only works with Join engine, so MVs would need restructuring.
 
 ## Postmaster Integration Notes
 
 When combining with Google Postmaster data:
+
 - Postmaster provides daily domain/IP reputation scores
 - Join postmaster reputation with our delivery stats by IP + date
 - This enables: "IP X has poor reputation at Gmail AND high bounce rate -> reduce volume"

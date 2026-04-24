@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{tag-process-url}}/contacts-batch"
+  url: '{{tag-process-url}}/contacts-batch'
   body:
     type: json
     json: |

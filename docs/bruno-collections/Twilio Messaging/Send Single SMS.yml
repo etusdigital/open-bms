@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{twilio-messaging-url}}/single"
+  url: '{{twilio-messaging-url}}/single'
   body:
     type: json
     json: |

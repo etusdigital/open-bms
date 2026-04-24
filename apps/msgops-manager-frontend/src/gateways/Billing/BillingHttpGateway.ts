@@ -3,7 +3,10 @@ import { HttpClient, axiosAdapter } from '../../infra/HttpClient';
 import { BillingGateway } from './BillingGateway.types';
 
 export class BillingHttpGateway implements BillingGateway {
-  constructor(readonly httpClient: HttpClient, readonly baseUrl: string) {}
+  constructor(
+    readonly httpClient: HttpClient,
+    readonly baseUrl: string,
+  ) {}
 
   async getAll(month: string, accountId?: Array<number> | number): Promise<BillingProduct[]> {
     const accountIdParams = (accountId as number[])?.map((id) => `accountId[]=${id}`).join('&');

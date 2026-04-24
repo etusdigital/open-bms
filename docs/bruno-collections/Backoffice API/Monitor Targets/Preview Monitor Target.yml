@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/monitor-targets/1/preview"
+  url: '{{backoffice-api-url}}/monitor-targets/1/preview'
   auth: inherit
 
 settings:

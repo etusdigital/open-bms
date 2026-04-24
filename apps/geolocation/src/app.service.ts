@@ -65,6 +65,15 @@ export class AppService {
         latitude: parseFloat(response?.location?.latitude || '0'),
         longitude: parseFloat(response?.location?.longitude || '0'),
         success: true,
+        traits: {
+          asn: response?.traits?.autonomous_system_number ?? 0,
+          asnOrg: response?.traits?.autonomous_system_organization ?? '',
+          isp: response?.traits?.isp ?? '',
+          organization: response?.traits?.organization ?? '',
+          userType: response?.traits?.user_type ?? '',
+          connectionType: response?.traits?.connection_type ?? '',
+          isAnycast: response?.traits?.is_anycast ?? false,
+        },
       };
     } catch (error) {
       console.error(`Error looking up IP ${ip}:`, error);

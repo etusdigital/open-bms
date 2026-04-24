@@ -5,7 +5,7 @@ info:
 
 http:
   method: PATCH
-  url: "{{backoffice-api-url}}/sub-accounts/1"
+  url: '{{backoffice-api-url}}/sub-accounts/1'
   body:
     type: json
     json: |

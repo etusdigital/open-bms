@@ -5,16 +5,16 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/reports/providers"
+  url: '{{backoffice-api-url}}/reports/providers'
   params:
     - name: from
-      value: "2025-01-01T00:00:00Z"
+      value: '2025-01-01T00:00:00Z'
     - name: to
-      value: "2025-01-31T23:59:59Z"
+      value: '2025-01-31T23:59:59Z'
     - name: granularity
-      value: "daily"
+      value: 'daily'
     - name: timezone
-      value: "UTC"
+      value: 'UTC'
   auth: inherit
 
 settings:

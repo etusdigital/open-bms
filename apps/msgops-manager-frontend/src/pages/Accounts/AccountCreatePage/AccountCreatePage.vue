@@ -2,13 +2,7 @@
 import { InvalidSubmissionHandler, useField, useForm } from 'vee-validate';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import {
-  BmsPageBase,
-  BmsPageTitleWithPlusAction,
-  BmsButton,
-  BmsTextField,
-  BmsSelect,
-} from '../../../components';
+import { BmsPageBase, BmsPageTitleWithPlusAction, BmsButton, BmsTextField, BmsSelect } from '../../../components';
 import { useAccountStore } from '../../../stores';
 import { CreateAccount, accountCreateZodValidation, SendgridDns, Account } from '../../../entities/Account';
 import { showToast } from '../../../utils/showToast';

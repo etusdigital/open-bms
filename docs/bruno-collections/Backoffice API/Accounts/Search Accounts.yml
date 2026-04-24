@@ -5,10 +5,10 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/accounts/search"
+  url: '{{backoffice-api-url}}/accounts/search'
   params:
     - name: q
-      value: "acme"
+      value: 'acme'
   auth: inherit
 
 settings:

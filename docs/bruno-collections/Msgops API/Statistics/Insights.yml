@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/statistics/insights/7d"
+  url: '{{msgops-api-url}}/statistics/insights/7d'
   auth: inherit
 
 settings:

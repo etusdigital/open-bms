@@ -1,5 +1,5 @@
 ---
-title: "feat: Email Statistics Overview Page"
+title: 'feat: Email Statistics Overview Page'
 type: feat
 status: active
 date: 2026-04-07
@@ -13,12 +13,14 @@ date: 2026-04-07
 **Research agents used:** ECharts best practices, Data table patterns, Filter system patterns, Vercel React performance, Composition patterns, ECharts v6 docs, TanStack Router search params, Repo pattern analysis
 
 ### Key Improvements
+
 1. **Architecture**: `StatisticsProvider` context pattern (matching existing `ListPage` compound component) with explicit variant components per display mode — no prop drilling, no boolean flags
 2. **Performance**: Lazy-load ECharts via `React.lazy`, single `useMemo` for chart options, `placeholderData: keepPreviousData` for seamless filter changes, 4 memoized sibling components
 3. **Filter UX**: Sheet (side drawer) instead of popover for 7 filter sections, reusable `FilterCheckboxList` component, draft state pattern matching existing campaigns filter bar
 4. **Codebase alignment**: Follows exact project conventions — CSV string params with `parseCsvIds`/`serializeCsvIds`, `.default(x).catch(x)` Zod pattern, `usePermissions().can()`, `ListPage` layout shell
 
 ### New Considerations Discovered
+
 - `analytics:dashboard_export` permission doesn't exist in the React Permission type yet — needs adding to `ALL_PERMISSIONS`
 - ECharts colors must be set per-series via `itemStyle.color` + `lineStyle.color` (not palette index) to prevent color shifts when legend toggling
 - The existing `CampaignsDateRangePicker` can be generalized and reused rather than building from scratch
@@ -63,6 +65,7 @@ Params: startDate, endDate, campaigns[], automations[], messages[], tags[], segm
 ```
 
 Response:
+
 ```typescript
 {
   general: {
@@ -84,6 +87,7 @@ Response:
 ```
 
 Filter option endpoints (existing):
+
 - `GET /campaigns` — campaign list
 - `GET /automations` — automation list
 - `GET /messages` — message list
@@ -121,11 +125,13 @@ Children read from context via `use(StatisticsContext)` (React 19) — no prop d
 ### Research Insights: Component Architecture
 
 **Explicit variant components per display mode** (not boolean props):
+
 - `EmailNumericCards` / `EmailPercentageCards` / `EmailPerUserCards` — each reads same data from context but formats differently
 - Column definition hooks per mode: `useEmailColumns()`, `usePushColumns()`, `usePerUserColumns()`
 - Mode selector renders the appropriate variant: `{mode === 'numeric' && <EmailNumericCards />}`
 
 **4 memoized sibling components** to isolate re-renders:
+
 1. `StatisticsFilterBar` — owns filter state synced to URL
 2. `StatisticsSummaryCards` — receives summary values
 3. `StatisticsChart` (lazy-loaded) — receives memoized ECharts option
@@ -141,6 +147,7 @@ Children read from context via `use(StatisticsContext)` (React 19) — no prop d
 ### Research Insights: ECharts Configuration
 
 **Per-series color binding** (critical — do NOT use palette index):
+
 ```typescript
 {
   name: 'Open',
@@ -157,17 +164,19 @@ Children read from context via `use(StatisticsContext)` (React 19) — no prop d
 **Legend**: Use `legend.type: 'scroll'` for 7+ series to prevent wrapping/layout shift.
 
 **Dual Y-axis for "per user" mode**:
+
 - `yAxis: [{position: 'left', ...}, {position: 'right', min: 0, max: 100, splitLine: { show: false }}]`
 - Lines (counts) use `yAxisIndex: 0`, bars (rates) use `yAxisIndex: 1`
 - `xAxis.boundaryGap: true` required when mixing bars
 
 **Y-axis formatter** (abbreviations like "100 MIL", "1M"):
+
 ```typescript
 function formatCompact(value: number): string {
-  const abs = Math.abs(value)
-  if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
-  if (abs >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')} MIL`
-  return String(value)
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (abs >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')} MIL`;
+  return String(value);
 }
 ```
 
@@ -181,19 +190,19 @@ function formatCompact(value: number): string {
 
 ### Metric Colors (exact from Vue 2 `Dashboard.vue:1221-1334`)
 
-| Metric | Color | Used in cards, chart, table progress bars |
-|--------|-------|------------------------------------------|
-| delivered | `#0057f4` | Blue (email); `#0FB75C` for push |
-| open | `#0FB75C` | Green |
-| unique_opens | `#076e62` | Dark teal |
-| click | `#00cefc` | Cyan |
-| unique_clicks | `#436bba` | Blue-purple |
-| CTOR | `#800080` | Purple |
-| unsubscribe | `#f06158` | Red |
-| bounce | `#ff9654` | Orange |
-| sent | `#0057f4` | Blue (push only) |
-| close | `#f06158` | Red (push only) |
-| UTO | `#F06158` | Red |
+| Metric        | Color     | Used in cards, chart, table progress bars |
+| ------------- | --------- | ----------------------------------------- |
+| delivered     | `#0057f4` | Blue (email); `#0FB75C` for push          |
+| open          | `#0FB75C` | Green                                     |
+| unique_opens  | `#076e62` | Dark teal                                 |
+| click         | `#00cefc` | Cyan                                      |
+| unique_clicks | `#436bba` | Blue-purple                               |
+| CTOR          | `#800080` | Purple                                    |
+| unsubscribe   | `#f06158` | Red                                       |
+| bounce        | `#ff9654` | Orange                                    |
+| sent          | `#0057f4` | Blue (push only)                          |
+| close         | `#f06158` | Red (push only)                           |
+| UTO           | `#F06158` | Red                                       |
 
 "Per user" mode metrics:
 | Metric | Color |
@@ -209,39 +218,40 @@ function formatCompact(value: number): string {
 
 **Email mode** (8 cards, 2 rows of 4):
 
-| Card | Display | Percentage formula |
-|------|---------|-------------------|
-| Entregue (Delivered) | count only | — |
-| Abertura (Open) | `%` + count | open / delivered |
-| Abertura Única (Unique Open) | `%` + count | unique_opens / delivered |
-| Clique (Click) | `%` + count | click / delivered |
-| Clique Único (Unique Click) | `%` + count | unique_clicks / delivered |
-| CTOR | `%` only | click / open |
-| Insc. cancelada (Unsubscribe) | `%` + count | unsubscribe / delivered |
-| Bounce | `%` + count | bounce / delivered |
+| Card                          | Display     | Percentage formula        |
+| ----------------------------- | ----------- | ------------------------- |
+| Entregue (Delivered)          | count only  | —                         |
+| Abertura (Open)               | `%` + count | open / delivered          |
+| Abertura Única (Unique Open)  | `%` + count | unique_opens / delivered  |
+| Clique (Click)                | `%` + count | click / delivered         |
+| Clique Único (Unique Click)   | `%` + count | unique_clicks / delivered |
+| CTOR                          | `%` only    | click / open              |
+| Insc. cancelada (Unsubscribe) | `%` + count | unsubscribe / delivered   |
+| Bounce                        | `%` + count | bounce / delivered        |
 
 Card format: colored percentage text (large), gray count text (small, formatted with locale separator).
 
 ### Table Columns (Email)
 
-| Column | Key | Format | Progress bar color |
-|--------|-----|--------|--------------------|
-| Data (Date) | `date` | DD/MM/YYYY | — |
-| Entregue | `delivered` | count | — |
-| Abertura | `open` | `%` + count | `#0FB75C` |
-| Abertura Única | `unique_opens` | `%` + count | `#076e62` |
-| Clique | `click` | `%` + count | `#00cefc` |
-| Clique Único | `unique_clicks` | `%` + count | `#436bba` |
-| CTOR | `percentageCtor` | `%` | `#800080` |
-| Insc. cancelada | `unsubscribe` | `%` + count | `#f06158` |
-| UTO | `percentageUto` | `%` | `#F06158` |
-| Bounce | `bounce` | `%` + count | `#ff9654` |
+| Column          | Key              | Format      | Progress bar color |
+| --------------- | ---------------- | ----------- | ------------------ |
+| Data (Date)     | `date`           | DD/MM/YYYY  | —                  |
+| Entregue        | `delivered`      | count       | —                  |
+| Abertura        | `open`           | `%` + count | `#0FB75C`          |
+| Abertura Única  | `unique_opens`   | `%` + count | `#076e62`          |
+| Clique          | `click`          | `%` + count | `#00cefc`          |
+| Clique Único    | `unique_clicks`  | `%` + count | `#436bba`          |
+| CTOR            | `percentageCtor` | `%`         | `#800080`          |
+| Insc. cancelada | `unsubscribe`    | `%` + count | `#f06158`          |
+| UTO             | `percentageUto`  | `%`         | `#F06158`          |
+| Bounce          | `bounce`         | `%` + count | `#ff9654`          |
 
 Each cell with `%` shows: colored percentage badge + absolute count below, with a thin (4px) progress bar underneath.
 
 ### Research Insights: Data Table
 
 **Custom cell renderer** — extract a `StatsCell` component (not inline arrow function):
+
 ```typescript
 function StatsCell({ rate, count, color }: { rate: number; count: number; color: string }) {
   return (
@@ -295,6 +305,7 @@ Date, Base Size, Engaged Users (`%` + count), DAU (`%` + count), Avg Open Rate, 
 **Reusable `FilterCheckboxList` component** — extract the repeated Collapsible + Search + Checkbox pattern (seen 5 times in `campaigns-filter-bar.tsx`) into one component used 7 times. Props: `title`, `options: FilterOption[]`, `selected: string[]`, `onToggle`, `onSelectAll?`, `onSearch?`, `isLoading?`.
 
 **Draft state pattern** (matching existing campaigns filter bar):
+
 1. Sheet opens → copy URL state into local `useState` (draft)
 2. User edits draft (no URL changes yet)
 3. Click "Apply" → serialize draft to URL via `navigate({ search: prev => ({...prev, ...}) })`
@@ -311,6 +322,7 @@ Date, Base Size, Engaged Users (`%` + count), DAU (`%` + count), Avg Open Rate, 
 ### Research Insights: TanStack Router Search Params
 
 **Follow project conventions exactly**:
+
 - Use `.default('').catch('')` on every field (not `fallback()` from zod-adapter)
 - Pass Zod schema directly to `validateSearch` (not wrapped in `zodValidator()`)
 - Store arrays as CSV strings with `parseCsvIds`/`serializeCsvIds` (already exist in contacts search schema)
@@ -320,6 +332,7 @@ Date, Base Size, Engaged Users (`%` + count), DAU (`%` + count), Avg Open Rate, 
 - Use `replace: true` for filter changes (don't pollute history)
 
 **Share schema between email and web-push routes**:
+
 ```typescript
 // statistics-search-schema.ts
 export const statisticsSearchSchema = z.object({
@@ -334,7 +347,7 @@ export const statisticsSearchSchema = z.object({
   segments: z.string().default('').catch(''),
   senders: z.string().default('').catch(''),
   subUsers: z.string().default('').catch(''),
-})
+});
 ```
 
 Both route files use the same schema via `validateSearch: statisticsSearchSchema`.
@@ -366,6 +379,7 @@ Export button in table footer (permission-gated: `analytics:dashboard_export`). 
 ## Acceptance Criteria
 
 ### Core Layout
+
 - [ ] Replace existing email statistics page at `/messages/email/statistics`
 - [ ] Add `/messages/web-push/statistics` route
 - [ ] Tab navigation between email/web-push (channel-dependent via account config)
@@ -373,12 +387,14 @@ Export button in table footer (permission-gated: `analytics:dashboard_export`). 
 - [ ] Use `ListPage` compound component as layout shell
 
 ### Summary Cards
+
 - [ ] 8 metric cards for email: Delivered, Open, Unique Open, Click, Unique Click, CTOR, Unsubscribe, Bounce
 - [ ] Card format: colored percentage (large) + gray absolute count (small, locale-formatted)
 - [ ] CTOR shows percentage only (click/open), Delivered shows count only (email)
 - [ ] Push cards: Sent (count), Delivered (% + count), Click (% + count), Close (web-push, % + count)
 
 ### Chart
+
 - [ ] ECharts multi-line chart with all metrics as separate colored series
 - [ ] Lazy-loaded via `React.lazy` with `Suspense` fallback skeleton
 - [ ] Legend at bottom (`type: 'scroll'`), clickable to toggle series visibility
@@ -391,6 +407,7 @@ Export button in table footer (permission-gated: `analytics:dashboard_export`). 
 - [ ] Per-user mode: dual Y-axis mixed line+bar chart
 
 ### Data Table
+
 - [ ] Client-side sorting via `getSortedRowModel()` (default: date descending)
 - [ ] `StatsCell` component for percentage badge + count + 4px progress bar cells
 - [ ] `tabular-nums` class for aligned numbers
@@ -399,6 +416,7 @@ Export button in table footer (permission-gated: `analytics:dashboard_export`). 
 - [ ] Column definitions via `useStatisticsColumns(mode)` hook with `useMemo`
 
 ### Filters
+
 - [ ] Date range picker generalized from `CampaignsDateRangePicker` (2-month calendar, preset highlighting)
 - [ ] "Per user" toggle (only for internal accounts with `currentAccount.isInternal`)
 - [ ] "More filters" opens Sheet (side drawer) with 7 sections
@@ -410,6 +428,7 @@ Export button in table footer (permission-gated: `analytics:dashboard_export`). 
 - [ ] `parseCsvIds`/`serializeCsvIds` from existing contacts schema
 
 ### Performance
+
 - [ ] ECharts lazy-loaded via `React.lazy` + `Suspense`
 - [ ] Single `useMemo` for chart options with `[daily, displayMode]` deps
 - [ ] Static chart config hoisted to module scope
@@ -418,10 +437,12 @@ Export button in table footer (permission-gated: `analytics:dashboard_export`). 
 - [ ] Pagination/sorting state lives in `StatisticsTable` only (not in parent)
 
 ### Loading & Empty States
+
 - [ ] Skeleton loaders for cards, chart, and table while loading
 - [ ] "No data" message in table when empty
 
 ### i18n
+
 - [ ] All labels translatable via i18next (pt-BR and en)
 - [ ] New top-level `"statistics"` namespace in both locale files
 
@@ -490,24 +511,28 @@ Both routes use `validateSearch: statisticsSearchSchema` and pass `Route.useSear
 ### Key Component Breakdown
 
 **`email-statistics-page.tsx`** — Orchestrator:
+
 - Reads route params for message type (email/web-push)
 - Reads URL search params via `Route.useSearch()`
 - Wraps everything in `<StatisticsProvider params={searchParams}>`
 - Composes: `ListPage.Root` > tabs > filter bar > chips > cards > toggle > chart (in Suspense) > table
 
 **`statistics-provider.tsx`** — Context provider:
+
 - Fetches statistics data via `useEmailStatistics` with all filter params
 - Computes summary and table data with percentages via `useMemo`
 - Exposes state + actions via context
 - Children read via `use(StatisticsContext)` (React 19)
 
 **`statistics-filter-panel.tsx`** — Sheet (side drawer):
+
 - Opens via "Mais filtros" button
 - Contains 7 `FilterCheckboxList` sections in `ScrollArea`
 - Manages draft state locally (copy from URL on open, write to URL on Apply)
 - `SheetFooter` with Clear/Apply buttons
 
 **`filter-checkbox-list.tsx`** — Reusable filter section:
+
 - `Collapsible` wrapper with title + active count badge
 - Search input (debounced for server-side, instant for client-side)
 - `ScrollArea` (max-height ~160px) with checkbox list
@@ -515,6 +540,7 @@ Both routes use `validateSearch: statisticsSearchSchema` and pass `Route.useSear
 - Props: `title`, `options`, `selected`, `onToggle`, `onSelectAll?`, `onSearch?`
 
 **`statistics-chart.tsx`** — Lazy-loaded ECharts wrapper:
+
 - Reads data and display mode from `StatisticsContext`
 - Builds chart options via pure functions from `chart-options.ts`
 - Single `useMemo` with `[daily, displayMode]` as deps
@@ -522,6 +548,7 @@ Both routes use `validateSearch: statisticsSearchSchema` and pass `Route.useSear
 - Per-user mode renders dual Y-axis mixed chart
 
 **`statistics-table.tsx`** — Client-side TanStack Table:
+
 - Owns `sorting` and `pagination` state internally (isolates re-renders)
 - Selects columns via `useEmailColumns()` / `usePushColumns()` / `usePerUserColumns()` based on mode
 - Uses `getSortedRowModel()` + `getPaginationRowModel()`
@@ -529,18 +556,21 @@ Both routes use `validateSearch: statisticsSearchSchema` and pass `Route.useSear
 - Footer: export CSV button (gated by `usePermissions().can('analytics:dashboard_export')`)
 
 **`stats-cell.tsx`** — Table cell component:
+
 - Colored percentage text (matching metric color via inline `style={{ color }}`)
 - Absolute count in muted text below
 - 4px CSS-only progress bar (`h-1 rounded-full`) underneath
 - `tabular-nums` for aligned numbers
 
 **`chart-options.ts`** — Pure functions:
+
 - `buildNumericChartOption(daily, metricColors, t)` — 7-series line chart
 - `buildPercentageChartOption(daily, metricColors, t)` — 6-series line chart (no Delivered)
 - `buildPerUserChartOption(daily, metricColors, t)` — mixed line+bar with dual Y-axes
 - Common config: `emphasis: { focus: 'series' }`, `legend: { type: 'scroll', bottom: 0 }`, `smooth: 0.3`, `showSymbol: false`
 
 **`csv-export.ts`** — Pure function:
+
 - Generates CSV from columns + data with BOM prefix (`\uFEFF`)
 - Escapes values containing commas/quotes per RFC 4180
 - Creates `Blob` + `URL.createObjectURL` for download
@@ -550,7 +580,7 @@ Both routes use `validateSearch: statisticsSearchSchema` and pass `Route.useSear
 
 ```typescript
 // statistics-search-schema.ts
-import { z } from 'zod'
+import { z } from 'zod';
 
 export const statisticsSearchSchema = z.object({
   startDate: z.string().default('').catch(''),
@@ -564,12 +594,12 @@ export const statisticsSearchSchema = z.object({
   segments: z.string().default('').catch(''),
   senders: z.string().default('').catch(''),
   subUsers: z.string().default('').catch(''),
-})
+});
 
-export type StatisticsSearchParams = z.infer<typeof statisticsSearchSchema>
+export type StatisticsSearchParams = z.infer<typeof statisticsSearchSchema>;
 
 // Reuse from contacts-search-schema.ts or promote to shared:
-export { parseCsvIds, serializeCsvIds } from '@/features/contacts/contacts-search-schema'
+export { parseCsvIds, serializeCsvIds } from '@/features/contacts/contacts-search-schema';
 ```
 
 ## Deferred

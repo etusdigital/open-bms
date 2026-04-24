@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{event-receiver-url}}/"
+  url: '{{event-receiver-url}}/'
   body:
     type: json
     json: |

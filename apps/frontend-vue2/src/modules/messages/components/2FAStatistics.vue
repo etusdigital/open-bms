@@ -82,7 +82,9 @@ export default class TwoFAStatistics extends Vue {
 
 .statistics-card {
   border-radius: 16px;
-  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
+    0px 1px 2px 0px rgba(0, 0, 0, 0.06);
   background-color: $neutral-basic-white;
   padding: 20px;
   width: 600px;

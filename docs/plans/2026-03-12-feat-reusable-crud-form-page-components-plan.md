@@ -1,5 +1,5 @@
 ---
-title: "feat: Reusable CRUD create/edit form page component system"
+title: 'feat: Reusable CRUD create/edit form page component system'
 type: feat
 status: completed
 date: 2026-03-12
@@ -44,17 +44,17 @@ src/routes/_authenticated/_layout/tags/
 
 ### Key Design Decisions
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Form architecture | Single form component for create & edit | Detect mode via presence of `defaultValues`; avoids duplication |
-| Layout pattern | Compound components (`FormPage.Root/Header/Content/Footer`) | Matches existing `ListPage` pattern; familiar to team |
-| Form library | react-hook-form + zodResolver | Already installed (`^7.71.1`, `@hookform/resolvers ^5.2.2`), CLAUDE.md convention |
-| Validation | Zod schemas per entity | Already used project-wide, type inference with `z.infer<>` |
-| Server errors | Map to form fields via `setError()` + generic toast fallback | Field-level errors for known fields, toast for unstructured errors |
-| Unsaved changes | `useBlocker()` + `beforeunload` | TanStack Router built-in + browser tab close protection |
-| Edit data fetching | `useQuery` in component (not route loader) | Matches existing pattern (`useTagsList`), simpler, handles refetch/stale |
-| Post-submit navigation | Redirect to list page (no state preservation) | Newly created/edited item may not match previous filters |
-| Route structure | `/tags/create` (static) + `/tags/$tagId` (dynamic) | TanStack Router prioritizes static over dynamic segments |
+| Decision               | Choice                                                       | Rationale                                                                         |
+| ---------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Form architecture      | Single form component for create & edit                      | Detect mode via presence of `defaultValues`; avoids duplication                   |
+| Layout pattern         | Compound components (`FormPage.Root/Header/Content/Footer`)  | Matches existing `ListPage` pattern; familiar to team                             |
+| Form library           | react-hook-form + zodResolver                                | Already installed (`^7.71.1`, `@hookform/resolvers ^5.2.2`), CLAUDE.md convention |
+| Validation             | Zod schemas per entity                                       | Already used project-wide, type inference with `z.infer<>`                        |
+| Server errors          | Map to form fields via `setError()` + generic toast fallback | Field-level errors for known fields, toast for unstructured errors                |
+| Unsaved changes        | `useBlocker()` + `beforeunload`                              | TanStack Router built-in + browser tab close protection                           |
+| Edit data fetching     | `useQuery` in component (not route loader)                   | Matches existing pattern (`useTagsList`), simpler, handles refetch/stale          |
+| Post-submit navigation | Redirect to list page (no state preservation)                | Newly created/edited item may not match previous filters                          |
+| Route structure        | `/tags/create` (static) + `/tags/$tagId` (dynamic)           | TanStack Router prioritizes static over dynamic segments                          |
 
 ### Out of Scope
 
@@ -71,48 +71,33 @@ src/routes/_authenticated/_layout/tags/
 
 ```tsx
 // src/components/form-page.tsx
-import type { ReactNode } from 'react'
-import { ArrowLeft } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
-import { Skeleton } from '@/components/ui/skeleton'
+import type { ReactNode } from 'react';
+import { ArrowLeft } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { Skeleton } from '@/components/ui/skeleton';
 
 function Root({ children }: { children: ReactNode }) {
-  return <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">{children}</div>
+  return <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">{children}</div>;
 }
 
-function Header({
-  title,
-  backTo,
-  backLabel,
-}: {
-  title: string
-  backTo: string
-  backLabel: string
-}) {
+function Header({ title, backTo, backLabel }: { title: string; backTo: string; backLabel: string }) {
   return (
     <div className="space-y-1">
-      <Link
-        to={backTo}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
+      <Link to={backTo} className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm">
         <ArrowLeft className="h-4 w-4" />
         {backLabel}
       </Link>
       <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
     </div>
-  )
+  );
 }
 
 function Content({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={className ?? 'max-w-2xl'}>{children}</div>
+  return <div className={className ?? 'max-w-2xl'}>{children}</div>;
 }
 
 function Footer({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex items-center gap-2 max-w-2xl">
-      {children}
-    </div>
-  )
+  return <div className="flex max-w-2xl items-center gap-2">{children}</div>;
 }
 
 function LoadingSkeleton() {
@@ -128,24 +113,24 @@ function LoadingSkeleton() {
       </div>
       <Skeleton className="h-10 w-24" />
     </div>
-  )
+  );
 }
 
-export const FormPage = { Root, Header, Content, Footer, LoadingSkeleton }
+export const FormPage = { Root, Header, Content, Footer, LoadingSkeleton };
 ```
 
 ### Zod Schema Pattern (Per Entity)
 
 ```tsx
 // src/features/tags/tag-schema.ts
-import { z } from 'zod'
+import { z } from 'zod';
 
 export const tagFormSchema = z.object({
   name: z.string().min(1, 'tags.validation.nameRequired').max(100),
   description: z.string().max(500).optional().default(''),
-})
+});
 
-export type TagFormValues = z.infer<typeof tagFormSchema>
+export type TagFormValues = z.infer<typeof tagFormSchema>;
 ```
 
 **Translation of validation messages:** Use i18n keys in the zod schema message, resolve them in a custom error map or in the `FormMessage` component. Alternatively, pass `t()` to a schema factory function (already done in profile page: `createProfileSchema(t)`).
@@ -158,7 +143,7 @@ const templateFormSchema = z.object({
   name: z.string().min(1),
   description: z.string().max(500).optional().default(''),
   content: z.string().min(1, 'Content is required'),
-})
+});
 ```
 
 No base schema abstraction needed — each entity defines its own schema. Name + description fields are copy-pasted, not inherited. Premature abstraction for 2 fields is not worth it.
@@ -167,38 +152,33 @@ No base schema abstraction needed — each entity defines its own schema. Name +
 
 ```tsx
 // src/features/tags/tag-form.tsx
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { useTranslation } from 'react-i18next'
-import {
-  Form, FormField, FormItem, FormLabel, FormControl, FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { UnsavedChangesDialog } from '@/components/unsaved-changes-dialog'
-import { tagFormSchema, type TagFormValues } from './tag-schema'
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useTranslation } from 'react-i18next';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { UnsavedChangesDialog } from '@/components/unsaved-changes-dialog';
+import { tagFormSchema, type TagFormValues } from './tag-schema';
 
 interface TagFormProps {
-  defaultValues?: TagFormValues
-  onSubmit: (data: TagFormValues) => void
-  isPending: boolean
+  defaultValues?: TagFormValues;
+  onSubmit: (data: TagFormValues) => void;
+  isPending: boolean;
 }
 
 export function TagForm({ defaultValues, onSubmit, isPending }: TagFormProps) {
-  const { t } = useTranslation()
-  const isEditing = defaultValues !== undefined
+  const { t } = useTranslation();
+  const isEditing = defaultValues !== undefined;
 
   const form = useForm<TagFormValues>({
     resolver: zodResolver(tagFormSchema),
     defaultValues: defaultValues ?? { name: '', description: '' },
-  })
+  });
 
   return (
     <>
-      <UnsavedChangesDialog
-        isDirty={form.formState.isDirty}
-        isPending={isPending}
-      />
+      <UnsavedChangesDialog isDirty={form.formState.isDirty} isPending={isPending} />
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FormField
@@ -230,24 +210,20 @@ export function TagForm({ defaultValues, onSubmit, isPending }: TagFormProps) {
           />
 
           {form.formState.errors.root?.serverError && (
-            <div role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            <div role="alert" className="bg-destructive/10 text-destructive rounded-md p-3 text-sm">
               {form.formState.errors.root.serverError.message}
             </div>
           )}
 
           <div className="flex items-center gap-2">
             <Button type="submit" disabled={isPending}>
-              {isPending
-                ? t('common.loading')
-                : isEditing
-                  ? t('common.save')
-                  : t('common.create')}
+              {isPending ? t('common.loading') : isEditing ? t('common.save') : t('common.create')}
             </Button>
           </div>
         </form>
       </Form>
     </>
-  )
+  );
 }
 ```
 
@@ -255,71 +231,61 @@ export function TagForm({ defaultValues, onSubmit, isPending }: TagFormProps) {
 
 ```tsx
 // src/features/tags/tag-form-page.tsx
-import { useTranslation } from 'react-i18next'
-import { useNavigate } from '@tanstack/react-router'
-import { isAxiosError } from 'axios'
-import { FormPage } from '@/components/form-page'
-import { TagForm } from './tag-form'
-import { useTag, useCreateTag, useUpdateTag } from './use-tags'
-import type { TagFormValues } from './tag-schema'
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from '@tanstack/react-router';
+import { isAxiosError } from 'axios';
+import { FormPage } from '@/components/form-page';
+import { TagForm } from './tag-form';
+import { useTag, useCreateTag, useUpdateTag } from './use-tags';
+import type { TagFormValues } from './tag-schema';
 
 interface TagFormPageProps {
-  tagId?: number
+  tagId?: number;
 }
 
 export function TagFormPage({ tagId }: TagFormPageProps) {
-  const { t } = useTranslation()
-  const navigate = useNavigate()
-  const isEditing = tagId !== undefined
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const isEditing = tagId !== undefined;
 
-  const tagQuery = useTag(tagId!)
-  const createMutation = useCreateTag()
-  const updateMutation = useUpdateTag(tagId ?? 0)
-  const mutation = isEditing ? updateMutation : createMutation
+  const tagQuery = useTag(tagId!);
+  const createMutation = useCreateTag();
+  const updateMutation = useUpdateTag(tagId ?? 0);
+  const mutation = isEditing ? updateMutation : createMutation;
 
   const handleSubmit = (data: TagFormValues) => {
     mutation.mutate(data, {
       onSuccess: () => {
-        navigate({ to: '/tags' })
+        navigate({ to: '/tags' });
       },
       onError: (error) => {
         // API error message shown via toast (same pattern as delete)
         // Field-level server errors can be mapped here if backend supports it
       },
-    })
-  }
+    });
+  };
 
   if (isEditing && tagQuery.isLoading) {
     return (
       <FormPage.Root>
-        <FormPage.Header
-          title={t('tags.edit')}
-          backTo="/tags"
-          backLabel={t('tags.title')}
-        />
+        <FormPage.Header title={t('tags.edit')} backTo="/tags" backLabel={t('tags.title')} />
         <FormPage.Content>
           <FormPage.LoadingSkeleton />
         </FormPage.Content>
       </FormPage.Root>
-    )
+    );
   }
 
   if (isEditing && tagQuery.error) {
     // 404 or fetch error
     return (
       <FormPage.Root>
-        <FormPage.Header
-          title={t('tags.edit')}
-          backTo="/tags"
-          backLabel={t('tags.title')}
-        />
+        <FormPage.Header title={t('tags.edit')} backTo="/tags" backLabel={t('tags.title')} />
         <FormPage.Content>
-          <div className="text-sm text-muted-foreground">
-            {t('common.entityNotFound')}
-          </div>
+          <div className="text-muted-foreground text-sm">{t('common.entityNotFound')}</div>
         </FormPage.Content>
       </FormPage.Root>
-    )
+    );
   }
 
   return (
@@ -337,7 +303,7 @@ export function TagFormPage({ tagId }: TagFormPageProps) {
         />
       </FormPage.Content>
     </FormPage.Root>
-  )
+  );
 }
 ```
 
@@ -345,28 +311,39 @@ export function TagFormPage({ tagId }: TagFormPageProps) {
 
 ```tsx
 // src/components/unsaved-changes-dialog.tsx
-import { useBlocker } from '@tanstack/react-router'
-import { useTranslation } from 'react-i18next'
+import { useBlocker } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface UnsavedChangesDialogProps {
-  isDirty: boolean
-  isPending?: boolean
+  isDirty: boolean;
+  isPending?: boolean;
 }
 
 export function UnsavedChangesDialog({ isDirty, isPending = false }: UnsavedChangesDialogProps) {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
 
   const { proceed, reset, status } = useBlocker({
     shouldBlockFn: () => isDirty && !isPending,
     enableBeforeUnload: isDirty && !isPending,
-  })
+  });
 
   return (
-    <AlertDialog open={status === 'blocked'} onOpenChange={(open) => { if (!open) reset() }}>
+    <AlertDialog
+      open={status === 'blocked'}
+      onOpenChange={(open) => {
+        if (!open) reset();
+      }}
+    >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{t('common.unsavedChangesTitle')}</AlertDialogTitle>
@@ -378,7 +355,7 @@ export function UnsavedChangesDialog({ isDirty, isPending = false }: UnsavedChan
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  )
+  );
 }
 ```
 
@@ -390,69 +367,57 @@ Add to existing `src/features/tags/use-tags.ts`:
 
 ```tsx
 export function useTag(id: number) {
-  const auth = useAppStore((s) => s.auth)
-  const accountId = auth.status === 'authenticated' ? auth.account.id : 0
+  const auth = useAppStore((s) => s.auth);
+  const accountId = auth.status === 'authenticated' ? auth.account.id : 0;
 
   return useQuery({
     queryKey: queryKeys.tags.detail(accountId, id),
     queryFn: async ({ signal }) => {
-      const { data } = await apiClient.get<Tag>(`/tags/${id}`, { signal })
-      return data
+      const { data } = await apiClient.get<Tag>(`/tags/${id}`, { signal });
+      return data;
     },
     enabled: auth.status === 'authenticated' && id > 0,
-  })
+  });
 }
 
 export function useCreateTag() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: TagFormValues) => {
-      const { data: result } = await apiClient.post<Tag>('/tags', data)
-      return result
+      const { data: result } = await apiClient.post<Tag>('/tags', data);
+      return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.tags.all })
-      toast.success(
-        i18n.t('common.createSuccess', { entity: i18n.t('tags.entityName') }),
-      )
+      queryClient.invalidateQueries({ queryKey: queryKeys.tags.all });
+      toast.success(i18n.t('common.createSuccess', { entity: i18n.t('tags.entityName') }));
     },
     onError: (error) => {
       const apiMessage =
-        isAxiosError(error) && typeof error.response?.data?.error === 'string'
-          ? error.response.data.error
-          : null
-      toast.error(
-        apiMessage ?? i18n.t('common.createError', { entity: i18n.t('tags.entityName') }),
-      )
+        isAxiosError(error) && typeof error.response?.data?.error === 'string' ? error.response.data.error : null;
+      toast.error(apiMessage ?? i18n.t('common.createError', { entity: i18n.t('tags.entityName') }));
     },
-  })
+  });
 }
 
 export function useUpdateTag(id: number) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: TagFormValues) => {
-      const { data: result } = await apiClient.put<Tag>(`/tags/${id}`, data)
-      return result
+      const { data: result } = await apiClient.put<Tag>(`/tags/${id}`, data);
+      return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.tags.all })
-      toast.success(
-        i18n.t('common.updateSuccess', { entity: i18n.t('tags.entityName') }),
-      )
+      queryClient.invalidateQueries({ queryKey: queryKeys.tags.all });
+      toast.success(i18n.t('common.updateSuccess', { entity: i18n.t('tags.entityName') }));
     },
     onError: (error) => {
       const apiMessage =
-        isAxiosError(error) && typeof error.response?.data?.error === 'string'
-          ? error.response.data.error
-          : null
-      toast.error(
-        apiMessage ?? i18n.t('common.updateError', { entity: i18n.t('tags.entityName') }),
-      )
+        isAxiosError(error) && typeof error.response?.data?.error === 'string' ? error.response.data.error : null;
+      toast.error(apiMessage ?? i18n.t('common.updateError', { entity: i18n.t('tags.entityName') }));
     },
-  })
+  });
 }
 ```
 
@@ -462,15 +427,15 @@ export function useUpdateTag(id: number) {
 
 ```tsx
 // src/routes/_authenticated/_layout/tags/create.tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { TagFormPage } from '@/features/tags/tag-form-page'
+import { createFileRoute } from '@tanstack/react-router';
+import { TagFormPage } from '@/features/tags/tag-form-page';
 
 export const Route = createFileRoute('/_authenticated/_layout/tags/create')({
   component: TagCreateRoute,
-})
+});
 
 function TagCreateRoute() {
-  return <TagFormPage />
+  return <TagFormPage />;
 }
 ```
 
@@ -478,16 +443,16 @@ function TagCreateRoute() {
 
 ```tsx
 // src/routes/_authenticated/_layout/tags/$tagId.tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { TagFormPage } from '@/features/tags/tag-form-page'
+import { createFileRoute } from '@tanstack/react-router';
+import { TagFormPage } from '@/features/tags/tag-form-page';
 
 export const Route = createFileRoute('/_authenticated/_layout/tags/$tagId')({
   component: TagEditRoute,
-})
+});
 
 function TagEditRoute() {
-  const { tagId } = Route.useParams()
-  return <TagFormPage tagId={Number(tagId)} />
+  const { tagId } = Route.useParams();
+  return <TagFormPage tagId={Number(tagId)} />;
 }
 ```
 
@@ -501,9 +466,9 @@ The backend currently returns errors as `{ status: number, error: string }`. The
 // Future enhancement when backend supports field-level errors
 // In tag-form-page.tsx handleSubmit onError:
 if (isAxiosError(error) && error.response?.data?.errors) {
-  const fieldErrors = error.response.data.errors as Array<{ field: string; message: string }>
+  const fieldErrors = error.response.data.errors as Array<{ field: string; message: string }>;
   for (const { field, message } of fieldErrors) {
-    form.setError(field as keyof TagFormValues, { type: 'server', message })
+    form.setError(field as keyof TagFormValues, { type: 'server', message });
   }
 } else {
   // Generic toast (current behavior)
@@ -610,13 +575,13 @@ Build shared components and the Tags create/edit pages together.
 
 ## Dependencies & Risks
 
-| Risk | Mitigation |
-|------|------------|
-| Backend API error format varies per entity | Show API error string via toast (current pattern); add field-level mapping later |
-| `useBlocker` API may change in TanStack Router updates | It's stable since v1; wrap in our own component for easy migration |
-| Route conflict between `/tags/create` and `/tags/$tagId` | TanStack Router prioritizes static routes; verified in docs |
-| Long forms need sections/tabs (future entities) | `FormPage.Content` accepts children — sections are just React children, not a framework concern |
-| File upload / rich text fields (Templates) | Out of scope; extend form pattern when needed |
+| Risk                                                     | Mitigation                                                                                      |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Backend API error format varies per entity               | Show API error string via toast (current pattern); add field-level mapping later                |
+| `useBlocker` API may change in TanStack Router updates   | It's stable since v1; wrap in our own component for easy migration                              |
+| Route conflict between `/tags/create` and `/tags/$tagId` | TanStack Router prioritizes static routes; verified in docs                                     |
+| Long forms need sections/tabs (future entities)          | `FormPage.Content` accepts children — sections are just React children, not a framework concern |
+| File upload / rich text fields (Templates)               | Out of scope; extend form pattern when needed                                                   |
 
 ## Success Metrics
 
@@ -627,6 +592,7 @@ Build shared components and the Tags create/edit pages together.
 ## Sources & References
 
 ### Internal References
+
 - List page plan: `docs/plans/2026-03-12-feat-reusable-crud-list-page-components-plan.md`
 - Existing form pattern: `src/features/profile/profile-page.tsx`
 - shadcn Form component: `src/components/ui/form.tsx`
@@ -636,6 +602,7 @@ Build shared components and the Tags create/edit pages together.
 - Tags columns (edit link): `src/features/tags/tags-columns.tsx`
 
 ### External References
+
 - [react-hook-form — useForm](https://react-hook-form.com/docs/useform)
 - [react-hook-form — setError for server errors](https://react-hook-form.com/docs/useform/seterror)
 - [shadcn/ui — Form](https://ui.shadcn.com/docs/components/form)

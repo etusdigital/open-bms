@@ -188,13 +188,7 @@ const handleDeleteRow = (index: number) => {
               />
             </div>
           </div>
-          <BmsButton
-            name="back-page"
-            type="button"
-            variant="primary"
-            :disabled="isSubmitting"
-            @click="handleAddRow()"
-          >
+          <BmsButton name="back-page" type="button" variant="primary" :disabled="isSubmitting" @click="handleAddRow()">
             {{ $t('addNewAccount') }}
           </BmsButton>
         </div>

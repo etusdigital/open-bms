@@ -276,7 +276,7 @@
       <LineComponent :type="'vertical'" v-if="showTimeCustom" />
       <div class="mt-auto time-custom" :class="[{ 'time-custom-focus': isFocused }]" v-if="showTimeCustom">
         <input
-          oninput="value = value.replace(/[^0-9]/g, '');"
+          oninput="value = value.replace(/[^0-9]/g, '')"
           autofocus
           class="form-control mo-input days-input"
           @input="updateTime($event.target.value)"

@@ -10,12 +10,9 @@ describe('computeBackoffMs', () => {
       { attempt: 6, base: 1000, max: 60_000, expected: 32_000 },
       { attempt: 7, base: 1000, max: 60_000, expected: 60_000 },
       { attempt: 20, base: 1000, max: 60_000, expected: 60_000 },
-    ])(
-      'attempt=$attempt, base=$base, max=$max → $expected',
-      ({ attempt, base, max, expected }) => {
-        expect(computeBackoffMs(attempt, base, max)).toBe(expected);
-      },
-    );
+    ])('attempt=$attempt, base=$base, max=$max → $expected', ({ attempt, base, max, expected }) => {
+      expect(computeBackoffMs(attempt, base, max)).toBe(expected);
+    });
   });
 
   describe('guards', () => {

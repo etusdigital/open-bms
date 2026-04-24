@@ -140,6 +140,7 @@ export interface Account {
   updatedAt?: string;
   deletedAt?: string;
   customFields?: CustomFields[];
+  isInternal?: boolean;
 }
 
 export interface AccountConfig {

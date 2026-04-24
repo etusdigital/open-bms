@@ -5,7 +5,7 @@ info:
 
 http:
   method: PATCH
-  url: "{{backoffice-api-url}}/users/me/settings"
+  url: '{{backoffice-api-url}}/users/me/settings'
   body:
     type: json
     json: |

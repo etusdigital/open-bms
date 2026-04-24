@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/tags/segment"
+  url: '{{msgops-api-url}}/tags/segment'
   body:
     type: json
     json: |

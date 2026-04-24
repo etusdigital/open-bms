@@ -345,10 +345,11 @@ describe('MsgopsService', () => {
   });
 
   describe('findContactByUuid', () => {
-    it('should return contact when found', async () => {
-      mockPgPool.query.mockResolvedValueOnce({ rows: [{ id: 20 }] });
+    it('should return contact with id and email when found', async () => {
+      mockPgPool.query.mockResolvedValueOnce({ rows: [{ id: 20, email: 'found@test.com' }] });
       const result = await service.findContactByUuid(1, 'uuid-1');
-      expect(result).toEqual({ id: 20 });
+      expect(result).toEqual({ id: 20, email: 'found@test.com' });
+      expect(mockPgPool.query.mock.calls[0][0]).toMatch(/SELECT id, email FROM contacts/);
     });
 
     it('should return null when not found', async () => {
@@ -432,6 +433,19 @@ describe('MsgopsService', () => {
       expect(query).not.toContain('delivered_id');
     });
 
+    it('should exclude traits (internal bot-detection field) from column list', async () => {
+      mockPgPoolLogs.query.mockResolvedValueOnce({ rows: [] });
+      await service.saveEventsLogs([
+        {
+          accountId: 1,
+          event: 'click',
+          traits: { asn: 15169, asnOrg: 'Google LLC', userType: 'hosting' },
+        },
+      ]);
+      const query = mockPgPoolLogs.query.mock.calls[0][0];
+      expect(query).not.toContain('traits');
+    });
+
     it('should throw Error when query fails', async () => {
       mockPgPoolLogs.query.mockRejectedValueOnce(new Error('db error'));
       await expect(service.saveEventsLogs([{ accountId: 1 }])).rejects.toThrow('Error to save logs');
@@ -489,6 +503,86 @@ describe('MsgopsService', () => {
       mockPgPool.query.mockResolvedValueOnce({ rows: [] });
       await service.clearValidationUnsubscribed(['a@test.com']);
       expect(mockPgPool.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE email_validations'));
+    });
+  });
+
+  describe('findMessageAssociation', () => {
+    const accountId = 10;
+    const messageId = 579367;
+    const name = 'cc_portobnk_hfnc_v1-32';
+
+    it('should return from memory cache on hit', async () => {
+      mockCacheService.get.mockReturnValueOnce({ campaignId: 42 });
+      const result = await service.findMessageAssociation(accountId, messageId, name);
+      expect(result).toEqual({ campaignId: 42 });
+      expect(mockRedisClient.get).not.toHaveBeenCalled();
+      expect(mockPgPool.query).not.toHaveBeenCalled();
+    });
+
+    it('should return from Redis cache when memory cache misses', async () => {
+      mockCacheService.get.mockReturnValueOnce(undefined);
+      mockRedisClient.get.mockResolvedValueOnce(JSON.stringify({ automationId: 88 }));
+      const result = await service.findMessageAssociation(accountId, messageId, name);
+      expect(result).toEqual({ automationId: 88 });
+      expect(mockCacheService.set).toHaveBeenCalledWith('message_association', `${accountId}:${messageId}:${name}`, {
+        automationId: 88,
+      });
+      expect(mockPgPool.query).not.toHaveBeenCalled();
+    });
+
+    it('should resolve campaignId via campaigns_messages join when both caches miss', async () => {
+      mockCacheService.get.mockReturnValueOnce(undefined);
+      mockRedisClient.get.mockResolvedValueOnce(null);
+      mockPgPool.query.mockResolvedValueOnce({ rows: [{ id: 42 }] });
+
+      const result = await service.findMessageAssociation(accountId, messageId, name);
+      expect(result).toEqual({ campaignId: 42 });
+      expect(mockPgPool.query).toHaveBeenCalledTimes(1);
+      expect(mockPgPool.query.mock.calls[0][0]).toMatch(/campaigns_messages/);
+      expect(mockPgPool.query.mock.calls[0][1]).toEqual([accountId, name, messageId]);
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        expect.stringContaining('message_association:'),
+        JSON.stringify({ campaignId: 42 }),
+        'EX',
+        expect.any(Number),
+      );
+    });
+
+    it('should fall back to automations steps LIKE scan when no campaign matches', async () => {
+      mockCacheService.get.mockReturnValueOnce(undefined);
+      mockRedisClient.get.mockResolvedValueOnce(null);
+      mockPgPool.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ id: 88 }] });
+
+      const result = await service.findMessageAssociation(accountId, messageId, name);
+      expect(result).toEqual({ automationId: 88 });
+      expect(mockPgPool.query).toHaveBeenCalledTimes(2);
+      expect(mockPgPool.query.mock.calls[1][0]).toMatch(/automations/);
+      expect(mockPgPool.query.mock.calls[1][0]).toMatch(/steps::text LIKE/);
+      expect(mockPgPool.query.mock.calls[1][1]).toEqual([accountId, name, `%"id": ${messageId}%`]);
+    });
+
+    it('should return empty object and cache the miss when neither campaign nor automation matches', async () => {
+      mockCacheService.get.mockReturnValueOnce(undefined);
+      mockRedisClient.get.mockResolvedValueOnce(null);
+      mockPgPool.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
+
+      const result = await service.findMessageAssociation(accountId, messageId, name);
+      expect(result).toEqual({});
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        expect.stringContaining('message_association:'),
+        JSON.stringify({}),
+        'EX',
+        expect.any(Number),
+      );
+    });
+
+    it('should not run LIKE scan when campaign lookup already hit', async () => {
+      mockCacheService.get.mockReturnValueOnce(undefined);
+      mockRedisClient.get.mockResolvedValueOnce(null);
+      mockPgPool.query.mockResolvedValueOnce({ rows: [{ id: 42 }] });
+
+      await service.findMessageAssociation(accountId, messageId, name);
+      expect(mockPgPool.query).toHaveBeenCalledTimes(1);
     });
   });
 });

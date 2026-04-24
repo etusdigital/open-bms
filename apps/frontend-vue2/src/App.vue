@@ -175,7 +175,11 @@ export default class App extends Vue {
 }
 
 .material-symbols-rounded {
-  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  font-variation-settings:
+    'FILL' 1,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
 }
 
 .theme--light.v-data-table > .v-data-table__wrapper > table > tbody > tr > td {
@@ -190,7 +194,10 @@ export default class App extends Vue {
 
 .theme--light.v-data-table > .v-data-table__wrapper > table > tbody > tr:hover {
   background: transparent !important;
-  box-shadow: inset 1px 0 0 $ds-gray-300, inset 0px 0 0 $ds-gray-300, 0 1px 2px 0 rgba(60, 64, 67, 0.3),
+  box-shadow:
+    inset 1px 0 0 $ds-gray-300,
+    inset 0px 0 0 $ds-gray-300,
+    0 1px 2px 0 rgba(60, 64, 67, 0.3),
     0 1px 3px 1px rgba(60, 64, 67, 0.15);
 }
 
@@ -382,7 +389,9 @@ body {
   background-color: #ffffff;
   margin-bottom: 24px;
   border-radius: 16px !important;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .c-cards {
@@ -457,7 +466,9 @@ p {
   width: 380px;
 }
 ::v-deep.v-text-field.v-text-field--solo:not(.v-text-field--solo-flat) > .v-input__control > .v-input__slot {
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1) !important;
 }
 .v-data-table-header__icon {
   color: $ds-blue !important;
@@ -801,7 +812,9 @@ button.btn-back {
 .v--modal {
   height: auto !important;
   background: $ds-gray-100 !important;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
   border-radius: 16px !important;
 }
 .v--modal-box {
@@ -819,7 +832,9 @@ button.btn-back {
   right: 22px;
 
   .v-sheet.v-snack__wrapper:not(.v-sheet--outlined) {
-    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow:
+      0px 1px 2px rgba(0, 0, 0, 0.06),
+      0px 1px 3px rgba(0, 0, 0, 0.1);
   }
   .v-snack__wrapper {
     min-width: 464px;
@@ -942,7 +957,9 @@ button.btn-back {
 }
 .v-menu__content {
   border-radius: 8px !important;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .v-list-item__action {
@@ -982,7 +999,9 @@ button.btn-back {
 .c-menu {
   background: #ffffff;
   border: 1px solid $neutral-gray-500;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
   border-radius: 4px;
   width: 149px;
   min-width: 149px !important;
@@ -1308,9 +1327,11 @@ a.button {
 }
 
 select.mo-select {
-  background-image: linear-gradient(45deg, transparent 50%, gray 50%),
-    linear-gradient(135deg, gray 50%, transparent 50%);
-  background-position: calc(100% - 20px) calc(1em + 2px), calc(100% - 15px) calc(1em + 2px);
+  background-image:
+    linear-gradient(45deg, transparent 50%, gray 50%), linear-gradient(135deg, gray 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) calc(1em + 2px),
+    calc(100% - 15px) calc(1em + 2px);
   background-size: 6px 6px;
   background-repeat: no-repeat;
 }
@@ -1320,9 +1341,11 @@ select.mo-select:focus {
 }
 
 select.mo-select:active {
-  background-image: linear-gradient(45deg, $ds-blue 50%, transparent 50%),
-    linear-gradient(135deg, transparent 50%, $ds-blue 50%);
-  background-position: calc(100% - 15px) 1em, calc(100% - 20px) 1em;
+  background-image:
+    linear-gradient(45deg, $ds-blue 50%, transparent 50%), linear-gradient(135deg, transparent 50%, $ds-blue 50%);
+  background-position:
+    calc(100% - 15px) 1em,
+    calc(100% - 20px) 1em;
   background-size: 6px 6px;
   background-repeat: no-repeat;
   outline: 0;
@@ -1373,6 +1396,10 @@ select.mo-select:active {
 }
 
 .unfilled-icon {
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24 !important;
 }
 </style>

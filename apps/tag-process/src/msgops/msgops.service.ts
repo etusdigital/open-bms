@@ -628,6 +628,9 @@ export class MsgopsService {
     }
 
     const contact = await getContacts.getOne();
+    if (!contact) {
+      return null;
+    }
     contact.parseCustomFields(keyType || CustomFieldKeyType.ID);
 
     return contact;

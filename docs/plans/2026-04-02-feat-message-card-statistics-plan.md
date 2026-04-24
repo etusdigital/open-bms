@@ -1,5 +1,5 @@
 ---
-title: "feat: Add Per-Step Statistics to Message Cards"
+title: 'feat: Add Per-Step Statistics to Message Cards'
 type: feat
 status: active
 date: 2026-04-02
@@ -16,6 +16,7 @@ Add live statistics to message step cards (email, webPush, mobilePush, testAB, r
 **Endpoint:** `GET /statistics/messages`
 
 **Params:**
+
 ```
 email: string[]       // single-quoted message IDs: ["'123'", "'456'"]
 webPush: string[]     // same format
@@ -26,6 +27,7 @@ automationId: number
 ```
 
 **Response:** Object keyed by `message_id`:
+
 ```json
 {
   "123": {
@@ -46,6 +48,7 @@ automationId: number
 ## Stat Display Per Step Type
 
 ### Single Email Step
+
 4 inline stat tiles on the card:
 | Stat | Formula | Display |
 |------|---------|---------|
@@ -57,6 +60,7 @@ automationId: number
 "More Statistics" button → opens link to `/messages/email/statistics?messages={id}` in new tab.
 
 ### TestAB Step (running)
+
 Per-message: shows winner criteria stat (open or click) with percentage + count.
 Winner highlighted green, loser red.
 Total delivered at bottom.
@@ -64,24 +68,27 @@ Total delivered at bottom.
 "Finish Test" button → calls `POST /automations/finish-testab`.
 
 ### TestAB Step (finished)
+
 Shows winner message with all 4 inline stats.
 "View A/B Test" button → opens dialog with full stats.
 
 ### Random Message Steps
+
 List of messages on card.
 "More Statistics" button → opens dialog with all 8 stat columns per message.
 
 ### Full Stats Dialog (8 columns)
-| Column | Formula |
-|--------|---------|
-| Total Delivered | raw count |
-| Open | `open/delivered × 100` |
-| Unique Open | `unique_open/delivered × 100` |
-| Click | `click/delivered × 100` |
-| Unique Click | `unique_click/delivered × 100` |
-| CTOR | `click/open × 100` |
-| Unsubscribe | `unsubscribe/delivered × 100` |
-| Bounce | `bounce/delivered × 100` |
+
+| Column          | Formula                        |
+| --------------- | ------------------------------ |
+| Total Delivered | raw count                      |
+| Open            | `open/delivered × 100`         |
+| Unique Open     | `unique_open/delivered × 100`  |
+| Click           | `click/delivered × 100`        |
+| Unique Click    | `unique_click/delivered × 100` |
+| CTOR            | `click/open × 100`             |
+| Unsubscribe     | `unsubscribe/delivered × 100`  |
+| Bounce          | `bounce/delivered × 100`       |
 
 ## Implementation Tasks
 
@@ -92,7 +99,7 @@ List of messages on card.
 Fetches `GET /statistics/messages` with the automation's message IDs. Collects all message IDs from the current flow by walking nodes.
 
 ```typescript
-export function useMessageStatistics(automationId: number, messageIds: number[], daysFilter: number)
+export function useMessageStatistics(automationId: number, messageIds: number[], daysFilter: number);
 ```
 
 ### Task 2: Add date range selector to top bar
@@ -106,6 +113,7 @@ Expand `message-node.tsx` (the generic factory) to show inline stat tiles below 
 ### Task 4: Update testAB node card
 
 Expand `testab-node.tsx` to show:
+
 - Per-message winner criteria stat with green/red highlighting
 - Total delivered count
 - "More Statistics" / "Finish Test" buttons

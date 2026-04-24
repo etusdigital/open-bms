@@ -1816,7 +1816,9 @@ export default class CampaignsView extends Vue {
   margin-top: 16px;
   border-radius: 16px;
   width: 100%;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
 
   th.text-start {
     white-space: nowrap;
@@ -1929,7 +1931,9 @@ export default class CampaignsView extends Vue {
   gap: 25px;
   padding: 20px;
   border-radius: 16px;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1) !important;
   height: 107px;
 }
 
@@ -1959,7 +1963,9 @@ export default class CampaignsView extends Vue {
 
 .card-statistics-items {
   background-color: white;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1) !important;
   border-radius: 10px;
   width: 33%;
   height: 100px;
@@ -2505,7 +2511,9 @@ export default class CampaignsView extends Vue {
     background-color: $neutral-basic-white;
     border-radius: 8px;
     padding: 10px;
-    box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+    box-shadow:
+      0px 1px 3px 0px rgba(0, 0, 0, 0.1),
+      0px 1px 2px 0px rgba(0, 0, 0, 0.06);
     width: max-content;
     transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     &:hover {

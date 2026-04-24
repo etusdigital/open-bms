@@ -13,8 +13,8 @@
           isLoadingSearch
             ? $t('input.searching')
             : searchOptions
-            ? `${$t('datatable.noData')}`
-            : $t('datatable.noMessages')
+              ? `${$t('datatable.noData')}`
+              : $t('datatable.noMessages')
         "
         :items="optionsSelect"
         :item-text="'name'"
@@ -147,10 +147,10 @@ export default class RandomMessageComponent extends Vue {
           this.step.type === 'randomMessage'
             ? 'email'
             : this.step.type === 'randomWebPush'
-            ? 'web-push'
-            : this.step.type === 'randomMobilePush'
-            ? 'mobile-push'
-            : '',
+              ? 'web-push'
+              : this.step.type === 'randomMobilePush'
+                ? 'mobile-push'
+                : '',
         itemsPerPage: 40,
       });
       return response.data?.results.map((message: any) => {

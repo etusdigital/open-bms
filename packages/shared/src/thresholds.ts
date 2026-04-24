@@ -54,11 +54,7 @@ export const ALERT_THRESHOLDS: AlertThreshold[] = [
   },
 ];
 
-export function getSeverity(
-  type: AlertType,
-  currentValue: number,
-  baselineValue: number,
-): AlertSeverity | null {
+export function getSeverity(type: AlertType, currentValue: number, baselineValue: number): AlertSeverity | null {
   const threshold = ALERT_THRESHOLDS.find((t) => t.type === type);
   if (!threshold) return null;
 
@@ -148,7 +144,7 @@ export const ALERT_THRESHOLDS_V2: AlertThresholdV2[] = [
     minDataPoints: 5,
     absoluteFloor: 500,
     minSpread: 1,
-    minSpreadPct: 0.10,
+    minSpreadPct: 0.1,
     minAbsoluteDeviation: 0,
     minBaselineMedian: 50,
   },
@@ -160,7 +156,7 @@ export const ALERT_THRESHOLDS_V2: AlertThresholdV2[] = [
     minDataPoints: 5,
     absoluteFloor: 200, // baseline median must exceed this
     minSpread: 1,
-    minSpreadPct: 0.10,
+    minSpreadPct: 0.1,
     minAbsoluteDeviation: 0,
   },
   {

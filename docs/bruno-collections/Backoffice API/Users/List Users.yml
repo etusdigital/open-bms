@@ -5,12 +5,12 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/users"
+  url: '{{backoffice-api-url}}/users'
   params:
     - name: page
-      value: "1"
+      value: '1'
     - name: limit
-      value: "50"
+      value: '50'
   auth: inherit
 
 settings:

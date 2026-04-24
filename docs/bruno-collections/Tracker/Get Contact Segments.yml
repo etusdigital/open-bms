@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{tracker-url}}/cs"
+  url: '{{tracker-url}}/cs'
   body:
     type: json
     json: |

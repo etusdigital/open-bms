@@ -5,16 +5,16 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/alerts"
+  url: '{{backoffice-api-url}}/alerts'
   params:
     - name: page
-      value: "1"
+      value: '1'
     - name: pageSize
-      value: "20"
+      value: '20'
     - name: status
-      value: "active"
+      value: 'active'
     - name: timezone
-      value: "UTC"
+      value: 'UTC'
   auth: inherit
 
 settings:

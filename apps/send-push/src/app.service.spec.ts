@@ -836,4 +836,24 @@ describe('AppService', () => {
     expect(service.getAccountConfig(configs, 'language')).toBe('en-US');
     expect(service.getAccountConfig(configs, 'missing')).toBeUndefined();
   });
+
+  it('addDefaultUTMs should add trailing slash before query when account is internal', () => {
+    const internalAccount = { ...account, isInternal: true };
+    const url = 'https://example.com/lp';
+
+    const result = service.addDefaultUTMs(url, internalAccount as never, 'campaign-int', 'web-push');
+
+    expect(result).toContain('/lp/?');
+    expect(result.startsWith('https://example.com/lp/?')).toBe(true);
+  });
+
+  it('addDefaultUTMs should not add trailing slash when account is external', () => {
+    const externalAccount = { ...account, isInternal: false };
+    const url = 'https://example.com/lp';
+
+    const result = service.addDefaultUTMs(url, externalAccount as never, 'campaign-ext', 'web-push');
+
+    expect(result.startsWith('https://example.com/lp?')).toBe(true);
+    expect(result).not.toContain('/lp/?');
+  });
 });

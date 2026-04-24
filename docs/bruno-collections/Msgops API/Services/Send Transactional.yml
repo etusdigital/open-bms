@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/services/send-transactional"
+  url: '{{msgops-api-url}}/services/send-transactional'
   body:
     type: json
     json: |

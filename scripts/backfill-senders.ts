@@ -106,7 +106,9 @@ async function main() {
   const chDb = env.CLICKHOUSE_DATABASE;
 
   if (!chHost || !chUser || !chDb) {
-    console.error('Missing ClickHouse credentials. Set CLICKHOUSE_HOST, CLICKHOUSE_USERNAME, CLICKHOUSE_PASSWORD, CLICKHOUSE_DATABASE');
+    console.error(
+      'Missing ClickHouse credentials. Set CLICKHOUSE_HOST, CLICKHOUSE_USERNAME, CLICKHOUSE_PASSWORD, CLICKHOUSE_DATABASE',
+    );
     process.exit(1);
   }
 
@@ -118,7 +120,9 @@ async function main() {
   const pgDb = env.TYPEORM_DATABASE;
 
   if (!pgHost || !pgUser || !pgDb) {
-    console.error('Missing PostgreSQL credentials. Set TYPEORM_HOST, TYPEORM_PORT, TYPEORM_USERNAME, TYPEORM_PASSWORD, TYPEORM_DATABASE');
+    console.error(
+      'Missing PostgreSQL credentials. Set TYPEORM_HOST, TYPEORM_PORT, TYPEORM_USERNAME, TYPEORM_PASSWORD, TYPEORM_DATABASE',
+    );
     process.exit(1);
   }
 
@@ -205,7 +209,10 @@ async function main() {
     ]);
 
     // Build lookup maps
-    const poolsByNameAccount = new Map<string, { id: number; poolName: string; accountId: number; currentIps: string[]; senderEmail: string | null }>();
+    const poolsByNameAccount = new Map<
+      string,
+      { id: number; poolName: string; accountId: number; currentIps: string[]; senderEmail: string | null }
+    >();
     for (const row of poolsRes.rows) {
       const key = `${row.pool_name}::${row.account_id}`;
       poolsByNameAccount.set(key, {
@@ -242,7 +249,13 @@ async function main() {
 
     // Accumulate IPs per pool
     const poolIpSets = new Map<number, Set<string>>(); // poolId → Set<ipAddress>
-    const newAssignments: { ipId: number; poolId: number; poolName: string; accountId: number; senderEmail: string | null }[] = [];
+    const newAssignments: {
+      ipId: number;
+      poolId: number;
+      poolName: string;
+      accountId: number;
+      senderEmail: string | null;
+    }[] = [];
 
     let skippedNoPool = 0;
     let skippedNoIp = 0;
@@ -346,10 +359,7 @@ async function main() {
 
     // Update pools.ip
     for (const u of poolUpdates) {
-      await pgClient.query('UPDATE pools SET ip = $1 WHERE id = $2', [
-        JSON.stringify(u.ips),
-        u.poolId,
-      ]);
+      await pgClient.query('UPDATE pools SET ip = $1 WHERE id = $2', [JSON.stringify(u.ips), u.poolId]);
     }
     console.log(`  Updated ${poolUpdates.length} pool(s)`);
 
@@ -361,7 +371,15 @@ async function main() {
 
       for (const a of newAssignments) {
         placeholders.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`);
-        values.push(a.ipId, a.poolId, a.poolName, a.accountId, a.senderEmail, 'backfill-script', 'Backfilled from ClickHouse events (last 90 days)');
+        values.push(
+          a.ipId,
+          a.poolId,
+          a.poolName,
+          a.accountId,
+          a.senderEmail,
+          'backfill-script',
+          'Backfilled from ClickHouse events (last 90 days)',
+        );
       }
 
       await pgClient.query(

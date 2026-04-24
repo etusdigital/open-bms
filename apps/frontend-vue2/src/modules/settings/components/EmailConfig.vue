@@ -47,7 +47,9 @@ export default class EmailConfig extends Vue {
 @import '@/assets/styles/variables.scss';
 
 ::v-deep.v-card {
-  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06) !important;
+  box-shadow:
+    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
+    0px 1px 2px 0px rgba(0, 0, 0, 0.06) !important;
 }
 
 .message-form {

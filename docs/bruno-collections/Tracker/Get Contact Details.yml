@@ -5,15 +5,15 @@ info:
 
 http:
   method: GET
-  url: "{{tracker-url}}/contacts"
+  url: '{{tracker-url}}/contacts'
   params:
     - name: email
-      value: "user@example.com"
+      value: 'user@example.com'
     - name: includes
-      value: "details,tags,segments"
+      value: 'details,tags,segments'
   headers:
     - name: account-id
-      value: "1"
+      value: '1'
   auth: none
 
 settings:

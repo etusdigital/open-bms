@@ -1,4 +1,4 @@
-import { CampaignConfigDto } from "./campaign-config.dto";
+import { CampaignConfigDto } from './campaign-config.dto';
 
 export class CampaignRuleDto {
   id?: number;

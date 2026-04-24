@@ -1,9 +1,19 @@
 import { Injectable } from '@nestjs/common';
+import { addTrailingSlash } from '@msgops/url-utils';
 import { Account, CampaignMessage, CampaignMessageType, AutomationMessage, Contact } from './interfaces';
 import { MsgopsService } from './msgops/msgops.service';
 import { PubSubProvider } from './providers/pubsub.provider';
 import { Utils } from './utils/index.utils';
 import { EvolutionProvider } from './providers/evolution.provider';
+
+interface CreateRedirectLinkOptions {
+  url: string;
+  utmsDefault: string;
+  type: string;
+  utmCampaign: string;
+  baseUrl: string;
+  account: Account;
+}
 
 @Injectable()
 export class AppService {
@@ -36,7 +46,16 @@ export class AppService {
         const defaultUtmCampaign = `${campaignMessage.campaign?.name || campaignMessage.campaign_name}_e1_${message.id}`;
         const utmsCallback = shortUtms + `&utmcampaign=${defaultUtmCampaign}`;
 
-        const shortCode = message.url ? await this.createRedictLink(message.url, shortUtms, message.type, defaultUtmCampaign, '') : null;
+        const shortCode = message.url
+          ? await this.createRedirectLink({
+              url: message.url,
+              utmsDefault: shortUtms,
+              type: message.type,
+              utmCampaign: defaultUtmCampaign,
+              baseUrl: '',
+              account,
+            })
+          : null;
         return await evolutionProvider.sendWhatsappTemplate(message.providerMessageId, language, contact.whatsapp, utmsCallback, shortCode);
       }),
     );
@@ -65,7 +84,16 @@ export class AppService {
     if (!contact.hasWhatsapp) {
       return await this.invalidContact(contact, automationMessage);
     }
-    const shortCode = message.url ? await this.createRedictLink(message.url, shortUtms, message.type, defaultUtmCampaign, '') : null;
+    const shortCode = message.url
+      ? await this.createRedirectLink({
+          url: message.url,
+          utmsDefault: shortUtms,
+          type: message.type,
+          utmCampaign: defaultUtmCampaign,
+          baseUrl: '',
+          account,
+        })
+      : null;
     await evolutionProvider.sendWhatsappTemplate(message.providerMessageId, language, contact.whatsapp, utmCallback, shortCode, contact.code);
 
     if (!automationMessage.next || !automationMessage.next?.pubName) {
@@ -124,7 +152,9 @@ export class AppService {
     return await this.pubSubProvider.sendMessage(tracker, process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER);
   }
 
-  async createRedictLink(url: string, utmsDefault: string, type: string, utmCampaign: string, baseUrl: string) {
+  async createRedirectLink(opts: CreateRedirectLinkOptions) {
+    let { url } = opts;
+    const { utmsDefault, type, utmCampaign, baseUrl, account } = opts;
     url += url.includes('?') ? `&${utmsDefault}` : `?${utmsDefault}`;
     if (!url.includes('utm_source')) {
       url += '&utm_source=bms';
@@ -134,6 +164,9 @@ export class AppService {
     }
     if (!url.includes('utm_campaign')) {
       url += `&utm_campaign=${utmCampaign}`;
+    }
+    if (account.isInternal) {
+      url = addTrailingSlash(url);
     }
     return await this.msgopsService.createShortLink(url, baseUrl);
   }

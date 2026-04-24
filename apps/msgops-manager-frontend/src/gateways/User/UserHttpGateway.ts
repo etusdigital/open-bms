@@ -1,15 +1,13 @@
 import { CreateUser, EditUser, User } from '../../entities/User';
 import { HttpClient, axiosAdapter } from '../../infra/HttpClient';
-import {
-  BmsHttpParams,
-  BmsHttpResponse,
-  bmsHttpParamsDefault,
-  getBmsHttpParamsToString,
-} from '../_common/Bms';
+import { BmsHttpParams, BmsHttpResponse, bmsHttpParamsDefault, getBmsHttpParamsToString } from '../_common/Bms';
 import { UserGateway } from './UserGateway.types';
 
 export class UserHttpGateway implements UserGateway {
-  constructor(readonly httpClient: HttpClient, readonly baseUrl: string) {}
+  constructor(
+    readonly httpClient: HttpClient,
+    readonly baseUrl: string,
+  ) {}
 
   async getAll(params: BmsHttpParams): Promise<BmsHttpResponse<User[]>> {
     const mergedParams = { ...bmsHttpParamsDefault, ...params };

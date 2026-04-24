@@ -105,7 +105,7 @@ onMounted(() => {
 
     <div class="tw-flex">
       <div
-        class="focus:tw-shadow-outline tw-flex tw-w-full tw-border tw-border-gray-light tw-appearance-none tw-items-center tw-rounded-lg tw-py-2 tw-px-3 tw-leading-tight tw-text-main-gray tw-shadow focus:tw-outline-none"
+        class="focus:tw-shadow-outline tw-flex tw-w-full tw-appearance-none tw-items-center tw-rounded-lg tw-border tw-border-gray-light tw-px-3 tw-py-2 tw-leading-tight tw-text-main-gray tw-shadow focus:tw-outline-none"
         :class="{ ...getStyleDisabled(Boolean(disabled)) }"
       >
         <slot name="addon-before"></slot>
@@ -116,7 +116,7 @@ onMounted(() => {
           :value="inputValue"
           :placeholder="placeholder"
           :disabled="props.disabled"
-          class="tw-bg-transparent tw-mr-3 tw-w-full tw-appearance-none tw-border-none tw-py-0.5 tw-text-xs tw-text-main-gray tw-leading-tight focus:tw-outline-none"
+          class="tw-bg-transparent tw-mr-3 tw-w-full tw-appearance-none tw-border-none tw-py-0.5 tw-text-xs tw-leading-tight tw-text-main-gray focus:tw-outline-none"
           :class="{ ...getStyleDisabled(Boolean(disabled)) }"
           @input="handleChange"
           @blur="handleBlur"
@@ -124,16 +124,16 @@ onMounted(() => {
         <button
           v-if="password"
           type="button"
-          class="tw-bg-transparent tw-w-4 tw-flex-shrink-0 tw-rounded tw-border-4 -tw-mt-1"
+          class="tw-bg-transparent -tw-mt-1 tw-w-4 tw-flex-shrink-0 tw-rounded tw-border-4"
           @click="generatePassword"
         >
           <RefreshOutline color="#A6A6A6" />
         </button>
       </div>
-        <button v-if="password" type="button" class="tw-ml-2 tw-w-[18px]" @click="handleCopy">
-          <v-tooltip activator="parent" location="top">{{ tooltipText }}</v-tooltip>
-          <Copy color="#A6A6A6" />
-        </button>
+      <button v-if="password" type="button" class="tw-ml-2 tw-w-[18px]" @click="handleCopy">
+        <v-tooltip activator="parent" location="top">{{ tooltipText }}</v-tooltip>
+        <Copy color="#A6A6A6" />
+      </button>
     </div>
 
     <p v-if="errorMessage && meta.touched" class="tw-text-xs tw-text-gray" :class="{ 'tw-text-red': !!errorMessage }">

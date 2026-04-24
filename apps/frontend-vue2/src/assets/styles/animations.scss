@@ -1,12 +1,13 @@
 @import '@/assets/styles/variables.scss';
 
 @keyframes dotFlashing {
-	0% {
-		background-color: $neutral-gray-800;
-	}
-	50%, 100% {
-		background-color: $neutral-gray-400;
-	}
+  0% {
+    background-color: $neutral-gray-800;
+  }
+  50%,
+  100% {
+    background-color: $neutral-gray-400;
+  }
 }
 
 @keyframes fadeout {
@@ -17,48 +18,49 @@
 }
 
 .loading-dot-flashing {
-	position: relative;
+  position: relative;
   display: inline-flex;
-	width: 10px;
-	height: 10px;
+  width: 10px;
+  height: 10px;
   margin: 0 20px;
-	border-radius: 5px;
-	background-color: $neutral-gray-800;
-	color: $neutral-gray-800;
-	animation: dotFlashing 1s infinite linear alternate;
-	animation-delay: .5s;
-	&::before {
-		content: '';
-		display: inline-block;
-		position: absolute;
-		top: 0;
-		left: -15px;
-		width: 10px;
-		height: 10px;
-		border-radius: 5px;
-		background-color: $neutral-gray-800;
-		color: $neutral-gray-800;
-		animation: dotFlashing 1s infinite alternate;
-		animation-delay: 0s;
-	}
-	&::after {
-		content: '';
-		display: inline-block;
-		position: absolute;
-		top: 0;
-		left: 15px;
-		width: 10px;
-		height: 10px;
-		border-radius: 5px;
-		background-color: $neutral-gray-800;
-		color: $neutral-gray-800;
-		animation: dotFlashing 1s infinite alternate;
-		animation-delay: 1s;
-	}
+  border-radius: 5px;
+  background-color: $neutral-gray-800;
+  color: $neutral-gray-800;
+  animation: dotFlashing 1s infinite linear alternate;
+  animation-delay: 0.5s;
+  &::before {
+    content: '';
+    display: inline-block;
+    position: absolute;
+    top: 0;
+    left: -15px;
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
+    background-color: $neutral-gray-800;
+    color: $neutral-gray-800;
+    animation: dotFlashing 1s infinite alternate;
+    animation-delay: 0s;
+  }
+  &::after {
+    content: '';
+    display: inline-block;
+    position: absolute;
+    top: 0;
+    left: 15px;
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
+    background-color: $neutral-gray-800;
+    color: $neutral-gray-800;
+    animation: dotFlashing 1s infinite alternate;
+    animation-delay: 1s;
+  }
 }
 
 @keyframes flashUpdate {
-  0%, 100% {
+  0%,
+  100% {
     background-color: transparent;
   }
   50% {
@@ -67,7 +69,8 @@
 }
 
 @keyframes flashUpdateAction {
-  0%, 100% {
+  0%,
+  100% {
     background-color: transparent;
   }
   50% {
@@ -77,8 +80,8 @@
 
 .row-updated {
   animation: flashUpdate 1s ease-in-out 1;
-	
-	& > .action-cell > .action-row {
-		animation: flashUpdateAction 1s ease-in-out 1;		
-	}
+
+  & > .action-cell > .action-row {
+    animation: flashUpdateAction 1s ease-in-out 1;
+  }
 }

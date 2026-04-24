@@ -13,7 +13,7 @@ import { Pagination } from '../../../utils/pagination';
 type sortBy = {
   key: string;
   order: string;
-}
+};
 
 const { push } = useRouter();
 const { query } = useRoute();
@@ -23,7 +23,7 @@ const { user: userState, users, loading, error } = storeToRefs(useUserStore());
 const { fetchUsers } = useUserStore();
 
 let pagination = new Pagination();
-const options: any = ref({ page: 1, itemsPerPage: 10, sortBy: []});
+const options: any = ref({ page: 1, itemsPerPage: 10, sortBy: [] });
 
 const search = ref('');
 const totalUserData = ref(0);
@@ -43,13 +43,13 @@ const setValuesUrl = () => {
   };
 
   const shouldUpdateQueryString = _.isEqualWith(query, queryParams, (x, y) =>
-    typeof x === 'object' && typeof y === 'object' ? undefined : x == y
+    typeof x === 'object' && typeof y === 'object' ? undefined : x == y,
   );
 
   if (!shouldUpdateQueryString) {
     push({ query: queryParams });
   }
-}
+};
 
 const getValuesUrl = () => {
   if (query.page) {
@@ -58,10 +58,12 @@ const getValuesUrl = () => {
     pagination.sortBy = String(query.sortBy);
     pagination.order = String(query.order);
     search.value = String(query.search);
-    sortByRef.value = [{
-      key: String(query.sortBy),
-      order: String(query.order),
-    }];
+    sortByRef.value = [
+      {
+        key: String(query.sortBy),
+        order: String(query.order),
+      },
+    ];
 
     if (Number(options.value.page) !== Number(query.page)) {
       options.value = {
@@ -74,12 +76,12 @@ const getValuesUrl = () => {
 
   options.value = { ...options };
   pagination = { ...pagination };
-}
+};
 
 onMounted(async () => {
   getValuesUrl();
   await getUsers(pagination);
-})
+});
 
 const getUsers = async (params: Pagination) => {
   try {
@@ -99,7 +101,7 @@ const getUsers = async (params: Pagination) => {
   } finally {
     loading.value = false;
   }
-}
+};
 
 const dataTableHeaders = [
   { title: t('name'), align: 'start' as const, key: 'name', sortable: true },
@@ -114,7 +116,7 @@ const handlePagination = async () => await getUsers(pagination);
 const filterByName = async () => {
   pagination = new Pagination();
   await getUsers(pagination);
-}
+};
 
 const onChangeOptions = async (sortBy: sortBy[]) => {
   if (loading.value) return;
@@ -122,8 +124,8 @@ const onChangeOptions = async (sortBy: sortBy[]) => {
   if (!sortBy[0]) {
     pagination = {
       ...pagination,
-      sortBy: "",
-      order: "",
+      sortBy: '',
+      order: '',
     };
 
     sortByRef.value = initialSortByValue;
@@ -136,17 +138,17 @@ const onChangeOptions = async (sortBy: sortBy[]) => {
   }
 
   await getUsers(pagination);
-}
+};
 </script>
 
 <template>
   <BmsPageBase>
     <BmsPageTitleWithPlusAction @click-plus="handlePlusClick">
-      {{$t('userPage.users').toLocaleLowerCase()}}
+      {{ $t('userPage.users').toLocaleLowerCase() }}
     </BmsPageTitleWithPlusAction>
     <div>
       <form
-        class="tw-mt-3 tw-max-w-[283px] tw-max-h-10 tw-p-1 tw-flex tw-flex-row tw-border tw-border-gray-light tw-bg-white tw-rounded-lg focus-within:tw-outline focus-within:tw-outline-primary"
+        class="tw-mt-3 tw-flex tw-max-h-10 tw-max-w-[283px] tw-flex-row tw-rounded-lg tw-border tw-border-gray-light tw-bg-white tw-p-1 focus-within:tw-outline focus-within:tw-outline-primary"
         @submit.prevent="filterByName"
       >
         <input
@@ -154,39 +156,55 @@ const onChangeOptions = async (sortBy: sortBy[]) => {
           class="tw-grow tw-px-2 focus:tw-outline-none"
           :placeholder="$t('search')"
           :disabled="loading"
-        >
+        />
         <button type="submit" class="tw-mr-2 tw-mt-0.5 tw-h-5 tw-w-4 tw-text-main-gray">
-          <SearchOutline color="#5C5C5C"/>
+          <SearchOutline color="#5C5C5C" />
         </button>
       </form>
-       <p v-if="error">{{ error?.message }}</p>
+      <p v-if="error">{{ error?.message }}</p>
       <div class="tw-mt-4">
-        <v-skeleton-loader v-if="loading" class="tw-rounded-2xl" :elevation="1" color="white" type="table-tbody"></v-skeleton-loader>
-          <v-data-table-server
-            v-else
-            v-model:sort-by="sortByRef"
-            class="tw-rounded-2xl tw-border-solid tw-text-main-gray tw-shadow-md"
-            :headers="dataTableHeaders"
-            :items="users.results"
-            :items-length="totalUserData"
-            :items-per-page="users.itemsPerPage"
-            :loading="loading"
-            @update:sort-by="onChangeOptions"
-          >
-            <template #[`item.name`]="{ item }">
-              <RouterLink :to="`/users/edit/${item.id}`" class="tw-text-primary tw-underline tw-font-semibold">{{ item.name }}</RouterLink>
-            </template>
+        <v-skeleton-loader
+          v-if="loading"
+          class="tw-rounded-2xl"
+          :elevation="1"
+          color="white"
+          type="table-tbody"
+        ></v-skeleton-loader>
+        <v-data-table-server
+          v-else
+          v-model:sort-by="sortByRef"
+          class="tw-rounded-2xl tw-border-solid tw-text-main-gray tw-shadow-md"
+          :headers="dataTableHeaders"
+          :items="users.results"
+          :items-length="totalUserData"
+          :items-per-page="users.itemsPerPage"
+          :loading="loading"
+          @update:sort-by="onChangeOptions"
+        >
+          <template #[`item.name`]="{ item }">
+            <RouterLink :to="`/users/edit/${item.value}`" class="tw-font-semibold tw-text-primary tw-underline">{{
+              item.columns.name
+            }}</RouterLink>
+          </template>
 
-            <template #[`item.email`]="{ item }">
-              <p>{{ item.email }}</p>
-            </template>
+          <template #[`item.email`]="{ item }">
+            <p>{{ item.columns.email }}</p>
+          </template>
 
-            <template #[`item.createdAt`]="{ item }">
-              <p>{{ dateWithTimeFormatter(item.createdAt, $t('userPage.timePreposition'), userState?.settings.language) }}</p>
-            </template>
+          <template #[`item.createdAt`]="{ item }">
+            <p>
+              {{
+                dateWithTimeFormatter(
+                  item.columns.createdAt,
+                  $t('userPage.timePreposition'),
+                  userState?.settings.language,
+                )
+              }}
+            </p>
+          </template>
 
-            <template #bottom></template>
-          </v-data-table-server>
+          <template #bottom></template>
+        </v-data-table-server>
 
         <v-pagination
           v-model="pagination.page"

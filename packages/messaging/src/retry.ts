@@ -1,8 +1,4 @@
-export function computeBackoffMs(
-  attempt: number,
-  baseMs: number,
-  maxMs: number,
-): number {
+export function computeBackoffMs(attempt: number, baseMs: number, maxMs: number): number {
   if (baseMs <= 0) return 0;
   if (maxMs < baseMs) return maxMs;
   if (attempt < 1) return baseMs;
