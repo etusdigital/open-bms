@@ -37,6 +37,10 @@ yarn dev        # http://localhost:5173
 4. Quando o token expira, interceptor tenta `POST /auth/refresh` usando o cookie — se falhar, redireciona para `/login`.
 5. Roles/permissions vêm de `GET /users/me` e populam `useUserStore` (`effectiveRole`, `permissions`, `isSuperAdmin`, `canSeeAllAccounts`).
 
+## Audience: super-admin only
+
+Esta UI é o console de super-admin (gerencia tenants e usuários globais). O `router.ts` verifica `userStore.isSuperAdmin` no guard de navegação e redireciona qualquer user não-super-admin para `VITE_APP_REDIRECT_MSGOPS` (o app de operações — `apps/frontend-vue2`). Admins de conta, editores, etc. não têm UI aqui, vão direto pro app de ops.
+
 ## Build
 
 ```bash
