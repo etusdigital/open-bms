@@ -451,9 +451,7 @@ export default class Transactional extends Vue {
 @import '@/assets/styles/bs-layout.scss';
 
 .automation {
-  box-shadow:
-    0px 1px 2px rgba(0, 0, 0, 0.06),
-    0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
   border-radius: 16px;
 }
 
@@ -490,9 +488,7 @@ export default class Transactional extends Vue {
 
 ::v-deep.c-table {
   margin-top: 16px;
-  box-shadow:
-    0px 1px 2px rgba(0, 0, 0, 0.06),
-    0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
   border-radius: 16px;
   .icon {
     width: 16px;

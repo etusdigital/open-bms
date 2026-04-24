@@ -63,10 +63,10 @@
                   isLoadingSearch
                     ? $t('input.searching')
                     : searchOptions
-                      ? $t('datatable.noData')
-                      : ['email', 'webPush', 'mobilePush', 'sms', 'whatsapp'].includes(step.type)
-                        ? $t('datatable.noMessages')
-                        : $t('datatable.noTags')
+                    ? $t('datatable.noData')
+                    : ['email', 'webPush', 'mobilePush', 'sms', 'whatsapp'].includes(step.type)
+                    ? $t('datatable.noMessages')
+                    : $t('datatable.noTags')
                 "
                 :items="optionsSelect"
                 :item-text="

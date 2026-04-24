@@ -987,9 +987,7 @@ export default class Segments extends Vue {
   margin-top: 16px;
   border-radius: 16px;
   width: 100%;
-  box-shadow:
-    0px 1px 2px rgba(0, 0, 0, 0.06),
-    0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
   overflow-x: auto;
 
   th.text-start {
@@ -1338,9 +1336,7 @@ export default class Segments extends Vue {
   gap: 25px;
   padding: 20px;
   border-radius: 16px;
-  box-shadow:
-    0px 1px 2px rgba(0, 0, 0, 0.06),
-    0px 1px 3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
   height: 107px;
 }
 

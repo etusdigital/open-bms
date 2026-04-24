@@ -418,9 +418,7 @@ export default class WarmupList extends Vue {
 
 ::v-deep .c-table {
   margin-top: 28px;
-  box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.06),
-    0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06), 0 4px 6px rgba(0, 0, 0, 0.1);
   border-radius: 16px;
 }
 

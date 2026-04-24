@@ -209,82 +209,76 @@ export default class Insights extends Vue {
   ];
 
   get chartOptions() {
-    return this.metrics.reduce(
-      (acc, metric) => {
-        if (!this.metricsValues?.length || this.isLoadingData) {
-          acc[metric.value] = this.metricOptions;
-        } else {
-          const values = this.metricsValues.flatMap((day) => Object.values(day[metric.value] || {}));
-          const maxValue = Math.max(...values.map((value) => value as number));
-          const yaxisMax = this.getNiceScale(maxValue);
+    return this.metrics.reduce((acc, metric) => {
+      if (!this.metricsValues?.length || this.isLoadingData) {
+        acc[metric.value] = this.metricOptions;
+      } else {
+        const values = this.metricsValues.flatMap((day) => Object.values(day[metric.value] || {}));
+        const maxValue = Math.max(...values.map((value) => value as number));
+        const yaxisMax = this.getNiceScale(maxValue);
 
-          acc[metric.value] = {
-            ...this.metricOptions,
-            xaxis: {
-              ...this.metricOptions.xaxis,
-              categories: Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')),
-              labels: {
-                ...this.metricOptions.xaxis.labels,
-                formatter: (value: string) => `${value}H`,
+        acc[metric.value] = {
+          ...this.metricOptions,
+          xaxis: {
+            ...this.metricOptions.xaxis,
+            categories: Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')),
+            labels: {
+              ...this.metricOptions.xaxis.labels,
+              formatter: (value: string) => `${value}H`,
+            },
+          },
+          yaxis: {
+            ...this.metricOptions.yaxis,
+            max: yaxisMax,
+            tickAmount: 5,
+            labels: {
+              formatter: (value: number) => {
+                const roundedValue = Math.round(value / 5) * 5;
+                if (roundedValue >= 1000000) {
+                  return `${roundedValue / 1000000}M`;
+                }
+                if (roundedValue >= 1000) {
+                  return `${roundedValue / 1000}K`;
+                }
+                return roundedValue.toString();
               },
             },
-            yaxis: {
-              ...this.metricOptions.yaxis,
-              max: yaxisMax,
-              tickAmount: 5,
-              labels: {
-                formatter: (value: number) => {
-                  const roundedValue = Math.round(value / 5) * 5;
-                  if (roundedValue >= 1000000) {
-                    return `${roundedValue / 1000000}M`;
-                  }
-                  if (roundedValue >= 1000) {
-                    return `${roundedValue / 1000}K`;
-                  }
-                  return roundedValue.toString();
+          },
+          // colors: metric.colors,
+          tooltip: {
+            x: { show: false },
+            y: {
+              show: true,
+              formatter: (value: number) => Vue.filter('formatNumber')(value),
+              title: {
+                formatter: (seriesName: string, opts: any) => {
+                  const hour = opts.dataPointIndex.toString().padStart(2, '0');
+                  return `${seriesName} - ${hour}H:`;
                 },
               },
             },
-            // colors: metric.colors,
-            tooltip: {
-              x: { show: false },
-              y: {
-                show: true,
-                formatter: (value: number) => Vue.filter('formatNumber')(value),
-                title: {
-                  formatter: (seriesName: string, opts: any) => {
-                    const hour = opts.dataPointIndex.toString().padStart(2, '0');
-                    return `${seriesName} - ${hour}H:`;
-                  },
-                },
-              },
-            },
-          };
-        }
-        return acc;
-      },
-      {} as Record<string, any>
-    );
+          },
+        };
+      }
+      return acc;
+    }, {} as Record<string, any>);
   }
 
   get chartSeries() {
-    return this.metrics.reduce(
-      (acc, metric) => {
-        if (!this.metricsValues?.length || this.isLoadingData) {
-          acc[metric.value] = [];
-        } else {
-          acc[metric.value] = this.metricsValues.map((day) => ({
-            name: dayjs(day.date).format('DD/MM/YYYY'),
-            data: Array.from({ length: 24 }, (_, i) => {
-              const hour = i.toString().padStart(2, '0');
-              return (day[metric.value as keyof typeof day] as Record<string, number>)?.[hour] || 0;
-            }),
-          }));
-        }
-        return acc;
-      },
-      {} as Record<string, any>
-    );
+    return this.metrics.reduce((acc, metric) => {
+      if (!this.metricsValues?.length || this.isLoadingData) {
+        acc[metric.value] = [];
+      } else {
+        acc[metric.value] = this.metricsValues.map((day) => ({
+          name: dayjs(day.date).format('DD/MM/YYYY'),
+          data: Array.from({ length: 24 }, (_, i) => {
+            const hour = i.toString().padStart(2, '0');
+            return (day[metric.value as keyof typeof day] as Record<string, number>)?.[hour] || 0;
+          }),
+        }));
+      }
+      return acc;
+    }, {} as Record<string, any>);
   }
 
   get hasMetricsData(): boolean {
@@ -440,8 +434,6 @@ export default class Insights extends Vue {
 
 .v-menu__content {
   border-radius: 0px 0px 8px 8px !important;
-  box-shadow:
-    0px 1px 2px rgba(0, 0, 0, 0.06),
-    0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
 }
 </style>

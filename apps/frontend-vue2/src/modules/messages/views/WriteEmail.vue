@@ -1611,9 +1611,7 @@ export default class WriteEmail extends Vue {
   background-color: #ffffff;
   margin-bottom: 24px;
   border-radius: 14px;
-  box-shadow:
-    0px 1px 2px rgba(0, 0, 0, 0.06),
-    0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
   display: flex;
   justify-content: center;
   flex-direction: column;
@@ -1872,9 +1870,7 @@ export default class WriteEmail extends Vue {
   margin-top: 15px;
   margin-bottom: 20px;
   border-radius: 16px;
-  box-shadow:
-    0px 1px 2px rgba(0, 0, 0, 0.06),
-    0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
   min-width: 100px;
   align-items: center;
   justify-content: space-evenly;
@@ -1995,9 +1991,7 @@ export default class WriteEmail extends Vue {
   border-radius: 16px;
   background-color: #ffffff;
   padding: 20px;
-  box-shadow:
-    0px 3px 1px -2px rgba(0, 0, 0, 0.2),
-    0px 2px 2px 0px rgba(0, 0, 0, 0.14);
+  box-shadow: 0px 3px 1px -2px rgba(0, 0, 0, 0.2), 0px 2px 2px 0px rgba(0, 0, 0, 0.14);
 }
 
 .inputs-test {

@@ -1068,9 +1068,7 @@ export default class TwoFASettings extends Vue {
   width: 100%;
   border-radius: 16px;
   padding: 16px;
-  box-shadow:
-    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
-    0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
 }
 
 .messages-pages {
@@ -1260,9 +1258,7 @@ export default class TwoFASettings extends Vue {
     background-color: $neutral-basic-white;
     border-radius: 8px;
     padding: 10px;
-    box-shadow:
-      0px 1px 3px 0px rgba(0, 0, 0, 0.1),
-      0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+    box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
     width: max-content;
     transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     &:hover {

@@ -80,7 +80,8 @@ export default Vue.extend({
         const redirect = (this.$route.query.redirect as string) || '/';
         this.$router.push(redirect);
       } catch (err: any) {
-        this.error = err?.response?.status === 401 ? 'E-mail ou senha inválidos.' : 'Falha ao autenticar. Tente novamente.';
+        this.error =
+          err?.response?.status === 401 ? 'E-mail ou senha inválidos.' : 'Falha ao autenticar. Tente novamente.';
       } finally {
         this.submitting = false;
       }
@@ -99,8 +100,7 @@ export default Vue.extend({
   justify-content: center;
   padding: $spacing-md;
   background-color: $ds-blue;
-  background-image:
-    radial-gradient(circle at 20% 10%, rgba(255, 255, 255, 0.12), transparent 45%),
+  background-image: radial-gradient(circle at 20% 10%, rgba(255, 255, 255, 0.12), transparent 45%),
     radial-gradient(circle at 85% 90%, rgba(0, 0, 0, 0.25), transparent 55%),
     linear-gradient(160deg, $ds-blue 0%, $ds-blue-dark 100%);
 }

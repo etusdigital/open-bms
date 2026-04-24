@@ -7,7 +7,7 @@
     "build": "vue-cli-service build",
     "test:unit": "jest",
     "test:e2e": "vue-cli-service test:e2e",
-    "lint": "vue-cli-service lint",
+    "lint": "eslint --cache \"src/**/*.{js,ts,vue}\"",
     "lint:fix": "eslint --cache --fix \"src/**/*.{js,ts,vue}\"",
     "pre-commit": "lint-staged",
     "prepare": "husky install || true",

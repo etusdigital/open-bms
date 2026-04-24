@@ -644,9 +644,7 @@ export default class TriggerCampaignList extends Vue {
   margin-top: 16px;
   border-radius: 16px;
   width: 100%;
-  box-shadow:
-    0px 1px 2px rgba(0, 0, 0, 0.06),
-    0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
 
   th.text-start {
     white-space: nowrap;

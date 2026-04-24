@@ -230,10 +230,10 @@
           messageType.startsWith('transactional')
             ? $router.push('/automations/transactional')
             : messageType.startsWith('2FA-whatsapp')
-              ? currentGroup
-                ? $router.push(`/messages/2FA/whatsapp/${currentGroup}`)
-                : $router.push('/messages/2FA/whatsapp')
-              : $router.push('/messages/whatsapp')
+            ? currentGroup
+              ? $router.push(`/messages/2FA/whatsapp/${currentGroup}`)
+              : $router.push('/messages/2FA/whatsapp')
+            : $router.push('/messages/whatsapp')
         "
         type="button"
         :value="`${$t('button.cancel')}`"
@@ -631,9 +631,7 @@ textarea:focus {
   height: 32px;
 }
 .preview-wpp {
-  box-shadow:
-    0px 1px 2px rgb(0 0 0 / 6%),
-    0px 1px 3px rgb(0 0 0 / 10%);
+  box-shadow: 0px 1px 2px rgb(0 0 0 / 6%), 0px 1px 3px rgb(0 0 0 / 10%);
   display: flex;
   flex-direction: row;
   border: $ds-gray-300 4px solid;

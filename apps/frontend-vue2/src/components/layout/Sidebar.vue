@@ -825,9 +825,7 @@ div.sidebar__list > div.v-list-item:hover {
 
 .dark {
   background-color: #ffffff !important;
-  box-shadow:
-    0px 1px 2px rgba(0, 0, 0, 0.06),
-    0px 1px 3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
   border-radius: 16px;
   margin-top: 35px;
   max-height: 90vh !important;
@@ -1056,9 +1054,7 @@ div.sidebar__list {
   background-color: #ffffff;
   border-radius: 16px;
   padding: 8px;
-  box-shadow:
-    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
-    0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
   white-space: nowrap;
   float: right;
   position: relative;

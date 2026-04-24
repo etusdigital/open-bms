@@ -203,8 +203,8 @@
               step.type === 'randomMessage'
                 ? $t('automation.randomEmail')
                 : step.type === 'randomWebPush'
-                  ? $t('automation.randomWebPush')
-                  : $t('automation.randomMobilePush')
+                ? $t('automation.randomWebPush')
+                : $t('automation.randomMobilePush')
             }}</span>
           </div>
         </div>
@@ -557,8 +557,8 @@
                 step.type === 'randomMessage'
                   ? $t('title.randomEmailStatistics')
                   : step.type === 'randomWebPush'
-                    ? $t('title.randomWebPushStatistics')
-                    : $t('title.randomMobilePushStatistics')
+                  ? $t('title.randomWebPushStatistics')
+                  : $t('title.randomMobilePushStatistics')
               }}
             </h3>
             <button
@@ -957,10 +957,7 @@ export default class MessageCardComponent extends Vue {
   background-color: white;
   padding: 20px;
   border-radius: 15px;
-  box-shadow:
-    0px 3px 1px -2px rgb(0 0 0 / 20%),
-    0px 2px 2px 0px rgb(0 0 0 / 14%),
-    0px 1px 5px 0px rgb(0 0 0 / 12%);
+  box-shadow: 0px 3px 1px -2px rgb(0 0 0 / 20%), 0px 2px 2px 0px rgb(0 0 0 / 14%), 0px 1px 5px 0px rgb(0 0 0 / 12%);
   width: 550px;
 }
 .element-statistics {

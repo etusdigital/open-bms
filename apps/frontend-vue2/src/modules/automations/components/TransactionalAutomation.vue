@@ -44,8 +44,8 @@
             isLoadingSearch
               ? $t('input.searching')
               : searchMessages
-                ? $t('datatable.noData')
-                : $t('datatable.noMessages')
+              ? $t('datatable.noData')
+              : $t('datatable.noMessages')
           "
           :items="messages"
           v-model="automationForm.props.message"
@@ -640,9 +640,7 @@ export default class TransactionalAutomation extends Vue {
   ::v-deep .c-menu {
     background: #ffffff;
     border: 2px solid $neutral-gray-500;
-    box-shadow:
-      0px 2px 4px rgba(0, 0, 0, 0.06),
-      0px 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.06), 0px 4px 6px rgba(0, 0, 0, 0.1);
   }
 
   ::v-deep.c-autocomplete .v-select__selections {

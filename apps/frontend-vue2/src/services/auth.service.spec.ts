@@ -37,7 +37,7 @@ describe('auth.service', () => {
       expect(mockedAxios.post).toHaveBeenCalledWith(
         expect.stringMatching(/auth\/login$/),
         { email: 'a@b.com', password: 'password1' },
-        expect.objectContaining({ withCredentials: true }),
+        expect.objectContaining({ withCredentials: true })
       );
       expect(mockedStore.commit).toHaveBeenCalledWith('setUser', expect.objectContaining({ email: 'a@b.com' }));
       expect(authService.isAuthenticated()).toBe(true);
@@ -72,7 +72,7 @@ describe('auth.service', () => {
         () =>
           new Promise((resolve) => {
             resolveInner = resolve;
-          }),
+          })
       ) as any;
 
       const a = authService.refresh();

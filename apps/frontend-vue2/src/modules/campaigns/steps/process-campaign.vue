@@ -37,8 +37,8 @@
           <h4 v-if="!statistics" class="loading-dot-flashing d-block"></h4>
           <h4 class="text-info-revision total-color" v-else>
             {{
-              (newCampaign.messageType === campaignMessageType.EMAIL ? statistics.delivered : statistics.sent)
-                | formatNumber
+              (newCampaign.messageType === campaignMessageType.EMAIL ? statistics.delivered : statistics.sent) |
+                formatNumber
             }}
           </h4>
         </v-card>
@@ -343,7 +343,7 @@
                     <StepsComponent
                       class="enabled"
                       :desactive="true"
-                      :status="process = true"
+                      :status="(process = true)"
                       :step="step"
                       :indexStep="indexStep"
                       :indexCard="index"

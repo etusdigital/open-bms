@@ -68,8 +68,8 @@
           isLoadingEvents
             ? $t('input.searching')
             : searchCustomEvents
-              ? $t('datatable.noData')
-              : $t('input.noCustomEvents')
+            ? $t('datatable.noData')
+            : $t('input.noCustomEvents')
         "
         :items="customEventsOptions"
         :item-text="'name'"

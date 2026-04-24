@@ -1126,9 +1126,7 @@ export default class StatisticsComparison extends Vue {
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 24px;
-  box-shadow:
-    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
-    0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
 }
 
 .inactive-class {
@@ -1413,9 +1411,7 @@ export default class StatisticsComparison extends Vue {
 
 .expand-tags {
   margin-top: 8px;
-  transition:
-    width 2s ease-out,
-    height 2s ease-out;
+  transition: width 2s ease-out, height 2s ease-out;
   margin-bottom: 10px;
 }
 
@@ -1476,9 +1472,7 @@ export default class StatisticsComparison extends Vue {
   gap: 20px;
   border-radius: 16px;
   background: #fff;
-  box-shadow:
-    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
-    0px 1px 2px 0px rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06) !important;
 }
 
 .no-data-label {

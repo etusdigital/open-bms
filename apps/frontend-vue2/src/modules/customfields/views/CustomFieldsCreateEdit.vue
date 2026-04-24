@@ -211,9 +211,7 @@ export default class CustomFieldsCreateEdit extends Vue {
   background-color: #ffffff;
   padding: 20px;
   border-radius: 16px;
-  box-shadow:
-    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
-    0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
 }
 
 .fields-cards {
@@ -222,9 +220,7 @@ export default class CustomFieldsCreateEdit extends Vue {
   align-items: center;
   border-radius: 16px;
   gap: 16px;
-  box-shadow:
-    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
-    0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
   cursor: pointer;
   border: 1px solid #d9d9d9;
   background: #ffffff;

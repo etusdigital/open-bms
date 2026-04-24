@@ -111,12 +111,12 @@
                   type === 'open' && cardWinner
                     ? 'card-winner'
                     : type === 'open' && $props.campaign.status === 6
-                      ? ''
-                      : type === 'open' && !winner && ($props.campaign.status === 5 || $props.campaign.status === 6)
-                        ? 'card-loss'
-                        : type === 'open' && !winner && $props.campaign.status !== 5 && $props.campaign.status !== 6
-                          ? 'card-loss'
-                          : ''
+                    ? ''
+                    : type === 'open' && !winner && ($props.campaign.status === 5 || $props.campaign.status === 6)
+                    ? 'card-loss'
+                    : type === 'open' && !winner && $props.campaign.status !== 5 && $props.campaign.status !== 6
+                    ? 'card-loss'
+                    : ''
                 "
               >
                 <label>
@@ -140,12 +140,12 @@
                   type === 'click' && winner
                     ? 'card-winner'
                     : type === 'click' && $props.campaign.status === 6
-                      ? ''
-                      : type === 'click' && !winner
-                        ? 'card-loss'
-                        : type === 'click' && !winner && $props.campaign.status !== 5 && $props.campaign.status !== 6
-                          ? 'card-loss'
-                          : ''
+                    ? ''
+                    : type === 'click' && !winner
+                    ? 'card-loss'
+                    : type === 'click' && !winner && $props.campaign.status !== 5 && $props.campaign.status !== 6
+                    ? 'card-loss'
+                    : ''
                 "
               >
                 <label>

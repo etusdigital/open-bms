@@ -4,7 +4,9 @@ import store from '@/store';
 const baseURL = process.env.VUE_APP_API_URL;
 if (!baseURL) {
   // eslint-disable-next-line no-console
-  console.error('VUE_APP_API_URL is not defined. Create apps/frontend-vue2/.env with VUE_APP_API_URL=http://localhost:5001/ and restart the dev server.');
+  console.error(
+    'VUE_APP_API_URL is not defined. Create apps/frontend-vue2/.env with VUE_APP_API_URL=http://localhost:5001/ and restart the dev server.'
+  );
 }
 
 interface LoginResponse {

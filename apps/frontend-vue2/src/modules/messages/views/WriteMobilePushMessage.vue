@@ -730,9 +730,7 @@ export default class WriteMobilePushMessage extends Vue {
   background-color: $neutral-basic-white;
   padding: 20px;
   border-radius: 16px;
-  box-shadow:
-    0px 1px 2px rgba(0, 0, 0, 0.06),
-    0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
   width: 100%;
   justify-content: space-between;
 }
@@ -898,9 +896,7 @@ input[type='number'] {
 
 .device-switch {
   border-radius: 16px;
-  box-shadow:
-    0px 1px 2px rgba(0, 0, 0, 0.06),
-    0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
   padding: 10px;
   min-width: 100px;
   align-items: center;
@@ -927,11 +923,7 @@ input[type='number'] {
 
 .unfilled-icon {
   color: $ds-gray-300;
-  font-variation-settings:
-    'FILL' 0,
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24 !important;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
 }
 
 .buttons-style {
@@ -952,11 +944,7 @@ input[type='number'] {
 }
 
 .unfilled-icon {
-  font-variation-settings:
-    'FILL' 0,
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24 !important;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
 }
 
 .select-border:active {

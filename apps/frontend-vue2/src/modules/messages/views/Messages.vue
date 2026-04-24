@@ -654,9 +654,7 @@ export default class Messages extends Vue {
 
 ::v-deep.c-table {
   margin-top: 16px;
-  box-shadow:
-    0px 1px 2px rgba(0, 0, 0, 0.06),
-    0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
   border-radius: 16px;
   .icon {
     width: 16px;
@@ -792,9 +790,7 @@ v-btn-toggle:disabled {
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 24px;
-  box-shadow:
-    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
-    0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
 }
 
 .messages-pages {
