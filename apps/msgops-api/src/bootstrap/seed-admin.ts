@@ -36,8 +36,9 @@ export async function seedAdmin(dataSource: DataSource, config: SimpleConfigServ
     const password = (config.get as any)('BOOTSTRAP_ADMIN_PASSWORD') as string | undefined;
 
     if (!email || !password) {
-      await queryRunner.rollbackTransaction();
-      throw new Error('Empty users table requires BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD envs');
+      await queryRunner.commitTransaction();
+      logger.log('Bootstrap admin: skipped (no BOOTSTRAP_ADMIN_* envs — setup wizard will create the first admin)');
+      return;
     }
 
     if (password.length < MIN_PASSWORD_LENGTH) {

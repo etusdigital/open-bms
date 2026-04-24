@@ -29,6 +29,7 @@ import { CampaignsRulesModule } from './modules/campaigns-rules/campaigns-rules.
 import { LabelsModule } from './modules/labels/labels.module';
 import { IpReputationModule } from './modules/ip-reputation/ip-reputation.module';
 import { AuthzModule } from './modules/authz/authz.module';
+import { SetupModule } from './modules/setup/setup.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { AuthzModule } from './modules/authz/authz.module';
     CampaignsRulesModule,
     LabelsModule,
     IpReputationModule,
+    SetupModule,
   ],
   providers: [AuditSubscriber],
 })

@@ -3,15 +3,38 @@ import { routes } from './pages';
 import { useUserStore } from './stores';
 import { userHttpGateway } from './gateways/User';
 import { bootstrapAuth, useAuth } from './composables/useAuth';
+import { setupGateway } from './gateways/Setup';
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
 });
 
+let setupChecked = false;
+
 router.beforeEach(async (to: RouteLocationNormalized) => {
   if ((to.meta as any)?.public || to.path === '/login') {
     return true;
+  }
+
+  if (!setupChecked) {
+    try {
+      const status = await setupGateway.getStatus();
+      setupChecked = true;
+      if (!status.configured) {
+        return '/setup';
+      }
+    } catch (err: any) {
+      // Only redirect to /setup when the API says the wizard hasn't run yet (404 or network
+      // failure on a fresh VM). For 5xx we assume the platform is already configured and
+      // the API is transiently unhealthy — better to surface an auth error than to flash
+      // the wizard at every user on a hiccup.
+      const status = err?.response?.status;
+      if (!status || status === 404) {
+        return '/setup';
+      }
+      // setupChecked stays false so we retry on the next navigation.
+    }
   }
 
   const { isAuthenticated, refresh } = useAuth();

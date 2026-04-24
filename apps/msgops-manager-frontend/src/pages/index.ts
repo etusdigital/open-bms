@@ -4,12 +4,14 @@ import { homePageRouter } from './HomePage';
 import { userRoutes } from './Users';
 import { accountsRoutes } from './Accounts';
 import { billingRoutes } from './Billing';
+import { setupRoute } from './SetupPage';
 import { loginRoute } from './Login';
 
 export type RouterName =
   | 'login'
   | 'homePage'
   | 'notFoundPage'
+  | 'setupPage'
   | 'userCreatePage'
   | 'userEditPage'
   | 'usersPage'
@@ -23,6 +25,7 @@ export type RouterPath = Record<RouterName, string>;
 export const routes: PageRouteRecordRaw[] = [
   loginRoute,
   { ...homePageRouter },
+  { ...setupRoute },
   ...userRoutes,
   ...accountsRoutes,
   ...billingRoutes,
