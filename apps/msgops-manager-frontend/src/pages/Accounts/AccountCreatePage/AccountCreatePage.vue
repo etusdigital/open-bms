@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { InvalidSubmissionHandler, useForm } from 'vee-validate';
+import { InvalidSubmissionHandler, useField, useForm } from 'vee-validate';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { BmsPageBase, BmsPageTitleWithPlusAction, BmsButton, BmsTextField, BmsSelect } from '../../../components';
@@ -20,6 +20,7 @@ const formValues: CreateAccount = {
   unsubscribeRedirectUrl: '',
   linkBranding: '',
   isActive: true,
+  isInternal: false,
   sendgridIps: [],
   sendgridUser: '',
   accountConfigs: [],
@@ -45,6 +46,7 @@ const { handleSubmit, isSubmitting } = useForm({
   initialValues: formValues,
   validationSchema: accountCreateZodValidation,
 });
+const { value: isInternal } = useField<boolean>('isInternal');
 
 const time_zone: Ref<string> = ref('America/Sao_Paulo');
 const default_country: Ref<string> = ref('BR');
@@ -111,6 +113,18 @@ const onCancel = () => {
             :placeholder="$t('typeHere')"
             type="text"
           />
+
+          <div class="tw-mb-4 tw-mt-2">
+            <label class="tw-flex tw-cursor-pointer tw-items-start tw-gap-2" for="account-isInternal">
+              <input id="account-isInternal" v-model="isInternal" type="checkbox" name="isInternal" class="tw-mt-0.5" />
+              <span class="tw-flex tw-flex-col">
+                <span class="tw-text-xs tw-font-bold tw-text-main-gray">Conta interna</span>
+                <span class="tw-text-xs tw-text-gray">
+                  Libera ferramentas de operação avançada (pools, aquecimentos, regras, labels, insights, 2FA, eventos customizados).
+                </span>
+              </span>
+            </label>
+          </div>
         </div>
       </div>
 

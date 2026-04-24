@@ -1,23 +1,22 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { useAuth0 } from '@auth0/auth0-vue';
 import { BmsHeader, BmsSidebar, BmsLoadingPage } from './components';
-import { loginHttpGateway } from './gateways/Login';
+import { userHttpGateway } from './gateways/User';
 import { useUserStore } from './stores';
-import { User } from './entities/User';
 import { useI18n } from 'vue-i18n';
 import { routes } from './pages';
 import { SidebarItem } from './components/BmsSidebar/BmsSidebar.types';
+import { useAuth } from './composables/useAuth';
 import router from './router';
 
-const { isAuthenticated, isLoading, loginWithRedirect, user: authUser } = useAuth0();
-
-const { setUser } = useUserStore();
+const { isAuthenticated, isLoading, user: authUser } = useAuth();
+const userStore = useUserStore();
 const { locale } = useI18n();
 const location = useRoute();
 
 const setLogin = ref(false);
+const isPublicRoute = computed(() => Boolean((location.meta as Record<string, unknown>)?.public));
 const sidebarItems: SidebarItem[] = routes
   .filter((route) => route.icon && route.label)
   .map<SidebarItem>((route) => ({
@@ -28,42 +27,49 @@ const sidebarItems: SidebarItem[] = routes
     hideFromRoles: route.hideFromRoles || [],
   }));
 
-watch(authUser, async (newValue) => {
-  if (isAuthenticated && newValue && authUser.value) {
-    const req = {
-      name: authUser.value.name ?? '',
-      email: authUser.value.email ?? '',
-      picture: authUser.value.picture ?? '',
-    };
-    const user: User = await loginHttpGateway.loginApi(req);
-    locale.value = user.settings.language;
-    setUser(user);
-    setLogin.value = true;
-  } else {
-    loginWithRedirect();
-  }
-});
+watch(
+  authUser,
+  async (newValue) => {
+    if (isAuthenticated.value && newValue) {
+      try {
+        const me: any = await userHttpGateway.getMe();
+        userStore.setAuthContext(me);
+        if (me?.settings?.language) {
+          locale.value = me.settings.language;
+        }
+        setLogin.value = true;
+      } catch (err) {
+        console.error('Could not hydrate user context', err);
+      }
+    } else {
+      setLogin.value = false;
+    }
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
-  <BmsHeader></BmsHeader>
-  <div>
-    <div v-if="isLoading">
-      <BmsLoadingPage :is-loading="isLoading" />
-    </div>
-    <div v-else>
-      <BmsLoadingPage v-if="!setLogin" :is-loading="!setLogin" />
-
+  <router-view v-if="isPublicRoute" />
+  <template v-else>
+    <BmsHeader></BmsHeader>
+    <div>
+      <div v-if="isLoading">
+        <BmsLoadingPage :is-loading="isLoading" />
+      </div>
       <div v-else>
-        <div class="tw-mx-10 tw-grid tw-grid-cols-content">
-          <BmsSidebar :items="sidebarItems" :active-value="location.name?.toString()"></BmsSidebar>
-          <div class="tw-px-5">
-            <router-view></router-view>
+        <BmsLoadingPage v-if="!setLogin" :is-loading="!setLogin" />
+        <div v-else>
+          <div class="tw-mx-10 tw-grid tw-grid-cols-content">
+            <BmsSidebar :items="sidebarItems" :active-value="location.name?.toString()"></BmsSidebar>
+            <div class="tw-px-5">
+              <router-view></router-view>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </template>
 </template>
 
 <style>

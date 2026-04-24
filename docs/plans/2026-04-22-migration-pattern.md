@@ -308,10 +308,7 @@ async function bootstrap() {
     }
   }
 
-  const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule,
-    new FastifyAdapter({ bodyLimit: 1048576 }),
-  );
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ bodyLimit: 1048576 }));
   const consumer = app.get(ProbeConsumerService);
 
   let shuttingDown = false;
@@ -375,10 +372,8 @@ export class ProbeConsumerService {
   private readonly consumer: AmqpConsumer;
   constructor() {
     if (!process.env.AMQP_URL) throw new Error('AMQP_URL environment variable is required');
-    if (!process.env.INTERNAL_AUTH_TOKEN)
-      throw new Error('INTERNAL_AUTH_TOKEN environment variable is required');
-    if (!process.env.BRIDGE_ENDPOINT)
-      throw new Error('BRIDGE_ENDPOINT environment variable is required');
+    if (!process.env.INTERNAL_AUTH_TOKEN) throw new Error('INTERNAL_AUTH_TOKEN environment variable is required');
+    if (!process.env.BRIDGE_ENDPOINT) throw new Error('BRIDGE_ENDPOINT environment variable is required');
     this.consumer = new AmqpConsumer({ url: process.env.AMQP_URL }, SHUTDOWN_TIMEOUT_MS);
   }
   async start() {
@@ -455,10 +450,7 @@ export class AppModule {}
 
 ```ts
 async function bootstrap() {
-  const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule,
-    new FastifyAdapter({ bodyLimit: 1048576 }),
-  );
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ bodyLimit: 1048576 }));
   const consumer = app.get(CampaignConsumerService);
   const publisher = app.get(TriggerPublisherService);
 

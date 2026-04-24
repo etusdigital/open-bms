@@ -1,20 +1,13 @@
 import { NavigationGuardNext, Route } from 'vue-router/types/router';
-import AuthService from '@/services/auth.service';
+import { isAuthenticated, refresh } from '@/services/auth.service';
 
-const authService = new AuthService();
-
-async function authGuard(to: Route, from: Route, next: NavigationGuardNext) {
-  try {
-    const user = await authService.getUser();
-
-    if (!user) {
-      await authService.login();
-    }
-  } catch (err) {
-    console.error(err);
+async function authGuard(to: Route, _from: Route, next: NavigationGuardNext) {
+  if (isAuthenticated()) {
+    return next();
   }
-
-  next();
+  const token = await refresh();
+  if (token) return next();
+  return next({ name: 'login', query: { redirect: to.fullPath } });
 }
 
 export { authGuard };

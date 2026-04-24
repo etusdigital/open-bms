@@ -104,9 +104,9 @@ const getUsers = async (params: Pagination) => {
 };
 
 const dataTableHeaders = [
-  { title: t('name'), align: 'start', key: 'name', sortable: true },
-  { title: t('email'), align: 'start', key: 'email', sortable: true },
-  { title: t('createdAt'), align: 'start', key: 'createdAt', sortable: true },
+  { title: t('name'), align: 'start' as const, key: 'name', sortable: true },
+  { title: t('email'), align: 'start' as const, key: 'email', sortable: true },
+  { title: t('createdAt'), align: 'start' as const, key: 'createdAt', sortable: true },
 ];
 
 const handlePlusClick = () => push('/users/create');

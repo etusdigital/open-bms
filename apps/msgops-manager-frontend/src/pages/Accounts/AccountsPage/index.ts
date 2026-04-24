@@ -1,4 +1,4 @@
-import { authGuard } from '@auth0/auth0-vue';
+import { authGuard } from '../../../router/guards';
 import { Globe } from '@vicons/ionicons5';
 import { i18n } from '../../../i18n';
 import type { PageRouteRecordRaw } from '../../pages.types';
@@ -11,7 +11,7 @@ export const accountsPageRouter: PageRouteRecordRaw = {
   beforeEnter: authGuard,
   icon: Globe,
   label: i18n.global.t('accountPage.accounts'),
-  hideFromRoles: ['etus_superbilling'],
+  hideFromRoles: ['billing'],
 };
 
 export default AccountsPage;

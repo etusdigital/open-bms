@@ -18,6 +18,11 @@ export const useUserStore = defineStore(Storekeys.USERS, {
     loading: false,
     error: undefined,
     roles: [],
+    effectiveRole: '',
+    globalRole: '',
+    permissions: [],
+    isSuperAdmin: false,
+    canSeeAllAccounts: false,
   }),
 
   getters: {
@@ -79,6 +84,24 @@ export const useUserStore = defineStore(Storekeys.USERS, {
     },
     setRoles(roles: string[]) {
       this.roles = roles;
+    },
+    setAuthContext(me: any) {
+      this.user = me as User;
+      this.roles = Array.isArray(me?.roles) ? me.roles : [];
+      this.permissions = Array.isArray(me?.permissions) ? me.permissions : [];
+      this.effectiveRole = me?.effectiveRole || '';
+      this.globalRole = me?.globalRole || '';
+      this.isSuperAdmin = !!me?.isSuperAdmin;
+      this.canSeeAllAccounts = !!me?.canSeeAllAccounts;
+    },
+    clearAuthContext() {
+      this.user = undefined;
+      this.roles = [];
+      this.permissions = [];
+      this.effectiveRole = '';
+      this.globalRole = '';
+      this.isSuperAdmin = false;
+      this.canSeeAllAccounts = false;
     },
   },
 });

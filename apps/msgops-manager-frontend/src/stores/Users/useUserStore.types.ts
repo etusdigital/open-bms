@@ -9,4 +9,9 @@ export type UsersState = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: any;
   roles: string[];
+  effectiveRole: string;
+  globalRole: string;
+  permissions: string[];
+  isSuperAdmin: boolean;
+  canSeeAllAccounts: boolean;
 };

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AccountApiKeyEntity } from '../../entities/account-api-key.entity';
@@ -9,9 +9,10 @@ import { UserEntity } from '../../entities/users.entity';
 import { AuthzService } from './authz.service';
 import { PermissionGuard } from './permission.guard';
 import { PrincipalContextGuard } from './principal-context.guard';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UserEntity, UserAccountEntity, RoleEntity, AccountApiKeyEntity, AccountConfigEntity])],
+  imports: [TypeOrmModule.forFeature([UserEntity, UserAccountEntity, RoleEntity, AccountApiKeyEntity, AccountConfigEntity]), forwardRef(() => AuthModule)],
   providers: [
     AuthzService,
     {

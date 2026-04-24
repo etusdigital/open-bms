@@ -121,9 +121,10 @@ export default class Header extends Vue {
     return this.currentAccount.name;
   }
 
-  logout() {
+  async logout() {
+    await auth.logout();
     store.commit('setCurrentAccount', 0);
-    auth.logout();
+    this.$router.replace({ name: 'login' }).catch(() => null);
   }
 
   async beforeMount() {

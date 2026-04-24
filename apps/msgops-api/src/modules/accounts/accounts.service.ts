@@ -247,16 +247,17 @@ export class AccountsService {
         });
       }
 
-      const sendgridKey = await this.sendgridHandler.createApiKey({
-        subUserName: sendgridSubusername,
-        ...(!accountDto.createSendgridAccount && { name: `bms-prod-${account.id}` }),
-      });
-      accountDto.accountConfigs.push({
-        name: 'sendgrid_key',
-        value: sendgridKey.api_key,
-      });
+      if (accountDto.createSendgridAccount) {
+        const sendgridKey = await this.sendgridHandler.createApiKey({
+          subUserName: sendgridSubusername,
+        });
+        accountDto.accountConfigs.push({
+          name: 'sendgrid_key',
+          value: sendgridKey.api_key,
+        });
+      }
 
-      if (accountDto.defaultDomain) {
+      if (accountDto.createSendgridAccount && accountDto.defaultDomain) {
         const domain = accountDto.defaultDomain.replace(/^(http:\/\/www\.|https:\/\/www\.|http:\/\/|https:\/\/)?/i, '');
 
         const data = {
@@ -429,23 +430,40 @@ export class AccountsService {
       await this.createOrUpdateCustomEvents(account.id, customEvents);
       await this.permissionsUserAccounts(account.id, userId, true);
 
-      await this.uploadWebPushFile(account.id);
+      try {
+        await this.uploadWebPushFile(account.id);
+      } catch (err) {
+        console.error('Account created, but uploadWebPushFile failed (non-fatal):', err);
+      }
 
-      // create billing task
-      const minute = Math.floor(Math.random() * (40 - 1 + 1) + 1);
-      const dateSchedule = dayjs().tz('America/Sao_Paulo').add(24, 'hour').set('minute', minute).format('YYYY-MM-DD HH:mm:ss');
-      const currentDate = dayjs().tz('America/Sao_Paulo').format('YYYY-MM-DD');
-      await this.googleTasksProvider.create(
-        `${account.id}/${currentDate}`,
-        new Date(dateSchedule),
-        `${process.env.BRIUS_HOSTURL}/statistics/usage`,
-        process.env.GOOGLE_TASK_BMS_USAGE,
-      );
+      try {
+        const minute = Math.floor(Math.random() * (40 - 1 + 1) + 1);
+        const dateSchedule = dayjs().tz('America/Sao_Paulo').add(24, 'hour').set('minute', minute).format('YYYY-MM-DD HH:mm:ss');
+        const currentDate = dayjs().tz('America/Sao_Paulo').format('YYYY-MM-DD');
+        await this.googleTasksProvider.create(
+          `${account.id}/${currentDate}`,
+          new Date(dateSchedule),
+          `${process.env.BRIUS_HOSTURL}/statistics/usage`,
+          process.env.GOOGLE_TASK_BMS_USAGE,
+        );
+      } catch (err) {
+        console.error('Account created, but billing task scheduling failed (non-fatal):', err);
+      }
 
       return { account: accountEntity, dns };
     } catch (e) {
       console.error(e);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      if (e instanceof HttpException) throw e;
+      // Postgres unique_violation
+      if ((e as any)?.code === '23505') {
+        const detail = (e as any).detail || 'Resource already exists';
+        throw new HttpException(detail, HttpStatus.CONFLICT);
+      }
+      // Postgres foreign_key_violation
+      if ((e as any)?.code === '23503') {
+        throw new HttpException((e as any).detail || 'Invalid reference', HttpStatus.BAD_REQUEST);
+      }
+      throw new HttpException((e as Error)?.message || 'Failed to create account', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -552,6 +570,7 @@ export class AccountsService {
       this.accountRepository.merge(account, accountDto);
       delete account['accountConfigs'];
       delete account.customFields;
+      delete account['accountHash']; // virtual property populated by @AfterLoad — not a real column
       const redisClient = await this.redisService.getClient();
       const redisKeys = await redisClient.keys(`automations_tag:${account.id}:*`);
       const deleteKeys = await redisKeys.map((key) => key);
@@ -656,9 +675,16 @@ export class AccountsService {
         if (provider.name == 'webpush_settings') {
           provider.isLoadConfig = false;
           const contentVars = this.parsePushContentVars(provider.value);
-          await this.uploadWebPushFile(id, contentVars);
-
-          await this.sendPushRulesToCloudflareWorkers(id, provider.value);
+          try {
+            await this.uploadWebPushFile(id, contentVars);
+          } catch (err) {
+            console.error('webpush_settings: uploadWebPushFile failed (non-fatal):', err);
+          }
+          try {
+            await this.sendPushRulesToCloudflareWorkers(id, provider.value);
+          } catch (err) {
+            console.error('webpush_settings: sendPushRulesToCloudflareWorkers failed (non-fatal):', err);
+          }
         }
 
         accountProviders.push({
@@ -689,7 +715,8 @@ export class AccountsService {
         .execute();
     } catch (e) {
       console.error(e);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      if (e instanceof HttpException) throw e;
+      throw new HttpException((e as Error)?.message || 'Failed to update account configs', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

@@ -164,7 +164,7 @@ const getMonths = async () => {
 
 const getAccounts = async () => {
   try {
-    if (userStore.roles.includes('etus_superbilling')) {
+    if (userStore.canSeeAllAccounts) {
       await fetchAllAccounts();
     } else {
       await fetchAccounts({ itemsPerPage: 500 });

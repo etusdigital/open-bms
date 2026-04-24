@@ -1,4 +1,4 @@
-import { authGuard } from '@auth0/auth0-vue';
+import { authGuard } from '../../../router/guards';
 import type { PageRouteRecordRaw } from '../../pages.types';
 import UserCreatePage from './UserCreatePage.vue';
 
@@ -7,7 +7,7 @@ export const userCreatePageRouter: PageRouteRecordRaw = {
   name: 'userCreatePage',
   path: '/users/create',
   beforeEnter: authGuard,
-  hideFromRoles: ['etus_superbilling'],
+  hideFromRoles: ['billing'],
 };
 
 export default UserCreatePage;

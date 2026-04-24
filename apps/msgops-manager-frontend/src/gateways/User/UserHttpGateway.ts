@@ -32,6 +32,11 @@ export class UserHttpGateway implements UserGateway {
     // return this.httpClient.delete(`${this.baseUrl}/users/${id}`);
     console.log(id);
   }
+
+  async getMe<T = any>(accountId?: number | string): Promise<T> {
+    const query = accountId ? `?accountId=${accountId}` : '';
+    return this.httpClient.get<T>(`${this.baseUrl}/users/me${query}`);
+  }
 }
 
 export const userHttpGateway = new UserHttpGateway(axiosAdapter, import.meta.env.VITE_API_MSGOPS);

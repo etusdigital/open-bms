@@ -1,4 +1,4 @@
-import { authGuard } from '@auth0/auth0-vue';
+import { authGuard } from '../../../router/guards';
 import type { PageRouteRecordRaw } from '../../pages.types';
 import UsersPage from './UsersPage.vue';
 import { Person } from '@vicons/ionicons5';
@@ -11,7 +11,7 @@ export const usersPageRouter: PageRouteRecordRaw = {
   beforeEnter: authGuard,
   icon: Person,
   label: i18n.global.t('userPage.users'),
-  hideFromRoles: ['etus_superbilling'],
+  hideFromRoles: ['billing'],
 };
 
 export default UsersPage;
