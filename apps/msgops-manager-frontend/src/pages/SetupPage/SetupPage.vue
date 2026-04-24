@@ -5,7 +5,8 @@ import { CheckmarkOutline } from '@vicons/ionicons5';
 import Step1Admin from './steps/Step1Admin.vue';
 import Step2Smtp from './steps/Step2Smtp.vue';
 import Step3Domain from './steps/Step3Domain.vue';
-import Step4Pool from './steps/Step4Pool.vue';
+import Step4Sendgrid from './steps/Step4Sendgrid.vue';
+import Step5Pool from './steps/Step5Pool.vue';
 import { setupGateway } from '../../gateways/Setup';
 
 const router = useRouter();
@@ -16,6 +17,7 @@ const steps = [
   { label: 'Administrador' },
   { label: 'SMTP' },
   { label: 'Domínio' },
+  { label: 'SendGrid' },
   { label: 'IP Pool' },
 ];
 
@@ -23,7 +25,8 @@ const stepTitles: Record<number, string> = {
   1: 'Criar conta de administrador',
   2: 'Configurar servidor SMTP',
   3: 'URL base da plataforma',
-  4: 'IP Pool e primeira conta',
+  4: 'Provedor de envio em massa (SendGrid)',
+  5: 'IP Pool e primeira conta',
 };
 
 onMounted(async () => {
@@ -40,7 +43,7 @@ onMounted(async () => {
 });
 
 function advance() {
-  if (currentStep.value < 4) {
+  if (currentStep.value < 5) {
     currentStep.value++;
   }
 }
@@ -94,7 +97,7 @@ function finish() {
           <div
             v-if="i < steps.length - 1"
             :class="[
-              'tw-mx-3 tw-h-px tw-w-12 tw-flex-shrink-0 tw-mb-5',
+              'tw-mx-2 tw-h-px tw-w-10 tw-flex-shrink-0 tw-mb-5',
               i + 1 < currentStep ? 'tw-bg-primary' : 'tw-bg-gray-light',
             ]"
           />
@@ -116,7 +119,8 @@ function finish() {
           <Step1Admin v-if="currentStep === 1" @step-complete="advance" />
           <Step2Smtp v-else-if="currentStep === 2" @step-complete="advance" />
           <Step3Domain v-else-if="currentStep === 3" @step-complete="advance" />
-          <Step4Pool v-else-if="currentStep === 4" @step-complete="finish" />
+          <Step4Sendgrid v-else-if="currentStep === 4" @step-complete="advance" />
+          <Step5Pool v-else-if="currentStep === 5" @step-complete="finish" />
         </Transition>
       </div>
 

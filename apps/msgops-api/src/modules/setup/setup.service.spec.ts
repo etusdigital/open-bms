@@ -153,30 +153,30 @@ describe('SetupService', () => {
 
     it('returns configured=true once wizard is marked completed', async () => {
       const { service, systemConfigRepo } = await buildService();
-      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: true } });
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: true } });
 
       const status = await service.getStatus();
-      expect(status).toEqual({ configured: true, currentStep: 4 });
+      expect(status).toEqual({ configured: true, currentStep: 5 });
     });
   });
 
   describe('advanceStep — guards', () => {
     it('rejects all advance calls with 403 once wizard is completed', async () => {
       const { service, systemConfigRepo } = await buildService();
-      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: true } });
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: true } });
 
-      for (const step of [1, 2, 3, 4] as const) {
+      for (const step of [1, 2, 3, 4, 5] as const) {
         await expect(service.advanceStep({ step, data: {} as any })).rejects.toBeInstanceOf(ForbiddenException);
       }
     });
 
-    it('rejects out-of-order steps (POST step=4 when currentStep is still 2)', async () => {
+    it('rejects out-of-order steps (POST step=5 when currentStep is still 2)', async () => {
       const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 2, completed: false } });
 
       await expect(
         service.advanceStep({
-          step: 4,
+          step: 5,
           data: { accountName: 'A', poolName: 'P', senderEmail: 'a@b.io', senderName: 'A', replyToEmail: 'a@b.io', sendingLimit: 1 } as any,
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -346,30 +346,91 @@ describe('SetupService', () => {
     });
   });
 
-  describe('step4 — account + pool', () => {
-    it('with skip=true, marks wizard completed without touching account/pool tables', async () => {
-      const { service, systemConfigRepo, accountRepo, poolRepo, userAccountRepo } = await buildService();
+  describe('step4 — SendGrid', () => {
+    it('with skip=true, advances to step 5 without persisting sendgrid_settings', async () => {
+      const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
 
       await service.advanceStep({ step: 4, data: { skip: true } as any });
 
+      expect(systemConfigRepo.save).not.toHaveBeenCalledWith(expect.objectContaining({ key: 'sendgrid_settings' }));
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: expect.objectContaining({ currentStep: 5, completed: false }) }));
+    });
+
+    it('persists sendgrid_settings with required fields and advances to step 5', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+
+      await service.advanceStep({
+        step: 4,
+        data: {
+          apiKey: 'SG.abcdefghij',
+          subuserEmail: 'billing@acme.io',
+          subuserPrefix: 'bms',
+          defaultIpPool: 'pool-1',
+          webhookBaseUrl: 'https://bms.io/bms/events',
+        } as any,
+      });
+
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          key: 'sendgrid_settings',
+          value: expect.objectContaining({
+            apiKey: 'SG.abcdefghij',
+            subuserEmail: 'billing@acme.io',
+            subuserPrefix: 'bms',
+            defaultIpPool: 'pool-1',
+            webhookBaseUrl: 'https://bms.io/bms/events',
+          }),
+        }),
+      );
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: expect.objectContaining({ currentStep: 5, completed: false }) }));
+    });
+
+    it('rejects payload without skip and without apiKey', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      await expect(service.advanceStep({ step: 4, data: {} as any })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects payload without skip that has apiKey but misses subuserEmail', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      await expect(service.advanceStep({ step: 4, data: { apiKey: 'SG.abcdefghij' } as any })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects apiKey not starting with SG.', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      await expect(service.advanceStep({ step: 4, data: { apiKey: 'nope-not-sg', subuserEmail: 'a@b.io' } as any })).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('step5 — account + pool', () => {
+    it('with skip=true, marks wizard completed without touching account/pool tables', async () => {
+      const { service, systemConfigRepo, accountRepo, poolRepo, userAccountRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: false } });
+
+      await service.advanceStep({ step: 5, data: { skip: true } as any });
+
       expect(accountRepo.save).not.toHaveBeenCalled();
       expect(poolRepo.save).not.toHaveBeenCalled();
       expect(userAccountRepo.save).not.toHaveBeenCalled();
-      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: expect.objectContaining({ currentStep: 4, completed: true }) }));
+      // completeWizard persists on WIZARD_KEY with currentStep preserved (5) and completed=true
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ key: 'setup_wizard_step', value: expect.objectContaining({ completed: true }) }));
     });
 
     it('uses the adminUserId stored in wizard state (not "first super-admin") when linking master user', async () => {
       const { service, roleRepo, userRepo, accountRepo, poolRepo, userAccountRepo, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({
         key: 'setup_wizard_step',
-        value: { currentStep: 4, completed: false, adminUserId: 123 },
+        value: { currentStep: 5, completed: false, adminUserId: 123 },
       });
       userRepo.findOne.mockResolvedValue({ id: 123, email: 'admin@bms.io' });
       accountRepo.save.mockResolvedValue({ id: 100 });
 
       await service.advanceStep({
-        step: 4,
+        step: 5,
         data: {
           accountName: 'Acme',
           poolName: 'Acme Tx',
@@ -389,13 +450,13 @@ describe('SetupService', () => {
 
     it('falls back to the oldest super-admin (ORDER BY id ASC) when wizard state has no adminUserId', async () => {
       const { service, roleRepo, userRepo, accountRepo, userAccountRepo, systemConfigRepo } = await buildService();
-      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: false } });
       roleRepo.findOne.mockResolvedValue(SUPER_ADMIN_ROLE);
       userRepo.findOne.mockResolvedValue({ id: 7 });
       accountRepo.save.mockResolvedValue({ id: 200 });
 
       await service.advanceStep({
-        step: 4,
+        step: 5,
         data: {
           accountName: 'Acme',
           poolName: 'Acme Tx',
@@ -410,10 +471,10 @@ describe('SetupService', () => {
       expect(userAccountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ userId: 7, accountId: 200, isMasterUser: true }));
     });
 
-    it('rejects step4 payload that is neither skip nor full config (Joi or-constraint)', async () => {
+    it('rejects step5 payload that is neither skip nor full config (Joi or-constraint)', async () => {
       const { service, systemConfigRepo } = await buildService();
-      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
-      await expect(service.advanceStep({ step: 4, data: {} as any })).rejects.toBeInstanceOf(BadRequestException);
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: false } });
+      await expect(service.advanceStep({ step: 5, data: {} as any })).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 

@@ -7,6 +7,7 @@ const http = axios.create({ baseURL: baseUrl });
 export interface SetupStatus {
   configured: boolean;
   currentStep: number;
+  baseUrl?: string;
 }
 
 export const setupGateway = {
@@ -21,5 +22,10 @@ export const setupGateway = {
 
   async testSmtp(data: Record<string, unknown>): Promise<void> {
     await http.post('/setup/test-smtp', data);
+  },
+
+  async testSendgrid(apiKey: string): Promise<{ accountName: string | null }> {
+    const res = await http.post<{ accountName: string | null }>('/setup/test-sendgrid', { apiKey });
+    return res.data;
   },
 };
