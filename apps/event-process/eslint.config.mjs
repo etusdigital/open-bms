@@ -14,7 +14,12 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': [
         'warn',
-        { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
       ],
       '@typescript-eslint/no-unused-expressions': ['error', { allowTernary: true }],
       '@typescript-eslint/no-require-imports': 'off',
@@ -22,10 +27,7 @@ export default tseslint.config(
       'no-prototype-builtins': 'off',
       'no-useless-assignment': 'off',
       'no-unsafe-finally': 'off',
-      'prettier/prettier': [
-        'error',
-        { singleQuote: true, printWidth: 120, trailingComma: 'all' },
-      ],
+      'prettier/prettier': ['error', { singleQuote: true, printWidth: 120, trailingComma: 'all' }],
     },
   },
   { ignores: ['dist/', 'node_modules/'] },

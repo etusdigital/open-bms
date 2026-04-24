@@ -164,7 +164,7 @@ const getMonths = async () => {
 
 const getAccounts = async () => {
   try {
-    if (userStore.roles.includes('etus_superbilling')) {
+    if (userStore.canSeeAllAccounts) {
       await fetchAllAccounts();
     } else {
       await fetchAccounts({ itemsPerPage: 500 });
@@ -357,7 +357,7 @@ const billingCards = [
           <div class="tw-flex tw-flex-row tw-justify-end tw-gap-2 tw-border-t tw-border-[#f5f5f5] tw-p-2">
             <button
               class="tw-cursor-pointer tw-text-[10px] tw-font-semibold tw-uppercase tw-text-[#0057F4]"
-              :class="{ ' tw-text-[#A6A6A6]': !selectedAccounts.length }"
+              :class="{ 'tw-text-[#A6A6A6]': !selectedAccounts.length }"
               :disabled="!selectedAccounts.length"
               @click.prevent="clearFilters"
             >
@@ -514,7 +514,11 @@ const billingCards = [
       v-if="isDataSelected"
       :class="loading ? 'd-none' : ''"
       class="tw-mb-4 tw-flex tw-h-[98px] tw-flex-col tw-justify-center tw-gap-4 tw-rounded-2xl tw-bg-white tw-p-4"
-      style="box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1)"
+      style="
+        box-shadow:
+          0px 1px 2px rgba(0, 0, 0, 0.06),
+          0px 1px 3px rgba(0, 0, 0, 0.1);
+      "
     >
       <div class="tw-flex tw-w-full tw-flex-row">
         <span
@@ -548,11 +552,7 @@ const billingCards = [
         }}</span>
       </div>
       <p v-if="error">{{ error?.message }}</p>
-      <BmsDataLoader
-        :is-loading="loading"
-        :type="'table-tbody'"
-        :class="'tw-mt-1 tw-rounded-2xl tw-text-main-gray'"
-      />
+      <BmsDataLoader :is-loading="loading" :type="'table-tbody'" :class="'tw-mt-1 tw-rounded-2xl tw-text-main-gray'" />
       <table
         :class="loading ? 'd-none' : ''"
         class="tw-flex tw-w-[-webkit-fill-available] tw-flex-col tw-rounded-2xl tw-border-[1px] tw-border-solid tw-border-[#D9D9D9] tw-bg-white tw-p-5 tw-text-[#5c5c5c]"

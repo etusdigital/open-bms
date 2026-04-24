@@ -3,7 +3,7 @@
 # Version: 1.0.6
 # Date: 2026-04-15T18:20:51.290Z
 
-active_feature: '{value}'
+active_feature: 'local-auth-provider'
 project_name: bms-monorepo
 user_skill_level: intermediate
 planning_artifacts: '{project-root}/_evo-output/planning-artifacts'

@@ -53,7 +53,7 @@ export type LoginUser = {
   name: string;
   email: string;
   picture: string;
-}
+};
 
 export type CreateUser = Pick<User, 'name' | 'email'> & { accounts?: Accounts[] | unknown; password?: string };
 export type EditUser = { id: number; name?: string; email?: string; accounts: Accounts[] | unknown };

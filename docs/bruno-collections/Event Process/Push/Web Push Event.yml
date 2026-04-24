@@ -5,12 +5,12 @@ info:
 
 http:
   method: POST
-  url: "{{event-process-url}}/push"
+  url: '{{event-process-url}}/push'
   headers:
     - name: platform
-      value: "web-push"
+      value: 'web-push'
     - name: x-goog-pubsub-message-id
-      value: "test-webpush-event-001"
+      value: 'test-webpush-event-001'
   body:
     type: json
     json: |

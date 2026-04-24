@@ -194,7 +194,9 @@ export default class DataTable extends Vue {
 }
 
 .c-table {
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
   border-radius: 16px;
   margin-top: 1rem;
 }

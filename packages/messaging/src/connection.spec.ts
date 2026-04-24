@@ -1,9 +1,5 @@
 import * as amqplib from 'amqplib';
-import {
-  AmqpConnection,
-  ConnectionClosedError,
-  redactAmqpUrl,
-} from './connection';
+import { AmqpConnection, ConnectionClosedError, redactAmqpUrl } from './connection';
 
 jest.mock('amqplib');
 const mockConnect = amqplib.connect as jest.Mock;
@@ -259,9 +255,7 @@ describe('AmqpConnection', () => {
 
     it('succeeds if a later attempt recovers', async () => {
       const conn = createMockConn();
-      mockConnect
-        .mockRejectedValueOnce(new Error('broker down'))
-        .mockResolvedValueOnce(conn);
+      mockConnect.mockRejectedValueOnce(new Error('broker down')).mockResolvedValueOnce(conn);
 
       const c = new AmqpConnection({ url: 'amqp://test' }, FAST_RETRY);
       await c.getConnection();
@@ -301,9 +295,7 @@ describe('AmqpConnection', () => {
 
 describe('redactAmqpUrl', () => {
   it('replaces the password with asterisks', () => {
-    expect(redactAmqpUrl('amqp://user:secret@host:5672/')).toBe(
-      'amqp://user:***@host:5672/',
-    );
+    expect(redactAmqpUrl('amqp://user:secret@host:5672/')).toBe('amqp://user:***@host:5672/');
   });
 
   it('leaves URLs without password unchanged', () => {
@@ -311,9 +303,7 @@ describe('redactAmqpUrl', () => {
   });
 
   it('leaves user-only URLs unchanged', () => {
-    expect(redactAmqpUrl('amqp://user@host:5672/')).toBe(
-      'amqp://user@host:5672/',
-    );
+    expect(redactAmqpUrl('amqp://user@host:5672/')).toBe('amqp://user@host:5672/');
   });
 
   it('returns a placeholder for unparseable input', () => {
@@ -321,8 +311,6 @@ describe('redactAmqpUrl', () => {
   });
 
   it('preserves the vhost path', () => {
-    expect(redactAmqpUrl('amqp://u:p@host:5672/vhost')).toBe(
-      'amqp://u:***@host:5672/vhost',
-    );
+    expect(redactAmqpUrl('amqp://u:p@host:5672/vhost')).toBe('amqp://u:***@host:5672/vhost');
   });
 });

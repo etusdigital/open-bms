@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
-import { useForm, InvalidSubmissionHandler } from 'vee-validate';
+import { useForm, useField, InvalidSubmissionHandler } from 'vee-validate';
 import { useI18n } from 'vue-i18n';
 import { BmsPageBase, BmsPageTitleWithPlusAction, BmsButton, BmsTextField } from '../../../components';
 import { useAccountStore } from '../../../stores';
 import { EditAccount, accountEditZodValidation } from '../../../entities/Account';
 import { showToast } from '../../../utils/showToast';
-import {  onBeforeUnmount } from 'vue'
+import { onBeforeUnmount } from 'vue';
 
 const router = useRouter();
 const { params } = useRoute();
@@ -25,6 +25,7 @@ if (params.id) {
       id: account.value.id,
       name: account.value.name,
       description: account.value.description,
+      isInternal: !!account.value.isInternal,
     };
     resetForm({ values: formInitalValues });
   });
@@ -32,7 +33,9 @@ if (params.id) {
 
 const { handleSubmit, isSubmitting, resetForm } = useForm<EditAccount>({
   validationSchema: accountEditZodValidation,
+  initialValues: { isInternal: false } as EditAccount,
 });
+const { value: isInternal } = useField<boolean>('isInternal');
 
 const onInvalidSubmit: InvalidSubmissionHandler<EditAccount> = ({ errors }) => {
   showToast({ type: 'error', description: t('accountPage.error') });
@@ -84,6 +87,18 @@ onBeforeUnmount(() => {
               :label="$t('accountPage.description')"
               type="text"
             />
+
+            <div class="tw-mb-4 tw-mt-2">
+              <label class="tw-flex tw-cursor-pointer tw-items-start tw-gap-2" for="account-isInternal-edit">
+                <input id="account-isInternal-edit" v-model="isInternal" type="checkbox" name="isInternal" class="tw-mt-0.5" />
+                <span class="tw-flex tw-flex-col">
+                  <span class="tw-text-xs tw-font-bold tw-text-main-gray">Conta interna</span>
+                  <span class="tw-text-xs tw-text-gray">
+                    Libera ferramentas de operação avançada (pools, aquecimentos, regras, labels, insights, 2FA, eventos customizados).
+                  </span>
+                </span>
+              </label>
+            </div>
           </div>
         </div>
 

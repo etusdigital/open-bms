@@ -1,23 +1,22 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { useAuth0 } from '@auth0/auth0-vue';
 import { BmsHeader, BmsSidebar, BmsLoadingPage } from './components';
-import { loginHttpGateway } from './gateways/Login';
+import { userHttpGateway } from './gateways/User';
 import { useUserStore } from './stores';
-import { User } from './entities/User';
 import { useI18n } from 'vue-i18n';
 import { routes } from './pages';
 import { SidebarItem } from './components/BmsSidebar/BmsSidebar.types';
+import { useAuth } from './composables/useAuth';
 import router from './router';
 
-const { isLoading, user: authUser } = useAuth0();
-
-const { setUser } = useUserStore();
+const { isAuthenticated, isLoading, user: authUser } = useAuth();
+const userStore = useUserStore();
 const { locale } = useI18n();
 const location = useRoute();
 
 const setLogin = ref(false);
+const isPublicRoute = computed(() => Boolean((location.meta as Record<string, unknown>)?.public));
 const sidebarItems: SidebarItem[] = routes
   .filter((route) => route.icon && route.label)
   .map<SidebarItem>((route) => ({
@@ -28,24 +27,30 @@ const sidebarItems: SidebarItem[] = routes
     hideFromRoles: route.hideFromRoles || [],
   }));
 
-// Only loads user data — redirect to Auth0 is handled entirely by the router guard
-watch(authUser, async (newValue) => {
-  if (!newValue) return;
-  const req = {
-    name: newValue.name ?? '',
-    email: newValue.email ?? '',
-    picture: newValue.picture ?? '',
-  };
-  const user: User = await loginHttpGateway.loginApi(req);
-  locale.value = user.settings.language;
-  setUser(user);
-  setLogin.value = true;
-});
+watch(
+  authUser,
+  async (newValue) => {
+    if (isAuthenticated.value && newValue) {
+      try {
+        const me: any = await userHttpGateway.getMe();
+        userStore.setAuthContext(me);
+        if (me?.settings?.language) {
+          locale.value = me.settings.language;
+        }
+        setLogin.value = true;
+      } catch (err) {
+        console.error('Could not hydrate user context', err);
+      }
+    } else {
+      setLogin.value = false;
+    }
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
-  <router-view v-if="location.path.startsWith('/setup')" />
-
+  <router-view v-if="isPublicRoute" />
   <template v-else>
     <BmsHeader></BmsHeader>
     <div>
@@ -54,7 +59,6 @@ watch(authUser, async (newValue) => {
       </div>
       <div v-else>
         <BmsLoadingPage v-if="!setLogin" :is-loading="!setLogin" />
-
         <div v-else>
           <div class="tw-mx-10 tw-grid tw-grid-cols-content">
             <BmsSidebar :items="sidebarItems" :active-value="location.name?.toString()"></BmsSidebar>

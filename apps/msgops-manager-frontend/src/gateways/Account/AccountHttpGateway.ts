@@ -1,15 +1,13 @@
 import type { Account, CreateAccount, EditAccount, SendgridDns } from '../../entities/Account';
 import type { AccountGateway } from './AccountGateway.types';
 import { HttpClient, axiosAdapter } from '../../infra/HttpClient';
-import {
-  BmsHttpParams,
-  BmsHttpResponse,
-  bmsHttpParamsDefault,
-  getBmsHttpParamsToString,
-} from '../_common/Bms';
+import { BmsHttpParams, BmsHttpResponse, bmsHttpParamsDefault, getBmsHttpParamsToString } from '../_common/Bms';
 
 export class AccountHttpGateway implements AccountGateway {
-  constructor(readonly httpClient: HttpClient, readonly baseUrl: string) {}
+  constructor(
+    readonly httpClient: HttpClient,
+    readonly baseUrl: string,
+  ) {}
 
   async getAll(params: BmsHttpParams): Promise<BmsHttpResponse<Account[]>> {
     const mergedParams = { ...bmsHttpParamsDefault, ...params };

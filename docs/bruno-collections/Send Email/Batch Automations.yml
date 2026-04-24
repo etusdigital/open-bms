@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{send-email-url}}/batch/automations"
+  url: '{{send-email-url}}/batch/automations'
   body:
     type: json
     json: |

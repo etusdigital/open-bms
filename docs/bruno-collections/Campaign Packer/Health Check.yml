@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{campaign-packer-url}}/"
+  url: '{{campaign-packer-url}}/'
   auth: none
 
 settings:

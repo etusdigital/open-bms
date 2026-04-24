@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
 import { PubSubProvider } from '../providers/pubsub.provider';
 import { EventsTrigger, LeadMessage, TriggerType } from '../interfaces';
@@ -530,13 +530,15 @@ export class AutomationHandler {
         }
       }
 
+      const accountId = leadStateMessage.contact.accountId ?? leadStateMessage.account?.id;
       const contact = await this.msgOpsService.findContactByIdConditional(
         leadStateMessage.contact.id,
-        leadStateMessage.contact.accountId,
+        accountId,
         loadContacts,
       );
       if (!contact) {
-        throw new BadRequestException(`[${leadStateMessage.id}] Contact not found.`);
+        console.error(`[${leadStateMessage.id}] Contact not found for conditional evaluation.`);
+        return false;
       }
 
       if (loadLead) {
@@ -545,7 +547,18 @@ export class AutomationHandler {
           contact['lead'] = lead;
         }
       }
-      const resultLogic = eval(logic);
+
+      let resultLogic: boolean;
+      try {
+        // NOTE: eval is used here intentionally to evaluate dynamic conditional
+        // logic strings built from automation trigger configurations.
+        resultLogic = eval(logic);
+      } catch (evalError) {
+        console.error(
+          `Error evaluating conditional logic: ${logic} - STEP: ${JSON.stringify(leadStateMessage)} - ${evalError}`,
+        );
+        return false;
+      }
 
       await this.pubSubProvider.sendMessageClickHouse({
         timestamp: Date.now(),
@@ -561,7 +574,7 @@ export class AutomationHandler {
       return resultLogic;
     } catch (error) {
       console.error(`Error conditional trigger: STEP: ${JSON.stringify(leadStateMessage)} - ${error}`);
-      return false;
+      throw error;
     }
   }
 

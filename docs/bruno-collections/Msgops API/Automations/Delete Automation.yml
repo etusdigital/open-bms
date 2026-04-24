@@ -5,7 +5,7 @@ info:
 
 http:
   method: DELETE
-  url: "{{msgops-api-url}}/automations/1"
+  url: '{{msgops-api-url}}/automations/1'
   auth: inherit
 
 settings:

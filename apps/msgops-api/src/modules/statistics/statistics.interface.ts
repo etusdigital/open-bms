@@ -5,6 +5,8 @@ export interface RedisStatistics {
   click?: string;
   bounce?: string;
   blocked?: string;
+  bot_click?: string;
+  datacenter_click?: string;
   spam_report?: string;
   unsubscribe?: string;
   unique_open?: string;
@@ -22,6 +24,8 @@ export interface AggregatedData {
   unique_click: number;
   bounce: number;
   blocked: number;
+  bot_click: number;
+  datacenter_click: number;
   spam_report: number;
   unsubscribe: number;
   deferred: number;

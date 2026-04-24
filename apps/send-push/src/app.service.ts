@@ -1,4 +1,5 @@
 import { Injectable, OnApplicationShutdown } from '@nestjs/common';
+import { addTrailingSlash } from '@msgops/url-utils';
 import { TokenMessage } from 'firebase-admin/lib/messaging/messaging-api';
 import {
   Account,
@@ -362,7 +363,8 @@ export class AppService implements OnApplicationShutdown {
       ...paramsFromUrl,
     });
 
-    return `${url.origin}${url.pathname}?${queryString}`;
+    const finalUrl = `${url.origin}${url.pathname}?${queryString}`;
+    return account.isInternal ? addTrailingSlash(finalUrl) : finalUrl;
   }
 
   async sendTracker(event: string, campaignMessage: CampaignMessage, totalSent: number, data?: any) {

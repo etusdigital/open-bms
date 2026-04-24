@@ -59,24 +59,26 @@ SETTINGS index_granularity = 8192
 
 ### Key columns for queries
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `time` | DateTime64(3, 'UTC') | Precise event timestamp (ms). Use for exact time filtering. |
-| `time_date` | Date | Derived from `time` (UTC). **Must be in WHERE for primary index usage.** |
-| `account_id` | UInt32 | Partition key + ORDER BY prefix. Always filter by this. |
-| `message_type` | LowCardinality(String) | 2nd in ORDER BY. Filter with `= 'email'` for email events. |
-| `event` | String | 4th in ORDER BY. Values: `delivered`, `bounce`, `bounced`, `deferred`, `dropped`, `spamreport`, `open`, `click`, `unsubscribe`, `group_unsubscribe` |
-| `delivered_id` | String | Links non-delivery events back to the original delivered event (for IP attribution joins). |
+| Column         | Type                   | Notes                                                                                                                                               |
+| -------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `time`         | DateTime64(3, 'UTC')   | Precise event timestamp (ms). Use for exact time filtering.                                                                                         |
+| `time_date`    | Date                   | Derived from `time` (UTC). **Must be in WHERE for primary index usage.**                                                                            |
+| `account_id`   | UInt32                 | Partition key + ORDER BY prefix. Always filter by this.                                                                                             |
+| `message_type` | LowCardinality(String) | 2nd in ORDER BY. Filter with `= 'email'` for email events.                                                                                          |
+| `event`        | String                 | 4th in ORDER BY. Values: `delivered`, `bounce`, `bounced`, `deferred`, `dropped`, `spamreport`, `open`, `click`, `unsubscribe`, `group_unsubscribe` |
+| `delivered_id` | String                 | Links non-delivery events back to the original delivered event (for IP attribution joins).                                                          |
 
 ### Query performance rules
 
 1. **Always include `time_date` in WHERE** -- it's the 3rd column in ORDER BY and enables granule skipping. Without it, ClickHouse scans all granules within a monthly partition.
 
 2. **Use +-1 day buffer for timezone safety** -- `time_date` is UTC-based (`toDate(time)`) but user date ranges are in local timezone. Use:
+
    ```sql
    time_date >= toDate({from:String}) - 1
    time_date <= toDate({to:String}) + 1
    ```
+
    The precise `time` filter still enforces exact boundaries.
 
 3. **Filter by `account_id`** -- it's the partition key prefix. Without it, all partitions are scanned.

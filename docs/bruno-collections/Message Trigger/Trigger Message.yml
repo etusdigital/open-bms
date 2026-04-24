@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{message-trigger-url}}/"
+  url: '{{message-trigger-url}}/'
   body:
     type: json
     json: |

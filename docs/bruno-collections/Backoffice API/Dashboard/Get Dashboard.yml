@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/dashboard"
+  url: '{{backoffice-api-url}}/dashboard'
   auth: inherit
 
 settings:

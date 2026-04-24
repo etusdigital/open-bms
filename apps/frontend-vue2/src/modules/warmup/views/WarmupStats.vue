@@ -825,7 +825,9 @@ export default class WarmupStats extends Vue {
   font-size: 14px;
 }
 .c-table {
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
   border-radius: 16px;
   margin-top: 1rem;
 }
@@ -1124,7 +1126,9 @@ export default class WarmupStats extends Vue {
   border-radius: 16px;
   padding: 15px 20px 5px 20px;
   border-radius: 16px;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1) !important;
   width: auto;
   z-index: 0 !important;
 }
@@ -1135,7 +1139,9 @@ export default class WarmupStats extends Vue {
   gap: 18px;
   padding: 20px;
   border-radius: 16px;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1) !important;
   height: 92px;
   width: auto;
   z-index: 0 !important;
@@ -1184,7 +1190,9 @@ export default class WarmupStats extends Vue {
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 24px;
-  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
+    0px 1px 2px 0px rgba(0, 0, 0, 0.06);
 }
 
 .messages-pages {
@@ -1218,7 +1226,9 @@ export default class WarmupStats extends Vue {
 
 .expand-tags {
   margin-top: -7px;
-  transition: width 2s ease-out, height 2s ease-out;
+  transition:
+    width 2s ease-out,
+    height 2s ease-out;
   margin-bottom: 10px;
 }
 

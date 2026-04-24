@@ -141,7 +141,7 @@
       <LineComponent :type="'vertical'" v-if="['custom', 'range', 'date'].includes(showTimeCustom)" />
       <div class="mt-auto time-custom" :class="[{ 'time-custom-focus': isFocused }]" v-if="showTimeCustom == 'custom'">
         <input
-          oninput="value = value.replace(/[^0-9]/g, '');"
+          oninput="value = value.replace(/[^0-9]/g, '')"
           class="form-control mo-input days-input"
           @input="updateTime($event.target.value)"
           @focus="onFocus"

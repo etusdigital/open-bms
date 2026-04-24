@@ -28,6 +28,7 @@ pnpm --filter @retention/frontend test:watch
 ### Task 1: Shared types
 
 **Files:**
+
 - Create: `apps/frontend/src/components/data-table/types.ts`
 
 **Step 1: Create the types file**
@@ -81,6 +82,7 @@ git commit -m "feat: add shared FormattingRule types for datatable toolbar"
 ### Task 2: Color utilities
 
 **Files:**
+
 - Create: `apps/frontend/src/lib/color-utils.ts`
 - Create: `apps/frontend/src/lib/color-utils.test.ts`
 
@@ -161,20 +163,11 @@ Expected: `FAIL — color-utils not found`
 
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '');
-  return [
-    parseInt(h.substring(0, 2), 16),
-    parseInt(h.substring(2, 4), 16),
-    parseInt(h.substring(4, 6), 16),
-  ];
+  return [parseInt(h.substring(0, 2), 16), parseInt(h.substring(2, 4), 16), parseInt(h.substring(4, 6), 16)];
 }
 
 function rgbToHex(r: number, g: number, b: number): string {
-  return (
-    '#' +
-    [r, g, b]
-      .map((v) => Math.round(v).toString(16).padStart(2, '0'))
-      .join('')
-  );
+  return '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -227,6 +220,7 @@ git commit -m "feat: add color interpolation utilities with tests"
 ### Task 3: useTableSettings hook
 
 **Files:**
+
 - Create: `apps/frontend/src/hooks/use-table-settings.ts`
 - Create: `apps/frontend/src/hooks/use-table-settings.test.ts`
 
@@ -249,69 +243,60 @@ describe('useTableSettings', () => {
   });
 
   it('defaults to all columns visible when localStorage is empty', () => {
-    const { result } = renderHook(() =>
-      useTableSettings('tbl', ['col-a', 'col-b', 'col-c'])
-    );
+    const { result } = renderHook(() => useTableSettings('tbl', ['col-a', 'col-b', 'col-c']));
     expect(result.current.visibleColumns).toEqual(new Set(['col-a', 'col-b', 'col-c']));
   });
 
   it('loads visibleColumns from localStorage', () => {
-    storage.set(
-      'table-settings-tbl',
-      JSON.stringify({ visibleColumns: ['col-a'], formattingRules: [] })
-    );
-    const { result } = renderHook(() =>
-      useTableSettings('tbl', ['col-a', 'col-b'])
-    );
+    storage.set('table-settings-tbl', JSON.stringify({ visibleColumns: ['col-a'], formattingRules: [] }));
+    const { result } = renderHook(() => useTableSettings('tbl', ['col-a', 'col-b']));
     expect(result.current.visibleColumns).toEqual(new Set(['col-a']));
   });
 
   it('toggleColumn hides a visible column', () => {
-    const { result } = renderHook(() =>
-      useTableSettings('tbl', ['col-a', 'col-b'])
-    );
-    act(() => { result.current.toggleColumn('col-b'); });
+    const { result } = renderHook(() => useTableSettings('tbl', ['col-a', 'col-b']));
+    act(() => {
+      result.current.toggleColumn('col-b');
+    });
     expect(result.current.visibleColumns.has('col-b')).toBe(false);
   });
 
   it('toggleColumn shows a hidden column', () => {
-    storage.set(
-      'table-settings-tbl',
-      JSON.stringify({ visibleColumns: ['col-a'], formattingRules: [] })
-    );
-    const { result } = renderHook(() =>
-      useTableSettings('tbl', ['col-a', 'col-b'])
-    );
-    act(() => { result.current.toggleColumn('col-b'); });
+    storage.set('table-settings-tbl', JSON.stringify({ visibleColumns: ['col-a'], formattingRules: [] }));
+    const { result } = renderHook(() => useTableSettings('tbl', ['col-a', 'col-b']));
+    act(() => {
+      result.current.toggleColumn('col-b');
+    });
     expect(result.current.visibleColumns.has('col-b')).toBe(true);
   });
 
   it('toggleColumn ignores alwaysVisible columns', () => {
-    const { result } = renderHook(() =>
-      useTableSettings('tbl', ['col-a', 'col-b'], ['col-a'])
-    );
-    act(() => { result.current.toggleColumn('col-a'); });
+    const { result } = renderHook(() => useTableSettings('tbl', ['col-a', 'col-b'], ['col-a']));
+    act(() => {
+      result.current.toggleColumn('col-a');
+    });
     expect(result.current.visibleColumns.has('col-a')).toBe(true);
   });
 
   it('always includes alwaysVisible columns even when localStorage omits them', () => {
-    storage.set(
-      'table-settings-tbl',
-      JSON.stringify({ visibleColumns: [], formattingRules: [] })
-    );
-    const { result } = renderHook(() =>
-      useTableSettings('tbl', ['col-a', 'col-b'], ['col-a'])
-    );
+    storage.set('table-settings-tbl', JSON.stringify({ visibleColumns: [], formattingRules: [] }));
+    const { result } = renderHook(() => useTableSettings('tbl', ['col-a', 'col-b'], ['col-a']));
     expect(result.current.visibleColumns.has('col-a')).toBe(true);
   });
 
   it('addFormattingRule adds a rule', () => {
     const { result } = renderHook(() => useTableSettings('tbl', ['col-a']));
     const rule = {
-      id: 'r1', type: 'color-scale' as const,
-      columnKey: 'col-a', minColor: '#ff0000', midColor: '#ffff00', maxColor: '#00ff00',
+      id: 'r1',
+      type: 'color-scale' as const,
+      columnKey: 'col-a',
+      minColor: '#ff0000',
+      midColor: '#ffff00',
+      maxColor: '#00ff00',
     };
-    act(() => { result.current.addFormattingRule(rule); });
+    act(() => {
+      result.current.addFormattingRule(rule);
+    });
     expect(result.current.formattingRules).toHaveLength(1);
     expect(result.current.formattingRules[0]).toEqual(rule);
   });
@@ -319,29 +304,53 @@ describe('useTableSettings', () => {
   it('removeFormattingRule removes a rule by id', () => {
     const { result } = renderHook(() => useTableSettings('tbl', ['col-a']));
     const rule = {
-      id: 'r1', type: 'color-scale' as const,
-      columnKey: 'col-a', minColor: '#ff0000', midColor: '#ffff00', maxColor: '#00ff00',
+      id: 'r1',
+      type: 'color-scale' as const,
+      columnKey: 'col-a',
+      minColor: '#ff0000',
+      midColor: '#ffff00',
+      maxColor: '#00ff00',
     };
-    act(() => { result.current.addFormattingRule(rule); });
-    act(() => { result.current.removeFormattingRule('r1'); });
+    act(() => {
+      result.current.addFormattingRule(rule);
+    });
+    act(() => {
+      result.current.removeFormattingRule('r1');
+    });
     expect(result.current.formattingRules).toHaveLength(0);
   });
 
   it('setFormattingRules replaces all rules', () => {
     const { result } = renderHook(() => useTableSettings('tbl', ['col-a']));
     const rules = [
-      { id: 'r1', type: 'color-scale' as const, columnKey: 'col-a', minColor: '#ff0000', midColor: '#ffff00', maxColor: '#00ff00' },
-      { id: 'r2', type: 'color-scale' as const, columnKey: 'col-a', minColor: '#ff0000', midColor: '#ffff00', maxColor: '#00ff00' },
+      {
+        id: 'r1',
+        type: 'color-scale' as const,
+        columnKey: 'col-a',
+        minColor: '#ff0000',
+        midColor: '#ffff00',
+        maxColor: '#00ff00',
+      },
+      {
+        id: 'r2',
+        type: 'color-scale' as const,
+        columnKey: 'col-a',
+        minColor: '#ff0000',
+        midColor: '#ffff00',
+        maxColor: '#00ff00',
+      },
     ];
-    act(() => { result.current.setFormattingRules(rules); });
+    act(() => {
+      result.current.setFormattingRules(rules);
+    });
     expect(result.current.formattingRules).toHaveLength(2);
   });
 
   it('persists settings to localStorage after toggle', () => {
-    const { result } = renderHook(() =>
-      useTableSettings('tbl', ['col-a', 'col-b'])
-    );
-    act(() => { result.current.toggleColumn('col-b'); });
+    const { result } = renderHook(() => useTableSettings('tbl', ['col-a', 'col-b']));
+    act(() => {
+      result.current.toggleColumn('col-b');
+    });
     const stored = JSON.parse(storage.get('table-settings-tbl')!);
     expect(stored.visibleColumns).not.toContain('col-b');
   });
@@ -349,10 +358,16 @@ describe('useTableSettings', () => {
   it('persists formattingRules to localStorage after add', () => {
     const { result } = renderHook(() => useTableSettings('tbl', ['col-a']));
     const rule = {
-      id: 'r1', type: 'color-scale' as const,
-      columnKey: 'col-a', minColor: '#ff0000', midColor: '#ffff00', maxColor: '#00ff00',
+      id: 'r1',
+      type: 'color-scale' as const,
+      columnKey: 'col-a',
+      minColor: '#ff0000',
+      midColor: '#ffff00',
+      maxColor: '#00ff00',
     };
-    act(() => { result.current.addFormattingRule(rule); });
+    act(() => {
+      result.current.addFormattingRule(rule);
+    });
     const stored = JSON.parse(storage.get('table-settings-tbl')!);
     expect(stored.formattingRules).toHaveLength(1);
   });
@@ -380,11 +395,7 @@ function getKey(tableId: string): string {
   return `table-settings-${tableId}`;
 }
 
-function loadFromStorage(
-  tableId: string,
-  allColumnKeys: string[],
-  alwaysVisibleKeys: string[]
-): TableSettings {
+function loadFromStorage(tableId: string, allColumnKeys: string[], alwaysVisibleKeys: string[]): TableSettings {
   try {
     const raw = typeof window !== 'undefined' ? localStorage.getItem(getKey(tableId)) : null;
     if (raw) {
@@ -402,13 +413,9 @@ function loadFromStorage(
   return { visibleColumns: allColumnKeys, formattingRules: [] };
 }
 
-export function useTableSettings(
-  tableId: string,
-  allColumnKeys: string[],
-  alwaysVisibleKeys: string[] = []
-) {
+export function useTableSettings(tableId: string, allColumnKeys: string[], alwaysVisibleKeys: string[] = []) {
   const [settings, setSettings] = useState<TableSettings>(() =>
-    loadFromStorage(tableId, allColumnKeys, alwaysVisibleKeys)
+    loadFromStorage(tableId, allColumnKeys, alwaysVisibleKeys),
   );
 
   useEffect(() => {
@@ -429,7 +436,7 @@ export function useTableSettings(
         return { ...prev, visibleColumns: Array.from(visible) };
       });
     },
-    [alwaysVisibleKeys]
+    [alwaysVisibleKeys],
   );
 
   const setFormattingRules = useCallback((rules: FormattingRule[]) => {
@@ -481,6 +488,7 @@ git commit -m "feat: add useTableSettings hook with localStorage persistence"
 ### Task 4: ColumnsPopover component
 
 **Files:**
+
 - Create: `apps/frontend/src/components/data-table/columns-popover.tsx`
 - Create: `apps/frontend/src/components/data-table/columns-popover.test.tsx`
 
@@ -505,7 +513,7 @@ describe('ColumnsPopover', () => {
         columns={columns}
         visibleColumns={new Set(['col-a', 'col-b', 'col-c'])}
         onToggleColumn={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByRole('button', { name: /columns/i })).toBeInTheDocument();
   });
@@ -516,7 +524,7 @@ describe('ColumnsPopover', () => {
         columns={columns}
         visibleColumns={new Set(['col-a', 'col-b', 'col-c'])}
         onToggleColumn={vi.fn()}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /columns/i }));
     expect(screen.getByText('Column A')).toBeInTheDocument();
@@ -531,7 +539,7 @@ describe('ColumnsPopover', () => {
         columns={columns}
         visibleColumns={new Set(['col-a', 'col-b', 'col-c'])}
         onToggleColumn={onToggle}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /columns/i }));
     fireEvent.click(screen.getByText('Column A'));
@@ -545,7 +553,7 @@ describe('ColumnsPopover', () => {
         columns={columns}
         visibleColumns={new Set(['col-a', 'col-b', 'col-c'])}
         onToggleColumn={onToggle}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /columns/i }));
     fireEvent.click(screen.getByText('Column B'));
@@ -553,13 +561,7 @@ describe('ColumnsPopover', () => {
   });
 
   it('shows checkbox as checked for visible columns', () => {
-    render(
-      <ColumnsPopover
-        columns={columns}
-        visibleColumns={new Set(['col-a'])}
-        onToggleColumn={vi.fn()}
-      />
-    );
+    render(<ColumnsPopover columns={columns} visibleColumns={new Set(['col-a'])} onToggleColumn={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /columns/i }));
     const checkboxA = screen.getByTestId('checkbox-col-a');
     const checkboxC = screen.getByTestId('checkbox-col-c');
@@ -607,7 +609,7 @@ export function ColumnsPopover({ columns, visibleColumns, onToggleColumn }: Colu
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
+          className="border-border bg-background text-foreground hover:bg-accent inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium shadow-sm transition-colors"
           aria-label="Columns"
         >
           <Columns className="h-3.5 w-3.5" />
@@ -615,7 +617,7 @@ export function ColumnsPopover({ columns, visibleColumns, onToggleColumn }: Colu
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-2" align="start">
-        <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="text-muted-foreground mb-2 px-1 text-[10px] font-semibold tracking-wider uppercase">
           Visible Columns
         </p>
         <div className="space-y-0.5">
@@ -629,7 +631,7 @@ export function ColumnsPopover({ columns, visibleColumns, onToggleColumn }: Colu
                 disabled={isDisabled}
                 className={cn(
                   'flex w-full items-center gap-2 rounded px-1.5 py-1.5 text-sm transition-colors',
-                  isDisabled ? 'cursor-default opacity-50' : 'cursor-pointer hover:bg-accent'
+                  isDisabled ? 'cursor-default opacity-50' : 'hover:bg-accent cursor-pointer',
                 )}
               >
                 <div
@@ -637,9 +639,7 @@ export function ColumnsPopover({ columns, visibleColumns, onToggleColumn }: Colu
                   data-checked={String(isVisible)}
                   className={cn(
                     'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border',
-                    isVisible
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-muted-foreground'
+                    isVisible ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground',
                   )}
                 >
                   {isVisible && (
@@ -685,6 +685,7 @@ git commit -m "feat: add ColumnsPopover component with column visibility toggle"
 ### Task 5: FormattingModal component
 
 **Files:**
+
 - Create: `apps/frontend/src/components/data-table/formatting-modal.tsx`
 - Create: `apps/frontend/src/components/data-table/formatting-modal.test.tsx`
 
@@ -711,7 +712,7 @@ describe('FormattingModal', () => {
         numericColumns={numericColumns}
         formattingRules={[]}
         onApply={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText('Conditional Formatting')).toBeInTheDocument();
     expect(screen.getByText('Quick Presets')).toBeInTheDocument();
@@ -725,7 +726,7 @@ describe('FormattingModal', () => {
         numericColumns={numericColumns}
         formattingRules={[]}
         onApply={vi.fn()}
-      />
+      />,
     );
     expect(screen.queryByText('Conditional Formatting')).not.toBeInTheDocument();
   });
@@ -739,7 +740,7 @@ describe('FormattingModal', () => {
         numericColumns={numericColumns}
         formattingRules={[]}
         onApply={onApply}
-      />
+      />,
     );
     fireEvent.click(screen.getByText('Heatmap'));
     fireEvent.click(screen.getByRole('button', { name: /apply rules/i }));
@@ -750,7 +751,7 @@ describe('FormattingModal', () => {
           minColor: FORMATTING_PRESETS.heatmap.minColor,
           maxColor: FORMATTING_PRESETS.heatmap.maxColor,
         }),
-      ])
+      ]),
     );
   });
 
@@ -762,7 +763,7 @@ describe('FormattingModal', () => {
         numericColumns={numericColumns}
         formattingRules={[]}
         onApply={vi.fn()}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /add color scale rule/i }));
     expect(screen.getByText('Min Point Color')).toBeInTheDocument();
@@ -777,7 +778,7 @@ describe('FormattingModal', () => {
         numericColumns={numericColumns}
         formattingRules={[]}
         onApply={vi.fn()}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /add single color rule/i }));
     expect(screen.getByText('Background Color')).toBeInTheDocument();
@@ -792,7 +793,7 @@ describe('FormattingModal', () => {
         numericColumns={numericColumns}
         formattingRules={[]}
         onApply={vi.fn()}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /add color scale rule/i }));
     expect(screen.getByText('Min Point Color')).toBeInTheDocument();
@@ -810,7 +811,7 @@ describe('FormattingModal', () => {
         numericColumns={numericColumns}
         formattingRules={[]}
         onApply={onApply}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(onClose).toHaveBeenCalled();
@@ -827,7 +828,7 @@ describe('FormattingModal', () => {
         numericColumns={numericColumns}
         formattingRules={[]}
         onApply={onApply}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /apply rules/i }));
     expect(onApply).toHaveBeenCalledWith([]);
@@ -850,7 +851,7 @@ describe('FormattingModal', () => {
         numericColumns={numericColumns}
         formattingRules={[existingRule]}
         onApply={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText('Min Point Color')).toBeInTheDocument();
   });
@@ -906,24 +907,13 @@ function generateId(): string {
 }
 
 function GradientPreview({ min, mid, max }: { min: string; mid: string; max: string }) {
-  const stops = Array.from({ length: 20 }, (_, i) =>
-    interpolateThreeColors(min, mid, max, i / 19)
-  );
+  const stops = Array.from({ length: 20 }, (_, i) => interpolateThreeColors(min, mid, max, i / 19));
   return (
-    <div
-      className="h-6 w-full rounded"
-      style={{ background: `linear-gradient(to right, ${stops.join(', ')})` }}
-    />
+    <div className="h-6 w-full rounded" style={{ background: `linear-gradient(to right, ${stops.join(', ')})` }} />
   );
 }
 
-export function FormattingModal({
-  open,
-  onClose,
-  numericColumns,
-  formattingRules,
-  onApply,
-}: FormattingModalProps) {
+export function FormattingModal({ open, onClose, numericColumns, formattingRules, onApply }: FormattingModalProps) {
   const [draftRules, setDraftRules] = useState<FormattingRule[]>(formattingRules);
   const [presetColumnKey, setPresetColumnKey] = useState(numericColumns[0]?.key ?? '');
 
@@ -992,9 +982,7 @@ export function FormattingModal({
   }
 
   function updateRule(id: string, updates: Partial<FormattingRule>) {
-    setDraftRules((prev) =>
-      prev.map((r) => (r.id === id ? ({ ...r, ...updates } as FormattingRule) : r))
-    );
+    setDraftRules((prev) => prev.map((r) => (r.id === id ? ({ ...r, ...updates } as FormattingRule) : r)));
   }
 
   function handleApply() {
@@ -1009,22 +997,20 @@ export function FormattingModal({
       aria-modal="true"
       aria-label="Conditional Formatting"
     >
-      <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-background shadow-xl">
+      <div className="border-border bg-background max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border shadow-xl">
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-border px-5 py-4">
+        <div className="border-border flex items-start justify-between border-b px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <PaintBucket className="h-4 w-4" />
               Conditional Formatting
             </h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Define rules to visualize data patterns
-            </p>
+            <p className="text-muted-foreground mt-0.5 text-sm">Define rules to visualize data patterns</p>
           </div>
           <button
             onClick={onClose}
             aria-label="Close dialog"
-            className="rounded-md p-1 text-muted-foreground hover:bg-accent"
+            className="text-muted-foreground hover:bg-accent rounded-md p-1"
           >
             ✕
           </button>
@@ -1032,7 +1018,7 @@ export function FormattingModal({
 
         <div className="space-y-4 p-5">
           {/* Quick Presets */}
-          <div className="rounded-lg border border-border p-4">
+          <div className="border-border rounded-lg border p-4">
             <div className="mb-3 flex items-center gap-1.5 text-sm font-medium">
               <Zap className="h-3.5 w-3.5 text-amber-500" />
               Quick Presets
@@ -1053,24 +1039,24 @@ export function FormattingModal({
               <span className="text-muted-foreground">→</span>
               <button
                 onClick={() => applyPreset('heatmap')}
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-background px-3 text-xs hover:bg-accent"
+                className="border-border bg-background hover:bg-accent inline-flex h-8 items-center gap-1 rounded-md border px-3 text-xs"
               >
                 🎨 Heatmap
               </button>
               <button
                 onClick={() => applyPreset('highIsGood')}
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-background px-3 text-xs hover:bg-accent"
+                className="border-border bg-background hover:bg-accent inline-flex h-8 items-center gap-1 rounded-md border px-3 text-xs"
               >
                 📈 High = Good
               </button>
               <button
                 onClick={() => applyPreset('lowIsGood')}
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-background px-3 text-xs hover:bg-accent"
+                className="border-border bg-background hover:bg-accent inline-flex h-8 items-center gap-1 rounded-md border px-3 text-xs"
               >
                 📉 Low = Good
               </button>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
+            <p className="text-muted-foreground mt-2 text-xs">
               Select a column and click a preset to apply formatting instantly
             </p>
           </div>
@@ -1078,15 +1064,12 @@ export function FormattingModal({
           {/* Rules list */}
           <div className="space-y-3">
             {draftRules.map((rule, i) => (
-              <div key={rule.id} className="rounded-lg border border-border p-4">
+              <div key={rule.id} className="border-border rounded-lg border p-4">
                 {/* Rule header: column + type selectors + delete */}
                 <div className="mb-4 flex items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
                     <span className="text-muted-foreground">{i + 1}</span>
-                    <Select
-                      value={rule.columnKey}
-                      onValueChange={(v) => updateRule(rule.id, { columnKey: v })}
-                    >
+                    <Select value={rule.columnKey} onValueChange={(v) => updateRule(rule.id, { columnKey: v })}>
                       <SelectTrigger className="h-7 w-32 text-xs">
                         <SelectValue />
                       </SelectTrigger>
@@ -1106,7 +1089,12 @@ export function FormattingModal({
                           type: v as 'color-scale' | 'single-color',
                           ...(v === 'color-scale'
                             ? { minColor: '#dc2626', midColor: '#fbbf24', maxColor: '#16a34a' }
-                            : { operator: 'gt' as FormattingOperator, value1: 0, backgroundColor: '#22c55e', textColor: '#ffffff' }),
+                            : {
+                                operator: 'gt' as FormattingOperator,
+                                value1: 0,
+                                backgroundColor: '#22c55e',
+                                textColor: '#ffffff',
+                              }),
                         })
                       }
                     >
@@ -1122,7 +1110,7 @@ export function FormattingModal({
                   <button
                     onClick={() => removeRule(rule.id)}
                     aria-label="Delete rule"
-                    className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-destructive"
+                    className="text-muted-foreground hover:bg-accent hover:text-destructive rounded-md p-1"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -1133,36 +1121,32 @@ export function FormattingModal({
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
-                          Min Point Color
-                        </p>
+                        <p className="text-muted-foreground mb-1 text-xs tracking-wider uppercase">Min Point Color</p>
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
                             value={rule.minColor}
                             onChange={(e) => updateRule(rule.id, { minColor: e.target.value })}
-                            className="h-8 w-8 cursor-pointer rounded border border-border"
+                            className="border-border h-8 w-8 cursor-pointer rounded border"
                           />
                           <span className="font-mono text-xs">{rule.minColor}</span>
                         </div>
                       </div>
                       <div>
-                        <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
-                          Max Point Color
-                        </p>
+                        <p className="text-muted-foreground mb-1 text-xs tracking-wider uppercase">Max Point Color</p>
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
                             value={rule.maxColor}
                             onChange={(e) => updateRule(rule.id, { maxColor: e.target.value })}
-                            className="h-8 w-8 cursor-pointer rounded border border-border"
+                            className="border-border h-8 w-8 cursor-pointer rounded border"
                           />
                           <span className="font-mono text-xs">{rule.maxColor}</span>
                         </div>
                       </div>
                     </div>
                     <div>
-                      <p className="mb-1 text-xs text-muted-foreground">Preview Gradient</p>
+                      <p className="text-muted-foreground mb-1 text-xs">Preview Gradient</p>
                       <GradientPreview min={rule.minColor} mid={rule.midColor} max={rule.maxColor} />
                     </div>
                   </div>
@@ -1173,79 +1157,63 @@ export function FormattingModal({
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
-                          Apply to Range
-                        </p>
+                        <p className="text-muted-foreground mb-1 text-xs tracking-wider uppercase">Apply to Range</p>
                         <Select
                           value={rule.operator}
-                          onValueChange={(v) =>
-                            updateRule(rule.id, { operator: v as FormattingOperator })
-                          }
+                          onValueChange={(v) => updateRule(rule.id, { operator: v as FormattingOperator })}
                         >
                           <SelectTrigger className="h-8 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {(Object.entries(OPERATOR_LABELS) as [FormattingOperator, string][]).map(
-                              ([op, label]) => (
-                                <SelectItem key={op} value={op}>
-                                  {label}
-                                </SelectItem>
-                              )
-                            )}
+                            {(Object.entries(OPERATOR_LABELS) as [FormattingOperator, string][]).map(([op, label]) => (
+                              <SelectItem key={op} value={op}>
+                                {label}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
                       <div>
-                        <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
-                          Value
-                        </p>
+                        <p className="text-muted-foreground mb-1 text-xs tracking-wider uppercase">Value</p>
                         <input
                           type="number"
                           value={rule.value1}
                           onChange={(e) => updateRule(rule.id, { value1: Number(e.target.value) })}
-                          className="h-8 w-full rounded border border-border bg-background px-2 text-xs"
+                          className="border-border bg-background h-8 w-full rounded border px-2 text-xs"
                         />
                         {rule.operator === 'between' && (
                           <input
                             type="number"
                             value={rule.value2 ?? 0}
-                            onChange={(e) =>
-                              updateRule(rule.id, { value2: Number(e.target.value) })
-                            }
+                            onChange={(e) => updateRule(rule.id, { value2: Number(e.target.value) })}
                             placeholder="Max value"
-                            className="mt-1 h-8 w-full rounded border border-border bg-background px-2 text-xs"
+                            className="border-border bg-background mt-1 h-8 w-full rounded border px-2 text-xs"
                           />
                         )}
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
-                          Background Color
-                        </p>
+                        <p className="text-muted-foreground mb-1 text-xs tracking-wider uppercase">Background Color</p>
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
                             value={rule.backgroundColor}
-                            onChange={(e) =>
-                              updateRule(rule.id, { backgroundColor: e.target.value })
-                            }
-                            className="h-8 w-8 cursor-pointer rounded border border-border"
+                            onChange={(e) => updateRule(rule.id, { backgroundColor: e.target.value })}
+                            className="border-border h-8 w-8 cursor-pointer rounded border"
                           />
                           <span className="font-mono text-xs">{rule.backgroundColor}</span>
                         </div>
                       </div>
                       <div>
-                        <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
-                          Text Color
-                        </p>
+                        <p className="text-muted-foreground mb-1 text-xs tracking-wider uppercase">Text Color</p>
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
                             value={rule.textColor}
                             onChange={(e) => updateRule(rule.id, { textColor: e.target.value })}
-                            className="h-8 w-8 cursor-pointer rounded border border-border"
+                            className="border-border h-8 w-8 cursor-pointer rounded border"
                           />
                           <span className="font-mono text-xs">{rule.textColor}</span>
                         </div>
@@ -1261,14 +1229,14 @@ export function FormattingModal({
           <div className="flex gap-2">
             <button
               onClick={addColorScaleRule}
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-dashed border-border text-xs text-muted-foreground hover:bg-accent"
+              className="border-border text-muted-foreground hover:bg-accent flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-dashed text-xs"
             >
               <Plus className="h-3.5 w-3.5" />
               Add Color Scale Rule
             </button>
             <button
               onClick={addSingleColorRule}
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-dashed border-border text-xs text-muted-foreground hover:bg-accent"
+              className="border-border text-muted-foreground hover:bg-accent flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-dashed text-xs"
             >
               <Plus className="h-3.5 w-3.5" />
               Add Single Color Rule
@@ -1277,16 +1245,13 @@ export function FormattingModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-border px-5 py-4">
-          <button
-            onClick={onClose}
-            className="rounded-md px-4 py-2 text-sm text-muted-foreground hover:bg-accent"
-          >
+        <div className="border-border flex items-center justify-between border-t px-5 py-4">
+          <button onClick={onClose} className="text-muted-foreground hover:bg-accent rounded-md px-4 py-2 text-sm">
             Cancel
           </button>
           <button
             onClick={handleApply}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium"
           >
             <PaintBucket className="h-3.5 w-3.5" />
             Apply Rules
@@ -1318,6 +1283,7 @@ git commit -m "feat: add FormattingModal with color scale and single-color condi
 ### Task 6: DataTableToolbar component
 
 **Files:**
+
 - Create: `apps/frontend/src/components/data-table/data-table-toolbar.tsx`
 - Create: `apps/frontend/src/components/data-table/data-table-toolbar.test.tsx`
 
@@ -1343,7 +1309,7 @@ describe('DataTableToolbar', () => {
         formattingRules={[]}
         onToggleColumn={vi.fn()}
         onApplyFormatting={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByRole('button', { name: /columns/i })).toBeInTheDocument();
   });
@@ -1356,7 +1322,7 @@ describe('DataTableToolbar', () => {
         formattingRules={[]}
         onToggleColumn={vi.fn()}
         onApplyFormatting={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByRole('button', { name: /formatting/i })).toBeInTheDocument();
   });
@@ -1369,7 +1335,7 @@ describe('DataTableToolbar', () => {
         formattingRules={[]}
         onToggleColumn={vi.fn()}
         onApplyFormatting={vi.fn()}
-      />
+      />,
     );
     expect(screen.queryByRole('button', { name: /formatting/i })).not.toBeInTheDocument();
   });
@@ -1382,7 +1348,7 @@ describe('DataTableToolbar', () => {
         formattingRules={[]}
         onToggleColumn={vi.fn()}
         onApplyFormatting={vi.fn()}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /formatting/i }));
     expect(screen.getByText('Conditional Formatting')).toBeInTheDocument();
@@ -1397,7 +1363,7 @@ describe('DataTableToolbar', () => {
         formattingRules={[]}
         onToggleColumn={vi.fn()}
         onApplyFormatting={onApply}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /formatting/i }));
     fireEvent.click(screen.getByRole('button', { name: /apply rules/i }));
@@ -1456,16 +1422,12 @@ export function DataTableToolbar({
   return (
     <>
       <div className="mb-3 flex items-center gap-2">
-        <ColumnsPopover
-          columns={columns}
-          visibleColumns={visibleColumns}
-          onToggleColumn={onToggleColumn}
-        />
+        <ColumnsPopover columns={columns} visibleColumns={visibleColumns} onToggleColumn={onToggleColumn} />
         {numericColumns.length > 0 && (
           <button
             onClick={() => setFormattingOpen(true)}
             aria-label="Formatting"
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
+            className="border-border bg-background text-foreground hover:bg-accent inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium shadow-sm transition-colors"
           >
             <PaintBucket className="h-3.5 w-3.5" />
             Formatting
@@ -1509,6 +1471,7 @@ git commit -m "feat: add DataTableToolbar component composing Columns and Format
 ### Task 7: Extend ReportTable
 
 **Files:**
+
 - Modify: `apps/frontend/src/features/reports/components/report-table.tsx`
 - Create: `apps/frontend/src/features/reports/components/report-table.test.tsx`
 
@@ -1541,7 +1504,11 @@ vi.mock('@/hooks/use-table-settings', () => ({
   })),
 }));
 
-interface Row { name: string; delivered: number; bounce_rate: number }
+interface Row {
+  name: string;
+  delivered: number;
+  bounce_rate: number;
+}
 
 const columns: ColumnDef<Row>[] = [
   { key: 'name', header: 'Name', accessor: (r) => r.name, alwaysVisible: true },
@@ -1610,9 +1577,7 @@ describe('ReportTable', () => {
         removeFormattingRule: vi.fn(),
       });
 
-      const { container } = render(
-        <ReportTable data={data} columns={columns} tableId="test-table" />
-      );
+      const { container } = render(<ReportTable data={data} columns={columns} tableId="test-table" />);
 
       // Find cells in the 'delivered' column (index 1 in visible columns)
       const rows = container.querySelectorAll('tbody tr');
@@ -1673,11 +1638,7 @@ interface ReportTableProps<T> {
 
 type SortDirection = 'asc' | 'desc' | null;
 
-function getCellStyle(
-  rule: FormattingRule,
-  value: number,
-  stats: { min: number; max: number }
-): React.CSSProperties {
+function getCellStyle(rule: FormattingRule, value: number, stats: { min: number; max: number }): React.CSSProperties {
   if (rule.type === 'color-scale') {
     if (stats.max === stats.min) return {};
     const t = (value - stats.min) / (stats.max - stats.min);
@@ -1716,21 +1677,15 @@ function ReportTableWithSettings<T>({
   const [page, setPage] = useState(0);
 
   const allColumnKeys = useMemo(() => columns.map((c) => c.key), [columns]);
-  const alwaysVisibleKeys = useMemo(
-    () => columns.filter((c) => c.alwaysVisible).map((c) => c.key),
-    [columns]
-  );
+  const alwaysVisibleKeys = useMemo(() => columns.filter((c) => c.alwaysVisible).map((c) => c.key), [columns]);
 
   const { visibleColumns, formattingRules, toggleColumn, setFormattingRules } = useTableSettings(
     tableId,
     allColumnKeys,
-    alwaysVisibleKeys
+    alwaysVisibleKeys,
   );
 
-  const visibleColumnDefs = useMemo(
-    () => columns.filter((c) => visibleColumns.has(c.key)),
-    [columns, visibleColumns]
-  );
+  const visibleColumnDefs = useMemo(() => columns.filter((c) => visibleColumns.has(c.key)), [columns, visibleColumns]);
 
   const toolbarColumns = useMemo(
     () =>
@@ -1740,7 +1695,7 @@ function ReportTableWithSettings<T>({
         alwaysVisible: c.alwaysVisible,
         isNumeric: c.isNumeric,
       })),
-    [columns]
+    [columns],
   );
 
   // Pre-compute column stats for active color-scale rules
@@ -1777,9 +1732,7 @@ function ReportTableWithSettings<T>({
       if (typeof aVal === 'number' && typeof bVal === 'number') {
         return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
       }
-      return sortDir === 'asc'
-        ? String(aVal).localeCompare(String(bVal))
-        : String(bVal).localeCompare(String(aVal));
+      return sortDir === 'asc' ? String(aVal).localeCompare(String(bVal)) : String(bVal).localeCompare(String(aVal));
     });
   }, [data, sortKey, sortDir, columns]);
 
@@ -1793,7 +1746,10 @@ function ReportTableWithSettings<T>({
   const handleSort = (key: string) => {
     if (sortKey === key) {
       if (sortDir === 'asc') setSortDir('desc');
-      else { setSortKey(null); setSortDir(null); }
+      else {
+        setSortKey(null);
+        setSortDir(null);
+      }
     } else {
       setSortKey(key);
       setSortDir('asc');
@@ -1804,15 +1760,15 @@ function ReportTableWithSettings<T>({
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent" />
       </div>
     );
   }
 
   if (data.length === 0) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center rounded-lg border-2 border-dashed border-border">
-        <p className="text-sm text-muted-foreground">{emptyMessage ?? tReports('noData')}</p>
+      <div className="border-border flex h-64 flex-col items-center justify-center rounded-lg border-2 border-dashed">
+        <p className="text-muted-foreground text-sm">{emptyMessage ?? tReports('noData')}</p>
       </div>
     );
   }
@@ -1826,16 +1782,16 @@ function ReportTableWithSettings<T>({
         onToggleColumn={toggleColumn}
         onApplyFormatting={setFormattingRules}
       />
-      <div className="rounded-xl border border-border bg-card shadow-sm">
+      <div className="border-border bg-card rounded-xl border shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border">
+              <tr className="border-border border-b">
                 {visibleColumnDefs.map((col) => (
                   <th
                     key={col.key}
                     className={cn(
-                      'cursor-pointer px-4 py-3 font-medium text-muted-foreground transition-colors hover:text-foreground',
+                      'text-muted-foreground hover:text-foreground cursor-pointer px-4 py-3 font-medium transition-colors',
                       col.align === 'right' && 'text-right',
                       col.align === 'center' && 'text-center',
                     )}
@@ -1859,7 +1815,7 @@ function ReportTableWithSettings<T>({
             </thead>
             <tbody>
               {paginatedData.map((row, rowIndex) => (
-                <tr key={rowIndex} className="border-b border-border last:border-0 hover:bg-accent/50">
+                <tr key={rowIndex} className="border-border hover:bg-accent/50 border-b last:border-0">
                   {visibleColumnDefs.map((col) => {
                     const value = col.accessor(row);
                     const formatted = col.format ? col.format(value) : String(value);
@@ -1885,8 +1841,8 @@ function ReportTableWithSettings<T>({
           </table>
         </div>
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-border px-4 py-3">
-            <span className="text-xs text-muted-foreground">
+          <div className="border-border flex items-center justify-between border-t px-4 py-3">
+            <span className="text-muted-foreground text-xs">
               {t('showing', {
                 from: page * pageSize + 1,
                 to: Math.min((page + 1) * pageSize, sortedData.length),
@@ -1897,17 +1853,17 @@ function ReportTableWithSettings<T>({
               <button
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page === 0}
-                className="rounded-md p-1 hover:bg-accent disabled:opacity-50"
+                className="hover:bg-accent rounded-md p-1 disabled:opacity-50"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="px-2 text-xs text-muted-foreground">
+              <span className="text-muted-foreground px-2 text-xs">
                 {page + 1} / {totalPages}
               </span>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={page >= totalPages - 1}
-                className="rounded-md p-1 hover:bg-accent disabled:opacity-50"
+                className="hover:bg-accent rounded-md p-1 disabled:opacity-50"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -1945,9 +1901,7 @@ function ReportTablePlain<T>({
       if (typeof aVal === 'number' && typeof bVal === 'number') {
         return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
       }
-      return sortDir === 'asc'
-        ? String(aVal).localeCompare(String(bVal))
-        : String(bVal).localeCompare(String(aVal));
+      return sortDir === 'asc' ? String(aVal).localeCompare(String(bVal)) : String(bVal).localeCompare(String(aVal));
     });
   }, [data, sortKey, sortDir, columns]);
 
@@ -1961,7 +1915,10 @@ function ReportTablePlain<T>({
   const handleSort = (key: string) => {
     if (sortKey === key) {
       if (sortDir === 'asc') setSortDir('desc');
-      else { setSortKey(null); setSortDir(null); }
+      else {
+        setSortKey(null);
+        setSortDir(null);
+      }
     } else {
       setSortKey(key);
       setSortDir('asc');
@@ -1972,30 +1929,30 @@ function ReportTablePlain<T>({
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent" />
       </div>
     );
   }
 
   if (data.length === 0) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center rounded-lg border-2 border-dashed border-border">
-        <p className="text-sm text-muted-foreground">{emptyMessage ?? tReports('noData')}</p>
+      <div className="border-border flex h-64 flex-col items-center justify-center rounded-lg border-2 border-dashed">
+        <p className="text-muted-foreground text-sm">{emptyMessage ?? tReports('noData')}</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card shadow-sm">
+    <div className="border-border bg-card rounded-xl border shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border">
+            <tr className="border-border border-b">
               {columns.map((col) => (
                 <th
                   key={col.key}
                   className={cn(
-                    'cursor-pointer px-4 py-3 font-medium text-muted-foreground transition-colors hover:text-foreground',
+                    'text-muted-foreground hover:text-foreground cursor-pointer px-4 py-3 font-medium transition-colors',
                     col.align === 'right' && 'text-right',
                     col.align === 'center' && 'text-center',
                   )}
@@ -2004,7 +1961,11 @@ function ReportTablePlain<T>({
                   <span className="inline-flex items-center gap-1">
                     {col.header}
                     {sortKey === col.key ? (
-                      sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                      sortDir === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
                     ) : (
                       <ArrowUpDown className="h-3 w-3 opacity-40" />
                     )}
@@ -2015,7 +1976,7 @@ function ReportTablePlain<T>({
           </thead>
           <tbody>
             {paginatedData.map((row, rowIndex) => (
-              <tr key={rowIndex} className="border-b border-border last:border-0 hover:bg-accent/50">
+              <tr key={rowIndex} className="border-border hover:bg-accent/50 border-b last:border-0">
                 {columns.map((col) => {
                   const value = col.accessor(row);
                   const formatted = col.format ? col.format(value) : String(value);
@@ -2039,8 +2000,8 @@ function ReportTablePlain<T>({
         </table>
       </div>
       {totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-border px-4 py-3">
-          <span className="text-xs text-muted-foreground">
+        <div className="border-border flex items-center justify-between border-t px-4 py-3">
+          <span className="text-muted-foreground text-xs">
             {t('showing', {
               from: page * pageSize + 1,
               to: Math.min((page + 1) * pageSize, sortedData.length),
@@ -2051,17 +2012,17 @@ function ReportTablePlain<T>({
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="rounded-md p-1 hover:bg-accent disabled:opacity-50"
+              className="hover:bg-accent rounded-md p-1 disabled:opacity-50"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="px-2 text-xs text-muted-foreground">
+            <span className="text-muted-foreground px-2 text-xs">
               {page + 1} / {totalPages}
             </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="rounded-md p-1 hover:bg-accent disabled:opacity-50"
+              className="hover:bg-accent rounded-md p-1 disabled:opacity-50"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -2108,6 +2069,7 @@ git commit -m "feat: extend ReportTable with column visibility and conditional f
 ### Task 8: Add tableId to all report pages
 
 **Files to modify** (one commit each, or one combined commit):
+
 - `apps/frontend/src/features/reports/components/sender-report-page.tsx`
 - `apps/frontend/src/features/reports/components/account-report-page.tsx`
 - `apps/frontend/src/features/reports/components/provider-report-page.tsx`
@@ -2124,19 +2086,91 @@ For each file, also add `alwaysVisible: true` to identity columns and `isNumeric
 Find the `columns` array and add the props:
 
 ```typescript
-const columns = useMemo<ColumnDef<SenderReport>[]>(() => [
-  { key: 'sender_email', header: t('sender'), accessor: (row) => row.sender_email, alwaysVisible: true },
-  { key: 'account_id', header: 'Account', accessor: (row) => accountNameMap.get(row.account_id) ?? row.account_id, alwaysVisible: true },
-  { key: 'delivered', header: 'Delivered', accessor: (row) => row.delivered, align: 'right', format: (v) => formatNumber(Number(v)), isNumeric: true },
-  { key: 'opened', header: 'Opened', accessor: (row) => row.opened, align: 'right', format: (v) => formatNumber(Number(v)), isNumeric: true },
-  { key: 'clicked', header: 'Clicked', accessor: (row) => row.clicked, align: 'right', format: (v) => formatNumber(Number(v)), isNumeric: true },
-  { key: 'bounced', header: 'Bounced', accessor: (row) => row.bounced, align: 'right', format: (v) => formatNumber(Number(v)), isNumeric: true },
-  { key: 'deferred', header: 'Deferred', accessor: (row) => row.deferred, align: 'right', format: (v) => formatNumber(Number(v)), isNumeric: true },
-  { key: 'dropped', header: 'Dropped', accessor: (row) => row.dropped, align: 'right', format: (v) => formatNumber(Number(v)), isNumeric: true },
-  { key: 'spam_reported', header: 'Spam', accessor: (row) => row.spam_reported, align: 'right', format: (v) => formatNumber(Number(v)), isNumeric: true },
-  { key: 'delivery_rate', header: 'Delivery Rate', accessor: (row) => row.delivery_rate, align: 'right', format: (v) => `${Number(v).toFixed(2)}%`, className: 'font-medium', isNumeric: true },
-  { key: 'bounce_rate', header: 'Bounce Rate', accessor: (row) => row.bounce_rate, align: 'right', format: (v) => `${Number(v).toFixed(2)}%`, isNumeric: true },
-], [accountNameMap, formatNumber]);
+const columns = useMemo<ColumnDef<SenderReport>[]>(
+  () => [
+    { key: 'sender_email', header: t('sender'), accessor: (row) => row.sender_email, alwaysVisible: true },
+    {
+      key: 'account_id',
+      header: 'Account',
+      accessor: (row) => accountNameMap.get(row.account_id) ?? row.account_id,
+      alwaysVisible: true,
+    },
+    {
+      key: 'delivered',
+      header: 'Delivered',
+      accessor: (row) => row.delivered,
+      align: 'right',
+      format: (v) => formatNumber(Number(v)),
+      isNumeric: true,
+    },
+    {
+      key: 'opened',
+      header: 'Opened',
+      accessor: (row) => row.opened,
+      align: 'right',
+      format: (v) => formatNumber(Number(v)),
+      isNumeric: true,
+    },
+    {
+      key: 'clicked',
+      header: 'Clicked',
+      accessor: (row) => row.clicked,
+      align: 'right',
+      format: (v) => formatNumber(Number(v)),
+      isNumeric: true,
+    },
+    {
+      key: 'bounced',
+      header: 'Bounced',
+      accessor: (row) => row.bounced,
+      align: 'right',
+      format: (v) => formatNumber(Number(v)),
+      isNumeric: true,
+    },
+    {
+      key: 'deferred',
+      header: 'Deferred',
+      accessor: (row) => row.deferred,
+      align: 'right',
+      format: (v) => formatNumber(Number(v)),
+      isNumeric: true,
+    },
+    {
+      key: 'dropped',
+      header: 'Dropped',
+      accessor: (row) => row.dropped,
+      align: 'right',
+      format: (v) => formatNumber(Number(v)),
+      isNumeric: true,
+    },
+    {
+      key: 'spam_reported',
+      header: 'Spam',
+      accessor: (row) => row.spam_reported,
+      align: 'right',
+      format: (v) => formatNumber(Number(v)),
+      isNumeric: true,
+    },
+    {
+      key: 'delivery_rate',
+      header: 'Delivery Rate',
+      accessor: (row) => row.delivery_rate,
+      align: 'right',
+      format: (v) => `${Number(v).toFixed(2)}%`,
+      className: 'font-medium',
+      isNumeric: true,
+    },
+    {
+      key: 'bounce_rate',
+      header: 'Bounce Rate',
+      accessor: (row) => row.bounce_rate,
+      align: 'right',
+      format: (v) => `${Number(v).toFixed(2)}%`,
+      isNumeric: true,
+    },
+  ],
+  [accountNameMap, formatNumber],
+);
 ```
 
 And update the JSX:
@@ -2212,18 +2246,18 @@ Only commit if Step 1 or Step 2 revealed issues that needed fixing.
 
 ## Summary of new files
 
-| File | Purpose |
-|------|---------|
-| `src/components/data-table/types.ts` | FormattingRule types and FORMATTING_PRESETS |
-| `src/lib/color-utils.ts` | Color interpolation + darkness detection |
-| `src/hooks/use-table-settings.ts` | localStorage-persisted column + formatting state |
-| `src/components/data-table/columns-popover.tsx` | Column visibility toggle UI |
-| `src/components/data-table/formatting-modal.tsx` | Conditional formatting rules editor |
+| File                                               | Purpose                                          |
+| -------------------------------------------------- | ------------------------------------------------ |
+| `src/components/data-table/types.ts`               | FormattingRule types and FORMATTING_PRESETS      |
+| `src/lib/color-utils.ts`                           | Color interpolation + darkness detection         |
+| `src/hooks/use-table-settings.ts`                  | localStorage-persisted column + formatting state |
+| `src/components/data-table/columns-popover.tsx`    | Column visibility toggle UI                      |
+| `src/components/data-table/formatting-modal.tsx`   | Conditional formatting rules editor              |
 | `src/components/data-table/data-table-toolbar.tsx` | Toolbar container (Columns + Formatting buttons) |
 
 ## Modified files
 
-| File | Change |
-|------|--------|
+| File                                               | Change                                                                                 |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `src/features/reports/components/report-table.tsx` | Add `tableId`, `alwaysVisible`, `isNumeric` support; render toolbar; apply cell styles |
-| 7 report pages | Add `tableId` prop + `alwaysVisible`/`isNumeric` on columns |
+| 7 report pages                                     | Add `tableId` prop + `alwaysVisible`/`isNumeric` on columns                            |

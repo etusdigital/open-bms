@@ -19,9 +19,9 @@
     "test": "vitest --dom"
   },
   "dependencies": {
-    "@auth0/auth0-vue": "^1.0.3",
     "@faker-js/faker": "^7.6.0",
     "@types/faker": "^6.6.9",
+    "@types/lodash": "^4.17.24",
     "@types/node": "^18.11.9",
     "@vee-validate/zod": "^4.7.4",
     "@vue/test-utils": "^2.2.4",

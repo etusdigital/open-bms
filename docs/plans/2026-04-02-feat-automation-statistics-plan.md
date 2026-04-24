@@ -1,5 +1,5 @@
 ---
-title: "feat: Add Automation Statistics Dialog"
+title: 'feat: Add Automation Statistics Dialog'
 type: feat
 status: active
 date: 2026-04-02
@@ -14,24 +14,30 @@ Add a statistics dialog accessible from the top bar of the automation editor. Sh
 ## API Endpoints
 
 ### 1. Summary KPIs
+
 **`GET /statistics/automation/:automationId`**
 
 Response (array with one row):
+
 ```json
-[{
-  "unique_open": 1234,
-  "unique_click": 567,
-  "total_running": 8900,
-  "total_running_today": 42
-}]
+[
+  {
+    "unique_open": 1234,
+    "unique_click": 567,
+    "total_running": 8900,
+    "total_running_today": 42
+  }
+]
 ```
 
 ### 2. Goal Chart
+
 **`GET /automations/target/statistics`**
 
 Params: `{ automationId, startDate, endDate }` (YYYY-MM-DD)
 
 Response (array of daily counts):
+
 ```json
 [
   { "date": "2025-04-01", "count": 15 },
@@ -67,6 +73,7 @@ A `Dialog` component containing:
 Each card shows the number formatted with locale (e.g., `3.797` in pt-BR).
 
 **Bottom section — Goal chart:**
+
 - Date range picker (default: last 30 days, max 180 days back)
 - Line chart using **Recharts** (already installed in the project) showing daily goal completions
 - X-axis: dates (formatted short, e.g., "1 mar")
@@ -78,6 +85,7 @@ Each card shows the number formatted with locale (e.g., `3.797` in pt-BR).
 **File:** `automation-form-page.tsx`
 
 A `BarChart3` icon button in the top bar, next to the History button. Only shown when:
+
 - Editing an existing automation (`isEditing`)
 - Not in preview mode
 - Account is internal (`isInternal`) — matching Vue 2 behavior

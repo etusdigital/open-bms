@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/campaigns/duplicate/1"
+  url: '{{msgops-api-url}}/campaigns/duplicate/1'
   auth: inherit
 
 settings:

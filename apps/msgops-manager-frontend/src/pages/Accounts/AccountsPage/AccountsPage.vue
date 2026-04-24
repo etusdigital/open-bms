@@ -111,9 +111,9 @@ onMounted(async () => {
 });
 
 const dataTableHeaders = [
-  { title: t('name'), align: 'start', key: 'name', sortable: true },
-  { title: t('accountPage.description'), align: 'start', key: 'description', sortable: true },
-  { title: t('createdAt'), align: 'start', key: 'createdAt', sortable: true },
+  { title: t('name'), align: 'start' as const, key: 'name', sortable: true },
+  { title: t('accountPage.description'), align: 'start' as const, key: 'description', sortable: true },
+  { title: t('createdAt'), align: 'start' as const, key: 'createdAt', sortable: true },
 ];
 
 const handlePlusClick = () => push('/accounts/create');
@@ -182,27 +182,27 @@ const onChangeOptions = async (sortBy: sortBy[]) => {
           v-model:sort-by="sortByRef"
           class="tw-rounded-2xl tw-border-solid tw-text-main-gray tw-shadow-md"
           :headers="dataTableHeaders"
-          :items="accountsList"
+          :items="accountsList.results"
           :items-length="totalAccountData"
           :items-per-page="accountsList.itemsPerPage"
           :loading="loading"
           @update:sort-by="onChangeOptions"
         >
           <template #[`item.name`]="{ item }">
-            <RouterLink :to="`/accounts/edit/${item.value}`" class="tw-font-semibold tw-text-primary tw-underline">{{
-              item.columns.name
+            <RouterLink :to="`/accounts/edit/${item.id}`" class="tw-font-semibold tw-text-primary tw-underline">{{
+              item.name
             }}</RouterLink>
           </template>
 
           <template #[`item.description`]="{ item }">
-            <p>{{ item.columns.description }}</p>
+            <p>{{ item.description }}</p>
           </template>
 
           <template #[`item.createdAt`]="{ item }">
             <p>
               {{
                 dateWithTimeFormatter(
-                  item.columns.createdAt,
+                  item.createdAt,
                   $t('userPage.timePreposition'),
                   userStore.user?.settings.language,
                 )

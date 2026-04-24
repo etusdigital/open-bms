@@ -5,12 +5,12 @@ info:
 
 http:
   method: POST
-  url: "{{event-process-url}}/sparkpost"
+  url: '{{event-process-url}}/sparkpost'
   headers:
     - name: platform
-      value: "sparkpost"
+      value: 'sparkpost'
     - name: x-goog-pubsub-message-id
-      value: "test-sparkpost-event-001"
+      value: 'test-sparkpost-event-001'
   body:
     type: json
     json: |

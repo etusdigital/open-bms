@@ -1,7 +1,7 @@
 <script setup lang="ts"></script>
 
 <template>
-  <div class="tw-py-4 tw-px-6">
+  <div class="tw-px-6 tw-py-4">
     <slot></slot>
   </div>
 </template>

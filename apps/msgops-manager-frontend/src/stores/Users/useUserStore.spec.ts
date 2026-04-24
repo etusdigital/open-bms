@@ -52,8 +52,8 @@ describe('useUserStore', () => {
   describe('setRoles', () => {
     it('updates roles array', () => {
       const store = useUserStore();
-      store.setRoles(['admin', 'superbilling']);
-      expect(store.roles).toEqual(['admin', 'superbilling']);
+      store.setRoles(['admin', 'billing']);
+      expect(store.roles).toEqual(['admin', 'billing']);
     });
   });
 

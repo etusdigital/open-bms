@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as nodemailer from 'nodemailer';
@@ -8,7 +8,7 @@ import { RoleEntity } from '../../entities/role.entity';
 import { AccountEntity } from '../../entities/account.entity';
 import { PoolEntity } from '../../entities/pool.entity';
 import { UserAccountEntity } from '../../entities/users-account.entity';
-import { Auth0Provider } from '../../providers/auth0.provider';
+import { AUTH_PROVIDER_TOKEN, IAuthProvider } from '../auth/providers/auth.provider.interface';
 import { ROLE_CODES } from '../authz/authz.constants';
 import { AdvanceStepDto, Step1Data, Step2Data, Step3Data, Step4Data } from './dtos/advance-step.dto';
 import { TestSmtpDto } from './dtos/test-smtp.dto';
@@ -17,8 +17,6 @@ const WIZARD_KEY = 'setup_wizard_step';
 
 @Injectable()
 export class SetupService {
-  private auth0 = new Auth0Provider();
-
   constructor(
     @InjectRepository(SystemConfigEntity) private systemConfigRepo: Repository<SystemConfigEntity>,
     @InjectRepository(UserEntity) private userRepo: Repository<UserEntity>,
@@ -26,6 +24,7 @@ export class SetupService {
     @InjectRepository(AccountEntity) private accountRepo: Repository<AccountEntity>,
     @InjectRepository(PoolEntity) private poolRepo: Repository<PoolEntity>,
     @InjectRepository(UserAccountEntity) private userAccountRepo: Repository<UserAccountEntity>,
+    @Inject(AUTH_PROVIDER_TOKEN) private readonly authProvider: IAuthProvider,
   ) {}
 
   async getStatus(): Promise<{ configured: boolean; currentStep: number }> {
@@ -60,8 +59,11 @@ export class SetupService {
     const existing = await this.userRepo.findOne({ where: { email: data.email } });
     if (!existing) {
       const superAdminRole = await this.roleRepo.findOneOrFail({ where: { code: ROLE_CODES.SUPER_ADMIN } });
-      const auth0User = await this.auth0.createNewUser({ name: data.name, email: data.email, password: data.password, profile: '' });
-      const providerId = (auth0User as any).data?.user_id ?? (auth0User as any).user_id ?? '';
+      const { providerId } = await this.authProvider.createUser({
+        name: data.name,
+        email: data.email,
+        password: data.password,
+      });
       const user = this.userRepo.create({
         name: data.name,
         email: data.email,
@@ -71,6 +73,9 @@ export class SetupService {
         globalRoleId: superAdminRole.id,
       });
       await this.userRepo.save(user);
+      if (this.authProvider.supportsCredentialLogin()) {
+        await this.authProvider.updatePassword(providerId, data.password);
+      }
     }
     await this.upsertWizard(2);
   }
@@ -149,7 +154,6 @@ export class SetupService {
   private async upsertWizard(nextStep: number): Promise<void> {
     const existing = await this.systemConfigRepo.findOne({ where: { key: WIZARD_KEY } });
     const current = (existing?.value as any)?.currentStep ?? 0;
-    // never go backwards
     if (nextStep <= current && existing) return;
     await this.systemConfigRepo.save(this.systemConfigRepo.create({ key: WIZARD_KEY, value: { currentStep: nextStep, completed: false } }));
   }

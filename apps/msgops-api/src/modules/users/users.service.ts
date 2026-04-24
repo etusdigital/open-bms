@@ -1,21 +1,38 @@
-import { ForbiddenException, HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
-import * as jwt from 'jsonwebtoken';
-import jwksClient from 'jwks-rsa';
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { PaginationDto } from '../../dtos/pagination.dto';
 import { UserAccountEntity } from '../../entities/users-account.entity';
 import { UserEntity } from '../../entities/users.entity';
 import { UserActivityEntity } from '../../entities/user-activity.entity';
-import { Repository } from 'typeorm';
 import { PermissionsAccountsDto } from './dtos/permission-accounts.dto';
 import { CreateUserDto } from './dtos/create-user.dto';
-import { Auth0Provider } from '../../providers/auth0.provider';
 import { PageDto } from '../../dtos/filters/page.dto';
 import { AccountsService } from '../accounts/accounts.service';
 import { BucketsService } from '../buckets/buckets.service';
 import { RoleEntity } from '../../entities/role.entity';
 import { ALL_PERMISSION_KEYS, ROLE_CODES, ROLE_PERMISSIONS } from '../authz/authz.constants';
 import { AuthzService } from '../authz/authz.service';
+import { AUTH_PROVIDER_TOKEN, IAuthProvider } from '../auth/providers/auth.provider.interface';
+
+const AUTH0_PREFIX = 'auth0|';
+const LOCAL_PREFIX = 'local|';
+
+function currentProviderMode(): 'auth0' | 'local' {
+  return (process.env.AUTH_PROVIDER || 'local').toLowerCase() === 'auth0' ? 'auth0' : 'local';
+}
+
+function assertProviderMatches(providerId: string | undefined | null): void {
+  const mode = currentProviderMode();
+  const expectedPrefix = mode === 'auth0' ? AUTH0_PREFIX : LOCAL_PREFIX;
+  if (!providerId || !providerId.startsWith(expectedPrefix)) {
+    const actualPrefix = providerId?.split('|')[0] || 'none';
+    throw new BadRequestException(
+      `User provider '${actualPrefix}' does not match active provider '${mode}'. ` +
+        (mode === 'local' ? 'Reinvite the user to migrate them to the local provider.' : 'Switch AUTH_PROVIDER or reinvite the user.'),
+    );
+  }
+}
 
 @Injectable()
 export class UsersService {
@@ -28,57 +45,11 @@ export class UsersService {
     private readonly roleRepository: Repository<RoleEntity>,
     @InjectRepository(UserActivityEntity)
     private readonly userActivityRepository: Repository<UserActivityEntity>,
-    private readonly auth0: Auth0Provider,
+    @Inject(AUTH_PROVIDER_TOKEN) private readonly authProvider: IAuthProvider,
     private readonly accountService: AccountsService,
     private readonly bucketsService: BucketsService,
     private readonly authzService: AuthzService,
   ) {}
-
-  private readonly jwks = jwksClient({
-    jwksUri: process.env.JWKS_URI || '',
-    cache: true,
-    cacheMaxEntries: 10,
-    cacheMaxAge: 600000,
-  });
-
-  async validateJwtFromRequest(req: any): Promise<{ sub: string }> {
-    const authHeader = req.headers?.['authorization'] as string;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Missing or invalid Authorization header');
-    }
-
-    const token = authHeader.substring(7);
-
-    try {
-      const decoded: any = jwt.decode(token, { complete: true });
-      if (!decoded?.header?.kid) {
-        throw new UnauthorizedException('Invalid token');
-      }
-
-      const signingKey = await new Promise<string>((resolve, reject) => {
-        this.jwks.getSigningKey(decoded.header.kid, (err, key: any) => {
-          if (err || !key) {
-            reject(err || new Error('Signing key not found'));
-            return;
-          }
-          resolve(key.getPublicKey ? key.getPublicKey() : key.publicKey || key.rsaPublicKey);
-        });
-      });
-
-      const payload = jwt.verify(token, signingKey, {
-        audience: process.env.IDP_AUDIENCE,
-        issuer: process.env.IDP_ISSUER,
-        algorithms: ['RS256'],
-      }) as any;
-
-      return { sub: payload.sub };
-    } catch (error) {
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
-      throw new UnauthorizedException('Invalid or expired token');
-    }
-  }
 
   private async findRoleByCode(roleCode?: string, fallbackRoleCode: string = ROLE_CODES.EDITOR): Promise<RoleEntity> {
     const code = roleCode || fallbackRoleCode;
@@ -228,30 +199,43 @@ export class UsersService {
 
   async create(userDto: CreateUserDto) {
     try {
-      const userAuth0 = await this.auth0.createNewUser(userDto);
+      const { providerId } = await this.authProvider.createUser({
+        email: userDto.email!,
+        name: userDto.name!,
+        password: userDto.password,
+        picture: userDto.profile,
+      });
 
-      if (userAuth0) {
-        const globalRole = await this.findRoleByCode(userDto.globalRoleCode, ROLE_CODES.EDITOR);
-        userDto.profile = userAuth0.picture;
-        const userCreate = await this.userRepository.create({
-          ...userDto,
-          providerId: userAuth0.user_id,
-          globalRoleId: globalRole.id,
-          status: 'pending_invite',
-        });
-        const user = await this.userRepository.save(userCreate);
+      const globalRole = await this.findRoleByCode(userDto.globalRoleCode, ROLE_CODES.EDITOR);
+      const { password: _password, accounts: _accounts, ...restDto } = userDto;
+      const userCreate = this.userRepository.create({
+        ...restDto,
+        providerId,
+        globalRoleId: globalRole.id,
+        status: 'pending_invite',
+        profile: restDto.profile ?? '',
+        settings: restDto.settings ?? { language: 'pt-BR' },
+      });
+      const user = await this.userRepository.save(userCreate);
 
-        if (userDto.accounts && userDto.accounts.length) {
-          await this.permissionsAccounts({ userId: user.id, accounts: userDto.accounts });
-        }
-
-        return this.findOneById(user.id);
+      // Local provider mints only the providerId — credentials are persisted here,
+      // after the UserEntity row exists (updatePassword looks it up by providerId).
+      if (userDto.password && this.authProvider.supportsCredentialLogin()) {
+        await this.authProvider.updatePassword(providerId, userDto.password);
       }
 
-      throw new HttpException('Failed to create user in Auth0', HttpStatus.INTERNAL_SERVER_ERROR);
+      if (userDto.accounts && userDto.accounts.length) {
+        await this.permissionsAccounts({ userId: user.id, accounts: userDto.accounts });
+      }
+
+      return this.findOneById(user.id);
     } catch (e) {
+      if (e instanceof HttpException) throw e;
       console.error(e);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      if ((e as any)?.code === '23505') {
+        throw new HttpException((e as any).detail || 'User already exists', HttpStatus.CONFLICT);
+      }
+      throw new HttpException((e as Error)?.message || 'Failed to create user', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -261,7 +245,6 @@ export class UsersService {
 
   async updateProfile(providerId: string, profileDto: { name?: string; email?: string; profile?: string; settings?: Record<string, string> }): Promise<UserEntity> {
     const user = await this.findOneByProviderId(providerId);
-    const isDatabaseConnection = user.providerId?.startsWith('auth0|');
 
     if (profileDto.name !== undefined) user.name = profileDto.name;
     if (profileDto.email !== undefined) user.email = profileDto.email;
@@ -271,12 +254,14 @@ export class UsersService {
     delete user['userAccount'];
     await this.userRepository.update(user.id, user);
 
-    if (isDatabaseConnection) {
-      const auth0Fields = ['name', 'email', 'profile'];
-      const hasAuth0Changes = auth0Fields.some((field) => profileDto[field] !== undefined);
-      if (hasAuth0Changes) {
-        await this.auth0.updateUser({ provider_id: user.providerId, ...profileDto });
-      }
+    const providerFields = ['name', 'email', 'profile'];
+    const hasProviderChanges = providerFields.some((field) => profileDto[field] !== undefined);
+    if (hasProviderChanges) {
+      await this.authProvider.updateUser(user.providerId, {
+        name: profileDto.name,
+        email: profileDto.email,
+        picture: profileDto.profile,
+      });
     }
 
     return user;
@@ -296,10 +281,7 @@ export class UsersService {
     delete user['userAccount'];
     await this.userRepository.update(user.id, user);
 
-    const isDatabaseConnection = user.providerId?.startsWith('auth0|');
-    if (isDatabaseConnection) {
-      await this.auth0.updateUser({ provider_id: user.providerId, profile: result.link });
-    }
+    await this.authProvider.updateUser(user.providerId, { picture: result.link });
 
     return user;
   }
@@ -311,8 +293,6 @@ export class UsersService {
       if (!user) {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
-
-      const isDatabaseConnection = user.providerId?.startsWith('auth0|');
 
       if (userDto.globalRoleCode) {
         const globalRole = await this.findRoleByCode(userDto.globalRoleCode, ROLE_CODES.EDITOR);
@@ -327,12 +307,18 @@ export class UsersService {
         await this.permissionsAccounts({ userId: user.id, accounts: userDto.accounts, userMasterId });
       }
 
-      if (isDatabaseConnection) {
-        const auth0Fields = ['name', 'email', 'profile'];
-        const hasAuth0Changes = auth0Fields.some((field) => userDto[field] !== undefined);
-        if (hasAuth0Changes) {
-          await this.auth0.updateUser({ provider_id: user.providerId, ...userDto });
-        }
+      const providerFields = ['name', 'email', 'profile'];
+      const hasProviderChanges = providerFields.some((field) => userDto[field] !== undefined);
+      if (hasProviderChanges) {
+        await this.authProvider.updateUser(user.providerId, {
+          name: userDto.name,
+          email: userDto.email,
+          picture: userDto.profile,
+        });
+      }
+
+      if (userDto.globalRoleCode || userDto.accounts) {
+        await this.invalidateCacheForUser(user.id);
       }
 
       return user;
@@ -343,9 +329,17 @@ export class UsersService {
     }
   }
 
+  private async invalidateCacheForUser(userId: number): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { id: userId }, select: ['providerId'] });
+    if (user?.providerId) {
+      await this.authzService.invalidateUserCache(user.providerId);
+    }
+  }
+
   async updateGlobalRole(id: number, roleCode: string): Promise<UserEntity> {
     const role = await this.findRoleByCode(roleCode, ROLE_CODES.EDITOR);
     await this.userRepository.update(id, { globalRoleId: role.id });
+    await this.invalidateCacheForUser(id);
     return this.findOneById(id);
   }
 
@@ -360,6 +354,7 @@ export class UsersService {
       .orUpdate(['is_master_user', 'role_override_role_id'], ['account_id', 'user_id'])
       .execute();
 
+    await this.invalidateCacheForUser(userId);
     return this.userAccountRepository.find({ where: { userId, accountId } });
   }
 
@@ -377,6 +372,7 @@ export class UsersService {
       .where('user_id = :userId AND account_id = :accountId', { userId, accountId })
       .execute();
 
+    await this.invalidateCacheForUser(userId);
     return this.userAccountRepository.find({ where: { userId, accountId } });
   }
 
@@ -393,31 +389,23 @@ export class UsersService {
       .where('user_id = :userId AND account_id = :accountId', { userId, accountId })
       .execute();
 
+    await this.invalidateCacheForUser(userId);
     return { removed: true };
   }
 
   async updateMyPassword(providerId: string, password: string): Promise<UserEntity> {
     const user = await this.findOneByProviderId(providerId);
-
-    if (!user.providerId?.startsWith('auth0|')) {
-      throw new HttpException('Password update is only available for email/password accounts', HttpStatus.BAD_REQUEST);
-    }
-
-    await this.auth0.updateUserPassword(user.providerId, password);
+    assertProviderMatches(user.providerId);
+    await this.authProvider.updatePassword(user.providerId, password);
     return user;
   }
 
   async updatePassword(id: number, userDto: CreateUserDto): Promise<UserEntity> {
     try {
       const user = await this.userRepository.findOne({ where: { id } });
-
-      if (user) {
-        if (!user.providerId?.startsWith('auth0|')) {
-          throw new HttpException('Password update is only available for email/password accounts', HttpStatus.BAD_REQUEST);
-        }
-        await this.auth0.updateUserPassword(user.providerId, userDto.password);
-      }
-
+      if (!user) return user;
+      assertProviderMatches(user.providerId);
+      await this.authProvider.updatePassword(user.providerId, userDto.password!);
       return user;
     } catch (e) {
       if (e instanceof HttpException) throw e;
@@ -428,8 +416,6 @@ export class UsersService {
 
   async login(providerId: string) {
     try {
-      // Minimal query — just verify user exists, no relations needed
-      // All account/permission data is loaded via GET /users/me
       const user = await this.userRepository
         .createQueryBuilder('user')
         .select(['user.id', 'user.name', 'user.email', 'user.profile', 'user.providerId', 'user.settings', 'user.status', 'user.createdAt'])
@@ -451,8 +437,17 @@ export class UsersService {
     }
   }
 
+  async validateJwtFromRequest(req: any): Promise<{ sub: string }> {
+    const authHeader = req.headers?.['authorization'] as string;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new HttpException('Missing or invalid Authorization header', HttpStatus.UNAUTHORIZED);
+    }
+    const token = authHeader.substring(7);
+    const payload = await this.authProvider.verifyToken(token);
+    return { sub: payload.sub };
+  }
+
   async getMe(providerId: string, accountId?: number) {
-    // Lightweight user query — skip eager relations (userAccount, account, configs)
     const user = await this.userRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.globalRole', 'globalRole')
@@ -481,7 +476,6 @@ export class UsersService {
     const globalRole = user.globalRole || (await this.findRoleByCode(undefined, ROLE_CODES.EDITOR));
     const globalRoleCode = globalRole.code;
 
-    // Lightweight account query — only fields the frontend needs for account switcher
     const lightAccount = (account: any) => ({
       id: account.id,
       name: account.name,
@@ -493,7 +487,6 @@ export class UsersService {
     const numericAccountId = accountId ? Number(accountId) : undefined;
 
     if (globalRoleCode === ROLE_CODES.SUPER_ADMIN) {
-      // Lightweight query — only 4 columns, no eager relations
       const accounts = await this.accountService.getAllAccountsLightweight();
       membershipSource = accounts.map((account) => ({
         userId: user.id,
@@ -504,7 +497,6 @@ export class UsersService {
         roleOverride: null,
       }));
     } else {
-      // Lightweight query — skip eager customFields/accountConfigs
       const memberships = await this.userAccountRepository
         .createQueryBuilder('ua')
         .innerJoinAndSelect('ua.account', 'account', 'account.deleted_at IS NULL')
@@ -530,12 +522,22 @@ export class UsersService {
 
     const effectiveRoleCode = selectedMembership?.roleOverride || globalRoleCode;
     const permissions = this.getPermissionsByRoleCode(effectiveRoleCode);
+    const isSuperAdmin = globalRoleCode === ROLE_CODES.SUPER_ADMIN;
+
+    const roles: string[] = [];
+    if (isSuperAdmin) roles.push(ROLE_CODES.SUPER_ADMIN);
+    if (effectiveRoleCode && !roles.includes(effectiveRoleCode)) roles.push(effectiveRoleCode);
+
+    const canSeeAllAccounts = isSuperAdmin || effectiveRoleCode === 'billing';
 
     return {
       ...user,
       globalRole: globalRoleCode,
       effectiveRole: effectiveRoleCode,
       permissions,
+      roles,
+      isSuperAdmin,
+      canSeeAllAccounts,
       userAccount: membershipSource.map((membership) => ({
         ...membership,
         roleOverride: membership.roleOverride || null,
@@ -593,13 +595,16 @@ export class UsersService {
         }
       }
 
-      return await this.userAccountRepository
+      const result = await this.userAccountRepository
         .createQueryBuilder('users_accounts')
         .insert()
         .into('users_accounts')
         .values(usersAccounts)
         .orUpdate(['is_master_user', 'role_override_role_id'], ['account_id', 'user_id'])
         .execute();
+
+      await this.invalidateCacheForUser(permissionsAccountsDto.userId);
+      return result;
     } catch (e) {
       console.error(e);
       throw new HttpException('Cannot permission accounts to user', HttpStatus.INTERNAL_SERVER_ERROR);

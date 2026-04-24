@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/campaigns-rules/configs"
+  url: '{{msgops-api-url}}/campaigns-rules/configs'
   body:
     type: json
     json: |

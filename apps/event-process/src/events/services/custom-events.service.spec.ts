@@ -261,5 +261,91 @@ describe('CustomEventsService', () => {
         expect(mockFormatterUtils.logInfo).toHaveBeenCalledWith(expect.stringContaining('No custom events to process'));
       });
     });
+
+    // Hop 3 of the email click flow (pageview). An external service publishes
+    // directly to the pubsub topic with the user's IP already embedded in
+    // event.ip. These tests guard that bot classification reaches ClickHouse
+    // via Kafka properties, so we can correlate engagement across hops.
+    describe('bot signal stamping for pageview', () => {
+      const pageviewEvent = {
+        ...baseEvent,
+        event: 'pageview',
+        ip: '189.153.175.193',
+        userAgent:
+          'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.36',
+      };
+
+      it('stamps residential traits clean for a real user pageview', async () => {
+        mockGeolocationService.getLocation.mockResolvedValueOnce({
+          country: 'MX',
+          region: 'DIF',
+          city: 'Mexico City',
+          traits: {
+            asn: 8151,
+            asnOrg: 'Uninet S.A. de C.V.',
+            isp: '',
+            organization: '',
+            userType: 'residential',
+            connectionType: 'Cable/DSL',
+            isAnycast: false,
+          },
+        });
+
+        await service.customEventsProcess(makeRequest([pageviewEvent]) as any);
+
+        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalled();
+        const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+        expect(payload.event).toBe('pageview');
+        expect(payload.properties).toMatchObject({
+          is_bot: false,
+          is_datacenter: false,
+          bot_classification: null,
+          asn: 8151,
+          asn_org: 'Uninet S.A. de C.V.',
+          user_type: 'residential',
+        });
+      });
+
+      it('UA denylist flips a hosting pageview with curl UA to is_bot=true (script_ua)', async () => {
+        mockGeolocationService.getLocation.mockResolvedValueOnce({
+          country: 'US',
+          traits: {
+            asn: 16509,
+            asnOrg: 'Amazon.com, Inc.',
+            isp: '',
+            organization: '',
+            userType: 'hosting',
+            connectionType: '',
+            isAnycast: false,
+          },
+        });
+
+        await service.customEventsProcess(makeRequest([{ ...pageviewEvent, userAgent: 'curl/8.4.0' }]) as any);
+
+        const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+        expect(payload.properties).toMatchObject({
+          is_bot: true,
+          is_datacenter: true,
+          bot_classification: 'script_ua',
+          asn: 16509,
+        });
+      });
+
+      it('returns all-false bot signals when the event has no ip', async () => {
+        const { ip: _ip, ...noIpEvent } = pageviewEvent;
+        await service.customEventsProcess(makeRequest([noIpEvent]) as any);
+
+        expect(mockGeolocationService.getLocation).not.toHaveBeenCalled();
+        const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+        expect(payload.properties).toMatchObject({
+          is_bot: false,
+          is_datacenter: false,
+          bot_classification: null,
+          asn: 0,
+          asn_org: '',
+          user_type: '',
+        });
+      });
+    });
   });
 });

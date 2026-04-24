@@ -39,7 +39,7 @@ import { CampaignsType } from '../enums/campaign.enum';
   props: ['campaignType', 'messages', 'messageType'],
 })
 export default class ContentStep extends Vue {
-  @Prop() public campaignType!: typeof CampaignsType[keyof typeof CampaignsType];
+  @Prop() public campaignType!: (typeof CampaignsType)[keyof typeof CampaignsType];
   @Prop() public messageType!: string;
   @Prop() public messages!: any;
   public campaignsType = CampaignsType;

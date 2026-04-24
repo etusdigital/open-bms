@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{backoffice-api-url}}/subusers"
+  url: '{{backoffice-api-url}}/subusers'
   body:
     type: json
     json: |

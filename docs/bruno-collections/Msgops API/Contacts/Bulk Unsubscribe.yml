@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/contacts/bulk-unsubscribe"
+  url: '{{msgops-api-url}}/contacts/bulk-unsubscribe'
   body:
     type: json
     json: |

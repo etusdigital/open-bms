@@ -6,10 +6,15 @@ COPY package.json ./
 FROM base AS deps
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/send-push/package.json ./apps/send-push/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/url-utils/package.json ./packages/url-utils/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --filter msgops-send-push
+    pnpm install --frozen-lockfile --filter msgops-send-push...
 
 FROM deps AS build
+COPY packages/typescript-config ./packages/typescript-config
+COPY packages/url-utils ./packages/url-utils
+RUN pnpm --filter @msgops/url-utils build
 COPY apps/send-push/ ./apps/send-push/
 RUN pnpm --filter msgops-send-push build
 

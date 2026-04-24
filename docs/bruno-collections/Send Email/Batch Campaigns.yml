@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{send-email-url}}/batch/campaigns"
+  url: '{{send-email-url}}/batch/campaigns'
   body:
     type: json
     json: |

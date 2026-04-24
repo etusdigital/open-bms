@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{backoffice-api-url}}/ips"
+  url: '{{backoffice-api-url}}/ips'
   body:
     type: json
     json: |

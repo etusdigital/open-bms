@@ -732,7 +732,9 @@ export default class PushConfig extends Vue {
 @import '@/assets/styles/variables.scss';
 
 ::v-deep.v-card {
-  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06) !important;
+  box-shadow:
+    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
+    0px 1px 2px 0px rgba(0, 0, 0, 0.06) !important;
 }
 
 .message-form {
@@ -794,7 +796,9 @@ export default class PushConfig extends Vue {
   height: 492px;
   padding: 54px 24px;
   border-radius: 16px;
-  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
+    0px 1px 2px 0px rgba(0, 0, 0, 0.06);
 
   img {
     height: 100%;
@@ -880,7 +884,9 @@ input[type='radio']:checked {
 .preview-mobile {
   border-radius: 16px;
   background: var(--cinzas-gray-200, #eaeaea);
-  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
+    0px 1px 2px 0px rgba(0, 0, 0, 0.06);
   position: relative;
   display: flex;
   width: 80%;
@@ -896,7 +902,9 @@ input[type='radio']:checked {
   background: #e5e5e5;
   height: 90%;
   width: 90%;
-  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
+    0px 1px 2px 0px rgba(0, 0, 0, 0.06);
 }
 
 .phone-frame {
@@ -922,7 +930,9 @@ input[type='radio']:checked {
 }
 
 .format-push {
-  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06) !important;
+  box-shadow:
+    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
+    0px 1px 2px 0px rgba(0, 0, 0, 0.06) !important;
   position: relative;
   height: 100%;
   padding: 10px 5px 0px 0px;

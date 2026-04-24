@@ -5,14 +5,14 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/automations/lead-state"
+  url: '{{msgops-api-url}}/automations/lead-state'
   params:
     - name: automationTitle
-      value: "test-automation"
+      value: 'test-automation'
     - name: automationId
-      value: "1"
+      value: '1'
     - name: stepId
-      value: "1"
+      value: '1'
   auth: inherit
 
 settings:

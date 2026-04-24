@@ -308,9 +308,9 @@
             <img
               class="icon-card"
               :src="
-                require(`@/assets/campaign_recurring${
-                  newCampaign.type === campaignsType.RECURRING ? '_active' : ''
-                }.svg`)
+                require(
+                  `@/assets/campaign_recurring${newCampaign.type === campaignsType.RECURRING ? '_active' : ''}.svg`
+                )
               "
             />
           </div>
@@ -407,7 +407,9 @@ export default class SettingsStep extends Vue {
 ::v-deep .v-sheet.v-card:not(.v-sheet--outlined) {
   border: 1px solid var(--Cinzas-Gray-300, #d9d9d9);
   background: var(--Outras-cores-White, #fff);
-  box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0px 1px 3px 0px rgba(0, 0, 0, 0.1),
+    0px 1px 2px 0px rgba(0, 0, 0, 0.06);
 }
 
 .campaign-cards-wrapper {

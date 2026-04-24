@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/pools/get_sending_limits"
+  url: '{{msgops-api-url}}/pools/get_sending_limits'
   auth: inherit
 
 settings:

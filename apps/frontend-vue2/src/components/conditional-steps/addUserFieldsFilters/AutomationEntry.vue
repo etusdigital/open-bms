@@ -50,7 +50,7 @@
 
       <div class="mt-auto time-custom">
         <input
-          oninput="value = value.replace(/[^0-9]/g, '');"
+          oninput="value = value.replace(/[^0-9]/g, '')"
           @input="updateStep('user_field_value', $event.target.value)"
           autofocus
           class="form-control mo-input-days days-input"

@@ -1,8 +1,8 @@
 import { createRouter, createWebHistory, RouteLocationNormalized } from 'vue-router';
-import { watch } from 'vue';
 import { routes } from './pages';
 import { useUserStore } from './stores';
-import { auth0 } from './infra/Auth';
+import { userHttpGateway } from './gateways/User';
+import { bootstrapAuth, useAuth } from './composables/useAuth';
 import { setupGateway } from './gateways/Setup';
 
 const router = createRouter({
@@ -10,22 +10,10 @@ const router = createRouter({
   routes,
 });
 
-const ROLES_CLAIM = import.meta.env.VITE_AUTH0_ROLES_CLAIM || 'https://bms.local/roles';
-const BILLING_ONLY_ROLE = import.meta.env.VITE_AUTH0_BILLING_ONLY_ROLE || 'superbilling';
-
 let setupChecked = false;
 
-function waitForAuth0(): Promise<void> {
-  if (!auth0.isLoading.value) return Promise.resolve();
-  return new Promise<void>((resolve) => {
-    const stop = watch(auth0.isLoading, (loading) => {
-      if (!loading) { stop(); resolve(); }
-    });
-  });
-}
-
 router.beforeEach(async (to: RouteLocationNormalized) => {
-  if (to.path === '/callback' || to.path === '/login' || to.path.startsWith('/setup')) {
+  if ((to.meta as any)?.public || to.path === '/login') {
     return true;
   }
 
@@ -42,20 +30,40 @@ router.beforeEach(async (to: RouteLocationNormalized) => {
     }
   }
 
-  // Wait for Auth0 to finish its initial session check
-  await waitForAuth0();
-
-  if (!auth0.isAuthenticated.value) {
-    await auth0.loginWithRedirect({ appState: { target: to.fullPath } });
-    return false;
+  const { isAuthenticated, refresh } = useAuth();
+  if (!isAuthenticated.value) {
+    await bootstrapAuth();
+  }
+  if (!isAuthenticated.value) {
+    const token = await refresh();
+    if (!token) {
+      return { name: 'login', query: { redirect: to.fullPath } };
+    }
   }
 
   const userStore = useUserStore();
-  if (auth0.user?.value && !userStore.roles.length) {
-    userStore.setRoles(auth0.user.value[ROLES_CLAIM] || []);
+  if (!userStore.effectiveRole) {
+    try {
+      const me: any = await userHttpGateway.getMe();
+      userStore.setAuthContext(me);
+    } catch {
+      return { name: 'login', query: { redirect: to.fullPath } };
+    }
   }
 
-  if (userStore.roles.includes(BILLING_ONLY_ROLE)) {
+  // msgops-manager-frontend is the super-admin console (tenant & global user management).
+  // Non-super-admins belong in the operations app (frontend-vue2). Redirect them there.
+  if (!userStore.isSuperAdmin) {
+    const opsUrl = import.meta.env.VITE_APP_REDIRECT_MSGOPS;
+    if (opsUrl && typeof window !== 'undefined') {
+      window.location.replace(opsUrl);
+      return false;
+    }
+    // Fallback when ops URL isn't configured — send to /login with a flag.
+    return { name: 'login', query: { forbidden: '1' } };
+  }
+
+  if (userStore.effectiveRole === 'billing' && !userStore.isSuperAdmin) {
     if (to.path === '/users' || to.path === '/accounts') {
       return '/billing';
     }

@@ -7,4 +7,13 @@ module.exports = {
     sockHost: 'localhost',
     sockPort: 44357,
   },
+  // Provide postcss config inline so bootstrap.min.css (hoisted deep inside
+  // node_modules/.pnpm/*) doesn't trigger postcss-load-config lookup failures.
+  css: {
+    loaderOptions: {
+      postcss: {
+        plugins: [require('autoprefixer')],
+      },
+    },
+  },
 };

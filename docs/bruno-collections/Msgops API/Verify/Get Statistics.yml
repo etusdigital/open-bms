@@ -5,16 +5,16 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/verify/statistics"
+  url: '{{msgops-api-url}}/verify/statistics'
   params:
     - name: startDate
-      value: "2025-01-01"
+      value: '2025-01-01'
     - name: endDate
-      value: "2025-01-31"
+      value: '2025-01-31'
     - name: method
-      value: "SMS"
+      value: 'SMS'
     - name: group
-      value: "day"
+      value: 'day'
   auth: inherit
 
 settings:

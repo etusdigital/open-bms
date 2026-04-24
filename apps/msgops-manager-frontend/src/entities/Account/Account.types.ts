@@ -10,6 +10,7 @@ export type Account = {
   name?: string;
   description?: string;
   isActive?: boolean;
+  isInternal?: boolean;
   createdAt: string;
   updatedAt?: string | null;
   deletedAt?: string | null;
@@ -25,7 +26,7 @@ export type CreateAccount = Omit<Account, 'id' | 'createdAt'> & {
   sendgridUser?: string;
 };
 
-export type EditAccount = Pick<Account, 'name' | 'description'> & { id: number };
+export type EditAccount = Pick<Account, 'name' | 'description' | 'isInternal'> & { id: number };
 
 export type SendgridDns = {
   [key: string]: {

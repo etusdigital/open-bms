@@ -1,9 +1,5 @@
 import * as amqplib from 'amqplib';
-import {
-  AmqpConsumer,
-  ConsumerAlreadyActiveError,
-  ConsumerClosedError,
-} from './consumer';
+import { AmqpConsumer, ConsumerAlreadyActiveError, ConsumerClosedError } from './consumer';
 import { DLX, EXCHANGES } from './exchanges';
 import type { ConsumerOptions, MessageContext } from './types';
 
@@ -131,11 +127,7 @@ function setup() {
   const publishChannel = createMockChannel();
   const conn = createMockConn(channel, publishChannel);
   mockConnect.mockResolvedValue(conn);
-  const consumer = new AmqpConsumer(
-    { url: 'amqp://test' },
-    undefined,
-    FAST_RETRY,
-  );
+  const consumer = new AmqpConsumer({ url: 'amqp://test' }, undefined, FAST_RETRY);
   return { channel, publishChannel, conn, consumer };
 }
 
@@ -152,11 +144,7 @@ describe('AmqpConsumer', () => {
 
       await consumer.consume(DEFAULT_OPTS, async () => 'ack');
 
-      expect(channel.assertExchange).toHaveBeenCalledWith(
-        EXCHANGES.email,
-        'topic',
-        { durable: true },
-      );
+      expect(channel.assertExchange).toHaveBeenCalledWith(EXCHANGES.email, 'topic', { durable: true });
       expect(channel.assertExchange).toHaveBeenCalledWith(DLX, 'topic', {
         durable: true,
       });
@@ -164,20 +152,9 @@ describe('AmqpConsumer', () => {
         QUEUE,
         expect.objectContaining({ durable: true, exclusive: false, autoDelete: false }),
       );
-      expect(channel.assertQueue).toHaveBeenCalledWith(
-        DLQ_NAME,
-        expect.objectContaining({ durable: true }),
-      );
-      expect(channel.bindQueue).toHaveBeenCalledWith(
-        QUEUE,
-        EXCHANGES.email,
-        ROUTING_KEY,
-      );
-      expect(channel.bindQueue).toHaveBeenCalledWith(
-        DLQ_NAME,
-        DLX,
-        ROUTING_KEY,
-      );
+      expect(channel.assertQueue).toHaveBeenCalledWith(DLQ_NAME, expect.objectContaining({ durable: true }));
+      expect(channel.bindQueue).toHaveBeenCalledWith(QUEUE, EXCHANGES.email, ROUTING_KEY);
+      expect(channel.bindQueue).toHaveBeenCalledWith(DLQ_NAME, DLX, ROUTING_KEY);
     });
 
     it('defaults prefetch to 10', async () => {
@@ -195,19 +172,15 @@ describe('AmqpConsumer', () => {
     it('starts consuming the queue with manual ack', async () => {
       const { channel, consumer } = setup();
       await consumer.consume(DEFAULT_OPTS, async () => 'ack');
-      expect(channel.consume).toHaveBeenCalledWith(
-        QUEUE,
-        expect.any(Function),
-        { noAck: false },
-      );
+      expect(channel.consume).toHaveBeenCalledWith(QUEUE, expect.any(Function), { noAck: false });
     });
 
     it('rejects a second consume() on the same instance', async () => {
       const { consumer } = setup();
       await consumer.consume(DEFAULT_OPTS, async () => 'ack');
-      await expect(
-        consumer.consume(DEFAULT_OPTS, async () => 'ack'),
-      ).rejects.toBeInstanceOf(ConsumerAlreadyActiveError);
+      await expect(consumer.consume(DEFAULT_OPTS, async () => 'ack')).rejects.toBeInstanceOf(
+        ConsumerAlreadyActiveError,
+      );
     });
   });
 
@@ -271,9 +244,7 @@ describe('AmqpConsumer', () => {
         seenAttempt = ctx.attempt;
         return 'ack';
       });
-      channel.deliver(
-        makeMessage({ headers: { 'x-bms-attempt': 3 } }),
-      );
+      channel.deliver(makeMessage({ headers: { 'x-bms-attempt': 3 } }));
       await waitTick();
       expect(seenAttempt).toBe(3);
     });
@@ -312,8 +283,7 @@ describe('AmqpConsumer', () => {
 
       expect(channel.ack).toHaveBeenCalledWith(msg);
       expect(publishChannel.publish).toHaveBeenCalledTimes(1);
-      const [exchange, routingKey, content, options] =
-        publishChannel.publish.mock.calls[0]!;
+      const [exchange, routingKey, content, options] = publishChannel.publish.mock.calls[0]!;
       expect(exchange).toBe(EXCHANGES.email);
       expect(routingKey).toBe(ROUTING_KEY);
       expect(content).toBe(msg.content);
@@ -422,8 +392,7 @@ describe('AmqpConsumer', () => {
       await waitTick();
 
       expect(publishChannel.publish).toHaveBeenCalledTimes(1);
-      const [exchange, routingKey, , options] =
-        publishChannel.publish.mock.calls[0]!;
+      const [exchange, routingKey, , options] = publishChannel.publish.mock.calls[0]!;
       expect(exchange).toBe(DLX);
       expect(routingKey).toBe(ROUTING_KEY);
       expect(options).toMatchObject({
@@ -443,9 +412,7 @@ describe('AmqpConsumer', () => {
         throw new Error('x');
       });
 
-      channel.deliver(
-        makeMessage({ headers: { 'x-bms-attempt': 3 } }),
-      );
+      channel.deliver(makeMessage({ headers: { 'x-bms-attempt': 3 } }));
       await waitTick(50);
 
       // One publish — to DLX — and no subsequent republish to main
@@ -468,8 +435,7 @@ describe('AmqpConsumer', () => {
 
       expect(handler).not.toHaveBeenCalled();
       expect(publishChannel.publish).toHaveBeenCalledTimes(1);
-      const [exchange, routingKey, content, options] =
-        publishChannel.publish.mock.calls[0]!;
+      const [exchange, routingKey, content, options] = publishChannel.publish.mock.calls[0]!;
       expect(exchange).toBe(DLX);
       expect(routingKey).toBe(ROUTING_KEY);
       expect(content).toBe(msg.content);
@@ -529,11 +495,7 @@ describe('AmqpConsumer', () => {
       const { channel, consumer } = setup();
       await consumer.consume(DEFAULT_OPTS, async () => 'ack');
 
-      const [a, b, c] = await Promise.all([
-        consumer.shutdown(),
-        consumer.shutdown(),
-        consumer.shutdown(),
-      ]);
+      const [a, b, c] = await Promise.all([consumer.shutdown(), consumer.shutdown(), consumer.shutdown()]);
 
       expect(a).toBeUndefined();
       expect(b).toBeUndefined();
@@ -548,11 +510,7 @@ describe('AmqpConsumer', () => {
       const conn = createMockConn(channel, pub);
       mockConnect.mockResolvedValue(conn);
 
-      const consumer = new AmqpConsumer(
-        { url: 'amqp://test' },
-        undefined,
-        FAST_RETRY,
-      );
+      const consumer = new AmqpConsumer({ url: 'amqp://test' }, undefined, FAST_RETRY);
       await consumer.shutdown();
 
       expect(mockConnect).not.toHaveBeenCalled();
@@ -563,9 +521,7 @@ describe('AmqpConsumer', () => {
     it('rejects consume() after shutdown with ConsumerClosedError', async () => {
       const { consumer } = setup();
       await consumer.shutdown();
-      await expect(
-        consumer.consume(DEFAULT_OPTS, async () => 'ack'),
-      ).rejects.toBeInstanceOf(ConsumerClosedError);
+      await expect(consumer.consume(DEFAULT_OPTS, async () => 'ack')).rejects.toBeInstanceOf(ConsumerClosedError);
     });
 
     it('force-closes after timeout when in-flight handler hangs', async () => {
@@ -575,11 +531,7 @@ describe('AmqpConsumer', () => {
       mockConnect.mockResolvedValue(conn);
 
       // Short shutdown timeout for the test
-      const consumer = new AmqpConsumer(
-        { url: 'amqp://test' },
-        20,
-        FAST_RETRY,
-      );
+      const consumer = new AmqpConsumer({ url: 'amqp://test' }, 20, FAST_RETRY);
 
       await consumer.consume(DEFAULT_OPTS, async () => {
         // Never resolves
@@ -606,15 +558,8 @@ describe('AmqpConsumer', () => {
       mockConnect.mockResolvedValue(conn);
 
       // Long backoff so the timer is still pending when shutdown fires
-      const consumer = new AmqpConsumer(
-        { url: 'amqp://test' },
-        20,
-        FAST_RETRY,
-      );
-      await consumer.consume(
-        { ...DEFAULT_OPTS, backoffBaseMs: 5_000, backoffMaxMs: 5_000 },
-        async () => 'nack',
-      );
+      const consumer = new AmqpConsumer({ url: 'amqp://test' }, 20, FAST_RETRY);
+      await consumer.consume({ ...DEFAULT_OPTS, backoffBaseMs: 5_000, backoffMaxMs: 5_000 }, async () => 'nack');
 
       channel.deliver(makeMessage());
       await waitTick(5);
@@ -637,15 +582,8 @@ describe('AmqpConsumer', () => {
       mockConnect.mockResolvedValue(conn);
 
       // Plenty of shutdown time; short backoff so timer fires quickly
-      const consumer = new AmqpConsumer(
-        { url: 'amqp://test' },
-        500,
-        FAST_RETRY,
-      );
-      await consumer.consume(
-        { ...DEFAULT_OPTS, backoffBaseMs: 10, backoffMaxMs: 10 },
-        async () => 'nack',
-      );
+      const consumer = new AmqpConsumer({ url: 'amqp://test' }, 500, FAST_RETRY);
+      await consumer.consume({ ...DEFAULT_OPTS, backoffBaseMs: 10, backoffMaxMs: 10 }, async () => 'nack');
 
       channel.deliver(makeMessage());
       await waitTick(2);
@@ -670,11 +608,7 @@ describe('AmqpConsumer', () => {
       const conn2 = createMockConn(channel2, pub2);
       mockConnect.mockResolvedValueOnce(conn1).mockResolvedValueOnce(conn2);
 
-      const consumer = new AmqpConsumer(
-        { url: 'amqp://test' },
-        undefined,
-        FAST_RETRY,
-      );
+      const consumer = new AmqpConsumer({ url: 'amqp://test' }, undefined, FAST_RETRY);
       await consumer.consume(DEFAULT_OPTS, async () => 'ack');
 
       expect(channel1.assertExchange).toHaveBeenCalled();
@@ -685,23 +619,12 @@ describe('AmqpConsumer', () => {
 
       await waitTick(50);
 
-      expect(channel2.assertExchange).toHaveBeenCalledWith(
-        EXCHANGES.email,
-        'topic',
-        { durable: true },
-      );
+      expect(channel2.assertExchange).toHaveBeenCalledWith(EXCHANGES.email, 'topic', { durable: true });
       expect(channel2.assertExchange).toHaveBeenCalledWith(DLX, 'topic', {
         durable: true,
       });
-      expect(channel2.assertQueue).toHaveBeenCalledWith(
-        QUEUE,
-        expect.objectContaining({ durable: true }),
-      );
-      expect(channel2.consume).toHaveBeenCalledWith(
-        QUEUE,
-        expect.any(Function),
-        { noAck: false },
-      );
+      expect(channel2.assertQueue).toHaveBeenCalledWith(QUEUE, expect.objectContaining({ durable: true }));
+      expect(channel2.consume).toHaveBeenCalledWith(QUEUE, expect.any(Function), { noAck: false });
     });
 
     it('does not reestablish while shutting down', async () => {
@@ -713,11 +636,7 @@ describe('AmqpConsumer', () => {
       const conn2 = createMockConn(channel2, pub2);
       mockConnect.mockResolvedValueOnce(conn1).mockResolvedValueOnce(conn2);
 
-      const consumer = new AmqpConsumer(
-        { url: 'amqp://test' },
-        undefined,
-        FAST_RETRY,
-      );
+      const consumer = new AmqpConsumer({ url: 'amqp://test' }, undefined, FAST_RETRY);
       await consumer.consume(DEFAULT_OPTS, async () => 'ack');
 
       // Fire shutdown and a reconnect-triggering close concurrently

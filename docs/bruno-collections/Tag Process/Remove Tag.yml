@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{tag-process-url}}/remove"
+  url: '{{tag-process-url}}/remove'
   body:
     type: json
     json: |

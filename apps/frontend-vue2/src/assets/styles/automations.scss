@@ -1,182 +1,182 @@
 ::v-deep.view-automations {
-    .v-select.v-select--is-menu-active .v-input__icon--append .v-icon {
-      transform: rotate(0) !important;
-    }
-  
-    .v-input__icon--append,
-    .v-input__icon--clear {
-      height: 12px !important;
-    }
-  
-    .v-input__append-inner {
-      margin-top: 10.59px !important;
-    }
-  
-    .v-input__slot {
-      min-height: 33px !important;
-    }
-  
-    .v-input__slot:before,
-    .v-input__slot:after {
-      border: none;
-    }
-  
-    .search-field {
-      font-size: 14px;
-      height: 33px;
-    }
-    .c-multiselect .multiselect__single,
-    .c-multiselect .multiselect__option {
-      font-style: normal;
-      font-size: 14px;
-      line-height: 22px;
-      color: $neutral-gray-800;
-    }
-    .c-multiselect .multiselect__option {
-      padding: 4px 12px;
-      min-height: 25px;
-      height: 25px;
-    }
-  
-    .c-multiselect .multiselect__content-wrapper {
-      border: 1px solid #a6a6ab;
-    }
-    .c-multiselect .multiselect__tag {
-      margin-right: 10px !important;
-    }
-  
-    .c-multiselect .multiselect__content {
-      padding-left: 0 !important;
-    }
-  
-    .c-multiselect .multiselect__option--group {
-      background: #35353b;
-      color: white;
-    }
-    .c-multiselect .multiselect__tags {
-      border: 1px solid #D9D9D9;
-      border-radius: 8px !important;
-      height: 33px;
-      min-height: 33px;
-      padding: 8px 40px 8px 8px;
-    }
-    .c-multiselect .multiselect__single {
-      padding-left: 0;
-      margin: 3px 0 3px 0;
-      font-size: 14px;
-      font-weight: 400;
-    }
-  
-    .c-multiselect .multiselect__select {
-      height: 33px;
-    }
-    .c-multiselect ul .multiselect__content {
-      padding-left: 0;
-    }
-  
-    .search-field .v-input__slot {
-      border: 1px solid $neutral-gray-500 !important;
-      border-radius: 4px;
-    }
-  
-    .search-field .v-icon {
-      color: $neutral-gray-500;
-    }
-  }
-  
-  .automations-options_btn_add {
-    padding-bottom: 0px;
-  }
-  
-  .list-inline {
-    margin-bottom: 0px;
-  }
-  .automations-options_actions {
-    box-sizing: initial;
-    padding-bottom: 8px;
-  }
-  
-  .automations-options {
-    margin-bottom: 18px;
-    margin-top: 18px;
-    padding-top: 1px;
-    padding-bottom: 0px;
-  }
-  .list-inline-item {
-    font-style: normal;
-    font-weight: 600;
-    font-size: 12px;
-    line-height: 150%;
-    color: #35353b;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    vertical-align: sub;
-  }
-  .list-inline-item a,
-  .list-inline-item span {
-    padding: 1.5px 0;
-  }
-  
-  .list-inline-item:hover {
-    color: #35353ba4;
-  }
-  
-  .list-inline-item:not(:last-child) {
-    margin-right: 12px;
-  }
-  
-  .list-inline-item .separator {
-    padding: 0 0.455px;
-  }
-  
-  .icon {
-    width: 12.8px;
-    margin-right: 1px;
-  }
-  
-  .span-plus-icon {
-    width: 214px;
-    height: 18px;
-  }
-  
-  .nopadding-top {
-    padding-top: 0;
-    padding-bottom: 16px;
-  }
-  
-  .nopadding-top:last-child {
-    padding-bottom: 0;
-  }
-  
-  .view-automations {
-    width: 100%;
-  }
-  
-  .filter {
-    margin-top: 14px;
-  }
-  .filter_status,
-  .filter_others {
-    padding-right: 16px;
-    padding-bottom: 2px;
-  }
-  .custom__select {
-    position: absolute;
-    width: 40px;
-    height: 33px;
-    right: 1px;
-    line-height: 33px;
-    font-size: 17px;
-    text-align: center;
-    color: #a6a6ab;
-    cursor: pointer;
-  }
-  .multiselect--active {
-    .custom__select {
-      transform: rotate(180deg);
-    }
+  .v-select.v-select--is-menu-active .v-input__icon--append .v-icon {
+    transform: rotate(0) !important;
   }
 
-  .icon-dropdown {
+  .v-input__icon--append,
+  .v-input__icon--clear {
+    height: 12px !important;
+  }
+
+  .v-input__append-inner {
+    margin-top: 10.59px !important;
+  }
+
+  .v-input__slot {
+    min-height: 33px !important;
+  }
+
+  .v-input__slot:before,
+  .v-input__slot:after {
+    border: none;
+  }
+
+  .search-field {
+    font-size: 14px;
+    height: 33px;
+  }
+  .c-multiselect .multiselect__single,
+  .c-multiselect .multiselect__option {
+    font-style: normal;
+    font-size: 14px;
+    line-height: 22px;
+    color: $neutral-gray-800;
+  }
+  .c-multiselect .multiselect__option {
+    padding: 4px 12px;
+    min-height: 25px;
+    height: 25px;
+  }
+
+  .c-multiselect .multiselect__content-wrapper {
+    border: 1px solid #a6a6ab;
+  }
+  .c-multiselect .multiselect__tag {
+    margin-right: 10px !important;
+  }
+
+  .c-multiselect .multiselect__content {
+    padding-left: 0 !important;
+  }
+
+  .c-multiselect .multiselect__option--group {
+    background: #35353b;
+    color: white;
+  }
+  .c-multiselect .multiselect__tags {
+    border: 1px solid #d9d9d9;
+    border-radius: 8px !important;
+    height: 33px;
+    min-height: 33px;
+    padding: 8px 40px 8px 8px;
+  }
+  .c-multiselect .multiselect__single {
+    padding-left: 0;
+    margin: 3px 0 3px 0;
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  .c-multiselect .multiselect__select {
+    height: 33px;
+  }
+  .c-multiselect ul .multiselect__content {
+    padding-left: 0;
+  }
+
+  .search-field .v-input__slot {
+    border: 1px solid $neutral-gray-500 !important;
+    border-radius: 4px;
+  }
+
+  .search-field .v-icon {
+    color: $neutral-gray-500;
+  }
+}
+
+.automations-options_btn_add {
+  padding-bottom: 0px;
+}
+
+.list-inline {
+  margin-bottom: 0px;
+}
+.automations-options_actions {
+  box-sizing: initial;
+  padding-bottom: 8px;
+}
+
+.automations-options {
+  margin-bottom: 18px;
+  margin-top: 18px;
+  padding-top: 1px;
+  padding-bottom: 0px;
+}
+.list-inline-item {
+  font-style: normal;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 150%;
+  color: #35353b;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  vertical-align: sub;
+}
+.list-inline-item a,
+.list-inline-item span {
+  padding: 1.5px 0;
+}
+
+.list-inline-item:hover {
+  color: #35353ba4;
+}
+
+.list-inline-item:not(:last-child) {
+  margin-right: 12px;
+}
+
+.list-inline-item .separator {
+  padding: 0 0.455px;
+}
+
+.icon {
+  width: 12.8px;
+  margin-right: 1px;
+}
+
+.span-plus-icon {
+  width: 214px;
+  height: 18px;
+}
+
+.nopadding-top {
+  padding-top: 0;
+  padding-bottom: 16px;
+}
+
+.nopadding-top:last-child {
+  padding-bottom: 0;
+}
+
+.view-automations {
+  width: 100%;
+}
+
+.filter {
+  margin-top: 14px;
+}
+.filter_status,
+.filter_others {
+  padding-right: 16px;
+  padding-bottom: 2px;
+}
+.custom__select {
+  position: absolute;
+  width: 40px;
+  height: 33px;
+  right: 1px;
+  line-height: 33px;
+  font-size: 17px;
+  text-align: center;
+  color: #a6a6ab;
+  cursor: pointer;
+}
+.multiselect--active {
+  .custom__select {
     transform: rotate(180deg);
   }
+}
+
+.icon-dropdown {
+  transform: rotate(180deg);
+}

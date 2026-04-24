@@ -130,7 +130,7 @@ describe('AppService', () => {
       expect(result).toEqual({ status: 400, message: 'Invalid account configuration' });
     });
 
-    it('should call createRedictLink when message has url', async () => {
+    it('should call createRedirectLink when message has url', async () => {
       const msgWithUrl = {
         ...campaignMessage,
         message: { ...campaignMessage.message, url: 'https://example.com/page' },
@@ -139,7 +139,7 @@ describe('AppService', () => {
       expect(mockMsgopsService.createShortLink).toHaveBeenCalled();
     });
 
-    it('should not call createRedictLink when message has no url', async () => {
+    it('should not call createRedirectLink when message has no url', async () => {
       const msgNoUrl = {
         ...campaignMessage,
         message: { ...campaignMessage.message, url: undefined },
@@ -213,7 +213,7 @@ describe('AppService', () => {
       expect(result.message).toContain('does not have the next filled in');
     });
 
-    it('should call createRedictLink when message has url', async () => {
+    it('should call createRedirectLink when message has url', async () => {
       const msg = {
         ...automationMessage,
         message: { ...automationMessage.message, url: 'https://example.com' },
@@ -282,43 +282,115 @@ describe('AppService', () => {
     });
   });
 
-  describe('createRedictLink', () => {
+  describe('createRedirectLink', () => {
+    const externalAccount = { id: 1, name: 'External' } as any;
+    const internalAccount = { id: 2, name: 'Internal', isInternal: true } as any;
+
     it('should append UTMs and create short link', async () => {
-      await service.createRedictLink('https://example.com', 'key=val', 'whatsapp', 'campaign-1', 'https://base.com');
+      await service.createRedirectLink({
+        url: 'https://example.com',
+        utmsDefault: 'key=val',
+        type: 'whatsapp',
+        utmCampaign: 'campaign-1',
+        baseUrl: 'https://base.com',
+        account: externalAccount,
+      });
       expect(mockMsgopsService.createShortLink).toHaveBeenCalledWith(expect.stringContaining('utm_source=bms'), 'https://base.com');
     });
 
     it('should use ? separator for URLs without query params', async () => {
-      await service.createRedictLink('https://example.com', 'key=val', 'whatsapp', 'campaign-1', '');
+      await service.createRedirectLink({
+        url: 'https://example.com',
+        utmsDefault: 'key=val',
+        type: 'whatsapp',
+        utmCampaign: 'campaign-1',
+        baseUrl: '',
+        account: externalAccount,
+      });
       const calledUrl = mockMsgopsService.createShortLink.mock.calls[0][0];
       expect(calledUrl).toMatch(/^https:\/\/example\.com\?key=val/);
     });
 
     it('should use & separator for URLs with existing query params', async () => {
-      await service.createRedictLink('https://example.com?foo=bar', 'key=val', 'whatsapp', 'campaign-1', '');
+      await service.createRedirectLink({
+        url: 'https://example.com?foo=bar',
+        utmsDefault: 'key=val',
+        type: 'whatsapp',
+        utmCampaign: 'campaign-1',
+        baseUrl: '',
+        account: externalAccount,
+      });
       const calledUrl = mockMsgopsService.createShortLink.mock.calls[0][0];
       expect(calledUrl).toMatch(/^https:\/\/example\.com\?foo=bar&key=val/);
     });
 
     it('should not duplicate utm_source if already present', async () => {
-      await service.createRedictLink('https://example.com?utm_source=custom', 'key=val', 'whatsapp', 'campaign-1', '');
+      await service.createRedirectLink({
+        url: 'https://example.com?utm_source=custom',
+        utmsDefault: 'key=val',
+        type: 'whatsapp',
+        utmCampaign: 'campaign-1',
+        baseUrl: '',
+        account: externalAccount,
+      });
       const calledUrl = mockMsgopsService.createShortLink.mock.calls[0][0];
       const matches = calledUrl.match(/utm_source/g);
       expect(matches.length).toBe(1);
     });
 
     it('should not duplicate utm_medium if already present', async () => {
-      await service.createRedictLink('https://example.com?utm_medium=custom', 'key=val', 'whatsapp', 'campaign-1', '');
+      await service.createRedirectLink({
+        url: 'https://example.com?utm_medium=custom',
+        utmsDefault: 'key=val',
+        type: 'whatsapp',
+        utmCampaign: 'campaign-1',
+        baseUrl: '',
+        account: externalAccount,
+      });
       const calledUrl = mockMsgopsService.createShortLink.mock.calls[0][0];
       const matches = calledUrl.match(/utm_medium/g);
       expect(matches.length).toBe(1);
     });
 
     it('should not duplicate utm_campaign if already present', async () => {
-      await service.createRedictLink('https://example.com?utm_campaign=custom', 'key=val', 'whatsapp', 'campaign-1', '');
+      await service.createRedirectLink({
+        url: 'https://example.com?utm_campaign=custom',
+        utmsDefault: 'key=val',
+        type: 'whatsapp',
+        utmCampaign: 'campaign-1',
+        baseUrl: '',
+        account: externalAccount,
+      });
       const calledUrl = mockMsgopsService.createShortLink.mock.calls[0][0];
       const matches = calledUrl.match(/utm_campaign/g);
       expect(matches.length).toBe(1);
+    });
+
+    it('should add trailing slash before query for internal account', async () => {
+      await service.createRedirectLink({
+        url: 'https://example.com/lp',
+        utmsDefault: 'key=val',
+        type: 'whatsapp',
+        utmCampaign: 'campaign-1',
+        baseUrl: '',
+        account: internalAccount,
+      });
+      const calledUrl = mockMsgopsService.createShortLink.mock.calls[0][0];
+      expect(calledUrl).toMatch(/^https:\/\/example\.com\/lp\/\?/);
+    });
+
+    it('should NOT add trailing slash for external account', async () => {
+      await service.createRedirectLink({
+        url: 'https://example.com/lp',
+        utmsDefault: 'key=val',
+        type: 'whatsapp',
+        utmCampaign: 'campaign-1',
+        baseUrl: '',
+        account: externalAccount,
+      });
+      const calledUrl = mockMsgopsService.createShortLink.mock.calls[0][0];
+      expect(calledUrl).toMatch(/^https:\/\/example\.com\/lp\?/);
+      expect(calledUrl).not.toMatch(/\/lp\//);
     });
   });
 });

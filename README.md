@@ -4,13 +4,13 @@ Internal backoffice for the retention team to monitor and manage email delivery 
 
 ## Architecture
 
-| Component | Technology | Port |
-|-----------|-----------|------|
-| Frontend | Next.js 16 (App Router) | 3000 |
-| Backend | NestJS 11 | 3001 |
-| Analytics DB | ClickHouse Cloud | — |
-| Operational DB | PostgreSQL (GCP) | — |
-| Auth | Auth0 | — |
+| Component      | Technology                         | Port |
+| -------------- | ---------------------------------- | ---- |
+| Frontend       | Next.js 16 (App Router)            | 3000 |
+| Backend        | NestJS 11                          | 3001 |
+| Analytics DB   | ClickHouse Cloud                   | —    |
+| Operational DB | PostgreSQL (GCP)                   | —    |
+| Auth           | Local (default) / Auth0 (optional) | —    |
 
 **Monorepo**: Turborepo + pnpm
 
@@ -33,7 +33,10 @@ migrations/
 - Node.js >= 20
 - pnpm 9 (`corepack enable && corepack prepare pnpm@9 --activate`)
 - Access to ClickHouse Cloud and PostgreSQL instances
-- Auth0 tenant configured
+- `JWT_SECRET` (gere com `openssl rand -hex 32`) e `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD` para o primeiro boot em modo `local` (default).
+- Auth0 tenant — apenas se rodar com `AUTH_PROVIDER=auth0`.
+
+> Para OSS self-hosted, `AUTH_PROVIDER=local` é o default. Set `BOOTSTRAP_ADMIN_EMAIL` e `BOOTSTRAP_ADMIN_PASSWORD` antes do primeiro boot para criar o super_admin inicial.
 
 ## Getting Started
 
@@ -128,7 +131,7 @@ gcloud run deploy retention-frontend \
   --port 3000 \
   --allow-unauthenticated \
   --set-env-vars "NODE_ENV=production,PORT=3000,HOSTNAME=0.0.0.0" \
-  --set-secrets "AUTH0_SECRET=auth0-secret:latest,AUTH0_CLIENT_SECRET=auth0-client-secret:latest"
+  --set-secrets "JWT_SECRET=jwt-secret:latest,BOOTSTRAP_ADMIN_PASSWORD=bootstrap-admin-password:latest"
 ```
 
 ### Local Docker
@@ -156,9 +159,9 @@ docker run -p 3000:3000 --env-file apps/frontend/.env retention-frontend
 
 The backend exposes internal cron endpoints that are authenticated via the `CRON_SECRET` environment variable (passed in the `x-cron-secret` header). Set up [Cloud Scheduler](https://cloud.google.com/scheduler) jobs to call them on a schedule.
 
-| Endpoint | Schedule | Description |
-|----------|----------|-------------|
-| `POST /internal/cron/detect-anomalies` | Every 15 min | Runs anomaly detection on email delivery metrics and creates alerts |
+| Endpoint                               | Schedule           | Description                                                                    |
+| -------------------------------------- | ------------------ | ------------------------------------------------------------------------------ |
+| `POST /internal/cron/detect-anomalies` | Every 15 min       | Runs anomaly detection on email delivery metrics and creates alerts            |
 | `POST /internal/cron/refresh-ip-usage` | Daily at 06:00 UTC | Queries ClickHouse for 30-day delivered counts per IP and caches in PostgreSQL |
 
 ### Cloud Scheduler setup

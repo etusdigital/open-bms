@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{backoffice-api-url}}/internal/routing-event"
+  url: '{{backoffice-api-url}}/internal/routing-event'
   body:
     type: json
     json: |

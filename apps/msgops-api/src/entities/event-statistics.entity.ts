@@ -62,6 +62,12 @@ export class EventStatisticsEntity {
   blocked: number;
 
   @Column({ type: 'integer', default: 0 })
+  botClick: number;
+
+  @Column({ type: 'integer', default: 0 })
+  datacenterClick: number;
+
+  @Column({ type: 'integer', default: 0 })
   spamReport: number;
 
   @Column({ type: 'integer', default: 0 })

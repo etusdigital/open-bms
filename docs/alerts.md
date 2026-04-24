@@ -28,9 +28,11 @@ The V1 system used simple 7-day same-hour-of-day averages and multiplier-based t
 2. **Spread calculation**: `spread = (p75 - p25) / 1.35` — normalizes IQR to a standard-deviation equivalent.
 
 3. **Z-score**: `z = (current - median) / effectiveSpread` where:
+
    ```
    effectiveSpread = max(spread, minSpread, median × minSpreadPct)
    ```
+
    The `minSpreadPct` floor (e.g., 5% or 10% of median) prevents tight-IQR pools (very consistent traffic) from producing extreme z-scores on small absolute changes.
 
 4. **Z-score clamping**: Results are clamped to `[-20, 20]` for human-readable display.
@@ -49,9 +51,9 @@ Weekday baselines use a **28-day** lookback window, giving ~20 data points for d
 
 Detects abnormal increases in email bounces.
 
-| Severity | Condition |
-|---|---|
-| Warning | z-score >= **3.0** |
+| Severity | Condition          |
+| -------- | ------------------ |
+| Warning  | z-score >= **3.0** |
 | Critical | z-score >= **4.5** |
 
 - **Min events**: 200 total events in the current window
@@ -66,9 +68,9 @@ Detects abnormal increases in email bounces.
 
 Detects abnormal increases in deferred (temporarily failed) deliveries.
 
-| Severity | Condition |
-|---|---|
-| Warning | z-score >= **3.0** |
+| Severity | Condition          |
+| -------- | ------------------ |
+| Warning  | z-score >= **3.0** |
 | Critical | z-score >= **4.5** |
 
 - **Min events**: 200 total events in the current window
@@ -83,9 +85,9 @@ Detects abnormal increases in deferred (temporarily failed) deliveries.
 
 Detects high spam complaint rates relative to delivered volume.
 
-| Severity | Condition |
-|---|---|
-| Warning | Spam rate >= **0.1%** of delivered |
+| Severity | Condition                          |
+| -------- | ---------------------------------- |
+| Warning  | Spam rate >= **0.1%** of delivered |
 | Critical | Spam rate >= **0.3%** of delivered |
 
 - **Min events**: 200 total events in the current window
@@ -97,9 +99,9 @@ Detects high spam complaint rates relative to delivered volume.
 
 Detects abnormal decreases in total email volume (sending may have stopped or been throttled).
 
-| Severity | Condition |
-|---|---|
-| Warning | z-score <= **-4.0** |
+| Severity | Condition           |
+| -------- | ------------------- |
+| Warning  | z-score <= **-4.0** |
 | Critical | z-score <= **-6.0** |
 
 - **Absolute floor**: Baseline median must exceed 200 (guards against low-volume accounts)
@@ -121,9 +123,9 @@ The completed-hour check is reliable because it compares full hours against full
 
 Detects abnormal increases in total email volume.
 
-| Severity | Condition |
-|---|---|
-| Warning | z-score >= **4.0** |
+| Severity | Condition          |
+| -------- | ------------------ |
+| Warning  | z-score >= **4.0** |
 | Critical | z-score >= **6.0** |
 
 - **Min events**: 200 total events in the current window
@@ -148,14 +150,14 @@ Reserved for future use. Will detect IP/domain blocks from mailbox providers.
 
 ## Thresholds Summary
 
-| Type | Warning z | Critical z | Min Events | Min Points | Absolute Floor | Spread % Floor | Min Abs Dev |
-|---|---|---|---|---|---|---|---|
-| `bounce_spike` | >= 3.0 | >= 4.5 | 200 | 5 | bounced > 20 | 5% | 50 |
-| `deferred_spike` | >= 3.0 | >= 4.5 | 200 | 5 | deferred > 50 | 5% | 100 |
-| `volume_spike` | >= 4.0 | >= 6.0 | 200 | 5 | total > 500 | 10% | 0 |
-| `volume_drop` | <= -4.0 | <= -6.0 | n/a | 5 | median > 200 | 10% | 0 |
-| `spam_spike` | n/a (rate) | n/a (rate) | 200 | n/a | n/a | n/a | n/a |
-| `block_detected` | n/a | n/a | 10 | n/a | n/a | n/a | n/a |
+| Type             | Warning z  | Critical z | Min Events | Min Points | Absolute Floor | Spread % Floor | Min Abs Dev |
+| ---------------- | ---------- | ---------- | ---------- | ---------- | -------------- | -------------- | ----------- |
+| `bounce_spike`   | >= 3.0     | >= 4.5     | 200        | 5          | bounced > 20   | 5%             | 50          |
+| `deferred_spike` | >= 3.0     | >= 4.5     | 200        | 5          | deferred > 50  | 5%             | 100         |
+| `volume_spike`   | >= 4.0     | >= 6.0     | 200        | 5          | total > 500    | 10%            | 0           |
+| `volume_drop`    | <= -4.0    | <= -6.0    | n/a        | 5          | median > 200   | 10%            | 0           |
+| `spam_spike`     | n/a (rate) | n/a (rate) | 200        | n/a        | n/a            | n/a            | n/a         |
+| `block_detected` | n/a        | n/a        | 10         | n/a        | n/a            | n/a            | n/a         |
 
 Thresholds are defined in `packages/shared/src/thresholds.ts` (`ALERT_THRESHOLDS_V2`) and compiled into both frontend and backend. Changing thresholds requires a rebuild and redeploy.
 
@@ -170,12 +172,12 @@ Timeline:  ... |----hour 13----|----hour 14----|--now (14:35)
            Completed volume ─────────────► [hour 13 complete]
 ```
 
-| Window | ClickHouse Query | Used By |
-|---|---|---|
-| Spike current | `WHERE hour = toStartOfHour(now) AND account_id IN (internal_ids)` | bounce_spike, deferred_spike, spam_spike, volume_spike |
-| Spike baseline | Same hour-of-day, past 28 days (weekday) or 35 days (weekend), `HAVING data_points >= 5` | bounce_spike, deferred_spike, spam_spike, volume_spike |
-| Volume current | `WHERE hour = toStartOfHour(now) - INTERVAL 1 HOUR AND account_id IN (internal_ids)` | volume_drop, volume_spike (completed) |
-| Volume baseline | Same hour-of-day as completed hour, past 28/35 days, weekday/weekend split, `HAVING data_points >= 5` | volume_drop, volume_spike (completed) |
+| Window          | ClickHouse Query                                                                                      | Used By                                                |
+| --------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Spike current   | `WHERE hour = toStartOfHour(now) AND account_id IN (internal_ids)`                                    | bounce_spike, deferred_spike, spam_spike, volume_spike |
+| Spike baseline  | Same hour-of-day, past 28 days (weekday) or 35 days (weekend), `HAVING data_points >= 5`              | bounce_spike, deferred_spike, spam_spike, volume_spike |
+| Volume current  | `WHERE hour = toStartOfHour(now) - INTERVAL 1 HOUR AND account_id IN (internal_ids)`                  | volume_drop, volume_spike (completed)                  |
+| Volume baseline | Same hour-of-day as completed hour, past 28/35 days, weekday/weekend split, `HAVING data_points >= 5` | volume_drop, volume_spike (completed)                  |
 
 All four queries run in parallel via `Promise.all`.
 
@@ -212,10 +214,10 @@ This endpoint is excluded from JWT authentication and account middleware — it 
 
 ### Query parameters
 
-| Param | Type | Description |
-|---|---|---|
-| `referenceTime` | string (optional) | Override `now()` with a ClickHouse datetime, e.g. `2025-02-17T18:30:00`. Useful for testing. |
-| `dryRun` | `"true"` (optional) | Return what alerts would be created without persisting anything. |
+| Param           | Type                | Description                                                                                  |
+| --------------- | ------------------- | -------------------------------------------------------------------------------------------- |
+| `referenceTime` | string (optional)   | Override `now()` with a ClickHouse datetime, e.g. `2025-02-17T18:30:00`. Useful for testing. |
+| `dryRun`        | `"true"` (optional) | Return what alerts would be created without persisting anything.                             |
 
 ### Response
 
@@ -223,7 +225,7 @@ This endpoint is excluded from JWT authentication and account middleware — it 
 {
   "created": 2,
   "resolved": 1,
-  "details": []  // Only populated when dryRun=true
+  "details": [] // Only populated when dryRun=true
 }
 ```
 
@@ -237,15 +239,16 @@ This endpoint is excluded from JWT authentication and account middleware — it 
 
 ### Statuses
 
-| Status | Condition | Meaning |
-|---|---|---|
-| **Active** | `resolvedAt IS NULL AND acknowledgedAt IS NULL` | Anomaly is ongoing and unacknowledged |
+| Status           | Condition                                           | Meaning                                             |
+| ---------------- | --------------------------------------------------- | --------------------------------------------------- |
+| **Active**       | `resolvedAt IS NULL AND acknowledgedAt IS NULL`     | Anomaly is ongoing and unacknowledged               |
 | **Acknowledged** | `acknowledgedAt IS NOT NULL AND resolvedAt IS NULL` | A manager has seen it; anomaly may still be ongoing |
-| **Resolved** | `resolvedAt IS NOT NULL` | Anomaly condition no longer met (auto-resolved) |
+| **Resolved**     | `resolvedAt IS NOT NULL`                            | Anomaly condition no longer met (auto-resolved)     |
 
 ### Deduplication
 
 Only one active alert can exist per unique combination of `(accountId, alertType, pool, providerAccount)`. If an alert already exists for that tuple:
+
 - If severity changed (e.g. warning → critical), the existing alert is updated (including `title`, `baselineValue`, `currentValue`, `description`, and `metadata`)
 - Otherwise, no new alert is created
 
@@ -351,28 +354,29 @@ X-Cron-Secret: <secret>
 
 **Table**: `retention_alerts` (PostgreSQL)
 
-| Column | Type | Description |
-|---|---|---|
-| `id` | bigint PK | Auto-incremented |
-| `account_id` | integer | Account that owns the pool |
-| `alert_type` | varchar(50) | `bounce_spike`, `deferred_spike`, `volume_drop`, `volume_spike`, `spam_spike`, `block_detected` |
-| `severity` | varchar(20) | `warning` or `critical` |
-| `title` | varchar(255) | Human-readable summary |
-| `description` | text | Details with UTC hour label, current vs baseline values, z-score |
-| `metric_name` | varchar(100) | Which metric triggered it (`bounced`, `deferred`, `total_events`, `spam_rate`) |
-| `current_value` | real | The value that triggered the alert |
-| `baseline_value` | real | The baseline median |
-| `threshold_pct` | real | Reserved for future use |
-| `pool` | varchar(255) | Email sending pool name |
-| `provider_account` | varchar(255) | Provider account identifier |
-| `detected_at` | timestamptz | When the anomaly was first detected |
-| `resolved_at` | timestamptz | When auto-resolved (null = still active) |
-| `acknowledged_by` | varchar(255) | Email of user who acknowledged |
-| `acknowledged_at` | timestamptz | When acknowledged |
-| `metadata` | jsonb | Contains `zScore`, `spread`, `dataPoints` |
-| `created_at` | timestamptz | Row creation timestamp |
+| Column             | Type         | Description                                                                                     |
+| ------------------ | ------------ | ----------------------------------------------------------------------------------------------- |
+| `id`               | bigint PK    | Auto-incremented                                                                                |
+| `account_id`       | integer      | Account that owns the pool                                                                      |
+| `alert_type`       | varchar(50)  | `bounce_spike`, `deferred_spike`, `volume_drop`, `volume_spike`, `spam_spike`, `block_detected` |
+| `severity`         | varchar(20)  | `warning` or `critical`                                                                         |
+| `title`            | varchar(255) | Human-readable summary                                                                          |
+| `description`      | text         | Details with UTC hour label, current vs baseline values, z-score                                |
+| `metric_name`      | varchar(100) | Which metric triggered it (`bounced`, `deferred`, `total_events`, `spam_rate`)                  |
+| `current_value`    | real         | The value that triggered the alert                                                              |
+| `baseline_value`   | real         | The baseline median                                                                             |
+| `threshold_pct`    | real         | Reserved for future use                                                                         |
+| `pool`             | varchar(255) | Email sending pool name                                                                         |
+| `provider_account` | varchar(255) | Provider account identifier                                                                     |
+| `detected_at`      | timestamptz  | When the anomaly was first detected                                                             |
+| `resolved_at`      | timestamptz  | When auto-resolved (null = still active)                                                        |
+| `acknowledged_by`  | varchar(255) | Email of user who acknowledged                                                                  |
+| `acknowledged_at`  | timestamptz  | When acknowledged                                                                               |
+| `metadata`         | jsonb        | Contains `zScore`, `spread`, `dataPoints`                                                       |
+| `created_at`       | timestamptz  | Row creation timestamp                                                                          |
 
 **Indexes**:
+
 - `idx_ra_active` on `resolved_at` — fast lookup of active alerts
 - `idx_ra_detected` on `detected_at` — ordering by detection time
 - `idx_ra_account` on `(account_id, detected_at)` — per-account queries
@@ -387,20 +391,20 @@ Baseline queries use `quantiles(0.25, 0.5, 0.75)` aggregation functions to compu
 
 ## Configuration
 
-| Env Variable | Required | Description |
-|---|---|---|
-| `CRON_SECRET` | Yes | Secret for the `X-Cron-Secret` header on the cron endpoint |
-| `CLICKHOUSE_HOST` | Yes | ClickHouse Cloud connection URL |
-| `CLICKHOUSE_DATABASE` | Yes | ClickHouse database name (typically `BMS`) |
-| `CLICKHOUSE_USERNAME` | Yes | ClickHouse credentials |
-| `CLICKHOUSE_PASSWORD` | Yes | ClickHouse credentials |
+| Env Variable          | Required | Description                                                |
+| --------------------- | -------- | ---------------------------------------------------------- |
+| `CRON_SECRET`         | Yes      | Secret for the `X-Cron-Secret` header on the cron endpoint |
+| `CLICKHOUSE_HOST`     | Yes      | ClickHouse Cloud connection URL                            |
+| `CLICKHOUSE_DATABASE` | Yes      | ClickHouse database name (typically `BMS`)                 |
+| `CLICKHOUSE_USERNAME` | Yes      | ClickHouse credentials                                     |
+| `CLICKHOUSE_PASSWORD` | Yes      | ClickHouse credentials                                     |
 
 ## Key Files
 
-| File | Purpose |
-|---|---|
-| `packages/shared/src/thresholds.ts` | `ALERT_THRESHOLDS_V2`, `getSeverityV2()`, `computeZScore()` |
-| `packages/shared/src/types.ts` | `StatisticalBaseline`, `AlertType`, `AlertSeverity` interfaces |
-| `apps/backoffice-api/src/modules/alerts/alerts.service.ts` | Detection loops, ClickHouse queries, auto-resolution |
-| `apps/backoffice-api/src/modules/alerts/alerts.controller.ts` | REST API endpoints |
-| `apps/frontend/src/features/alerts/` | Frontend components, hooks, API client |
+| File                                                          | Purpose                                                        |
+| ------------------------------------------------------------- | -------------------------------------------------------------- |
+| `packages/shared/src/thresholds.ts`                           | `ALERT_THRESHOLDS_V2`, `getSeverityV2()`, `computeZScore()`    |
+| `packages/shared/src/types.ts`                                | `StatisticalBaseline`, `AlertType`, `AlertSeverity` interfaces |
+| `apps/backoffice-api/src/modules/alerts/alerts.service.ts`    | Detection loops, ClickHouse queries, auto-resolution           |
+| `apps/backoffice-api/src/modules/alerts/alerts.controller.ts` | REST API endpoints                                             |
+| `apps/frontend/src/features/alerts/`                          | Frontend components, hooks, API client                         |

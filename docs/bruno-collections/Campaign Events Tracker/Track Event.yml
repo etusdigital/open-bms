@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{campaign-events-tracker-url}}/"
+  url: '{{campaign-events-tracker-url}}/'
   body:
     type: json
     json: |

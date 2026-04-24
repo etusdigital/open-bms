@@ -6,11 +6,12 @@ import { RoleEntity } from '../../entities/role.entity';
 import { AccountEntity } from '../../entities/account.entity';
 import { PoolEntity } from '../../entities/pool.entity';
 import { UserAccountEntity } from '../../entities/users-account.entity';
+import { AuthModule } from '../auth/auth.module';
 import { SetupService } from './setup.service';
 import { SetupController } from './setup.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SystemConfigEntity, UserEntity, RoleEntity, AccountEntity, PoolEntity, UserAccountEntity])],
+  imports: [TypeOrmModule.forFeature([SystemConfigEntity, UserEntity, RoleEntity, AccountEntity, PoolEntity, UserAccountEntity]), AuthModule],
   providers: [SetupService],
   controllers: [SetupController],
 })

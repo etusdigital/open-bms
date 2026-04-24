@@ -1,11 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { MsgopsService } from './msgops/msgops.service';
 import { PubSubProvider } from './providers/pubsub.provider';
 import { ClsService } from 'nestjs-cls';
 import * as crypto from 'crypto';
+import { TrackerRedirectRequest } from './interfaces/tracker-redirect-event.interface';
 
 @Injectable()
 export class AppService {
+  private readonly logger = new Logger(AppService.name);
+
   constructor(
     private readonly pubSubProvider: PubSubProvider,
     private readonly msgopsService: MsgopsService,
@@ -67,6 +70,43 @@ export class AppService {
     }
 
     return response.redirect(302, url.toString());
+  }
+
+  async publishRedirectClick(params: { bmsUUID: string; accountId: string; decodedUrl: string; ip?: string; userAgent?: string }): Promise<void> {
+    if (process.env.ENABLE_TRACKER_REDIRECT_EVENT !== 'true') {
+      return;
+    }
+
+    const topic = process.env.TOPIC_WEBHOOKS;
+    if (!topic) {
+      this.logger.error('TOPIC_WEBHOOKS not set — skipping tracker-redirect publish');
+      return;
+    }
+
+    const body: TrackerRedirectRequest = {
+      platform: 'internal',
+      payload: [
+        {
+          event: 'tracker-redirect',
+          schemaVersion: 1,
+          timestamp: Date.now(),
+          accountId: params.accountId,
+          uuid: params.bmsUUID,
+          url: params.decodedUrl,
+          ip: params.ip,
+          userAgent: params.userAgent,
+        },
+      ],
+    };
+
+    try {
+      await this.pubSubProvider.sendMessage(body, topic, {
+        platform: 'internal',
+        message_type: 'tracker-redirect',
+      });
+    } catch (err) {
+      this.logger.error(`tracker-redirect publish failed (accountId=${params.accountId}, uuid=${params.bmsUUID}): ${err}`);
+    }
   }
 
   async findContactsByEmail(email: string, options?: string[]) {

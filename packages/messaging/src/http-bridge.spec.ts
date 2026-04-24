@@ -48,10 +48,7 @@ describe('createHttpBridgeHandler', () => {
         fetchImpl: mockFetch,
       });
 
-      await handler(
-        {},
-        makeCtx({ attempt: 3, routingKey: 'email.send.batch' }),
-      );
+      await handler({}, makeCtx({ attempt: 3, routingKey: 'email.send.batch' }));
 
       const headers = mockFetch.mock.calls[0]![1].headers;
       expect(headers['X-Bms-Attempt']).toBe('3');
@@ -237,9 +234,7 @@ describe('createHttpBridgeHandler', () => {
 
       await handler({ nested: { a: [1, 2, 3], b: true } }, makeCtx());
 
-      expect(mockFetch.mock.calls[0]![1].body).toBe(
-        JSON.stringify({ nested: { a: [1, 2, 3], b: true } }),
-      );
+      expect(mockFetch.mock.calls[0]![1].body).toBe(JSON.stringify({ nested: { a: [1, 2, 3], b: true } }));
     });
   });
 });

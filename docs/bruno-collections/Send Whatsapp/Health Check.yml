@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{send-whatsapp-url}}/"
+  url: '{{send-whatsapp-url}}/'
   auth: none
 
 settings:

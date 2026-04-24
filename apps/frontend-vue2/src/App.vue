@@ -1,13 +1,7 @@
 <template>
   <v-app>
-    <div id="app" v-if="loadAuth0 && currentUser.id">
-      <!-- <div class="spinner-wrapper" v-if="spinnerVisible">
-        <svg width="100" height="100" viewBox="-126 -126 252 252" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="0" cy="0" r="8.5" stroke="#0057F4" stroke-width="5" fill="#0057F4" class="circle-3" />
-          <circle cx="0" cy="0" r="72" stroke="#0057F4" stroke-width="25" class="circle-2" />
-          <circle cx="115" cy="0" r="8.5" stroke="#0057F4" stroke-width="5" fill="#0057F4" class="brius-animated-logo" />
-        </svg>
-      </div> -->
+    <router-view v-if="$route && $route.meta && $route.meta.public" />
+    <div id="app" v-else-if="loadAuth0 && currentUser.id">
       <Sidebar>
         <template slot="app-content">
           <Header username="username" />
@@ -17,7 +11,7 @@
       <modals-container />
       <Toast></Toast>
     </div>
-    <div v-if="isLoadingPageVisible" class="div-loading">
+    <div v-if="!($route && $route.meta && $route.meta.public) && isLoadingPageVisible" class="div-loading">
       <LoginUser :isLoading="isLoadingPageVisible" :color="'white'" />
     </div>
   </v-app>
@@ -68,20 +62,22 @@ export default class App extends Vue {
   }
 
   async mounted() {
+    if (this.$route?.meta?.public) {
+      return;
+    }
     const isAuthenticated = await this.auth.getisAuthenticated();
     if (!isAuthenticated) {
-      await this.auth.login();
-    } else {
-      store.commit('setLoadAuth0', true);
+      const redirect = window.location.pathname + window.location.search;
+      this.$router.replace({ name: 'login', query: redirect ? { redirect } : {} }).catch(() => null);
+      return;
     }
+    store.commit('setLoadAuth0', true);
   }
 
   @Watch('loadAuth0')
   async isAuthenticated() {
     if (this.loadAuth0) {
       try {
-        const authUser = await this.auth.getUser();
-        await this.loginService.loginAPI(authUser);
         const savedAccountId = this.currentAccount?.id || undefined;
         const me: any = await this.loginService.getMe(savedAccountId);
 
@@ -179,7 +175,11 @@ export default class App extends Vue {
 }
 
 .material-symbols-rounded {
-  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  font-variation-settings:
+    'FILL' 1,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
 }
 
 .theme--light.v-data-table > .v-data-table__wrapper > table > tbody > tr > td {
@@ -194,7 +194,10 @@ export default class App extends Vue {
 
 .theme--light.v-data-table > .v-data-table__wrapper > table > tbody > tr:hover {
   background: transparent !important;
-  box-shadow: inset 1px 0 0 $ds-gray-300, inset 0px 0 0 $ds-gray-300, 0 1px 2px 0 rgba(60, 64, 67, 0.3),
+  box-shadow:
+    inset 1px 0 0 $ds-gray-300,
+    inset 0px 0 0 $ds-gray-300,
+    0 1px 2px 0 rgba(60, 64, 67, 0.3),
     0 1px 3px 1px rgba(60, 64, 67, 0.15);
 }
 
@@ -386,7 +389,9 @@ body {
   background-color: #ffffff;
   margin-bottom: 24px;
   border-radius: 16px !important;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .c-cards {
@@ -461,7 +466,9 @@ p {
   width: 380px;
 }
 ::v-deep.v-text-field.v-text-field--solo:not(.v-text-field--solo-flat) > .v-input__control > .v-input__slot {
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1) !important;
 }
 .v-data-table-header__icon {
   color: $ds-blue !important;
@@ -805,7 +812,9 @@ button.btn-back {
 .v--modal {
   height: auto !important;
   background: $ds-gray-100 !important;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
   border-radius: 16px !important;
 }
 .v--modal-box {
@@ -823,7 +832,9 @@ button.btn-back {
   right: 22px;
 
   .v-sheet.v-snack__wrapper:not(.v-sheet--outlined) {
-    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow:
+      0px 1px 2px rgba(0, 0, 0, 0.06),
+      0px 1px 3px rgba(0, 0, 0, 0.1);
   }
   .v-snack__wrapper {
     min-width: 464px;
@@ -946,7 +957,9 @@ button.btn-back {
 }
 .v-menu__content {
   border-radius: 8px !important;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .v-list-item__action {
@@ -986,7 +999,9 @@ button.btn-back {
 .c-menu {
   background: #ffffff;
   border: 1px solid $neutral-gray-500;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
   border-radius: 4px;
   width: 149px;
   min-width: 149px !important;
@@ -1312,9 +1327,11 @@ a.button {
 }
 
 select.mo-select {
-  background-image: linear-gradient(45deg, transparent 50%, gray 50%),
-    linear-gradient(135deg, gray 50%, transparent 50%);
-  background-position: calc(100% - 20px) calc(1em + 2px), calc(100% - 15px) calc(1em + 2px);
+  background-image:
+    linear-gradient(45deg, transparent 50%, gray 50%), linear-gradient(135deg, gray 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) calc(1em + 2px),
+    calc(100% - 15px) calc(1em + 2px);
   background-size: 6px 6px;
   background-repeat: no-repeat;
 }
@@ -1324,9 +1341,11 @@ select.mo-select:focus {
 }
 
 select.mo-select:active {
-  background-image: linear-gradient(45deg, $ds-blue 50%, transparent 50%),
-    linear-gradient(135deg, transparent 50%, $ds-blue 50%);
-  background-position: calc(100% - 15px) 1em, calc(100% - 20px) 1em;
+  background-image:
+    linear-gradient(45deg, $ds-blue 50%, transparent 50%), linear-gradient(135deg, transparent 50%, $ds-blue 50%);
+  background-position:
+    calc(100% - 15px) 1em,
+    calc(100% - 20px) 1em;
   background-size: 6px 6px;
   background-repeat: no-repeat;
   outline: 0;
@@ -1377,6 +1396,10 @@ select.mo-select:active {
 }
 
 .unfilled-icon {
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24 !important;
 }
 </style>

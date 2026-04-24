@@ -256,9 +256,9 @@ export default class RenderChild extends Vue {
         return `${this.$t('automation.fillField')} <strong>
           ${this.step.settings.customFieldSelected.title}
           </strong> ${this.$t('automation.withValue')}: <strong>${this.formattedCustomField({
-          customFieldValue: this.step.settings.customFieldValue,
-          customFieldType: this.step.settings.customFieldSelected.type,
-        })}</strong>`;
+            customFieldValue: this.step.settings.customFieldValue,
+            customFieldType: this.step.settings.customFieldSelected.type,
+          })}</strong>`;
 
       case 'end':
         this.description = '';

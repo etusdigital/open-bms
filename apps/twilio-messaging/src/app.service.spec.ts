@@ -117,9 +117,16 @@ describe('AppService', () => {
     });
   });
 
-  describe('createRedictLink', () => {
+  describe('createRedirectLink', () => {
     it('should append utms with ? when url has no query params', async () => {
-      await service.createRedictLink('https://example.com', 'foo=bar', 'sms', 'campaign1', 'https://short.link/');
+      await service.createRedirectLink({
+        url: 'https://example.com',
+        utmsDefault: 'foo=bar',
+        type: 'sms',
+        utmCampaign: 'campaign1',
+        baseUrl: 'https://short.link/',
+        account: makeAccount(),
+      });
       expect(msgopsService.createShortLink).toHaveBeenCalled();
       const calledUrl = (msgopsService.createShortLink as jest.Mock).mock.calls[0][0];
       expect(calledUrl).toContain('?foo=bar');
@@ -129,35 +136,89 @@ describe('AppService', () => {
     });
 
     it('should append utms with & when url already has query params', async () => {
-      await service.createRedictLink(
-        'https://example.com?existing=1',
-        'foo=bar',
-        'sms',
-        'campaign1',
-        'https://short.link/',
-      );
+      await service.createRedirectLink({
+        url: 'https://example.com?existing=1',
+        utmsDefault: 'foo=bar',
+        type: 'sms',
+        utmCampaign: 'campaign1',
+        baseUrl: 'https://short.link/',
+        account: makeAccount(),
+      });
       const calledUrl = (msgopsService.createShortLink as jest.Mock).mock.calls[0][0];
       expect(calledUrl).toContain('&foo=bar');
     });
 
     it('should not add utm_source if already present', async () => {
-      await service.createRedictLink('https://example.com', 'utm_source=custom', 'sms', 'campaign1', '');
+      await service.createRedirectLink({
+        url: 'https://example.com',
+        utmsDefault: 'utm_source=custom',
+        type: 'sms',
+        utmCampaign: 'campaign1',
+        baseUrl: '',
+        account: makeAccount(),
+      });
       const calledUrl = (msgopsService.createShortLink as jest.Mock).mock.calls[0][0];
       expect(calledUrl).not.toContain('utm_source=bms');
     });
 
     it('should not add utm_medium if already present', async () => {
-      await service.createRedictLink('https://example.com', 'utm_medium=email', 'sms', 'campaign1', '');
+      await service.createRedirectLink({
+        url: 'https://example.com',
+        utmsDefault: 'utm_medium=email',
+        type: 'sms',
+        utmCampaign: 'campaign1',
+        baseUrl: '',
+        account: makeAccount(),
+      });
       const calledUrl = (msgopsService.createShortLink as jest.Mock).mock.calls[0][0];
       const mediumCount = (calledUrl.match(/utm_medium/g) || []).length;
       expect(mediumCount).toBe(1);
     });
 
     it('should not add utm_campaign if already present', async () => {
-      await service.createRedictLink('https://example.com', 'utm_campaign=existing', 'sms', 'campaign1', '');
+      await service.createRedirectLink({
+        url: 'https://example.com',
+        utmsDefault: 'utm_campaign=existing',
+        type: 'sms',
+        utmCampaign: 'campaign1',
+        baseUrl: '',
+        account: makeAccount(),
+      });
       const calledUrl = (msgopsService.createShortLink as jest.Mock).mock.calls[0][0];
       const campaignCount = (calledUrl.match(/utm_campaign/g) || []).length;
       expect(campaignCount).toBe(1);
+    });
+
+    it('should add trailing slash to URL path for internal account', async () => {
+      const internalAccount = { ...makeAccount(), isInternal: true };
+      await service.createRedirectLink({
+        url: 'https://example.com/lp',
+        utmsDefault: 'foo=bar',
+        type: 'sms',
+        utmCampaign: 'campaign1',
+        baseUrl: '',
+        account: internalAccount,
+      });
+      const calledUrl = (msgopsService.createShortLink as jest.Mock).mock.calls[0][0];
+      const queryIdx = calledUrl.indexOf('?');
+      expect(queryIdx).toBeGreaterThan(-1);
+      expect(calledUrl.slice(0, queryIdx)).toBe('https://example.com/lp/');
+    });
+
+    it('should not add trailing slash for external account', async () => {
+      const externalAccount = { ...makeAccount(), isInternal: false };
+      await service.createRedirectLink({
+        url: 'https://example.com/lp',
+        utmsDefault: 'foo=bar',
+        type: 'sms',
+        utmCampaign: 'campaign1',
+        baseUrl: '',
+        account: externalAccount,
+      });
+      const calledUrl = (msgopsService.createShortLink as jest.Mock).mock.calls[0][0];
+      const queryIdx = calledUrl.indexOf('?');
+      expect(queryIdx).toBeGreaterThan(-1);
+      expect(calledUrl.slice(0, queryIdx)).toBe('https://example.com/lp');
     });
   });
 

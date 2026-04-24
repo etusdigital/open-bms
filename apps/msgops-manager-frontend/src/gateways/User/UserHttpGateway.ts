@@ -1,15 +1,13 @@
 import { CreateUser, EditUser, User } from '../../entities/User';
 import { HttpClient, axiosAdapter } from '../../infra/HttpClient';
-import {
-  BmsHttpParams,
-  BmsHttpResponse,
-  bmsHttpParamsDefault,
-  getBmsHttpParamsToString,
-} from '../_common/Bms';
+import { BmsHttpParams, BmsHttpResponse, bmsHttpParamsDefault, getBmsHttpParamsToString } from '../_common/Bms';
 import { UserGateway } from './UserGateway.types';
 
 export class UserHttpGateway implements UserGateway {
-  constructor(readonly httpClient: HttpClient, readonly baseUrl: string) {}
+  constructor(
+    readonly httpClient: HttpClient,
+    readonly baseUrl: string,
+  ) {}
 
   async getAll(params: BmsHttpParams): Promise<BmsHttpResponse<User[]>> {
     const mergedParams = { ...bmsHttpParamsDefault, ...params };
@@ -33,6 +31,11 @@ export class UserHttpGateway implements UserGateway {
   async delete(id: number) {
     // return this.httpClient.delete(`${this.baseUrl}/users/${id}`);
     console.log(id);
+  }
+
+  async getMe<T = any>(accountId?: number | string): Promise<T> {
+    const query = accountId ? `?accountId=${accountId}` : '';
+    return this.httpClient.get<T>(`${this.baseUrl}/users/me${query}`);
   }
 }
 

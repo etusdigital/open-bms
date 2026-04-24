@@ -88,6 +88,84 @@ describe('AppService', () => {
     });
   });
 
+  describe('publishRedirectClick()', () => {
+    const baseParams = {
+      bmsUUID: 'uuid-123',
+      accountId: '5',
+      decodedUrl: 'https://example.com/page?utm_campaign=spring&utm_source=newsletter',
+      ip: '1.2.3.4',
+      userAgent: 'jest',
+    };
+
+    const originalEnv = { ...process.env };
+    afterEach(() => {
+      process.env = { ...originalEnv };
+    });
+
+    it('should send message with correct body and attributes when enabled', async () => {
+      process.env.ENABLE_TRACKER_REDIRECT_EVENT = 'true';
+      process.env.TOPIC_WEBHOOKS = 'test-topic';
+
+      await service.publishRedirectClick(baseParams);
+
+      expect(pubSubProvider.sendMessage).toHaveBeenCalledTimes(1);
+      expect(pubSubProvider.sendMessage).toHaveBeenCalledWith(
+        {
+          platform: 'internal',
+          payload: [
+            expect.objectContaining({
+              event: 'tracker-redirect',
+              schemaVersion: 1,
+              accountId: '5',
+              uuid: 'uuid-123',
+              url: baseParams.decodedUrl,
+              ip: '1.2.3.4',
+              userAgent: 'jest',
+              timestamp: expect.any(Number),
+            }),
+          ],
+        },
+        'test-topic',
+        { platform: 'internal', message_type: 'tracker-redirect' },
+      );
+    });
+
+    it('should no-op when feature flag is not set', async () => {
+      delete process.env.ENABLE_TRACKER_REDIRECT_EVENT;
+      process.env.TOPIC_WEBHOOKS = 'test-topic';
+
+      await service.publishRedirectClick(baseParams);
+
+      expect(pubSubProvider.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('should no-op when feature flag is "false"', async () => {
+      process.env.ENABLE_TRACKER_REDIRECT_EVENT = 'false';
+      process.env.TOPIC_WEBHOOKS = 'test-topic';
+
+      await service.publishRedirectClick(baseParams);
+
+      expect(pubSubProvider.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('should no-op when TOPIC_WEBHOOKS is unset', async () => {
+      process.env.ENABLE_TRACKER_REDIRECT_EVENT = 'true';
+      delete process.env.TOPIC_WEBHOOKS;
+
+      await service.publishRedirectClick(baseParams);
+
+      expect(pubSubProvider.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('should swallow publish errors', async () => {
+      process.env.ENABLE_TRACKER_REDIRECT_EVENT = 'true';
+      process.env.TOPIC_WEBHOOKS = 'test-topic';
+      (pubSubProvider.sendMessage as jest.Mock).mockRejectedValueOnce(new Error('boom'));
+
+      await expect(service.publishRedirectClick(baseParams)).resolves.toBeUndefined();
+    });
+  });
+
   describe('findContactsByEmail()', () => {
     it('should throw NotFoundException when email is empty', async () => {
       await expect(service.findContactsByEmail('')).rejects.toThrow(NotFoundException);

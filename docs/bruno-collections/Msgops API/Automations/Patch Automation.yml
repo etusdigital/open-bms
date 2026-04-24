@@ -5,7 +5,7 @@ info:
 
 http:
   method: PATCH
-  url: "{{msgops-api-url}}/automations/1"
+  url: '{{msgops-api-url}}/automations/1'
   body:
     type: json
     json: |
