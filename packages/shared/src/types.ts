@@ -256,28 +256,13 @@ export interface Pool {
 
 // ── Routing Rules ──
 
-export type RoutingProviderType =
-  | 'Gmail'
-  | 'Yahoo'
-  | 'Microsoft'
-  | 'iCloud'
-  | 'Other'
-  | 'all';
+export type RoutingProviderType = 'Gmail' | 'Yahoo' | 'Microsoft' | 'iCloud' | 'Other' | 'all';
 
-export type RoutingMessageType =
-  | 'campaign'
-  | 'journey'
-  | 'transactional'
-  | 'retargeting';
+export type RoutingMessageType = 'campaign' | 'journey' | 'transactional' | 'retargeting';
 
 export type RoutingUserStatus = 'new' | 'old';
 
-export type ExceptionTargetType =
-  | 'campaign'
-  | 'automation'
-  | 'segment'
-  | 'label'
-  | 'message';
+export type ExceptionTargetType = 'campaign' | 'automation' | 'segment' | 'label' | 'message';
 
 export interface RoutingDistribution {
   accountId: string;

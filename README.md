@@ -4,13 +4,13 @@ Internal backoffice for the retention team to monitor and manage email delivery 
 
 ## Architecture
 
-| Component | Technology | Port |
-|-----------|-----------|------|
-| Frontend | Next.js 16 (App Router) | 3000 |
-| Backend | NestJS 11 | 3001 |
-| Analytics DB | ClickHouse Cloud | — |
-| Operational DB | PostgreSQL (GCP) | — |
-| Auth | Auth0 | — |
+| Component      | Technology              | Port |
+| -------------- | ----------------------- | ---- |
+| Frontend       | Next.js 16 (App Router) | 3000 |
+| Backend        | NestJS 11               | 3001 |
+| Analytics DB   | ClickHouse Cloud        | —    |
+| Operational DB | PostgreSQL (GCP)        | —    |
+| Auth           | Auth0                   | —    |
 
 **Monorepo**: Turborepo + pnpm
 
@@ -156,9 +156,9 @@ docker run -p 3000:3000 --env-file apps/frontend/.env retention-frontend
 
 The backend exposes internal cron endpoints that are authenticated via the `CRON_SECRET` environment variable (passed in the `x-cron-secret` header). Set up [Cloud Scheduler](https://cloud.google.com/scheduler) jobs to call them on a schedule.
 
-| Endpoint | Schedule | Description |
-|----------|----------|-------------|
-| `POST /internal/cron/detect-anomalies` | Every 15 min | Runs anomaly detection on email delivery metrics and creates alerts |
+| Endpoint                               | Schedule           | Description                                                                    |
+| -------------------------------------- | ------------------ | ------------------------------------------------------------------------------ |
+| `POST /internal/cron/detect-anomalies` | Every 15 min       | Runs anomaly detection on email delivery metrics and creates alerts            |
 | `POST /internal/cron/refresh-ip-usage` | Daily at 06:00 UTC | Queries ClickHouse for 30-day delivered counts per IP and caches in PostgreSQL |
 
 ### Cloud Scheduler setup

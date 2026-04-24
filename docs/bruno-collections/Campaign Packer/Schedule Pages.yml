@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{campaign-packer-url}}/schedule-pages"
+  url: '{{campaign-packer-url}}/schedule-pages'
   body:
     type: json
     json: |

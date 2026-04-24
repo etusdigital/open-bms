@@ -18,7 +18,11 @@ interface ConfirmRegenResponse {
 export default class ApiKeyService {
   private api = new ApiService();
 
-  async requestRegeneration(accountId: number, keyType: 'api_key' | 'api_key_tracker', expiresAt?: string | null): Promise<void> {
+  async requestRegeneration(
+    accountId: number,
+    keyType: 'api_key' | 'api_key_tracker',
+    expiresAt?: string | null
+  ): Promise<void> {
     const api = await this.api.getApi();
     await api.post(`accounts/${accountId}/api-keys/request-regen`, { keyType, expiresAt: expiresAt || null });
   }
@@ -26,7 +30,7 @@ export default class ApiKeyService {
   async confirmRegeneration(
     accountId: number,
     token: string,
-    keyType: 'api_key' | 'api_key_tracker',
+    keyType: 'api_key' | 'api_key_tracker'
   ): Promise<ConfirmRegenResponse> {
     const api = await this.api.getApi();
     const response = await api.post(`accounts/${accountId}/api-keys/confirm-regen`, { token, keyType });

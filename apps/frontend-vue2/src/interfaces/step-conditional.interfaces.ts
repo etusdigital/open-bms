@@ -49,7 +49,7 @@ export enum InterationWhatsappTypes {
 
 export enum InterationPageViewTypes {
   PAGEVIEW = 'page_view',
-  NOPAGEVIEW = 'page_view'
+  NOPAGEVIEW = 'page_view',
 }
 
 export enum UserFieldsTypes {
@@ -71,7 +71,7 @@ export enum LeadFieldsTypes {
   LEAD_SOURCE = 'lead_source',
   UTM_CAMPAIGN = 'utm_campaign',
   STATUS = 'status',
-  ENGAGED = 'engaged'
+  ENGAGED = 'engaged',
 }
 
 export interface AddStepType {

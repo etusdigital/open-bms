@@ -1,5 +1,5 @@
 ---
-title: "feat: Add HTTP Request Integration Step"
+title: 'feat: Add HTTP Request Integration Step'
 type: feat
 status: active
 date: 2026-04-01
@@ -15,22 +15,22 @@ Add the `httpRequest` step type for making HTTP webhook calls from automations. 
 
 ```typescript
 interface HttpRequestSettings {
-  operation: 'get' | 'post' | 'put' | 'delete'
-  url: string
-  headers: HttpKeyValueItem[]
-  body: HttpKeyValueItem[]        // only for POST/PUT
-  queryString?: string
-  newTry: boolean                  // retry flag (UI commented out in Vue2)
-  quantityTry: number              // retry count (UI commented out in Vue2)
+  operation: 'get' | 'post' | 'put' | 'delete';
+  url: string;
+  headers: HttpKeyValueItem[];
+  body: HttpKeyValueItem[]; // only for POST/PUT
+  queryString?: string;
+  newTry: boolean; // retry flag (UI commented out in Vue2)
+  quantityTry: number; // retry count (UI commented out in Vue2)
 }
 
 interface HttpKeyValueItem {
-  key: string
+  key: string;
   value: {
-    id: string            // the actual value or field path
-    description: string   // display label
-    type: 'custom' | 'replace'  // custom = literal, replace = dynamic variable
-  }
+    id: string; // the actual value or field path
+    description: string; // display label
+    type: 'custom' | 'replace'; // custom = literal, replace = dynamic variable
+  };
 }
 ```
 
@@ -43,6 +43,7 @@ Add `httpRequest` to `AutomationStepType`, `HttpRequestSettings`, `HttpKeyValueI
 ### Task 2: Create node component
 
 **`http-request-node.tsx`** — Globe icon, shows:
+
 - "HTTP Request" label
 - URL truncated to 40 chars
 - HTTP method badge (GET/POST/PUT/DELETE)
@@ -50,6 +51,7 @@ Add `httpRequest` to `AutomationStepType`, `HttpRequestSettings`, `HttpKeyValueI
 ### Task 3: Create config panel
 
 **Form layout:**
+
 1. **Method select** — GET, POST, PUT, DELETE
 2. **URL input** — free text
 3. **Headers section** — repeating key-value rows with add/remove buttons

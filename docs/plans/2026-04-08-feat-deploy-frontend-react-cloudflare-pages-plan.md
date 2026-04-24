@@ -1,5 +1,5 @@
 ---
-title: "Deploy frontend-react to Cloudflare Pages with GitHub Actions CI/CD"
+title: 'Deploy frontend-react to Cloudflare Pages with GitHub Actions CI/CD'
 type: feat
 status: active
 date: 2026-04-08
@@ -13,12 +13,14 @@ date: 2026-04-08
 **Agents used:** Security Sentinel, Deployment Verification, Architecture Strategist, Performance Oracle, Code Simplicity Reviewer, Turborepo Caching Skill, CF Pages Deep Research, Pattern Recognition Specialist
 
 ### Key Improvements
+
 1. **Reusable workflow pattern** — Create `_deploy-cloudflare-pages.yml` + 3-job caller pattern matching all other deploy workflows in the repo
 2. **Security hardening** — CSP header, HSTS, SHA-pinned actions, scoped API token, build-time env validation
 3. **Performance optimizations** — Remove `fetch-depth: 0`, split `tsc` from build, add heavy deps to manual chunks, use Turbo `...` filter
 4. **`_redirects` likely unnecessary** — Cloudflare Pages has built-in SPA fallback when no `404.html` exists (still safe to include as a belt-and-suspenders approach)
 
 ### Critical Issues Discovered
+
 - **Auth0 client secret in `.env`** with `VITE_` prefix — must be rotated immediately (it ships to browsers if referenced)
 - **Preview deployments never expire** — need a cleanup strategy
 
@@ -43,13 +45,14 @@ The frontend-react app has no deployment pipeline. The predecessor Vue 2 app (`f
 ### Research Insights
 
 **`_redirects` vs built-in SPA fallback:**
-Cloudflare Pages docs state: *"If your project does not include a top-level `404.html` file, Pages assumes you are deploying a single-page application and matches all incoming paths to the root."* Since Vite does not generate a `404.html`, the SPA fallback is automatic. However, adding `_redirects` with `/* /index.html 200` is a safe belt-and-suspenders approach — it explicitly documents the intent and protects against future build tool changes that might add a `404.html`.
+Cloudflare Pages docs state: _"If your project does not include a top-level `404.html` file, Pages assumes you are deploying a single-page application and matches all incoming paths to the root."_ Since Vite does not generate a `404.html`, the SPA fallback is automatic. However, adding `_redirects` with `/* /index.html 200` is a safe belt-and-suspenders approach — it explicitly documents the intent and protects against future build tool changes that might add a `404.html`.
 
 **`_routes.json` is not relevant** — it controls Pages Functions invocation, not static asset routing. Irrelevant for pure static SPA deployment.
 
 ## Why Not wrangler.toml in the App
 
 The `cloudflare/wrangler-action@v3` GitHub Action handles everything via CLI flags:
+
 - `--project-name` specifies the Cloudflare Pages project
 - `accountId` is passed as an input to the action
 - No local wrangler config means no dev dependency on wrangler, no config drift between local and CI
@@ -108,6 +111,7 @@ npx wrangler pages project create bms-frontend-react --production-branch=master
 **Required:** Note the `CLOUDFLARE_ACCOUNT_ID` from the Cloudflare dashboard (Account Home > right sidebar).
 
 **API Token:** Create a scoped API token at `dash.cloudflare.com/profile/api-tokens`:
+
 - Permission: **Cloudflare Pages > Edit** (minimum required)
 - Restrict to specific account ID
 - Set an expiration date
@@ -116,22 +120,22 @@ npx wrangler pages project create bms-frontend-react --production-branch=master
 
 Add these secrets to the repository (Settings > Secrets and variables > Actions):
 
-| Secret | Scope | Description |
-|---|---|---|
-| `CF_PAGES_API_TOKEN` | Repository | Cloudflare API token with Pages:Edit permission |
-| `CF_ACCOUNT_ID` | Repository | Cloudflare account ID |
-| `VITE_AUTH0_DOMAIN` | Repository | Auth0 tenant domain |
-| `VITE_AUTH0_CLIENT_ID_STAGING` | Repository | Auth0 SPA client ID for staging |
-| `VITE_AUTH0_CLIENT_ID` | Repository | Auth0 SPA client ID for production |
-| `VITE_AUTH0_AUDIENCE` | Repository | Auth0 API audience |
-| `VITE_API_URL_STAGING` | Repository | Backend API URL for staging |
-| `VITE_API_URL` | Repository | Backend API URL for production |
-| `VITE_REDIRECT_MANAGER_URL` | Repository | External account management URL |
-| `VITE_SENTRY_DSN` | Repository | Sentry DSN |
-| `VITE_CLARITY_PROJECT_ID` | Repository | Microsoft Clarity project ID |
-| `SENTRY_AUTH_TOKEN` | Repository | Sentry auth token (source map upload) |
-| `SENTRY_ORG` | Repository | Sentry organization slug |
-| `SENTRY_PROJECT` | Repository | Sentry project slug |
+| Secret                         | Scope      | Description                                     |
+| ------------------------------ | ---------- | ----------------------------------------------- |
+| `CF_PAGES_API_TOKEN`           | Repository | Cloudflare API token with Pages:Edit permission |
+| `CF_ACCOUNT_ID`                | Repository | Cloudflare account ID                           |
+| `VITE_AUTH0_DOMAIN`            | Repository | Auth0 tenant domain                             |
+| `VITE_AUTH0_CLIENT_ID_STAGING` | Repository | Auth0 SPA client ID for staging                 |
+| `VITE_AUTH0_CLIENT_ID`         | Repository | Auth0 SPA client ID for production              |
+| `VITE_AUTH0_AUDIENCE`          | Repository | Auth0 API audience                              |
+| `VITE_API_URL_STAGING`         | Repository | Backend API URL for staging                     |
+| `VITE_API_URL`                 | Repository | Backend API URL for production                  |
+| `VITE_REDIRECT_MANAGER_URL`    | Repository | External account management URL                 |
+| `VITE_SENTRY_DSN`              | Repository | Sentry DSN                                      |
+| `VITE_CLARITY_PROJECT_ID`      | Repository | Microsoft Clarity project ID                    |
+| `SENTRY_AUTH_TOKEN`            | Repository | Sentry auth token (source map upload)           |
+| `SENTRY_ORG`                   | Repository | Sentry organization slug                        |
+| `SENTRY_PROJECT`               | Repository | Sentry project slug                             |
 
 ### Research Insights — Secret Naming
 
@@ -462,6 +466,7 @@ All 18+ deploy workflows in this repo use reusable workflows (`_deploy-cloudrun.
 Matches the established `changes` → `deploy-staging` → `deploy-production` pattern used by all Cloud Run deploy workflows. Uses `_detect-changes.yml` for Turbo-aware change detection.
 
 **Branch mapping:**
+
 - Push to `master` → production deployment (no `--branch` flag = production)
 - Push to `staging` → staging deployment (`staging.bms-frontend-react.pages.dev`)
 - PR → preview deployment (`pr-<number>.bms-frontend-react.pages.dev`)
@@ -485,6 +490,7 @@ Matches the established `changes` → `deploy-staging` → `deploy-production` p
 Auth0 requires every allowed callback URL to be explicitly registered. Preview deployments generate dynamic URLs like `pr-123.bms-frontend-react.pages.dev`.
 
 **Options:**
+
 1. **Wildcard subdomain** — Add `https://*.bms-frontend-react.pages.dev` to Auth0's Allowed Callback URLs, Logout URLs, and Web Origins.
 2. **Separate Auth0 dev tenant** — Use a dedicated Auth0 application for previews with looser wildcard scope.
 3. **Skip auth on previews** — If wildcard isn't available, previews can only test unauthenticated flows.
@@ -498,6 +504,7 @@ Auth0 requires every allowed callback URL to be explicitly registered. Preview d
 ### Custom Domain (Future)
 
 The plan uses the default `bms-frontend-react.pages.dev` domain. To use a custom domain later:
+
 1. Add it in Cloudflare Pages project settings
 2. Update Auth0 callback URLs
 3. Update backend CORS config
@@ -510,6 +517,7 @@ The `apiClient` at `apps/frontend-react/src/lib/api-client.ts:32` uses `VITE_API
 ### Rollback
 
 Cloudflare Pages keeps all previous deployments. To rollback:
+
 1. **Preferred:** Revert the merge commit via `git revert` and push — triggers a clean redeploy with audit trail.
 2. **Emergency (instant):** Use Cloudflare dashboard > Pages > Deployments > "Rollback to this deployment", or `wrangler pages deployments rollback <id> --project-name=bms-frontend-react`.
 
@@ -520,6 +528,7 @@ Cloudflare Pages keeps all previous deployments. To rollback:
 **Cloudflare Pages preview deployments do NOT auto-expire.** They persist indefinitely.
 
 **Options:**
+
 1. **Post-merge cleanup** — Add a workflow step that deletes the preview deployment when a PR is merged/closed.
 2. **Scheduled cleanup** — Weekly cron GitHub Action that deletes preview deployments older than 14 days via Cloudflare API.
 3. **Manual** — Periodically clean up via Cloudflare dashboard.
@@ -602,14 +611,14 @@ If the project grows past 2000+ files, switch from `@vitejs/plugin-react` to `@v
 
 Run within 5 minutes of each deploy:
 
-| Check | Command | Expected |
-|-------|---------|----------|
-| Root page loads | `curl -s -o /dev/null -w "%{http_code}" https://<domain>/` | `200` |
-| SPA routing works | `curl -s -o /dev/null -w "%{http_code}" https://<domain>/contacts` | `200` (not 404) |
-| Auth0 callback route | `curl -s -o /dev/null -w "%{http_code}" https://<domain>/callback` | `200` |
-| Security headers | `curl -sI https://<domain>/ \| grep -i x-frame-options` | `DENY` |
-| Asset caching | `curl -sI https://<domain>/assets/<hash>.js \| grep cache-control` | `max-age=31536000, immutable` |
-| No source maps | `curl -s -o /dev/null -w "%{http_code}" https://<domain>/assets/<chunk>.js.map` | `404` |
+| Check                | Command                                                                         | Expected                      |
+| -------------------- | ------------------------------------------------------------------------------- | ----------------------------- |
+| Root page loads      | `curl -s -o /dev/null -w "%{http_code}" https://<domain>/`                      | `200`                         |
+| SPA routing works    | `curl -s -o /dev/null -w "%{http_code}" https://<domain>/contacts`              | `200` (not 404)               |
+| Auth0 callback route | `curl -s -o /dev/null -w "%{http_code}" https://<domain>/callback`              | `200`                         |
+| Security headers     | `curl -sI https://<domain>/ \| grep -i x-frame-options`                         | `DENY`                        |
+| Asset caching        | `curl -sI https://<domain>/assets/<hash>.js \| grep cache-control`              | `max-age=31536000, immutable` |
+| No source maps       | `curl -s -o /dev/null -w "%{http_code}" https://<domain>/assets/<chunk>.js.map` | `404`                         |
 
 ## Success Metrics
 
@@ -621,36 +630,36 @@ Run within 5 minutes of each deploy:
 
 ## Dependencies & Risks
 
-| Dependency | Risk | Mitigation |
-|---|---|---|
-| Cloudflare API token permissions | Token may lack Pages:Edit scope | Create a dedicated scoped token with only Pages:Edit |
-| Auth0 wildcard callback URLs | OAuth security risk with broad wildcards | Use separate Auth0 dev tenant for previews |
-| `VITE_*` secret values | Wrong values break auth/API calls silently | Build-time validation step fails fast on missing vars |
-| Backend CORS | API rejects cross-origin requests from Pages domain | Update backend CORS config before first deploy |
-| Turborepo remote cache | Cache miss = slower builds | Not blocking; builds work without cache, just slower |
-| `packages/shared` changes | May break frontend without redeploy | Path filter + Turbo change detection covers this |
-| Preview deployment accumulation | Previews never expire, accumulate indefinitely | Add cleanup on PR close |
+| Dependency                       | Risk                                                | Mitigation                                            |
+| -------------------------------- | --------------------------------------------------- | ----------------------------------------------------- |
+| Cloudflare API token permissions | Token may lack Pages:Edit scope                     | Create a dedicated scoped token with only Pages:Edit  |
+| Auth0 wildcard callback URLs     | OAuth security risk with broad wildcards            | Use separate Auth0 dev tenant for previews            |
+| `VITE_*` secret values           | Wrong values break auth/API calls silently          | Build-time validation step fails fast on missing vars |
+| Backend CORS                     | API rejects cross-origin requests from Pages domain | Update backend CORS config before first deploy        |
+| Turborepo remote cache           | Cache miss = slower builds                          | Not blocking; builds work without cache, just slower  |
+| `packages/shared` changes        | May break frontend without redeploy                 | Path filter + Turbo change detection covers this      |
+| Preview deployment accumulation  | Previews never expire, accumulate indefinitely      | Add cleanup on PR close                               |
 
 ## Files to Create/Modify
 
-| File | Action | Purpose |
-|---|---|---|
-| `.github/workflows/_deploy-cloudflare-pages.yml` | **Create** | Reusable Cloudflare Pages deployment workflow |
-| `.github/workflows/deploy-frontend-react.yml` | **Create** | Caller workflow (3-job pattern) |
-| `apps/frontend-react/public/_redirects` | **Create** | SPA fallback rule (belt-and-suspenders) |
-| `apps/frontend-react/public/_headers` | **Create** | Security headers + asset caching |
-| `apps/frontend-react/.env` | **Modify** | Remove `VITE_AUTH0_CLIENT_SECRET`, `VITE_AUTH0_SECRET` |
-| `apps/frontend-react/.env.example` | **Modify** | Remove secret entries |
+| File                                             | Action     | Purpose                                                |
+| ------------------------------------------------ | ---------- | ------------------------------------------------------ |
+| `.github/workflows/_deploy-cloudflare-pages.yml` | **Create** | Reusable Cloudflare Pages deployment workflow          |
+| `.github/workflows/deploy-frontend-react.yml`    | **Create** | Caller workflow (3-job pattern)                        |
+| `apps/frontend-react/public/_redirects`          | **Create** | SPA fallback rule (belt-and-suspenders)                |
+| `apps/frontend-react/public/_headers`            | **Create** | Security headers + asset caching                       |
+| `apps/frontend-react/.env`                       | **Modify** | Remove `VITE_AUTH0_CLIENT_SECRET`, `VITE_AUTH0_SECRET` |
+| `apps/frontend-react/.env.example`               | **Modify** | Remove secret entries                                  |
 
 ## Monitoring (First 24 Hours)
 
-| Signal | Where | Alert Condition |
-|--------|-------|-----------------|
-| Sentry error rate | Sentry project dashboard | Any new error type post-deploy |
-| Auth0 failed logins | Auth0 Dashboard > Logs | Spike in `failed_login` or `failed_silent_auth` |
-| Cloudflare 4xx/5xx | Cloudflare Pages Analytics | Any 5xx; 404 spike = routing issue |
-| Clarity sessions | Microsoft Clarity dashboard | Zero sessions after 1 hour = init broken |
-| API error rate | Backend monitoring | Spike in 401/403 from new origin |
+| Signal              | Where                       | Alert Condition                                 |
+| ------------------- | --------------------------- | ----------------------------------------------- |
+| Sentry error rate   | Sentry project dashboard    | Any new error type post-deploy                  |
+| Auth0 failed logins | Auth0 Dashboard > Logs      | Spike in `failed_login` or `failed_silent_auth` |
+| Cloudflare 4xx/5xx  | Cloudflare Pages Analytics  | Any 5xx; 404 spike = routing issue              |
+| Clarity sessions    | Microsoft Clarity dashboard | Zero sessions after 1 hour = init broken        |
+| API error rate      | Backend monitoring          | Spike in 401/403 from new origin                |
 
 ## Sources & References
 

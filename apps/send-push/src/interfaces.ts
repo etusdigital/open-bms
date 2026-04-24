@@ -80,6 +80,7 @@ export interface Account {
   linkUnsubscriber?: string;
   apiKey?: string;
   customFields?: CustomFields[];
+  isInternal?: boolean;
 }
 
 export interface AccountConfig {

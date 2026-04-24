@@ -5,12 +5,12 @@ info:
 
 http:
   method: POST
-  url: "{{event-process-url}}/twilio"
+  url: '{{event-process-url}}/twilio'
   headers:
     - name: platform
-      value: "twilio"
+      value: 'twilio'
     - name: x-goog-pubsub-message-id
-      value: "test-twilio-click-001"
+      value: 'test-twilio-click-001'
   body:
     type: json
     json: |

@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{tag-process-url}}/process-segment-clickhouse"
+  url: '{{tag-process-url}}/process-segment-clickhouse'
   body:
     type: json
     json: |

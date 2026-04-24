@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/sub-accounts"
+  url: '{{backoffice-api-url}}/sub-accounts'
   auth: inherit
 
 settings:

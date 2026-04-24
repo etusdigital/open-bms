@@ -288,7 +288,9 @@ export default class PoolsCreate extends Vue {
   background-color: #ffffff;
   margin-bottom: 24px;
   border-radius: 14px;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0px 1px 2px rgba(0, 0, 0, 0.06),
+    0px 1px 3px rgba(0, 0, 0, 0.1);
   display: flex;
   justify-content: center;
   width: 100%;

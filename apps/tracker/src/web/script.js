@@ -15,11 +15,7 @@
 
   //#region cookies
   function findCookie(e) {
-    for (
-      var o = e + '=', t = decodeURIComponent(document.cookie.replace(/%%/g, '')).split(';'), i = 0;
-      i < t.length;
-      i++
-    ) {
+    for (var o = e + '=', t = decodeURIComponent(document.cookie.replace(/%%/g, '')).split(';'), i = 0; i < t.length; i++) {
       for (var a = t[i]; ' ' == a.charAt(0); ) a = a.substring(1);
 
       if (0 == a.indexOf(o)) return a.substring(o.length, a.length);

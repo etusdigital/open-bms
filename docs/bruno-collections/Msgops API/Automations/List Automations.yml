@@ -5,16 +5,16 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/automations"
+  url: '{{msgops-api-url}}/automations'
   params:
     - name: page
-      value: "1"
+      value: '1'
     - name: itemsPerPage
-      value: "20"
+      value: '20'
     - name: sortBy
-      value: "createdAt"
+      value: 'createdAt'
     - name: order
-      value: "DESC"
+      value: 'DESC'
   auth: inherit
 
 settings:

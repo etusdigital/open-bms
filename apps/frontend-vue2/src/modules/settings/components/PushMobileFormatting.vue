@@ -1257,7 +1257,10 @@ input[type='number']::-webkit-outer-spin-button {
   flex-direction: column;
   outline: 1px dashed #a6a6a6;
   border-radius: 8px;
-  transition: margin 0.15s ease-in-out, height 0.15s ease-in-out, background-color 0.15s linear;
+  transition:
+    margin 0.15s ease-in-out,
+    height 0.15s ease-in-out,
+    background-color 0.15s linear;
 }
 
 .drop-actions {

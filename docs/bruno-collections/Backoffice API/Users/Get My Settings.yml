@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/users/me/settings"
+  url: '{{backoffice-api-url}}/users/me/settings'
   auth: inherit
 
 settings:

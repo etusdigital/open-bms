@@ -16,6 +16,16 @@ jest.mock('mmdb-reader', () => {
   return { __esModule: true, default: ctor };
 });
 
+const emptyTraits = {
+  asn: 0,
+  asnOrg: '',
+  isp: '',
+  organization: '',
+  userType: '',
+  connectionType: '',
+  isAnycast: false,
+};
+
 describe('AppService', () => {
   let service: AppService;
 
@@ -68,7 +78,76 @@ describe('AppService', () => {
         latitude: 37.7749,
         longitude: -122.4194,
         success: true,
+        traits: emptyTraits,
       });
+    });
+
+    it('should surface traits (ASN, user_type, org) when present in the lookup', () => {
+      const mockResult: GeoIpLookupResult = {
+        country: { iso_code: 'US' },
+        location: { time_zone: 'America/Los_Angeles', latitude: '37.4056', longitude: '-122.0775' },
+        traits: {
+          autonomous_system_number: 15169,
+          autonomous_system_organization: 'Google LLC',
+          isp: 'Google LLC',
+          organization: 'Level 3',
+          user_type: 'hosting',
+          connection_type: 'Corporate',
+          is_anycast: true,
+        },
+      };
+
+      mockLookup.mockReturnValue(mockResult);
+
+      const result = service.getLocation('74.125.1.1');
+
+      expect(result.success).toBe(true);
+      expect(result.traits).toEqual({
+        asn: 15169,
+        asnOrg: 'Google LLC',
+        isp: 'Google LLC',
+        organization: 'Level 3',
+        userType: 'hosting',
+        connectionType: 'Corporate',
+        isAnycast: true,
+      });
+    });
+
+    it('should surface Microsoft Exchange traits', () => {
+      mockLookup.mockReturnValue({
+        country: { iso_code: 'US' },
+        traits: {
+          autonomous_system_number: 8075,
+          autonomous_system_organization: 'Microsoft Corporation',
+          isp: 'Microsoft Corporation',
+          user_type: 'hosting',
+          connection_type: 'Corporate',
+        },
+      });
+
+      const result = service.getLocation('40.107.1.1');
+
+      expect(result.traits?.asn).toBe(8075);
+      expect(result.traits?.asnOrg).toBe('Microsoft Corporation');
+      expect(result.traits?.userType).toBe('hosting');
+      expect(result.traits?.isAnycast).toBe(false);
+    });
+
+    it('should surface residential traits distinctly from hosting', () => {
+      mockLookup.mockReturnValue({
+        country: { iso_code: 'BR' },
+        traits: {
+          autonomous_system_number: 28573,
+          autonomous_system_organization: 'Claro NXT Telecomunicacoes Ltda',
+          user_type: 'residential',
+          connection_type: 'Cable/DSL',
+        },
+      });
+
+      const result = service.getLocation('177.1.1.1');
+
+      expect(result.traits?.userType).toBe('residential');
+      expect(result.traits?.asn).toBe(28573);
     });
 
     it('should handle missing fields from the lookup result', () => {
@@ -89,6 +168,7 @@ describe('AppService', () => {
         latitude: 0,
         longitude: 0,
         success: true,
+        traits: emptyTraits,
       });
     });
 
@@ -106,6 +186,7 @@ describe('AppService', () => {
         latitude: 0,
         longitude: 0,
         success: true,
+        traits: emptyTraits,
       });
     });
 
@@ -123,6 +204,7 @@ describe('AppService', () => {
         latitude: 0,
         longitude: 0,
         success: true,
+        traits: emptyTraits,
       });
     });
 
@@ -144,6 +226,7 @@ describe('AppService', () => {
         success: false,
         error: 'Failed to lookup IP: Lookup error',
       });
+      expect(result.traits).toBeUndefined();
     });
 
     it('should handle non-Error thrown during lookup', () => {
@@ -171,6 +254,7 @@ describe('AppService', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Invalid IP address format');
+      expect(result.traits).toBeUndefined();
       expect(mockLookup).not.toHaveBeenCalled();
     });
 
@@ -181,6 +265,7 @@ describe('AppService', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Database not loaded');
+      expect(result.traits).toBeUndefined();
     });
 
     it('should return error when ip is empty string', () => {

@@ -1,25 +1,12 @@
-import type {
-  Channel,
-  ConfirmChannel,
-  ConsumeMessage,
-} from 'amqplib';
+import type { Channel, ConfirmChannel, ConsumeMessage } from 'amqplib';
 import { AmqpConnection, type RetryConfig } from './connection';
 import { DLX } from './exchanges';
 import { computeBackoffMs } from './retry';
-import type {
-  ConnectionOptions,
-  Consumer,
-  ConsumerOptions,
-  Handler,
-  HandlerResult,
-  MessageContext,
-} from './types';
+import type { ConnectionOptions, Consumer, ConsumerOptions, Handler, HandlerResult, MessageContext } from './types';
 
 export class ConsumerAlreadyActiveError extends Error {
   constructor() {
-    super(
-      'AmqpConsumer is already consuming — create a new instance for a different queue',
-    );
+    super('AmqpConsumer is already consuming — create a new instance for a different queue');
     this.name = 'ConsumerAlreadyActiveError';
   }
 }
@@ -58,19 +45,12 @@ export class AmqpConsumer implements Consumer {
   private reconnectRegistered = false;
   private readonly shutdownTimeoutMs: number;
 
-  constructor(
-    opts: ConnectionOptions,
-    shutdownTimeoutMs?: number,
-    retry?: RetryConfig,
-  ) {
+  constructor(opts: ConnectionOptions, shutdownTimeoutMs?: number, retry?: RetryConfig) {
     this.conn = new AmqpConnection(opts, retry);
     this.shutdownTimeoutMs = shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
   }
 
-  async consume<T>(
-    options: ConsumerOptions,
-    handler: Handler<T>,
-  ): Promise<void> {
+  async consume<T>(options: ConsumerOptions, handler: Handler<T>): Promise<void> {
     if (this.closed || this.shuttingDown) throw new ConsumerClosedError();
     if (this.active) throw new ConsumerAlreadyActiveError();
 
@@ -204,10 +184,7 @@ export class AmqpConsumer implements Consumer {
     }
   }
 
-  private async assertTopology(
-    channel: Channel,
-    options: ConsumerOptions,
-  ): Promise<void> {
+  private async assertTopology(channel: Channel, options: ConsumerOptions): Promise<void> {
     const { exchange, queue, routingKey } = options;
     const dlqName = `${queue}.dlq`;
 
@@ -236,15 +213,10 @@ export class AmqpConsumer implements Consumer {
 
     try {
       const { options, handler } = this.active;
-      const rawHeaders = (msg.properties.headers ?? {}) as Record<
-        string,
-        unknown
-      >;
+      const rawHeaders = (msg.properties.headers ?? {}) as Record<string, unknown>;
       const attempt = this.parseAttempt(rawHeaders);
       const firstError =
-        typeof rawHeaders['x-bms-first-error'] === 'string'
-          ? (rawHeaders['x-bms-first-error'] as string)
-          : undefined;
+        typeof rawHeaders['x-bms-first-error'] === 'string' ? (rawHeaders['x-bms-first-error'] as string) : undefined;
 
       let payload: unknown;
       try {
@@ -281,13 +253,7 @@ export class AmqpConsumer implements Consumer {
       }
 
       if (result === 'nack') {
-        await this.retryOrDlq(
-          msg,
-          attempt,
-          firstError,
-          new Error('handler returned nack'),
-          options,
-        );
+        await this.retryOrDlq(msg, attempt, firstError, new Error('handler returned nack'), options);
         return;
       }
 
@@ -320,12 +286,7 @@ export class AmqpConsumer implements Consumer {
     const preservedFirstError = firstError ?? errorMsg;
 
     if (attempt >= maxRetries) {
-      await this.publishExhaustedToDlq(
-        msg,
-        attempt,
-        preservedFirstError,
-        errorMsg,
-      );
+      await this.publishExhaustedToDlq(msg, attempt, preservedFirstError, errorMsg);
       this.safeAck(msg);
       return;
     }
@@ -341,12 +302,7 @@ export class AmqpConsumer implements Consumer {
       this.inFlightTimers.delete(timer);
       if (this.drainResolver) this.drainResolver();
       if (this.closed || this.shuttingDown) return;
-      void this.republishForRetry(
-        msg,
-        attempt + 1,
-        preservedFirstError,
-        errorMsg,
-      );
+      void this.republishForRetry(msg, attempt + 1, preservedFirstError, errorMsg);
     }, delay);
     this.inFlightTimers.add(timer);
   }
@@ -368,16 +324,11 @@ export class AmqpConsumer implements Consumer {
     };
 
     try {
-      this.publishChannel.publish(
-        options.exchange,
-        msg.fields.routingKey,
-        msg.content,
-        {
-          persistent: wasPersistent(msg),
-          contentType: msg.properties.contentType ?? 'application/json',
-          headers,
-        },
-      );
+      this.publishChannel.publish(options.exchange, msg.fields.routingKey, msg.content, {
+        persistent: wasPersistent(msg),
+        contentType: msg.properties.contentType ?? 'application/json',
+        headers,
+      });
       await this.publishChannel.waitForConfirms();
     } catch {
       // best-effort; msg was acked, so loss is possible here —
@@ -407,10 +358,7 @@ export class AmqpConsumer implements Consumer {
     await this.publishChannel.waitForConfirms();
   }
 
-  private async publishParseFailureToDlq(
-    msg: ConsumeMessage,
-    parseError: unknown,
-  ): Promise<void> {
+  private async publishParseFailureToDlq(msg: ConsumeMessage, parseError: unknown): Promise<void> {
     if (!this.publishChannel) return;
     const headers: Record<string, unknown> = {
       ...(msg.properties.headers ?? {}),
@@ -444,9 +392,7 @@ export class AmqpConsumer implements Consumer {
   }
 }
 
-function coerceHeaders(
-  raw: Record<string, unknown>,
-): Record<string, unknown> {
+function coerceHeaders(raw: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(raw)) {
     out[k] = coerceValue(v);

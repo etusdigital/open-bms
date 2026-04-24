@@ -1,5 +1,5 @@
 ---
-title: "feat: Implement Full Trigger Configuration"
+title: 'feat: Implement Full Trigger Configuration'
 type: feat
 status: active
 date: 2026-04-02
@@ -14,6 +14,7 @@ Replace the current basic trigger config panel (just trigger type + tag name inp
 ## Current State
 
 The existing `TriggerConfig` in `step-config-panel.tsx` has:
+
 - Trigger type select (tag, events, custom_events, web-push, mobile-push)
 - Tag name text input (only for tag type)
 
@@ -22,7 +23,9 @@ The existing `TriggerConfig` in `step-config-panel.tsx` has:
 ## Form Layout (matching Vue 2)
 
 ### Section 1: Trigger Type
+
 **Select dropdown** with 5 options:
+
 - Tag added (`tag`)
 - Email events (`events`)
 - Custom event (`custom_events`)
@@ -32,33 +35,39 @@ The existing `TriggerConfig` in `step-config-panel.tsx` has:
 ### Section 2: Type-specific sub-fields
 
 **Tag** (`type === 'tag'`):
+
 - Searchable tag select from `GET /tags?type=tag&title={search}&page=1&itemsPerPage=40`
 - Stores: `{ id, name, type: 'tag' }`
 
 **Events** (`type === 'events'`):
+
 - Event type select: Open, Click, First open in 30 days
 - Message picker (hidden when `first_open_30_days`): searchable from `GET /messages?type=email&title={search}` with "Any message" option (id=0)
 - Stores: `{ id, name, title, type: 'events', eventType: 'open'|'click'|'first_open_30_days' }`
 
 **Custom events** (`type === 'custom_events'`):
+
 - Searchable custom event select from `GET /custom-events?title={search}&page=1&itemsPerPage=20`
 - Stores: `{ id, name, type: 'custom_events' }`
 
 **Web push / Mobile push**:
+
 - No sub-fields — just sets `{ id: 0, type: 'web-push'|'mobile-push' }`
 
 ### Section 3: Entry Frequency (`applyFrequency`)
+
 Radio group with 3 options:
 
-| Value | Label | Extra fields |
-|-------|-------|-------------|
-| `unique` | Only once | None |
+| Value             | Label              | Extra fields                                    |
+| ----------------- | ------------------ | ----------------------------------------------- |
+| `unique`          | Only once          | None                                            |
 | `multiply-period` | Once during period | Number input + unit select (days/hours/minutes) |
-| `multiply` | Multiple times | None |
+| `multiply`        | Multiple times     | None                                            |
 
 **Period conversion**: stored in minutes internally. UI shows in selected unit, converts on save (days×24×60, hours×60, minutes×1).
 
 ### Section 4: Entry Condition Filter (`conditional`)
+
 Embeds the `AutomationConditionBuilder` (same one used in the conditional step). Rules stored in `settings.conditional[]`. All 7 rule types available (interaction, custom_field, user_field, tag, automation_state, custom_event, lead).
 
 ## Implementation Tasks

@@ -544,7 +544,9 @@ export default class HttpRequestComponent extends Vue {
 }
 
 .nav-bar-title {
-  box-shadow: 0px 1px 3px 0px #0000001a, 0px 1px 2px 0px #0000000f;
+  box-shadow:
+    0px 1px 3px 0px #0000001a,
+    0px 1px 2px 0px #0000000f;
   padding: 16px;
   border-radius: 16px;
 }

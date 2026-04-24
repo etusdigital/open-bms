@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+.npmrc
+
+# Build output
+dist/
+.next/
+.turbo/
+build/
+out/
+coverage/
+coverage-*/
+**/lcov-report/
+
+# Cloudflare / Wrangler
+.wrangler/
+
+# TanStack Router auto-generated
+.tanstack/
+**/routeTree.gen.ts
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# Env / logs
+*.log
+.env
+.env.local
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+.history/
+
+# Upstream reference clone
+bms-reference/
+
+# EVO Method workflows and artifacts
+_evo/
+_evo-output/

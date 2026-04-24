@@ -1,4 +1,4 @@
-import { LabelDto } from "./label.dto";
+import { LabelDto } from './label.dto';
 
 export class LabelContentDto {
   id: number;

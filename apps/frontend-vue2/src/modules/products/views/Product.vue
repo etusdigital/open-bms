@@ -498,7 +498,9 @@ export default class Product extends Vue {
 }
 
 .product-table {
-  box-shadow: 0px 4px 6px -4px #0000001a, 0px 10px 15px -3px #0000001a;
+  box-shadow:
+    0px 4px 6px -4px #0000001a,
+    0px 10px 15px -3px #0000001a;
   border-radius: 12px;
   overflow: hidden;
 }
@@ -536,7 +538,9 @@ export default class Product extends Vue {
 
 .today-column-header {
   background: linear-gradient(135deg, #f0f9ff, #e0f2fe) !important;
-  box-shadow: inset 0 1px 2px rgba(59, 130, 246, 0.1), 0 1px 1px rgba(59, 130, 246, 0.05);
+  box-shadow:
+    inset 0 1px 2px rgba(59, 130, 246, 0.1),
+    0 1px 1px rgba(59, 130, 246, 0.05);
   border-left: 2px solid #93c5fd !important;
   border-right: 2px solid #93c5fd !important;
   position: relative;
@@ -544,7 +548,9 @@ export default class Product extends Vue {
 
 .today-column-cell {
   background: linear-gradient(135deg, #fefefe, #f8fafc) !important;
-  box-shadow: inset 1px 0 3px rgba(59, 130, 246, 0.06), inset -1px 0 3px rgba(59, 130, 246, 0.06);
+  box-shadow:
+    inset 1px 0 3px rgba(59, 130, 246, 0.06),
+    inset -1px 0 3px rgba(59, 130, 246, 0.06);
   border-left: 2px solid #93c5fd !important;
   border-right: 2px solid #93c5fd !important;
   position: relative;

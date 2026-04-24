@@ -9,6 +9,7 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/event-receiver-probe/package.json ./apps/event-receiver-probe/
 COPY packages/messaging/package.json ./packages/messaging/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --filter msgops-event-receiver-probe...
 

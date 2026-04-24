@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/accounts/all"
+  url: '{{msgops-api-url}}/accounts/all'
   auth: inherit
 
 settings:

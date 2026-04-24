@@ -16,7 +16,11 @@ const props = defineProps<BmsDataLoaderProps>();
       :type="props.type"
       :height="props.height"
       :class="props.class"
-      style="box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 1px 3px rgba(0, 0, 0, 0.1)"
+      style="
+        box-shadow:
+          0px 1px 2px rgba(0, 0, 0, 0.06),
+          0px 1px 3px rgba(0, 0, 0, 0.1);
+      "
     >
     </v-skeleton-loader>
   </div>

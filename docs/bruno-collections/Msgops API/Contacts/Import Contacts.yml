@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/contacts/import"
+  url: '{{msgops-api-url}}/contacts/import'
   body:
     type: json
     json: |

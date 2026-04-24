@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{lead-conception-url}}/update-contact"
+  url: '{{lead-conception-url}}/update-contact'
   body:
     type: json
     json: |

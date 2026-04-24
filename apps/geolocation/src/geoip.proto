@@ -10,6 +10,20 @@ message IpRequest {
   string ip = 1; // Can be IPv4 or IPv6
 }
 
+// Sourced from DB-IP Full MMDB's `traits` block. Populated with zero
+// defaults when the underlying lookup succeeds but no traits exist for
+// the IP (e.g. private/reserved ranges). Absent entirely on failed
+// lookups (see LocationResponse.success).
+message Traits {
+  uint32 asn = 1;
+  string asn_org = 2;          // autonomous_system_organization
+  string isp = 3;
+  string organization = 4;
+  string user_type = 5;        // hosting | business | residential | cellular | cdn | college | government | dialup
+  string connection_type = 6;  // Corporate | Cellular | Cable/DSL | Dialup
+  bool is_anycast = 7;
+}
+
 message LocationResponse {
   string country = 1; // ISO code
   string region = 2;  // ISO code
@@ -20,4 +34,5 @@ message LocationResponse {
   double longitude = 7;
   bool success = 8;   // To indicate if lookup was successful
   string error = 9;   // Error message if any
+  Traits traits = 10; // Present on successful lookups; used for bot/datacenter classification
 }

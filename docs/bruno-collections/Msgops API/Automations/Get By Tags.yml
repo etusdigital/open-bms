@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/automations/tags/test-tag"
+  url: '{{msgops-api-url}}/automations/tags/test-tag'
   auth: inherit
 
 settings:

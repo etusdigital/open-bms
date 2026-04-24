@@ -168,7 +168,10 @@ export class SendgridService extends EventsService {
       // Add geo data if needed
       if (['open', 'click'].includes(event.event) && event.ip) {
         const geoData = await this.getGeoIpInfo(event.ip);
-        if (geoData.country) {
+        // Attach on any successful enrichment: country and traits are sourced
+        // from the same MMDB lookup but a geo-less result may still carry
+        // traits (and vice-versa), both of which are needed downstream.
+        if (geoData.country || geoData.traits) {
           event.geoData = geoData;
         }
 

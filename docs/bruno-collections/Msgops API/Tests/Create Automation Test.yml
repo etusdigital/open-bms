@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/tests/automations/create"
+  url: '{{msgops-api-url}}/tests/automations/create'
   body:
     type: json
     json: |

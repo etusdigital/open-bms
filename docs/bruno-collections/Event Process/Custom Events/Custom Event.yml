@@ -5,12 +5,12 @@ info:
 
 http:
   method: POST
-  url: "{{event-process-url}}/custom-events"
+  url: '{{event-process-url}}/custom-events'
   headers:
     - name: platform
-      value: "custom_events"
+      value: 'custom_events'
     - name: x-goog-pubsub-message-id
-      value: "test-custom-event-001"
+      value: 'test-custom-event-001'
   body:
     type: json
     json: |

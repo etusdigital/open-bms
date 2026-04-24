@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{twilio-messaging-url}}/"
+  url: '{{twilio-messaging-url}}/'
   auth: none
 
 settings:

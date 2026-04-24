@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/verify/generate"
+  url: '{{msgops-api-url}}/verify/generate'
   body:
     type: json
     json: |

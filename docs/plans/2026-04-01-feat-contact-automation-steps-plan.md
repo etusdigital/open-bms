@@ -1,5 +1,5 @@
 ---
-title: "feat: Add Contact Automation Steps (Tag, Custom Field, Validate, Transfer, Remove)"
+title: 'feat: Add Contact Automation Steps (Tag, Custom Field, Validate, Transfer, Remove)'
 type: feat
 status: active
 date: 2026-04-01
@@ -13,14 +13,14 @@ Add 6 contact-related automation step types: **addTag**, **removeTag**, **update
 
 ## Step Types Summary
 
-| Step | Settings Shape | Config UI | Internal Only |
-|------|---------------|-----------|:---:|
-| `addTag` | `Array<{ id, name }>` | Multi-select searchable tags | No |
-| `removeTag` | `Array<{ id, name }>` | Multi-select searchable tags | No |
-| `updateCustomField` | `{ customFieldValue, customFieldSelected: { id, title, type } }` | Field picker + value input (type-aware) | No |
-| `contactValidate` | `{}` (empty) | No config needed — just click to add | No |
-| `contactTransfer` | `{ accountId, accountName, tagId, tagName, apiKey }` | Account picker → tag picker (cascading) | **Yes** |
-| `removeAutomation` | `{ automations: [{ id, name, title }] }` | Multi-select searchable automations | **Yes** |
+| Step                | Settings Shape                                                   | Config UI                               | Internal Only |
+| ------------------- | ---------------------------------------------------------------- | --------------------------------------- | :-----------: |
+| `addTag`            | `Array<{ id, name }>`                                            | Multi-select searchable tags            |      No       |
+| `removeTag`         | `Array<{ id, name }>`                                            | Multi-select searchable tags            |      No       |
+| `updateCustomField` | `{ customFieldValue, customFieldSelected: { id, title, type } }` | Field picker + value input (type-aware) |      No       |
+| `contactValidate`   | `{}` (empty)                                                     | No config needed — just click to add    |      No       |
+| `contactTransfer`   | `{ accountId, accountName, tagId, tagName, apiKey }`             | Account picker → tag picker (cascading) |    **Yes**    |
+| `removeAutomation`  | `{ automations: [{ id, name, title }] }`                         | Multi-select searchable automations     |    **Yes**    |
 
 ## Implementation Tasks
 
@@ -29,33 +29,35 @@ Add 6 contact-related automation step types: **addTag**, **removeTag**, **update
 **File:** `editor/types.ts`
 
 Add to `AutomationStepType`:
+
 ```typescript
 | 'addTag' | 'removeTag' | 'updateCustomField' | 'contactValidate' | 'contactTransfer' | 'removeAutomation'
 ```
 
 Add settings interfaces:
+
 ```typescript
 export interface TagStepSettings {
   // Can be array (new) or single object (legacy) — normalize to array on load
-  [index: number]: { id: number; name: string } // when it's an array
+  [index: number]: { id: number; name: string }; // when it's an array
 }
 // Actually store as: Array<{ id: number; name: string }>
 
 export interface UpdateCustomFieldSettings {
-  customFieldValue: string
-  customFieldSelected: { id: number; title: string; type: string }
+  customFieldValue: string;
+  customFieldSelected: { id: number; title: string; type: string };
 }
 
 export interface ContactTransferSettings {
-  accountId: number
-  accountName: string
-  tagId: number
-  tagName: string
-  apiKey: string
+  accountId: number;
+  accountName: string;
+  tagId: number;
+  tagName: string;
+  apiKey: string;
 }
 
 export interface RemoveAutomationSettings {
-  automations: Array<{ id: number; name: string; title: string }>
+  automations: Array<{ id: number; name: string; title: string }>;
 }
 ```
 
@@ -66,6 +68,7 @@ Add discriminated step types, node data types, and update `KNOWN_STEP_TYPES`.
 Use the existing `createMessageNode` factory pattern — but these aren't message nodes, they're action nodes. Create a simpler approach:
 
 **6 new node components** in `editor/nodes/`:
+
 - `add-tag-node.tsx` — Green tag icon, shows selected tag names (or "Select tag(s)")
 - `remove-tag-node.tsx` — Orange tag icon, shows selected tag names
 - `update-custom-field-node.tsx` — Blue icon, shows "Set {fieldName} = {value}"
@@ -116,13 +119,13 @@ New translation keys for all 6 step types in both `pt-BR.json` and `en-US.json`.
 
 ## API Endpoints Used
 
-| Endpoint | Used by | Params |
-|----------|---------|--------|
-| `GET /tags` | addTag, removeTag | `?type=tag&title={search}&page=1&itemsPerPage=40` |
-| `GET /custom-fields` | updateCustomField | `?page=1` |
-| `GET /accounts` | contactTransfer | — |
-| `GET /tags` (with Account-Id header) | contactTransfer | `?status=active&type=tag` |
-| `GET /automations` | removeAutomation | `?type=email&title={search}&page=1&itemsPerPage=10` |
+| Endpoint                             | Used by           | Params                                              |
+| ------------------------------------ | ----------------- | --------------------------------------------------- |
+| `GET /tags`                          | addTag, removeTag | `?type=tag&title={search}&page=1&itemsPerPage=40`   |
+| `GET /custom-fields`                 | updateCustomField | `?page=1`                                           |
+| `GET /accounts`                      | contactTransfer   | —                                                   |
+| `GET /tags` (with Account-Id header) | contactTransfer   | `?status=active&type=tag`                           |
+| `GET /automations`                   | removeAutomation  | `?type=email&title={search}&page=1&itemsPerPage=10` |
 
 ## Acceptance Criteria
 

@@ -626,7 +626,10 @@ export default class ContactsImport extends Vue {
   flex-direction: column;
   outline: 1px dashed $ds-blue;
   border-radius: 4px;
-  transition: margin 0.15s ease-in-out, height 0.15s ease-in-out, background-color 0.15s linear;
+  transition:
+    margin 0.15s ease-in-out,
+    height 0.15s ease-in-out,
+    background-color 0.15s linear;
 }
 
 .dash-blue:hover .dropZone-title {

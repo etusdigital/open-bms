@@ -577,7 +577,9 @@ textarea:focus {
   cursor: pointer;
 }
 .preview-windows {
-  box-shadow: 0px 1px 2px rgb(0 0 0 / 6%), 0px 1px 3px rgb(0 0 0 / 10%);
+  box-shadow:
+    0px 1px 2px rgb(0 0 0 / 6%),
+    0px 1px 3px rgb(0 0 0 / 10%);
   display: flex;
   flex-direction: row;
 }

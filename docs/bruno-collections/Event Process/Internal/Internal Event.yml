@@ -5,12 +5,12 @@ info:
 
 http:
   method: POST
-  url: "{{event-process-url}}/internal"
+  url: '{{event-process-url}}/internal'
   headers:
     - name: platform
-      value: "internal"
+      value: 'internal'
     - name: x-goog-pubsub-message-id
-      value: "test-internal-event-001"
+      value: 'test-internal-event-001'
   body:
     type: json
     json: |

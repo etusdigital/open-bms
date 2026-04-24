@@ -1,18 +1,8 @@
 import { createServer, type Server } from 'http';
 import type { AddressInfo } from 'net';
 import * as amqplib from 'amqplib';
-import {
-  GenericContainer,
-  type StartedTestContainer,
-  Wait,
-} from 'testcontainers';
-import {
-  AmqpConsumer,
-  AmqpPublisher,
-  createHttpBridgeHandler,
-  DLX,
-  EXCHANGES,
-} from '../../src';
+import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
+import { AmqpConsumer, AmqpPublisher, createHttpBridgeHandler, DLX, EXCHANGES } from '../../src';
 
 let container: StartedTestContainer;
 let amqpUrl: string;
@@ -41,11 +31,7 @@ function strOrBuffer(v: unknown): string | undefined {
   return undefined;
 }
 
-async function waitUntil(
-  pred: () => boolean,
-  timeout = 10_000,
-  interval = 25,
-): Promise<void> {
+async function waitUntil(pred: () => boolean, timeout = 10_000, interval = 25): Promise<void> {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     if (pred()) return;
@@ -59,9 +45,7 @@ interface DlqInspection {
   headers: Record<string, unknown>;
 }
 
-async function closeSilently(conn: {
-  close: () => Promise<void>;
-}): Promise<void> {
+async function closeSilently(conn: { close: () => Promise<void> }): Promise<void> {
   try {
     await conn.close();
   } catch {
@@ -83,10 +67,7 @@ async function openInspectionConn(): Promise<{
   return { conn, ch };
 }
 
-async function popFromQueue(
-  queueName: string,
-  timeoutMs = 5000,
-): Promise<DlqInspection> {
+async function popFromQueue(queueName: string, timeoutMs = 5000): Promise<DlqInspection> {
   const { conn, ch } = await openInspectionConn();
   try {
     return await new Promise<DlqInspection>((resolve, reject) => {
@@ -135,14 +116,11 @@ describe('AmqpPublisher + AmqpConsumer integration', () => {
       resolveReceived = r;
     });
 
-    await consumer.consume(
-      { exchange: EXCHANGES.email, routingKey, queue },
-      async (payload) => {
-        received = payload;
-        resolveReceived();
-        return 'ack';
-      },
-    );
+    await consumer.consume({ exchange: EXCHANGES.email, routingKey, queue }, async (payload) => {
+      received = payload;
+      resolveReceived();
+      return 'ack';
+    });
 
     const started = Date.now();
     await publisher.publish({
@@ -193,12 +171,8 @@ describe('AmqpPublisher + AmqpConsumer integration', () => {
     const dlqMsg = await popFromQueue(`${queue}.dlq`, 5000);
     expect(dlqMsg.payload).toEqual({ id: 't2' });
     expect(dlqMsg.headers['x-bms-attempt']).toBe(2);
-    expect(strOrBuffer(dlqMsg.headers['x-bms-first-error'])).toBe(
-      'always-fails',
-    );
-    expect(strOrBuffer(dlqMsg.headers['x-bms-last-error'])).toBe(
-      'always-fails',
-    );
+    expect(strOrBuffer(dlqMsg.headers['x-bms-first-error'])).toBe('always-fails');
+    expect(strOrBuffer(dlqMsg.headers['x-bms-last-error'])).toBe('always-fails');
 
     await publisher.close();
     await consumer.shutdown();
@@ -213,15 +187,12 @@ describe('AmqpPublisher + AmqpConsumer integration', () => {
     const attempts: number[] = [];
     let deliveries = 0;
 
-    await consumer.consume(
-      { exchange: EXCHANGES.email, routingKey, queue },
-      async (_, ctx) => {
-        deliveries += 1;
-        attempts.push(ctx.attempt);
-        if (deliveries < 4) return 'requeue';
-        return 'ack';
-      },
-    );
+    await consumer.consume({ exchange: EXCHANGES.email, routingKey, queue }, async (_, ctx) => {
+      deliveries += 1;
+      attempts.push(ctx.attempt);
+      if (deliveries < 4) return 'requeue';
+      return 'ack';
+    });
 
     await publisher.publish({
       exchange: EXCHANGES.email,
@@ -246,15 +217,12 @@ describe('AmqpPublisher + AmqpConsumer integration', () => {
     const completed: number[] = [];
     let startedCount = 0;
 
-    await consumer.consume(
-      { exchange: EXCHANGES.email, routingKey, queue },
-      async (payload) => {
-        startedCount += 1;
-        await new Promise((r) => setTimeout(r, 300));
-        completed.push((payload as { i: number }).i);
-        return 'ack';
-      },
-    );
+    await consumer.consume({ exchange: EXCHANGES.email, routingKey, queue }, async (payload) => {
+      startedCount += 1;
+      await new Promise((r) => setTimeout(r, 300));
+      completed.push((payload as { i: number }).i);
+      return 'ack';
+    });
 
     for (let i = 0; i < 5; i++) {
       await publisher.publish({
@@ -299,10 +267,7 @@ describe('AmqpPublisher + AmqpConsumer integration', () => {
       hangTimer = setTimeout(() => hangHandle.resolve(), 30_000);
     });
 
-    await hangingConsumer.consume(
-      { exchange: EXCHANGES.email, routingKey, queue },
-      async () => hangPromise,
-    );
+    await hangingConsumer.consume({ exchange: EXCHANGES.email, routingKey, queue }, async () => hangPromise);
 
     await publisher.publish({
       exchange: EXCHANGES.email,
@@ -322,9 +287,7 @@ describe('AmqpPublisher + AmqpConsumer integration', () => {
     expect(hangReleased).toBe(false); // timeout force-closed without waiting
 
     // The unacked msg should still be in the queue (broker returns unacked on channel close)
-    await waitUntil(async () => (await queueDepth(queue)) === 1, 3000).catch(
-      () => {},
-    );
+    await waitUntil(async () => (await queueDepth(queue)) === 1, 3000).catch(() => {});
     expect(await queueDepth(queue)).toBe(1);
 
     // Fresh consumer picks it up
@@ -335,14 +298,11 @@ describe('AmqpPublisher + AmqpConsumer integration', () => {
       resolveRedelivered = r;
     });
 
-    await freshConsumer.consume(
-      { exchange: EXCHANGES.email, routingKey, queue },
-      async (payload) => {
-        redelivered = payload;
-        resolveRedelivered();
-        return 'ack';
-      },
-    );
+    await freshConsumer.consume({ exchange: EXCHANGES.email, routingKey, queue }, async (payload) => {
+      redelivered = payload;
+      resolveRedelivered();
+      return 'ack';
+    });
 
     await got;
     expect(redelivered).toEqual({ id: 't5' });
@@ -386,10 +346,7 @@ describe('AmqpPublisher + AmqpConsumer integration', () => {
       token: 'bridge-token',
     });
 
-    await consumer.consume(
-      { exchange: EXCHANGES.email, routingKey, queue },
-      handler,
-    );
+    await consumer.consume({ exchange: EXCHANGES.email, routingKey, queue }, handler);
 
     await publisher.publish({
       exchange: EXCHANGES.email,

@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{tag-process-url}}/events-trigger"
+  url: '{{tag-process-url}}/events-trigger'
   body:
     type: json
     json: |

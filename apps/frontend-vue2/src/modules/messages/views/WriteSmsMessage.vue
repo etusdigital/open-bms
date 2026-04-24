@@ -91,10 +91,10 @@
           messageType.startsWith('transactional')
             ? $router.push('/automations/transactional')
             : messageType.startsWith('2FA-sms')
-            ? currentGroup
-              ? $router.push(`/messages/2FA/sms/${currentGroup}`)
-              : $router.push('/messages/2FA/sms')
-            : $router.push('/messages/sms')
+              ? currentGroup
+                ? $router.push(`/messages/2FA/sms/${currentGroup}`)
+                : $router.push('/messages/2FA/sms')
+              : $router.push('/messages/sms')
         "
         type="button"
         :value="`${$t('button.cancel')}`"
@@ -566,7 +566,9 @@ textarea:focus {
   cursor: pointer;
 }
 .preview-sms {
-  box-shadow: 0px 1px 2px rgb(0 0 0 / 6%), 0px 1px 3px rgb(0 0 0 / 10%);
+  box-shadow:
+    0px 1px 2px rgb(0 0 0 / 6%),
+    0px 1px 3px rgb(0 0 0 / 10%);
   display: flex;
   flex-direction: row;
 }
@@ -668,7 +670,11 @@ textarea:focus {
   color: $ds-red;
 }
 .text-area-container .material-symbols-rounded {
-  font-variation-settings: 'FILL' 0, 'wght' 700, 'GRAD' 0, 'opsz' 48;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 700,
+    'GRAD' 0,
+    'opsz' 48;
   color: $ds-gray-400;
 }
 

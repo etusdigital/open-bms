@@ -5,12 +5,12 @@ info:
 
 http:
   method: POST
-  url: "{{event-process-url}}/sendgrid"
+  url: '{{event-process-url}}/sendgrid'
   headers:
     - name: platform
-      value: "sendgrid"
+      value: 'sendgrid'
     - name: x-goog-pubsub-message-id
-      value: "test-sendgrid-event-001"
+      value: 'test-sendgrid-event-001'
   body:
     type: json
     json: |

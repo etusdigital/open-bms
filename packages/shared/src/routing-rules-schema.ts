@@ -26,10 +26,7 @@ export const ROUTING_RULES_SCHEMA = {
       items: { $ref: '#/definitions/ExceptionRule' },
     },
     defaultConfig: {
-      oneOf: [
-        { $ref: '#/definitions/DefaultConfig' },
-        { type: 'null' },
-      ],
+      oneOf: [{ $ref: '#/definitions/DefaultConfig' }, { type: 'null' }],
     },
   },
 

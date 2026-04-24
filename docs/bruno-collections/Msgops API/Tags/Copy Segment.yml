@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/tags/segment/1/copy"
+  url: '{{msgops-api-url}}/tags/segment/1/copy'
   auth: inherit
 
 settings:

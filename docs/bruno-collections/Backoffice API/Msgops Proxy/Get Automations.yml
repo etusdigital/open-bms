@@ -5,13 +5,13 @@ info:
 
 http:
   method: GET
-  url: "{{backoffice-api-url}}/msgops/automations"
+  url: '{{backoffice-api-url}}/msgops/automations'
   headers:
     - name: account-id
-      value: "1"
+      value: '1'
   auth:
     type: bearer
-    token: "{{backoffice-token}}"
+    token: '{{backoffice-token}}'
 
 settings:
   encodeUrl: true

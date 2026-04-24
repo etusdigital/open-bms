@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { addTrailingSlash } from '@msgops/url-utils';
 import Redis from 'ioredis';
 import { RedisService } from './providers/redis/redis.service';
 import {
@@ -14,6 +15,15 @@ import { MsgopsService } from './msgops/msgops.service';
 import { PubSubProvider } from './providers/pubsub.provider';
 import { TwilioProvider } from './providers/twilio.provider';
 import { Utils } from './utils/index.utils';
+
+interface CreateRedirectLinkOptions {
+  url: string;
+  utmsDefault: string;
+  type: string;
+  utmCampaign: string;
+  baseUrl: string;
+  account: Account;
+}
 
 @Injectable()
 export class AppService {
@@ -51,7 +61,14 @@ export class AppService {
 
         if (message.type == CampaignMessageType.WHATSAPP) {
           const shortCode = message.url
-            ? await this.createRedictLink(message.url, shortUtms, message.type, defaultUtmCampaign, '')
+            ? await this.createRedirectLink({
+                url: message.url,
+                utmsDefault: shortUtms,
+                type: message.type,
+                utmCampaign: defaultUtmCampaign,
+                baseUrl: '',
+                account,
+              })
             : null;
           return await twilioProvider.sendSingleWhatsapp(
             message.providerMessageId,
@@ -65,7 +82,14 @@ export class AppService {
         let content = this.utils.parseVariables(message.content, contact, account);
         if (message.url) {
           const baseUrl = this.configByName(account, 'shortlink_base_url');
-          const link = await this.createRedictLink(message.url, shortUtms, message.type, defaultUtmCampaign, baseUrl);
+          const link = await this.createRedirectLink({
+            url: message.url,
+            utmsDefault: shortUtms,
+            type: message.type,
+            utmCampaign: defaultUtmCampaign,
+            baseUrl,
+            account,
+          });
           content += ` ${link}`;
         }
         return await twilioProvider.sendSingleSms(content, contact.phone, utmsCallback, twilioService);
@@ -101,7 +125,14 @@ export class AppService {
         return await this.invalidContact(contact, automationMessage);
       }
       const shortCode = message.url
-        ? await this.createRedictLink(message.url, shortUtms, message.type, defaultUtmCampaign, '')
+        ? await this.createRedirectLink({
+            url: message.url,
+            utmsDefault: shortUtms,
+            type: message.type,
+            utmCampaign: defaultUtmCampaign,
+            baseUrl: '',
+            account,
+          })
         : null;
       await twilioProvider.sendSingleWhatsapp(
         message.providerMessageId,
@@ -116,7 +147,14 @@ export class AppService {
       let content = this.utils.parseVariables(message.content, contact, account);
       if (message.url) {
         const baseUrl = this.configByName(account, 'shortlink_base_url');
-        const link = await this.createRedictLink(message.url, shortUtms, message.type, defaultUtmCampaign, baseUrl);
+        const link = await this.createRedirectLink({
+          url: message.url,
+          utmsDefault: shortUtms,
+          type: message.type,
+          utmCampaign: defaultUtmCampaign,
+          baseUrl,
+          account,
+        });
         content += ` ${link}`;
       }
 
@@ -209,7 +247,9 @@ export class AppService {
     return await this.pubSubProvider.sendMessage(tracker, process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER);
   }
 
-  async createRedictLink(url: string, utmsDefault: string, type: string, utmCampaign: string, baseUrl: string) {
+  async createRedirectLink(opts: CreateRedirectLinkOptions) {
+    let { url } = opts;
+    const { utmsDefault, type, utmCampaign, baseUrl, account } = opts;
     url += url.includes('?') ? `&${utmsDefault}` : `?${utmsDefault}`;
     if (!url.includes('utm_source')) {
       url += '&utm_source=bms';
@@ -220,6 +260,7 @@ export class AppService {
     if (!url.includes('utm_campaign')) {
       url += `&utm_campaign=${utmCampaign}`;
     }
+    if (account.isInternal) url = addTrailingSlash(url);
     return await this.msgopsService.createShortLink(url, baseUrl);
   }
 

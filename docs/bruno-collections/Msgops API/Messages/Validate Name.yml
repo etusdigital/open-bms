@@ -5,10 +5,10 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/messages/validate-name"
+  url: '{{msgops-api-url}}/messages/validate-name'
   params:
     - name: title
-      value: "test-message"
+      value: 'test-message'
   auth: inherit
 
 settings:

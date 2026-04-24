@@ -5,10 +5,10 @@ info:
 
 http:
   method: GET
-  url: "{{msgops-api-url}}/statistics/account-usage"
+  url: '{{msgops-api-url}}/statistics/account-usage'
   params:
     - name: accountId
-      value: "1"
+      value: '1'
   auth: inherit
 
 settings:

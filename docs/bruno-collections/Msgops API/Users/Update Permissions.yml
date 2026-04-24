@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{msgops-api-url}}/users/permissions"
+  url: '{{msgops-api-url}}/users/permissions'
   body:
     type: json
     json: |
