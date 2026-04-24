@@ -10,7 +10,7 @@ import { PoolEntity } from '../../entities/pool.entity';
 import { UserAccountEntity } from '../../entities/users-account.entity';
 import { AUTH_PROVIDER_TOKEN, IAuthProvider } from '../auth/providers/auth.provider.interface';
 import { ROLE_CODES } from '../authz/authz.constants';
-import { AdvanceStepDto, Step1Data, Step2Data, Step3Data, Step4Data } from './dtos/advance-step.dto';
+import { AdvanceStepDto, STEP_SCHEMAS, Step1Data, Step2Data, Step3Data, Step4Data } from './dtos/advance-step.dto';
 import { TestSmtpDto } from './dtos/test-smtp.dto';
 
 const WIZARD_KEY = 'setup_wizard_step';
@@ -43,15 +43,20 @@ export class SetupService {
   }
 
   async advanceStep(dto: AdvanceStepDto): Promise<void> {
+    const schema = STEP_SCHEMAS[dto.step];
+    const { value, error } = schema.validate(dto.data, { abortEarly: false, stripUnknown: true });
+    if (error) {
+      throw new BadRequestException(error.details.map((d) => d.message).join('; '));
+    }
     switch (dto.step) {
       case 1:
-        return this.step1(dto.data as Step1Data);
+        return this.step1(value as Step1Data);
       case 2:
-        return this.step2(dto.data as Step2Data);
+        return this.step2(value as Step2Data);
       case 3:
-        return this.step3(dto.data as Step3Data);
+        return this.step3(value as Step3Data);
       case 4:
-        return this.step4(dto.data as Step4Data);
+        return this.step4(value as Step4Data);
     }
   }
 
