@@ -69,14 +69,14 @@ export default Vue.extend({
 
       this.submitting = true;
       try {
-        // Ensure the watch on loadAuth0 always fires by forcing a false→true transition.
+        // Ensure the watch on sessionStarted always fires by forcing a false→true transition.
         // Vuex watchers don't run when the committed value equals the current one, and
         // a stale true from a prior session would silently break the post-login redirect.
-        store.commit('setLoadAuth0', false);
+        store.commit('setSessionStarted', false);
         await this.$auth.login(this.email, this.password);
-        // Trigger App.vue's loadAuth0 watcher — it fetches /users/me and flips
+        // Trigger App.vue's sessionStarted watcher — it fetches /users/me and flips
         // authReady, which the router's beforeEach is blocked waiting on.
-        store.commit('setLoadAuth0', true);
+        store.commit('setSessionStarted', true);
         const redirect = (this.$route.query.redirect as string) || '/';
         this.$router.push(redirect);
       } catch (err: any) {

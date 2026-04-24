@@ -71,7 +71,7 @@ const storeInstance = new Vuex.Store({
     customFields: [] as Array<string>,
     userAccounts: [] as UserAccountDto[],
     currentAccount: JSON.parse(currentAccountFromLocalstorage) as AccountDto,
-    loadAuth0: false as boolean,
+    sessionStarted: false as boolean,
     userMaster: false as boolean,
     isSuperAdmin: false as boolean,
     isSuportUser: false as boolean,
@@ -120,8 +120,8 @@ const storeInstance = new Vuex.Store({
     setCustomFields(state, customFields: Array<string>) {
       state.customFields = customFields;
     },
-    setLoadAuth0(state, loadAuth0: boolean) {
-      state.loadAuth0 = loadAuth0;
+    setSessionStarted(state, sessionStarted: boolean) {
+      state.sessionStarted = sessionStarted;
     },
     setUserMaster(state, userMaster) {
       state.userMaster = userMaster;

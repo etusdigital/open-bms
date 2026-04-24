@@ -49,7 +49,7 @@ export async function logout(): Promise<void> {
     setTokens(null, 0);
     store.commit('setUser', {});
     store.commit('setAuthReady', false);
-    store.commit('setLoadAuth0', false);
+    store.commit('setSessionStarted', false);
     store.commit('setPermissions', []);
     store.commit('setEffectiveRole', '');
     store.commit('setGlobalRole', '');

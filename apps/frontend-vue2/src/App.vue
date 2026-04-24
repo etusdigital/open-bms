@@ -1,7 +1,7 @@
 <template>
   <v-app>
     <router-view v-if="$route && $route.meta && $route.meta.public" />
-    <div id="app" v-else-if="loadAuth0 && currentUser.id">
+    <div id="app" v-else-if="sessionStarted && currentUser.id">
       <Sidebar>
         <template slot="app-content">
           <Header username="username" />
@@ -39,7 +39,7 @@ import AccountService from '@/modules/accounts/services/account.service';
   components: { Header, Sidebar, Footer, Toast, LoginUser },
   providers: [ModalService, MathUtilService],
   computed: {
-    ...mapState(['loadAuth0', 'isLoadingPageVisible', 'currentUser', 'currentAccount']),
+    ...mapState(['sessionStarted', 'isLoadingPageVisible', 'currentUser', 'currentAccount']),
   },
 })
 export default class App extends Vue {
@@ -48,7 +48,7 @@ export default class App extends Vue {
   loginService = new LoginService();
   isLoggedIn = false;
   spinnerVisible = false;
-  loadAuth0!: boolean;
+  sessionStarted!: boolean;
   currentAccount!: AccountDto;
   currentUser!: UserDto;
   isLoadingPageVisible!: boolean;
@@ -71,12 +71,12 @@ export default class App extends Vue {
       this.$router.replace({ name: 'login', query: redirect ? { redirect } : {} }).catch(() => null);
       return;
     }
-    store.commit('setLoadAuth0', true);
+    store.commit('setSessionStarted', true);
   }
 
-  @Watch('loadAuth0')
+  @Watch('sessionStarted')
   async isAuthenticated() {
-    if (this.loadAuth0) {
+    if (this.sessionStarted) {
       try {
         const savedAccountId = this.currentAccount?.id || undefined;
         const me: any = await this.loginService.getMe(savedAccountId);
@@ -122,7 +122,7 @@ export default class App extends Vue {
 
   @Watch('currentAccount')
   async onCurrentAccountChanged(newAccount: AccountDto, oldAccount: AccountDto) {
-    if (!store.state.authReady || !this.loadAuth0 || !newAccount?.id || newAccount?.id === oldAccount?.id) {
+    if (!store.state.authReady || !this.sessionStarted || !newAccount?.id || newAccount?.id === oldAccount?.id) {
       return;
     }
 
