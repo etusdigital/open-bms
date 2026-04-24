@@ -4,7 +4,6 @@ import { IpAddress } from '../../decorators/ip_address.decorator';
 import { SetupService } from './setup.service';
 import { AdvanceStepDto } from './dtos/advance-step.dto';
 import { TestSmtpDto } from './dtos/test-smtp.dto';
-import { TestSendgridDto } from './dtos/test-sendgrid.dto';
 
 @Controller('setup')
 export class SetupController {
@@ -26,11 +25,5 @@ export class SetupController {
   @PublicRoute()
   testSmtp(@Body() dto: TestSmtpDto, @IpAddress() ipAddress?: string) {
     return this.setupService.testSmtp(dto, ipAddress);
-  }
-
-  @Post('test-sendgrid')
-  @PublicRoute()
-  testSendgrid(@Body() dto: TestSendgridDto, @IpAddress() ipAddress?: string) {
-    return this.setupService.testSendgrid(dto, ipAddress);
   }
 }

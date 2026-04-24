@@ -21,15 +21,6 @@ export class Step3Data {
 
 export class Step4Data {
   skip?: boolean;
-  apiKey?: string;
-  subuserEmail?: string;
-  subuserPrefix?: string;
-  defaultIpPool?: string;
-  webhookBaseUrl?: string;
-}
-
-export class Step5Data {
-  skip?: boolean;
   accountName?: string;
   poolName?: string;
   senderEmail?: string;
@@ -67,28 +58,7 @@ export const step3Schema = Joi.object<Step3Data>({
     .required(),
 });
 
-// Two alternatives: either skip=true alone, or a full config payload.
-// `match: 'one'` ensures exactly one alternative applies — ambiguity surfaces as validation error.
-export const step4Schema = Joi.alternatives<Step4Data>().try(
-  Joi.object({ skip: Joi.valid(true).required() }),
-  Joi.object({
-    skip: Joi.valid(false).optional(),
-    apiKey: Joi.string().trim().pattern(/^SG\./, 'starts with SG.').min(10).required(),
-    subuserEmail: Joi.string()
-      .email({ tlds: { allow: false } })
-      .required(),
-    subuserPrefix: Joi.string()
-      .trim()
-      .pattern(/^[a-z0-9-]+$/)
-      .optional(),
-    defaultIpPool: Joi.string().trim().optional(),
-    webhookBaseUrl: Joi.string()
-      .uri({ scheme: ['http', 'https'] })
-      .optional(),
-  }),
-);
-
-export const step5Schema = Joi.object<Step5Data>({
+export const step4Schema = Joi.object<Step4Data>({
   skip: Joi.boolean().optional(),
   accountName: Joi.string().trim().min(1).optional(),
   poolName: Joi.string().trim().min(1).optional(),
@@ -105,12 +75,12 @@ export const step5Schema = Joi.object<Step5Data>({
     .optional(),
 }).or('skip', 'accountName'); // at least one: skip=true or full config
 
-export const STEP_SCHEMAS = { 1: step1Schema, 2: step2Schema, 3: step3Schema, 4: step4Schema, 5: step5Schema } as const;
+export const STEP_SCHEMAS = { 1: step1Schema, 2: step2Schema, 3: step3Schema, 4: step4Schema } as const;
 
 export class AdvanceStepDto {
-  @JoiSchema(Joi.number().valid(1, 2, 3, 4, 5).required())
-  step: 1 | 2 | 3 | 4 | 5;
+  @JoiSchema(Joi.number().valid(1, 2, 3, 4).required())
+  step: 1 | 2 | 3 | 4;
 
   @JoiSchema(Joi.object().required())
-  data: Step1Data | Step2Data | Step3Data | Step4Data | Step5Data;
+  data: Step1Data | Step2Data | Step3Data | Step4Data;
 }
