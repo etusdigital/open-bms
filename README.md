@@ -154,6 +154,7 @@ docker run -p 3000:3000 --env-file apps/frontend/.env retention-frontend
 - **Secrets**: Use [Secret Manager](https://cloud.google.com/secret-manager) with `--set-secrets` instead of `--set-env-vars` for sensitive values.
 - **Root `.dockerignore`**: Excludes `node_modules`, build artifacts, `.git`, tests, and docs to keep Cloud Build uploads fast.
 - **Build order inside Docker**: Shared packages (`@retention/shared`, `@retention/database`) are built before the app, matching the Turborepo `^build` dependency graph.
+- **`X-Forwarded-For` trust**: `msgops-api` reads `X-Forwarded-For` to log login IP and persist it with the refresh token (`user_refresh_tokens.ip`). Deploy **only behind a reverse proxy that strips client-supplied values and appends the real source IP** (Cloud Run, nginx, Cloudflare, ALB). Exposing the Nest port directly to the internet lets any client spoof the header. The value is never used for authorization decisions — only for audit and refresh-reuse forensics — but a spoofed audit log is worse than no log.
 
 ## Cron Jobs
 
