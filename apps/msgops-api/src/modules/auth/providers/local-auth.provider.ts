@@ -35,9 +35,10 @@ export class LocalAuthProvider implements IAuthProvider {
   }
 
   async createUser(_input: CreateAuthUserInput): Promise<{ providerId: string }> {
-    // Local provider just mints a providerId. The UserEntity insert is owned by
-    // UsersService.create (which knows globalRoleId, accounts, etc.). The caller
-    // is responsible for calling updatePassword afterwards when a password is provided.
+    // Local provider only mints a providerId. The UserEntity insert is owned by
+    // UsersService.create (which needs globalRoleId, accounts, etc.), which must
+    // then call `updatePassword(providerId, password)` to persist credentials.
+    // Callers that skip the follow-up produce a user that cannot log in.
     return { providerId: `${PROVIDER_PREFIX}${uuidv4()}` };
   }
 
@@ -113,13 +114,16 @@ export class LocalAuthProvider implements IAuthProvider {
 
     const affected = (result.raw as any[]) || [];
     if (affected.length === 0) {
+      // Only a previously revoked row is reuse. Expired-but-never-revoked rows are normal
+      // expiry and must not trigger the security alarm.
       const existed = await this.refreshTokenRepository.findOne({ where: { tokenHash } });
-      if (existed) {
+      if (existed && existed.revokedAt) {
         this.logger.warn({
           event: 'refresh_token_reuse_detected',
           tokenHash,
           userAgent: meta?.userAgent,
           ip: meta?.ip,
+          timestamp: new Date().toISOString(),
         });
       }
       throw new UnauthorizedException('Invalid or expired refresh token');

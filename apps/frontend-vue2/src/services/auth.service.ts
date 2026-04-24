@@ -89,6 +89,14 @@ export function getCurrentAccessToken(): string | null {
   return accessToken;
 }
 
+// Test-only: resets module-level token/expiry/in-flight state so specs can start clean.
+// Not imported by application code.
+export function __resetForTests(): void {
+  accessToken = null;
+  tokenExpiresAt = 0;
+  refreshInflight = null;
+}
+
 export default class AuthService {
   public async getUser() {
     return store.state.currentUser || null;

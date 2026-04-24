@@ -55,10 +55,11 @@ export async function seedAdmin(dataSource: DataSource, config: SimpleConfigServ
     const providerId = `local|${uuidv4()}`;
     const userRepo = queryRunner.manager.getRepository(UserEntity);
     const credentialsRepo = queryRunner.manager.getRepository(UserCredentialsEntity);
+    const normalizedEmail = email.toLowerCase();
 
     const savedUser = await userRepo.save(
       userRepo.create({
-        email: email.toLowerCase(),
+        email: normalizedEmail,
         name: 'Admin',
         profile: '',
         providerId,
@@ -71,7 +72,7 @@ export async function seedAdmin(dataSource: DataSource, config: SimpleConfigServ
     await credentialsRepo.save(credentialsRepo.create({ userId: savedUser.id, passwordHash: hash }));
 
     await queryRunner.commitTransaction();
-    logger.log(`Bootstrap admin created: ${email}`);
+    logger.log(`Bootstrap admin created: ${normalizedEmail}`);
   } catch (error) {
     if (queryRunner.isTransactionActive) {
       await queryRunner.rollbackTransaction().catch(() => null);

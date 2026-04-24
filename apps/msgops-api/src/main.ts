@@ -1,18 +1,18 @@
+// MUST be first: populates process.env from .env before any module-top-level env reads.
+import './env-loader';
+
 import * as Sentry from '@sentry/node';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import { createCorsOptions } from './cors.config';
 import { JoiPipe } from 'nestjs-joi';
 import { seedAdmin } from './bootstrap/seed-admin';
-
-dotenv.config();
 
 function assertAuthEnvs(): void {
   const mode = (process.env.AUTH_PROVIDER || 'local').toLowerCase();

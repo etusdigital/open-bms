@@ -133,4 +133,99 @@ describe('LocalAuthProvider', () => {
       await expect(provider.login('missing@b.com', 'whatever1')).rejects.toBeInstanceOf(UnauthorizedException);
     });
   });
+
+  describe('refresh', () => {
+    function mockRefreshUpdate(result: { raw: any[]; affected?: number }) {
+      const qb = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue(result),
+      };
+      refreshTokenRepository.createQueryBuilder.mockReturnValue(qb);
+      return qb;
+    }
+
+    it('rotates: emits new tokens when refresh token is valid', async () => {
+      mockRefreshUpdate({ raw: [{ user_id: 7 }], affected: 1 });
+      userRepository.findOne.mockResolvedValue({ id: 7, email: 'a@b.com', name: 'A', providerId: 'local|x', profile: '' });
+
+      const result = await provider.refresh('raw-refresh-token', { userAgent: 'jest', ip: '127.0.0.1' });
+
+      expect(result.accessToken).toBeTruthy();
+      expect(result.refreshToken).toBeTruthy();
+      expect(result.expiresIn).toBe(3600);
+      // A new refresh row must be saved (rotation)
+      expect(refreshTokenRepository.save).toHaveBeenCalled();
+    });
+
+    it('rejects unknown refresh token without reuse alert', async () => {
+      const warnSpy = jest.spyOn((provider as any).logger, 'warn');
+      mockRefreshUpdate({ raw: [], affected: 0 });
+      refreshTokenRepository.findOne.mockResolvedValue(null);
+
+      await expect(provider.refresh('never-seen')).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('does NOT alert reuse for expired-but-never-revoked token (H3 regression)', async () => {
+      const warnSpy = jest.spyOn((provider as any).logger, 'warn');
+      mockRefreshUpdate({ raw: [], affected: 0 });
+      // Row exists but was never revoked — it's just expired.
+      refreshTokenRepository.findOne.mockResolvedValue({ tokenHash: 'abc', revokedAt: null });
+
+      await expect(provider.refresh('expired-token')).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('alerts reuse when presented token was already revoked', async () => {
+      const warnSpy = jest.spyOn((provider as any).logger, 'warn');
+      mockRefreshUpdate({ raw: [], affected: 0 });
+      refreshTokenRepository.findOne.mockResolvedValue({ tokenHash: 'abc', revokedAt: new Date() });
+
+      await expect(provider.refresh('reused-token', { userAgent: 'bot', ip: '9.9.9.9' })).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'refresh_token_reuse_detected',
+          userAgent: 'bot',
+          ip: '9.9.9.9',
+          timestamp: expect.any(String),
+        }),
+      );
+    });
+  });
+
+  describe('logout', () => {
+    function mockLogoutUpdate() {
+      const qb = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      };
+      refreshTokenRepository.createQueryBuilder.mockReturnValue(qb);
+      return qb;
+    }
+
+    it('revokes token and invalidates cache for the user', async () => {
+      mockLogoutUpdate();
+      refreshTokenRepository.findOne.mockResolvedValue({ userId: 42, tokenHash: 'abc' });
+      userRepository.findOne.mockResolvedValue({ id: 42, providerId: 'local|u42' });
+
+      await provider.logout('raw-refresh');
+
+      expect(authzService.invalidateUserCache).toHaveBeenCalledWith('local|u42');
+    });
+
+    it('is idempotent when token is already unknown', async () => {
+      mockLogoutUpdate();
+      refreshTokenRepository.findOne.mockResolvedValue(null);
+
+      await expect(provider.logout('unknown')).resolves.toBeUndefined();
+      expect(authzService.invalidateUserCache).not.toHaveBeenCalled();
+    });
+  });
 });

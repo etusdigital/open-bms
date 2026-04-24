@@ -95,6 +95,14 @@
       "json",
       "vue"
     ],
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/src/$1"
+    },
+    "globals": {
+      "ts-jest": {
+        "tsconfig": "tsconfig.jest.json"
+      }
+    },
     "transform": {
       "^.+\\.tsx?$": "ts-jest",
       ".*\\.(vue)$": "vue-jest"

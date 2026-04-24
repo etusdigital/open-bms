@@ -26,7 +26,11 @@ function assertProviderMatches(providerId: string | undefined | null): void {
   const mode = currentProviderMode();
   const expectedPrefix = mode === 'auth0' ? AUTH0_PREFIX : LOCAL_PREFIX;
   if (!providerId || !providerId.startsWith(expectedPrefix)) {
-    throw new BadRequestException('User is not managed by the active auth provider');
+    const actualPrefix = providerId?.split('|')[0] || 'none';
+    throw new BadRequestException(
+      `User provider '${actualPrefix}' does not match active provider '${mode}'. ` +
+        (mode === 'local' ? 'Reinvite the user to migrate them to the local provider.' : 'Switch AUTH_PROVIDER or reinvite the user.'),
+    );
   }
 }
 

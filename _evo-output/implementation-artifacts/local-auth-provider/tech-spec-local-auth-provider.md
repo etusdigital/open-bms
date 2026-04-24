@@ -2,8 +2,9 @@
 title: 'Substituição Auth0 por Autenticação Local Plugável'
 slug: 'local-auth-provider'
 created: '2026-04-23'
-status: 'implementation-complete'
+status: 'done'
 stepsCompleted: [1, 2, 3, 4, 5]
+reviewed: '2026-04-24'
 tech_stack:
   - 'NestJS 10+ (msgops-api)'
   - 'TypeORM + PostgreSQL'
@@ -1017,4 +1018,30 @@ Ordem obrigatória: cada grupo depende do anterior. Dentro do grupo, tasks podem
 **Contexto da discovery preservado:**
 
 - Inventário Auth0 levantado em duas rodadas de `Explore`. Principais achados consolidados em "Files to Reference" e "Technical Decisions".
+
+### Review Follow-ups (AI) — 2026-04-24
+
+Adversarial review rodado em 2026-04-24. 4 HIGH e 7 MEDIUM encontrados; todos corrigidos nesta passada.
+
+- [x] **[AI-Review][H1]** Write 6 missing test files claimed `[x]` but not on disk — `tests/e2e/auth.e2e-spec.ts`, `tests/e2e/seed-admin-race.e2e-spec.ts`, `tests/e2e/auth-cache-invalidation.e2e-spec.ts`, `src/bootstrap/seed-admin.spec.ts`, `apps/frontend-vue2/src/services/auth.service.spec.ts`, `apps/msgops-manager-frontend/src/composables/useAuth.spec.ts`.
+- [x] **[AI-Review][H2]** Add `refresh` / `logout` coverage to `local-auth.provider.spec.ts` (T7.1 had only 5 of 7 methods).
+- [x] **[AI-Review][H3]** `LocalAuthProvider.refresh` was logging `refresh_token_reuse_detected` for expired-but-never-revoked tokens. Fixed: only log when `existed.revokedAt != null`. Regression test added.
+- [x] **[AI-Review][H4]** `AuthModule` reads `process.env.AUTH_PROVIDER` at import-time, before `main.ts:15` ran `dotenv.config()`. Extracted a `src/env-loader.ts` imported first in `main.ts` so `.env`-driven provider selection actually works.
+- [x] **[AI-Review][M1]** `LocalAuthProvider.createUser` is a no-op by design (persistence owned by `UsersService.create`). Added explicit doc comment calling out the follow-up `updatePassword` contract so the next contributor doesn't create users without credentials.
+- [x] **[AI-Review][M3]** `seedAdmin` now logs the same normalized email it stored (not the raw envvar).
+- [x] **[AI-Review][M4]** `assertProviderMatches` error message now names the actual provider prefix and tells the operator to reinvite.
+- [x] **[AI-Review][M5]** Added `timestamp` to the `refresh_token_reuse_detected` log payload (AC19 literal spec).
+- [ ] **[AI-Review][M2]** `router.ts` Vue3 redirects non-super-admins to `VITE_APP_REDIRECT_MSGOPS` — legitimate product decision but not documented in T5.6/T5.15. **Action:** add this to the Linear card description or a follow-up spec note before release notes go out. Not a code change.
+- [ ] **[AI-Review][M6]** `useAuth.ts` calls `axios` bare (not the `api` singleton). Intentional for auth endpoints; `bootstrapAuth`'s GET `/users/me` could benefit from interceptor but impact is negligible. **Action:** leave as-is for v0.1; revisit if session instability shows up.
+- [ ] **[AI-Review][M7]** `setLoadAuth0` / `loadAuth0` store key in Vue2 carries Auth0 residue in naming despite anti-Auth0 fluxo. **Action:** rename to `authReady` in a follow-up PR (not blocking).
+- [ ] **[AI-Review][L1]** Add `@ApiBody` / `@ApiResponse` annotations to `AuthController` handlers so Swagger shows login/refresh/logout schemas. Nice-to-have.
+- [ ] **[AI-Review][L2]** Document `X-Forwarded-For` trust assumption in deployment notes — only trustworthy behind a reverse proxy that sanitizes the header.
+- [ ] **[AI-Review][L3]** PR #7 bundles local-auth with `fef3e62` (vuetify install fix) and `adcd267` (isInternal account toggle). **Action:** call this out in the PR description so the reviewer knows scope creep is intentional.
+
+Unit/integration test runs after fixes:
+
+- `apps/msgops-api`: 214 tests / 14 suites passing (inclui +12 novos em `local-auth.provider.spec.ts` e `seed-admin.spec.ts`).
+- `apps/msgops-manager-frontend`: 24 tests / 4 suites passing (inclui +6 novos em `useAuth.spec.ts`).
+- `apps/frontend-vue2`: 8 tests / 1 suite passing (primeiro jest spec do app — adicionado `tsconfig.jest.json` + `moduleNameMapper` para desbloquear).
+- E2E skeletons (`auth.e2e-spec.ts`, `seed-admin-race.e2e-spec.ts`, `auth-cache-invalidation.e2e-spec.ts`) requerem DB + Redis de teste e rodam via `pnpm --filter msgops-api test:e2e`.
 - CLAUDE.md da raiz menciona `@auth0/nextjs-auth0` e `apps/backoffice-api` — **referências desatualizadas**, corrigidas como parte deste spec (T6.1).

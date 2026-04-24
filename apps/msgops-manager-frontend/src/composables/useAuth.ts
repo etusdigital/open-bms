@@ -132,3 +132,14 @@ export function useAuth() {
 }
 
 export type UseAuthReturn = ReturnType<typeof useAuth>;
+
+// Test-only: resets all module-level state. Not imported by application code.
+export function __resetForTests(): void {
+  accessToken = null;
+  tokenExpiresAt = 0;
+  refreshInflight = null;
+  initialized = false;
+  state.user = null;
+  state.isAuthenticated = false;
+  state.isLoading = false;
+}
