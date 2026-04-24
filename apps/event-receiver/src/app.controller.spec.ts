@@ -1,14 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { PubSubService } from './pubsub.service';
+import { EventPublisherService } from './event-publisher.service';
 import { FastifyRequest } from 'fastify';
 
-jest.mock('./pubsub.service');
+jest.mock('@bms/messaging', () => ({
+  AmqpPublisher: jest.fn().mockImplementation(() => ({
+    publish: jest.fn().mockResolvedValue(undefined),
+    close: jest.fn().mockResolvedValue(undefined),
+  })),
+  EXCHANGES: { events: 'bms.events' },
+}));
+
+jest.mock('./event-publisher.service');
 
 describe('AppController', () => {
   let appController: AppController;
-  let pubSubService: jest.Mocked<PubSubService>;
+  let eventPublisherService: jest.Mocked<EventPublisherService>;
 
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
@@ -16,16 +24,16 @@ describe('AppController', () => {
       providers: [
         AppService,
         {
-          provide: PubSubService,
+          provide: EventPublisherService,
           useFactory: () => ({
-            sendAsyncMessage: jest.fn().mockResolvedValue(undefined),
+            publish: jest.fn().mockResolvedValue(undefined),
           }),
         },
       ],
     }).compile();
 
     appController = app.get<AppController>(AppController);
-    pubSubService = app.get(PubSubService);
+    eventPublisherService = app.get(EventPublisherService);
   });
 
   describe('handleEvent', () => {
@@ -41,9 +49,9 @@ describe('AppController', () => {
       expect(result).toEqual({ response: 'ok' });
     });
 
-    it('should send message to PubSub with correct data', async () => {
+    it('should publish message with correct data', async () => {
       await appController.handleEvent(mockRequest, {});
-      expect(pubSubService.sendAsyncMessage).toHaveBeenCalledWith(
+      expect(eventPublisherService.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           timestamp: expect.any(Number),
           client_info: expect.objectContaining({

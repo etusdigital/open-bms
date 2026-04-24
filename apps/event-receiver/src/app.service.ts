@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { FastifyRequest } from 'fastify';
-import { PubSubService } from './pubsub.service';
+import { EventPublisherService } from './event-publisher.service';
 
 @Injectable()
 export class AppService {
-  constructor(private readonly pubSubService: PubSubService) {}
+  constructor(private readonly eventPublisherService: EventPublisherService) {}
 
   async handleMessage(request: FastifyRequest, headers: any) {
     const message: any = {};
@@ -96,7 +96,7 @@ export class AppService {
       args.event = message.payload?.MessageStatus;
     }
 
-    await this.pubSubService.sendAsyncMessage(message, args);
+    await this.eventPublisherService.publish(message, args);
 
     return { response: 'ok' };
   }
