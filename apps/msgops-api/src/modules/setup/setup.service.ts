@@ -146,7 +146,7 @@ export class SetupService {
 
         if (this.authProvider.supportsCredentialLogin()) {
           try {
-            await this.authProvider.updatePassword(providerId, data.password);
+            await this.authProvider.updatePassword(providerId, data.password, em);
           } catch (err) {
             // Password persistence failed after user was created — roll back the local user
             // row so the wizard can be retried cleanly. Provider-side user may remain orphaned

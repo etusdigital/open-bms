@@ -280,7 +280,7 @@ describe('SetupService', () => {
       expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_xact_lock'), [834729]);
       expect(authProvider.createUser).toHaveBeenCalledWith({ name: 'Admin', email: 'admin@bms.io', password: 'password1' });
       expect(userRepo.save).toHaveBeenCalledWith(expect.objectContaining({ email: 'admin@bms.io', providerId: 'local|abc', globalRoleId: SUPER_ADMIN_ROLE.id }));
-      expect(authProvider.updatePassword).toHaveBeenCalledWith('local|abc', 'password1');
+      expect(authProvider.updatePassword).toHaveBeenCalledWith('local|abc', 'password1', expect.objectContaining({ getRepository: expect.any(Function) }));
       expect(systemConfigRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ key: 'setup_wizard_step', value: expect.objectContaining({ currentStep: 2, completed: false, adminUserId: 17 }) }),
       );

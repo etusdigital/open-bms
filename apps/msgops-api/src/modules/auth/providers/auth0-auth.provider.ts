@@ -62,7 +62,9 @@ export class Auth0AuthProvider implements IAuthProvider {
     await this.management.users.update(providerId, data);
   }
 
-  async updatePassword(providerId: string, newPassword: string): Promise<void> {
+  async updatePassword(providerId: string, newPassword: string, _em?: import('typeorm').EntityManager): Promise<void> {
+    // Auth0 stores credentials externally — the optional EntityManager (used by
+    // LocalAuthProvider for tx-scoped lookups) is irrelevant here.
     await this.management.users.update(providerId, { password: newPassword });
   }
 

@@ -1,3 +1,5 @@
+import type { EntityManager } from 'typeorm';
+
 export const AUTH_PROVIDER_TOKEN = Symbol('AUTH_PROVIDER');
 
 export interface CreateAuthUserInput {
@@ -40,7 +42,7 @@ export interface AuthMeta {
 export interface IAuthProvider {
   createUser(input: CreateAuthUserInput): Promise<{ providerId: string }>;
   updateUser(providerId: string, patch: UpdateAuthUserInput): Promise<void>;
-  updatePassword(providerId: string, newPassword: string): Promise<void>;
+  updatePassword(providerId: string, newPassword: string, em?: EntityManager): Promise<void>;
   deleteUser(providerId: string): Promise<void>;
   verifyToken(accessToken: string): Promise<NormalizedJwtPayload>;
   supportsCredentialLogin(): boolean;
