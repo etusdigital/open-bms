@@ -5,6 +5,7 @@ import * as nodemailer from 'nodemailer';
 import { SystemConfigEntity } from '../../entities/system-config.entity';
 
 jest.mock('nodemailer', () => ({ createTransport: jest.fn() }));
+jest.mock('axios', () => ({ __esModule: true, default: { get: jest.fn() } }));
 import { UserEntity } from '../../entities/users.entity';
 import { RoleEntity } from '../../entities/role.entity';
 import { AccountEntity } from '../../entities/account.entity';
@@ -153,30 +154,30 @@ describe('SetupService', () => {
 
     it('returns configured=true once wizard is marked completed', async () => {
       const { service, systemConfigRepo } = await buildService();
-      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: true } });
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: true } });
 
       const status = await service.getStatus();
-      expect(status).toEqual({ configured: true, currentStep: 4 });
+      expect(status).toEqual({ configured: true, currentStep: 5 });
     });
   });
 
   describe('advanceStep — guards', () => {
     it('rejects all advance calls with 403 once wizard is completed', async () => {
       const { service, systemConfigRepo } = await buildService();
-      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: true } });
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: true } });
 
-      for (const step of [1, 2, 3, 4] as const) {
+      for (const step of [1, 2, 3, 4, 5] as const) {
         await expect(service.advanceStep({ step, data: {} as any })).rejects.toBeInstanceOf(ForbiddenException);
       }
     });
 
-    it('rejects out-of-order steps (POST step=4 when currentStep is still 2)', async () => {
+    it('rejects out-of-order steps (POST step=5 when currentStep is still 2)', async () => {
       const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 2, completed: false } });
 
       await expect(
         service.advanceStep({
-          step: 4,
+          step: 5,
           data: { accountName: 'A', poolName: 'P', senderEmail: 'a@b.io', senderName: 'A', replyToEmail: 'a@b.io', sendingLimit: 1 } as any,
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -280,7 +281,7 @@ describe('SetupService', () => {
       expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_xact_lock'), [834729]);
       expect(authProvider.createUser).toHaveBeenCalledWith({ name: 'Admin', email: 'admin@bms.io', password: 'password1' });
       expect(userRepo.save).toHaveBeenCalledWith(expect.objectContaining({ email: 'admin@bms.io', providerId: 'local|abc', globalRoleId: SUPER_ADMIN_ROLE.id }));
-      expect(authProvider.updatePassword).toHaveBeenCalledWith('local|abc', 'password1');
+      expect(authProvider.updatePassword).toHaveBeenCalledWith('local|abc', 'password1', expect.objectContaining({ getRepository: expect.any(Function) }));
       expect(systemConfigRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ key: 'setup_wizard_step', value: expect.objectContaining({ currentStep: 2, completed: false, adminUserId: 17 }) }),
       );
@@ -346,30 +347,92 @@ describe('SetupService', () => {
     });
   });
 
-  describe('step4 — account + pool', () => {
-    it('with skip=true, marks wizard completed without touching account/pool tables', async () => {
-      const { service, systemConfigRepo, accountRepo, poolRepo, userAccountRepo } = await buildService();
+  describe('step4 — SendGrid', () => {
+    it('with skip=true, advances to step 5 without persisting sendgrid_settings', async () => {
+      const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
 
       await service.advanceStep({ step: 4, data: { skip: true } as any });
 
+      expect(systemConfigRepo.save).not.toHaveBeenCalledWith(expect.objectContaining({ key: 'sendgrid_settings' }));
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: expect.objectContaining({ currentStep: 5, completed: false }) }));
+    });
+
+    it('persists sendgrid_settings with required fields and advances to step 5', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+
+      await service.advanceStep({
+        step: 4,
+        data: {
+          apiKey: 'SG.abcdefghij',
+          subuserEmail: 'billing@acme.io',
+          subuserPrefix: 'bms',
+          defaultIpPool: 'pool-1',
+          webhookBaseUrl: 'https://bms.io/bms/events',
+        } as any,
+      });
+
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          key: 'sendgrid_settings',
+          value: expect.objectContaining({
+            apiKey: 'SG.abcdefghij',
+            subuserEmail: 'billing@acme.io',
+            subuserPrefix: 'bms',
+            defaultIpPool: 'pool-1',
+            webhookBaseUrl: 'https://bms.io/bms/events',
+          }),
+        }),
+      );
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: expect.objectContaining({ currentStep: 5, completed: false }) }));
+    });
+
+    it('rejects payload without skip and without apiKey', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      await expect(service.advanceStep({ step: 4, data: {} as any })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects payload without skip that has apiKey but misses subuserEmail', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      await expect(service.advanceStep({ step: 4, data: { apiKey: 'SG.abcdefghij' } as any })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects apiKey not starting with SG.', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      await expect(service.advanceStep({ step: 4, data: { apiKey: 'nope-not-sg', subuserEmail: 'a@b.io' } as any })).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('step5 — account + pool', () => {
+    it('with skip=true, marks wizard completed without touching account/pool tables', async () => {
+      const { service, systemConfigRepo, accountRepo, poolRepo, userAccountRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: false } });
+
+      await service.advanceStep({ step: 5, data: { skip: true } as any });
+
       expect(accountRepo.save).not.toHaveBeenCalled();
       expect(poolRepo.save).not.toHaveBeenCalled();
       expect(userAccountRepo.save).not.toHaveBeenCalled();
-      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: expect.objectContaining({ currentStep: 4, completed: true }) }));
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'setup_wizard_step', value: expect.objectContaining({ currentStep: 5, completed: true }) }),
+      );
     });
 
     it('uses the adminUserId stored in wizard state (not "first super-admin") when linking master user', async () => {
       const { service, roleRepo, userRepo, accountRepo, poolRepo, userAccountRepo, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({
         key: 'setup_wizard_step',
-        value: { currentStep: 4, completed: false, adminUserId: 123 },
+        value: { currentStep: 5, completed: false, adminUserId: 123 },
       });
       userRepo.findOne.mockResolvedValue({ id: 123, email: 'admin@bms.io' });
       accountRepo.save.mockResolvedValue({ id: 100 });
 
       await service.advanceStep({
-        step: 4,
+        step: 5,
         data: {
           accountName: 'Acme',
           poolName: 'Acme Tx',
@@ -389,13 +452,13 @@ describe('SetupService', () => {
 
     it('falls back to the oldest super-admin (ORDER BY id ASC) when wizard state has no adminUserId', async () => {
       const { service, roleRepo, userRepo, accountRepo, userAccountRepo, systemConfigRepo } = await buildService();
-      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: false } });
       roleRepo.findOne.mockResolvedValue(SUPER_ADMIN_ROLE);
       userRepo.findOne.mockResolvedValue({ id: 7 });
       accountRepo.save.mockResolvedValue({ id: 200 });
 
       await service.advanceStep({
-        step: 4,
+        step: 5,
         data: {
           accountName: 'Acme',
           poolName: 'Acme Tx',
@@ -410,10 +473,10 @@ describe('SetupService', () => {
       expect(userAccountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ userId: 7, accountId: 200, isMasterUser: true }));
     });
 
-    it('rejects step4 payload that is neither skip nor full config (Joi or-constraint)', async () => {
+    it('rejects step5 payload that is neither skip nor full config (Joi or-constraint)', async () => {
       const { service, systemConfigRepo } = await buildService();
-      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
-      await expect(service.advanceStep({ step: 4, data: {} as any })).rejects.toBeInstanceOf(BadRequestException);
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: false } });
+      await expect(service.advanceStep({ step: 5, data: {} as any })).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
@@ -503,6 +566,142 @@ describe('SetupService', () => {
       }
       try {
         await service.testSmtp(body, '9.9.9.9');
+        throw new Error('expected 6th attempt to throw');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect(err.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+      }
+    });
+  });
+
+  describe('testSendgrid', () => {
+    const axiosMock = require('axios').default.get as jest.Mock;
+    afterEach(() => axiosMock.mockReset());
+
+    it('returns first_name as accountName on 2xx', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 200, data: { first_name: 'Maria', company: 'Acme', type: 'free' } });
+
+      const out = await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+
+      expect(axiosMock).toHaveBeenCalledWith(
+        'https://api.sendgrid.com/v3/user/account',
+        expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer SG.abcdefghij' }) }),
+      );
+      expect(out).toEqual({ accountName: 'Maria' });
+    });
+
+    it('falls back to company when first_name is absent', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 200, data: { company: 'Acme', type: 'free' } });
+
+      const out = await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+
+      expect(out).toEqual({ accountName: 'Acme' });
+    });
+
+    it('does NOT use res.data.type as accountName fallback (would mislead user with plan tier)', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 200, data: { type: 'free' } });
+
+      const out = await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+
+      expect(out).toEqual({ accountName: null });
+    });
+
+    it('maps 401 to UNAUTHORIZED with PT-BR message about Full Access', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 401, data: { errors: [{ message: 'unauthorized' }] } });
+
+      try {
+        await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+        throw new Error('expected to throw');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect(err.getStatus()).toBe(HttpStatus.UNAUTHORIZED);
+        expect(err.message).toMatch(/Full Access/);
+      }
+    });
+
+    it('maps 403 to UNAUTHORIZED with the same message', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 403, data: {} });
+
+      try {
+        await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+        throw new Error('expected to throw');
+      } catch (err: any) {
+        expect(err.getStatus()).toBe(HttpStatus.UNAUTHORIZED);
+      }
+    });
+
+    it('passes through 429 from SendGrid as TOO_MANY_REQUESTS', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 429, data: {} });
+
+      try {
+        await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+        throw new Error('expected to throw');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect(err.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+      }
+    });
+
+    it('maps unexpected status (5xx) to BAD_GATEWAY with generic message', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 502, data: { detail: 'upstream' } });
+
+      try {
+        await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+        throw new Error('expected to throw');
+      } catch (err: any) {
+        expect(err.getStatus()).toBe(HttpStatus.BAD_GATEWAY);
+        // Generic — does not leak upstream payload
+        expect(err.message).not.toMatch(/upstream/);
+      }
+    });
+
+    it('maps network errors (axios rejects) to BAD_GATEWAY', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockRejectedValue(new Error('connect ETIMEDOUT api.sendgrid.com'));
+
+      try {
+        await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+        throw new Error('expected to throw');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect(err.getStatus()).toBe(HttpStatus.BAD_GATEWAY);
+        expect(err.message).not.toMatch(/ETIMEDOUT|api\.sendgrid\.com/);
+      }
+    });
+
+    it('rejects testSendgrid once wizard is already completed', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: true } });
+
+      await expect(service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(axiosMock).not.toHaveBeenCalled();
+    });
+
+    it('applies per-IP rate limit independently of testSmtp (6th SendGrid attempt returns 429)', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 200, data: { first_name: 'X' } });
+
+      for (let i = 0; i < 5; i++) {
+        await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '8.8.8.8');
+      }
+      try {
+        await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '8.8.8.8');
         throw new Error('expected 6th attempt to throw');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);

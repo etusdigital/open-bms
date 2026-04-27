@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inj
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import * as nodemailer from 'nodemailer';
+import axios from 'axios';
 import { SystemConfigEntity } from '../../entities/system-config.entity';
 import { UserEntity } from '../../entities/users.entity';
 import { RoleEntity } from '../../entities/role.entity';
@@ -10,17 +11,19 @@ import { PoolEntity } from '../../entities/pool.entity';
 import { UserAccountEntity } from '../../entities/users-account.entity';
 import { AUTH_PROVIDER_TOKEN, IAuthProvider } from '../auth/providers/auth.provider.interface';
 import { ROLE_CODES } from '../authz/authz.constants';
-import { AdvanceStepDto, STEP_SCHEMAS, Step1Data, Step2Data, Step3Data, Step4Data } from './dtos/advance-step.dto';
+import { AdvanceStepDto, STEP_SCHEMAS, Step1Data, Step2Data, Step3Data, Step4Data, Step5Data } from './dtos/advance-step.dto';
 import { TestSmtpDto } from './dtos/test-smtp.dto';
+import { TestSendgridDto } from './dtos/test-sendgrid.dto';
 
 const WIZARD_KEY = 'setup_wizard_step';
 const SMTP_KEY = 'smtp_settings';
 const DOMAIN_KEY = 'domain_settings';
+const SENDGRID_KEY = 'sendgrid_settings';
 // Shared with seedAdmin (bootstrap/seed-admin.ts) so the wizard serializes against the same lock.
 const ADVISORY_LOCK_KEY = 834729;
 // Rate limit for testSmtp — window in ms and max attempts per IP in that window.
-const TEST_SMTP_WINDOW_MS = 60_000;
-const TEST_SMTP_MAX_PER_WINDOW = 5;
+const TEST_RATE_WINDOW_MS = 60_000;
+const TEST_RATE_MAX_PER_WINDOW = 5;
 
 type WizardState = {
   currentStep: number;
@@ -30,11 +33,18 @@ type WizardState = {
 
 type SmtpSettings = Omit<Step2Data, never>;
 type DomainSettings = Step3Data;
+type SendgridSettings = {
+  apiKey: string;
+  subuserEmail: string;
+  subuserPrefix?: string;
+  defaultIpPool?: string;
+  webhookBaseUrl?: string;
+};
 
 @Injectable()
 export class SetupService {
   private readonly logger = new Logger(SetupService.name);
-  private readonly testSmtpHits = new Map<string, number[]>();
+  private readonly testProviderHits = new Map<string, number[]>();
 
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
@@ -47,9 +57,9 @@ export class SetupService {
     @Inject(AUTH_PROVIDER_TOKEN) private readonly authProvider: IAuthProvider,
   ) {}
 
-  async getStatus(): Promise<{ configured: boolean; currentStep: number }> {
+  async getStatus(): Promise<{ configured: boolean; currentStep: number; baseUrl?: string }> {
     const state = await this.readWizard();
-    if (state?.completed) return { configured: true, currentStep: 4 };
+    if (state?.completed) return { configured: true, currentStep: 5 };
 
     const superAdminRole = await this.roleRepo.findOne({ where: { code: ROLE_CODES.SUPER_ADMIN } });
     if (superAdminRole) {
@@ -58,7 +68,13 @@ export class SetupService {
     }
 
     if (!state) return { configured: false, currentStep: 1 };
-    return { configured: false, currentStep: state.currentStep || 1 };
+
+    // Expose the step-3 baseUrl so Step4Sendgrid can pre-fill the webhook URL
+    // without a second round-trip.
+    const domainCfg = await this.systemConfigRepo.findOne({ where: { key: DOMAIN_KEY } });
+    const baseUrl: string | undefined = (domainCfg?.value as any)?.baseUrl;
+
+    return { configured: false, currentStep: state.currentStep || 1, ...(baseUrl && { baseUrl }) };
   }
 
   async advanceStep(dto: AdvanceStepDto): Promise<void> {
@@ -76,7 +92,7 @@ export class SetupService {
     const state = await this.readWizard();
     const expectedStep = state?.currentStep ?? 1;
     if (dto.step > expectedStep) {
-      throw new BadRequestException(`Out-of-order step: expected ${expectedStep}, got ${dto.step}`);
+      throw new BadRequestException(`Passo fora de ordem: esperado ${expectedStep}, recebido ${dto.step}.`);
     }
 
     switch (dto.step) {
@@ -88,6 +104,8 @@ export class SetupService {
         return this.step3(value as Step3Data);
       case 4:
         return this.step4(value as Step4Data);
+      case 5:
+        return this.step5(value as Step5Data);
     }
   }
 
@@ -128,7 +146,7 @@ export class SetupService {
 
         if (this.authProvider.supportsCredentialLogin()) {
           try {
-            await this.authProvider.updatePassword(providerId, data.password);
+            await this.authProvider.updatePassword(providerId, data.password, em);
           } catch (err) {
             // Password persistence failed after user was created — roll back the local user
             // row so the wizard can be retried cleanly. Provider-side user may remain orphaned
@@ -156,6 +174,23 @@ export class SetupService {
   }
 
   private async step4(data: Step4Data): Promise<void> {
+    if (data.skip) {
+      await this.upsertWizard({ currentStep: 5 });
+      return;
+    }
+
+    const value: SendgridSettings = {
+      apiKey: data.apiKey!,
+      subuserEmail: data.subuserEmail!,
+      ...(data.subuserPrefix && { subuserPrefix: data.subuserPrefix }),
+      ...(data.defaultIpPool && { defaultIpPool: data.defaultIpPool }),
+      ...(data.webhookBaseUrl && { webhookBaseUrl: data.webhookBaseUrl }),
+    };
+    await this.systemConfigRepo.save(this.systemConfigRepo.create({ key: SENDGRID_KEY, value }));
+    await this.upsertWizard({ currentStep: 5 });
+  }
+
+  private async step5(data: Step5Data): Promise<void> {
     if (data.skip) {
       await this.completeWizard();
       return;
@@ -208,22 +243,54 @@ export class SetupService {
       });
       await this.userAccountRepo.save(userAccount);
     } else {
-      this.logger.warn(`Setup step4: created account ${savedAccount.id} but no admin user found to link as master`);
+      this.logger.warn(`Setup step5: created account ${savedAccount.id} but no admin user found to link as master`);
     }
 
     await this.completeWizard();
   }
 
+  async testSendgrid(dto: TestSendgridDto, requesterIp?: string): Promise<{ accountName: string | null }> {
+    await this.ensureNotConfigured();
+    this.enforceTestRateLimit('sendgrid', requesterIp);
+
+    try {
+      const res = await axios.get('https://api.sendgrid.com/v3/user/account', {
+        headers: { Authorization: `Bearer ${dto.apiKey}` },
+        timeout: 10_000,
+        validateStatus: () => true,
+      });
+      if (res.status >= 200 && res.status < 300) {
+        // Prefer human-readable identifiers; intentionally do NOT fall back to res.data.type
+        // (the SendGrid plan tier — "free", "reseller", etc) since it would render as
+        // "✅ Conectado — free", which misleadingly looks like an account name.
+        const name: string | undefined = res.data?.first_name || res.data?.company;
+        return { accountName: name ?? null };
+      }
+      if (res.status === 401 || res.status === 403) {
+        throw new HttpException('Credenciais inválidas. Verifique se a API Key tem permissão Full Access.', HttpStatus.UNAUTHORIZED);
+      }
+      if (res.status === 429) {
+        throw new HttpException('SendGrid aplicou rate limit. Aguarde alguns segundos e tente novamente.', HttpStatus.TOO_MANY_REQUESTS);
+      }
+      this.logger.warn(`SendGrid test returned HTTP ${res.status}: ${JSON.stringify(res.data)?.slice(0, 200)}`);
+      throw new HttpException('Falha ao validar credenciais SendGrid.', HttpStatus.BAD_GATEWAY);
+    } catch (e: any) {
+      if (e instanceof HttpException) throw e;
+      this.logger.warn(`SendGrid test network error: ${e?.message ?? 'unknown'}`);
+      throw new HttpException('Não foi possível contatar o SendGrid. Verifique sua conexão.', HttpStatus.BAD_GATEWAY);
+    }
+  }
+
   async testSmtp(dto: TestSmtpDto, requesterIp?: string): Promise<void> {
     await this.ensureNotConfigured();
-    this.enforceTestSmtpRateLimit(requesterIp);
+    this.enforceTestRateLimit('smtp', requesterIp);
 
     // AC#2 says the test email lands on the admin's address. Resolve it server-side from
     // the step1 admin so the endpoint cannot be used as an open relay with arbitrary
     // recipients.
     const toEmail = await this.resolveAdminEmail();
     if (!toEmail) {
-      throw new BadRequestException('Complete step 1 (create admin) before testing SMTP.');
+      throw new BadRequestException('Conclua o passo 1 (criar admin) antes de testar o SMTP.');
     }
 
     const transporter = nodemailer.createTransport({
@@ -249,20 +316,21 @@ export class SetupService {
   private async ensureNotConfigured(): Promise<void> {
     const state = await this.readWizard();
     if (state?.completed) {
-      throw new ForbiddenException('Setup is already complete.');
+      throw new ForbiddenException('A configuração inicial já foi concluída.');
     }
   }
 
-  private enforceTestSmtpRateLimit(requesterIp?: string): void {
-    const key = requesterIp || 'unknown';
+  private enforceTestRateLimit(provider: 'smtp' | 'sendgrid', requesterIp?: string): void {
+    const key = `${provider}:${requesterIp || 'unknown'}`;
     const now = Date.now();
-    const windowStart = now - TEST_SMTP_WINDOW_MS;
-    const hits = (this.testSmtpHits.get(key) || []).filter((t) => t > windowStart);
-    if (hits.length >= TEST_SMTP_MAX_PER_WINDOW) {
-      throw new HttpException('Too many SMTP test attempts. Try again in a minute.', HttpStatus.TOO_MANY_REQUESTS);
+    const windowStart = now - TEST_RATE_WINDOW_MS;
+    const hits = (this.testProviderHits.get(key) || []).filter((t: number) => t > windowStart);
+    if (hits.length >= TEST_RATE_MAX_PER_WINDOW) {
+      const label = provider === 'smtp' ? 'SMTP' : 'SendGrid';
+      throw new HttpException(`Muitas tentativas de teste ${label}. Aguarde um minuto e tente novamente.`, HttpStatus.TOO_MANY_REQUESTS);
     }
     hits.push(now);
-    this.testSmtpHits.set(key, hits);
+    this.testProviderHits.set(key, hits);
   }
 
   private async resolveAdminEmail(): Promise<string | null> {
@@ -327,7 +395,7 @@ export class SetupService {
   private async completeWizard(): Promise<void> {
     const existing = await this.readWizard();
     const next: WizardState = {
-      currentStep: 4,
+      currentStep: existing?.currentStep ?? 5,
       completed: true,
       adminUserId: existing?.adminUserId,
     };

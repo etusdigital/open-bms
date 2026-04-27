@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException, UnauthorizedException, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
@@ -52,13 +52,18 @@ export class LocalAuthProvider implements IAuthProvider {
     await this.userRepository.createQueryBuilder().update(UserEntity).set(data).where('provider_id = :providerId', { providerId }).andWhere('deleted_at IS NULL').execute();
   }
 
-  async updatePassword(providerId: string, newPassword: string): Promise<void> {
+  async updatePassword(providerId: string, newPassword: string, em?: EntityManager): Promise<void> {
     if (!providerId.startsWith(PROVIDER_PREFIX)) {
       throw new BadRequestException('LocalAuthProvider cannot update non-local provider user');
     }
-    const user = await this.userRepository.findOne({ where: { providerId } });
+    // When called from inside a transaction, the just-saved user row is only visible
+    // through the transaction's EntityManager. Fall back to the injected pool repos
+    // when no EM is provided.
+    const userRepo = em ? em.getRepository(UserEntity) : this.userRepository;
+    const credentialsRepo = em ? em.getRepository(UserCredentialsEntity) : this.credentialsRepository;
+    const user = await userRepo.findOne({ where: { providerId } });
     if (!user) throw new NotFoundException('User not found');
-    await this.upsertCredentials(user.id, newPassword);
+    await this.upsertCredentials(user.id, newPassword, credentialsRepo);
     await this.authzService.invalidateUserCache(providerId);
   }
 
@@ -156,13 +161,13 @@ export class LocalAuthProvider implements IAuthProvider {
     }
   }
 
-  private async upsertCredentials(userId: number, password: string): Promise<void> {
+  private async upsertCredentials(userId: number, password: string, repo: Repository<UserCredentialsEntity> = this.credentialsRepository): Promise<void> {
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    const existing = await this.credentialsRepository.findOne({ where: { userId } });
+    const existing = await repo.findOne({ where: { userId } });
     if (existing) {
-      await this.credentialsRepository.update({ userId }, { passwordHash: hash });
+      await repo.update({ userId }, { passwordHash: hash });
     } else {
-      await this.credentialsRepository.save(this.credentialsRepository.create({ userId, passwordHash: hash }));
+      await repo.save(repo.create({ userId, passwordHash: hash }));
     }
   }
 

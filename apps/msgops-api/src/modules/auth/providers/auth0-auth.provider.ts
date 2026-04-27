@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Injectable, UnauthorizedException } from '@n
 import { ManagementClient } from 'auth0';
 import * as jwt from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
+import type { EntityManager } from 'typeorm';
 import { CreateAuthUserInput, IAuthProvider, NormalizedJwtPayload, UpdateAuthUserInput } from './auth.provider.interface';
 
 @Injectable()
@@ -62,7 +63,9 @@ export class Auth0AuthProvider implements IAuthProvider {
     await this.management.users.update(providerId, data);
   }
 
-  async updatePassword(providerId: string, newPassword: string): Promise<void> {
+  async updatePassword(providerId: string, newPassword: string, _em?: EntityManager): Promise<void> {
+    // Auth0 stores credentials externally — the optional EntityManager (used by
+    // LocalAuthProvider for tx-scoped lookups) is irrelevant here.
     await this.management.users.update(providerId, { password: newPassword });
   }
 
