@@ -5,6 +5,7 @@ import * as nodemailer from 'nodemailer';
 import { SystemConfigEntity } from '../../entities/system-config.entity';
 
 jest.mock('nodemailer', () => ({ createTransport: jest.fn() }));
+jest.mock('axios', () => ({ __esModule: true, default: { get: jest.fn() } }));
 import { UserEntity } from '../../entities/users.entity';
 import { RoleEntity } from '../../entities/role.entity';
 import { AccountEntity } from '../../entities/account.entity';
@@ -416,8 +417,9 @@ describe('SetupService', () => {
       expect(accountRepo.save).not.toHaveBeenCalled();
       expect(poolRepo.save).not.toHaveBeenCalled();
       expect(userAccountRepo.save).not.toHaveBeenCalled();
-      // completeWizard persists on WIZARD_KEY with currentStep preserved (5) and completed=true
-      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ key: 'setup_wizard_step', value: expect.objectContaining({ completed: true }) }));
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'setup_wizard_step', value: expect.objectContaining({ currentStep: 5, completed: true }) }),
+      );
     });
 
     it('uses the adminUserId stored in wizard state (not "first super-admin") when linking master user', async () => {
@@ -564,6 +566,142 @@ describe('SetupService', () => {
       }
       try {
         await service.testSmtp(body, '9.9.9.9');
+        throw new Error('expected 6th attempt to throw');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect(err.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+      }
+    });
+  });
+
+  describe('testSendgrid', () => {
+    const axiosMock = require('axios').default.get as jest.Mock;
+    afterEach(() => axiosMock.mockReset());
+
+    it('returns first_name as accountName on 2xx', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 200, data: { first_name: 'Maria', company: 'Acme', type: 'free' } });
+
+      const out = await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+
+      expect(axiosMock).toHaveBeenCalledWith(
+        'https://api.sendgrid.com/v3/user/account',
+        expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer SG.abcdefghij' }) }),
+      );
+      expect(out).toEqual({ accountName: 'Maria' });
+    });
+
+    it('falls back to company when first_name is absent', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 200, data: { company: 'Acme', type: 'free' } });
+
+      const out = await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+
+      expect(out).toEqual({ accountName: 'Acme' });
+    });
+
+    it('does NOT use res.data.type as accountName fallback (would mislead user with plan tier)', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 200, data: { type: 'free' } });
+
+      const out = await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+
+      expect(out).toEqual({ accountName: null });
+    });
+
+    it('maps 401 to UNAUTHORIZED with PT-BR message about Full Access', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 401, data: { errors: [{ message: 'unauthorized' }] } });
+
+      try {
+        await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+        throw new Error('expected to throw');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect(err.getStatus()).toBe(HttpStatus.UNAUTHORIZED);
+        expect(err.message).toMatch(/Full Access/);
+      }
+    });
+
+    it('maps 403 to UNAUTHORIZED with the same message', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 403, data: {} });
+
+      try {
+        await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+        throw new Error('expected to throw');
+      } catch (err: any) {
+        expect(err.getStatus()).toBe(HttpStatus.UNAUTHORIZED);
+      }
+    });
+
+    it('passes through 429 from SendGrid as TOO_MANY_REQUESTS', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 429, data: {} });
+
+      try {
+        await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+        throw new Error('expected to throw');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect(err.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+      }
+    });
+
+    it('maps unexpected status (5xx) to BAD_GATEWAY with generic message', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 502, data: { detail: 'upstream' } });
+
+      try {
+        await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+        throw new Error('expected to throw');
+      } catch (err: any) {
+        expect(err.getStatus()).toBe(HttpStatus.BAD_GATEWAY);
+        // Generic — does not leak upstream payload
+        expect(err.message).not.toMatch(/upstream/);
+      }
+    });
+
+    it('maps network errors (axios rejects) to BAD_GATEWAY', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockRejectedValue(new Error('connect ETIMEDOUT api.sendgrid.com'));
+
+      try {
+        await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1');
+        throw new Error('expected to throw');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect(err.getStatus()).toBe(HttpStatus.BAD_GATEWAY);
+        expect(err.message).not.toMatch(/ETIMEDOUT|api\.sendgrid\.com/);
+      }
+    });
+
+    it('rejects testSendgrid once wizard is already completed', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: true } });
+
+      await expect(service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '1.1.1.1')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(axiosMock).not.toHaveBeenCalled();
+    });
+
+    it('applies per-IP rate limit independently of testSmtp (6th SendGrid attempt returns 429)', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
+      axiosMock.mockResolvedValue({ status: 200, data: { first_name: 'X' } });
+
+      for (let i = 0; i < 5; i++) {
+        await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '8.8.8.8');
+      }
+      try {
+        await service.testSendgrid({ apiKey: 'SG.abcdefghij' } as any, '8.8.8.8');
         throw new Error('expected 6th attempt to throw');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);

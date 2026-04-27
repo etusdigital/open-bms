@@ -22,8 +22,8 @@ const SENDGRID_KEY = 'sendgrid_settings';
 // Shared with seedAdmin (bootstrap/seed-admin.ts) so the wizard serializes against the same lock.
 const ADVISORY_LOCK_KEY = 834729;
 // Rate limit for testSmtp — window in ms and max attempts per IP in that window.
-const TEST_SMTP_WINDOW_MS = 60_000;
-const TEST_SMTP_MAX_PER_WINDOW = 5;
+const TEST_RATE_WINDOW_MS = 60_000;
+const TEST_RATE_MAX_PER_WINDOW = 5;
 
 type WizardState = {
   currentStep: number;
@@ -44,7 +44,7 @@ type SendgridSettings = {
 @Injectable()
 export class SetupService {
   private readonly logger = new Logger(SetupService.name);
-  private readonly testSmtpHits = new Map<string, number[]>();
+  private readonly testProviderHits = new Map<string, number[]>();
 
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
@@ -92,7 +92,7 @@ export class SetupService {
     const state = await this.readWizard();
     const expectedStep = state?.currentStep ?? 1;
     if (dto.step > expectedStep) {
-      throw new BadRequestException(`Out-of-order step: expected ${expectedStep}, got ${dto.step}`);
+      throw new BadRequestException(`Passo fora de ordem: esperado ${expectedStep}, recebido ${dto.step}.`);
     }
 
     switch (dto.step) {
@@ -251,7 +251,7 @@ export class SetupService {
 
   async testSendgrid(dto: TestSendgridDto, requesterIp?: string): Promise<{ accountName: string | null }> {
     await this.ensureNotConfigured();
-    this.enforceTestSendgridRateLimit(requesterIp);
+    this.enforceTestRateLimit('sendgrid', requesterIp);
 
     try {
       const res = await axios.get('https://api.sendgrid.com/v3/user/account', {
@@ -260,7 +260,10 @@ export class SetupService {
         validateStatus: () => true,
       });
       if (res.status >= 200 && res.status < 300) {
-        const name: string | undefined = res.data?.first_name || res.data?.company || res.data?.type;
+        // Prefer human-readable identifiers; intentionally do NOT fall back to res.data.type
+        // (the SendGrid plan tier — "free", "reseller", etc) since it would render as
+        // "✅ Conectado — free", which misleadingly looks like an account name.
+        const name: string | undefined = res.data?.first_name || res.data?.company;
         return { accountName: name ?? null };
       }
       if (res.status === 401 || res.status === 403) {
@@ -280,14 +283,14 @@ export class SetupService {
 
   async testSmtp(dto: TestSmtpDto, requesterIp?: string): Promise<void> {
     await this.ensureNotConfigured();
-    this.enforceTestSmtpRateLimit(requesterIp);
+    this.enforceTestRateLimit('smtp', requesterIp);
 
     // AC#2 says the test email lands on the admin's address. Resolve it server-side from
     // the step1 admin so the endpoint cannot be used as an open relay with arbitrary
     // recipients.
     const toEmail = await this.resolveAdminEmail();
     if (!toEmail) {
-      throw new BadRequestException('Complete step 1 (create admin) before testing SMTP.');
+      throw new BadRequestException('Conclua o passo 1 (criar admin) antes de testar o SMTP.');
     }
 
     const transporter = nodemailer.createTransport({
@@ -313,32 +316,21 @@ export class SetupService {
   private async ensureNotConfigured(): Promise<void> {
     const state = await this.readWizard();
     if (state?.completed) {
-      throw new ForbiddenException('Setup is already complete.');
+      throw new ForbiddenException('A configuração inicial já foi concluída.');
     }
   }
 
-  private enforceTestSmtpRateLimit(requesterIp?: string): void {
-    const key = requesterIp || 'unknown';
+  private enforceTestRateLimit(provider: 'smtp' | 'sendgrid', requesterIp?: string): void {
+    const key = `${provider}:${requesterIp || 'unknown'}`;
     const now = Date.now();
-    const windowStart = now - TEST_SMTP_WINDOW_MS;
-    const hits = (this.testSmtpHits.get(key) || []).filter((t) => t > windowStart);
-    if (hits.length >= TEST_SMTP_MAX_PER_WINDOW) {
-      throw new HttpException('Too many SMTP test attempts. Try again in a minute.', HttpStatus.TOO_MANY_REQUESTS);
+    const windowStart = now - TEST_RATE_WINDOW_MS;
+    const hits = (this.testProviderHits.get(key) || []).filter((t: number) => t > windowStart);
+    if (hits.length >= TEST_RATE_MAX_PER_WINDOW) {
+      const label = provider === 'smtp' ? 'SMTP' : 'SendGrid';
+      throw new HttpException(`Muitas tentativas de teste ${label}. Aguarde um minuto e tente novamente.`, HttpStatus.TOO_MANY_REQUESTS);
     }
     hits.push(now);
-    this.testSmtpHits.set(key, hits);
-  }
-
-  private enforceTestSendgridRateLimit(requesterIp?: string): void {
-    const key = `sg:${requesterIp || 'unknown'}`;
-    const now = Date.now();
-    const windowStart = now - TEST_SMTP_WINDOW_MS;
-    const hits = (this.testSmtpHits.get(key) || []).filter((t) => t > windowStart);
-    if (hits.length >= TEST_SMTP_MAX_PER_WINDOW) {
-      throw new HttpException('Too many SendGrid test attempts. Try again in a minute.', HttpStatus.TOO_MANY_REQUESTS);
-    }
-    hits.push(now);
-    this.testSmtpHits.set(key, hits);
+    this.testProviderHits.set(key, hits);
   }
 
   private async resolveAdminEmail(): Promise<string | null> {
@@ -403,7 +395,7 @@ export class SetupService {
   private async completeWizard(): Promise<void> {
     const existing = await this.readWizard();
     const next: WizardState = {
-      currentStep: 4,
+      currentStep: existing?.currentStep ?? 5,
       completed: true,
       adminUserId: existing?.adminUserId,
     };

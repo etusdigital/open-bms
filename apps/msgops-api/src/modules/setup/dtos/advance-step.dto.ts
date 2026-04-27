@@ -1,6 +1,12 @@
 import Joi from 'joi';
 import { JoiSchema } from 'nestjs-joi';
 
+// Centralized SendGrid API key constraints. Shared between step4Schema and TestSendgridDto
+// so a future format change (length, prefix) edits one place instead of three.
+export const SENDGRID_API_KEY_PREFIX = 'SG.';
+export const SENDGRID_API_KEY_PATTERN = /^SG\./;
+export const SENDGRID_API_KEY_MIN_LENGTH = 10;
+
 export class Step1Data {
   name: string;
   email: string;
@@ -73,7 +79,7 @@ export const step4Schema = Joi.alternatives<Step4Data>().try(
   Joi.object({ skip: Joi.valid(true).required() }),
   Joi.object({
     skip: Joi.valid(false).optional(),
-    apiKey: Joi.string().trim().pattern(/^SG\./, 'starts with SG.').min(10).required(),
+    apiKey: Joi.string().trim().pattern(SENDGRID_API_KEY_PATTERN, `starts with ${SENDGRID_API_KEY_PREFIX}`).min(SENDGRID_API_KEY_MIN_LENGTH).required(),
     subuserEmail: Joi.string()
       .email({ tlds: { allow: false } })
       .required(),
@@ -88,22 +94,28 @@ export const step4Schema = Joi.alternatives<Step4Data>().try(
   }),
 );
 
-export const step5Schema = Joi.object<Step5Data>({
-  skip: Joi.boolean().optional(),
-  accountName: Joi.string().trim().min(1).optional(),
-  poolName: Joi.string().trim().min(1).optional(),
-  senderEmail: Joi.string()
-    .email({ tlds: { allow: false } })
-    .optional(),
-  senderName: Joi.string().trim().min(1).optional(),
-  replyToEmail: Joi.string()
-    .email({ tlds: { allow: false } })
-    .optional(),
-  sendingLimit: Joi.number().integer().min(1).optional(),
-  ips: Joi.array()
-    .items(Joi.string().ip({ version: ['ipv4', 'ipv6'] }))
-    .optional(),
-}).or('skip', 'accountName'); // at least one: skip=true or full config
+// Same discriminated pattern as step4: either skip=true alone, or a full config payload
+// with skip omitted/false. `match: 'one'` makes ambiguous payloads (skip=true + accountName)
+// fail validation instead of silently ignoring extra fields.
+export const step5Schema = Joi.alternatives<Step5Data>().try(
+  Joi.object({ skip: Joi.valid(true).required() }),
+  Joi.object({
+    skip: Joi.valid(false).optional(),
+    accountName: Joi.string().trim().min(1).required(),
+    poolName: Joi.string().trim().min(1).optional(),
+    senderEmail: Joi.string()
+      .email({ tlds: { allow: false } })
+      .optional(),
+    senderName: Joi.string().trim().min(1).optional(),
+    replyToEmail: Joi.string()
+      .email({ tlds: { allow: false } })
+      .optional(),
+    sendingLimit: Joi.number().integer().min(1).optional(),
+    ips: Joi.array()
+      .items(Joi.string().ip({ version: ['ipv4', 'ipv6'] }))
+      .optional(),
+  }),
+);
 
 export const STEP_SCHEMAS = { 1: step1Schema, 2: step2Schema, 3: step3Schema, 4: step4Schema, 5: step5Schema } as const;
 

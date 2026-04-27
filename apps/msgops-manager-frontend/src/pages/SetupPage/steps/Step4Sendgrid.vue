@@ -26,7 +26,7 @@ const schema = toTypedSchema(
     subuserEmail: z.string().email('Email inválido'),
     subuserPrefix: z
       .string()
-      .regex(/^[a-z0-9-]*$/, 'Use apenas letras minúsculas, números e hífen')
+      .regex(/^[a-z0-9-]+$/, 'Use apenas letras minúsculas, números e hífen')
       .optional()
       .or(z.literal('')),
     defaultIpPool: z.string().optional().or(z.literal('')),
