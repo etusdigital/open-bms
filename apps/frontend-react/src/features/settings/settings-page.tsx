@@ -8,7 +8,7 @@ import { ListPage } from '@/components/list-page';
 import { selectIsSuperAdmin, useAppStore } from '@/stores/app-store';
 import { useAccountConfig, useAccountId, useTimezone, useUpdateAccountConfigs } from './use-settings';
 import { SETTINGS_TABS, type SettingsTab } from './types';
-import { SendgridTab } from './sendgrid-tab';
+import { SendgridAccountTab } from './sendgrid-account-tab';
 import { PoolTab } from './pool-tab';
 
 export default function SettingsPage() {
@@ -17,7 +17,7 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<SettingsTab>('general');
 
   const visibleTabs = useMemo<SettingsTab[]>(
-    () => (isSuperAdmin ? [...SETTINGS_TABS, 'sendgrid', 'pool'] : SETTINGS_TABS),
+    () => (isSuperAdmin ? [...SETTINGS_TABS, 'pool'] : SETTINGS_TABS),
     [isSuperAdmin],
   );
 
@@ -44,7 +44,7 @@ export default function SettingsPage() {
         <div className="p-6">
           {tab === 'general' && <GeneralTab />}
           {tab === 'email' && <EmailTab />}
-          {tab === 'sendgrid' && isSuperAdmin && <SendgridTab />}
+          {tab === 'sendgrid' && <SendgridAccountTab />}
           {tab === 'pool' && isSuperAdmin && <PoolTab />}
         </div>
       </ListPage.Content>

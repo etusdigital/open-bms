@@ -1683,7 +1683,19 @@
     "sendgridSaveOk": "Configurações SendGrid salvas.",
     "sendgridSaveError": "Erro ao salvar configurações SendGrid.",
     "sendgridLoadError": "Erro ao carregar configurações SendGrid.",
-    "sendgridApiKeyInvalid": "Informe uma API Key válida começando com \"SG.\"."
+    "sendgridApiKeyInvalid": "Informe uma API Key válida começando com \"SG.\".",
+    "sendgridDeleteOk": "Chave SendGrid removida.",
+    "sendgridDeleteError": "Erro ao remover chave SendGrid.",
+    "sendgridSourceLabel": "Fonte ativa",
+    "sendgridSourceAccount": "Esta conta usa uma chave SendGrid própria.",
+    "sendgridSourceGlobal": "Esta conta está usando a chave global da plataforma. Cole sua chave abaixo para usar uma chave própria.",
+    "sendgridSourceNone": "Nenhuma chave SendGrid configurada — envios de email não funcionarão até que uma chave seja informada.",
+    "sendgridStoredLabel": "Chave armazenada",
+    "sendgridReplaceApiKey": "Substituir API Key",
+    "sendgridUseGlobalInstead": "Usar chave global",
+    "sendgridSaveAndRegister": "Salvar e registrar webhook",
+    "sendgridGlobalScopeHelp": "Esta chave é usada como fallback por contas que não configuraram uma chave própria. Os clientes não veem esta chave.",
+    "sendgridNoStoredKey": "Nenhuma chave global configurada."
   },
   "twofaMessages": {
     "pageTitle": "2FA",

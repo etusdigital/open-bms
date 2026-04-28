@@ -1,8 +1,15 @@
 import { apiClient } from '@/lib/api-client';
 
-export interface SendgridSettings {
+// Global (super-admin) SendGrid view. The plaintext key is never returned —
+// the backend masks it as `SG.****...<last4>`. The webhook is registered
+// per-account, so this scope has no `webhookBaseUrl`.
+export interface GlobalSendgridSettings {
+  apiKeyMasked: string;
+  hasKey: boolean;
+}
+
+export interface SaveSendgridPayload {
   apiKey: string;
-  webhookBaseUrl?: string;
 }
 
 export interface SendgridTestResult {
@@ -10,13 +17,18 @@ export interface SendgridTestResult {
 }
 
 export const sendgridGateway = {
-  async getSendgrid(): Promise<SendgridSettings | null> {
-    const res = await apiClient.get<SendgridSettings | null>('/settings/sendgrid');
+  async getSendgrid(): Promise<GlobalSendgridSettings | null> {
+    const res = await apiClient.get<GlobalSendgridSettings | null>('/settings/sendgrid');
     return res.data ?? null;
   },
 
-  async saveSendgrid(payload: SendgridSettings): Promise<void> {
-    await apiClient.put('/settings/sendgrid', payload);
+  async saveSendgrid(payload: SaveSendgridPayload): Promise<GlobalSendgridSettings> {
+    const res = await apiClient.put<GlobalSendgridSettings>('/settings/sendgrid', payload);
+    return res.data;
+  },
+
+  async deleteSendgrid(): Promise<void> {
+    await apiClient.delete('/settings/sendgrid');
   },
 
   async testSendgrid(apiKey: string): Promise<SendgridTestResult> {

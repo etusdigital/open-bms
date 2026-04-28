@@ -2,34 +2,42 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Trash2, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { sendgridGateway, type GlobalSendgridSettings } from './sendgrid-gateway';
+import { useAccountId } from './use-settings';
+import { accountSendgridGateway, type AccountSendgridSettings } from './sendgrid-account-gateway';
 
 const SENDGRID_API_KEY_PREFIX = 'SG.';
 const SENDGRID_API_KEY_MIN_LENGTH = 10;
 
-// Super-admin tab for the platform-wide SendGrid fallback key. The webhook
-// is registered per-account, not here — accounts that haven't configured
-// their own key inherit this one for outbound mail. The plaintext key is
-// never shown back: the backend masks it as `SG.****...<last4>`.
-export function SendgridTab() {
+// Per-account SendGrid configuration. The user pastes their own SendGrid
+// API key, and the backend registers an event webhook against that key
+// pointed at this BMS instance with `&account=<id>` so the event-process
+// worker can route incoming events to the right tenant.
+//
+// When the account has no key, mail goes through the platform-wide
+// fallback set by super_admin in /settings (sendgridGlobal tab). The
+// banner makes the active source explicit.
+export function SendgridAccountTab() {
   const { t } = useTranslation();
-  const [stored, setStored] = useState<GlobalSendgridSettings | null>(null);
+  const accountId = useAccountId();
+  const [stored, setStored] = useState<AccountSendgridSettings | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    if (!accountId) return;
     let cancelled = false;
-    sendgridGateway
-      .getSendgrid()
+    accountSendgridGateway
+      .get(accountId)
       .then((value) => {
         if (cancelled) return;
         setStored(value);
@@ -46,7 +54,7 @@ export function SendgridTab() {
     return () => {
       cancelled = true;
     };
-  }, [t]);
+  }, [accountId, t]);
 
   function isApiKeyValid(value: string): boolean {
     return value.startsWith(SENDGRID_API_KEY_PREFIX) && value.length >= SENDGRID_API_KEY_MIN_LENGTH;
@@ -59,7 +67,7 @@ export function SendgridTab() {
     }
     setTesting(true);
     try {
-      const res = await sendgridGateway.testSendgrid(apiKey);
+      const res = await accountSendgridGateway.test(accountId, apiKey);
       const accountSuffix = res.accountName ? ` (${res.accountName})` : '';
       toast.success(`${t('settings.sendgridTestOk')}${accountSuffix}`);
     } catch (err) {
@@ -80,7 +88,7 @@ export function SendgridTab() {
     }
     setSaving(true);
     try {
-      const next = await sendgridGateway.saveSendgrid({ apiKey });
+      const next = await accountSendgridGateway.save(accountId, { apiKey });
       setStored(next);
       setApiKey('');
       toast.success(t('settings.sendgridSaveOk'));
@@ -95,11 +103,12 @@ export function SendgridTab() {
   }
 
   async function handleDelete() {
-    if (!stored?.hasKey) return;
+    if (stored?.source !== 'account') return;
     setRemoving(true);
     try {
-      await sendgridGateway.deleteSendgrid();
-      setStored(null);
+      await accountSendgridGateway.remove(accountId);
+      const refreshed = await accountSendgridGateway.get(accountId);
+      setStored(refreshed);
       toast.success(t('settings.sendgridDeleteOk'));
     } catch (err) {
       const msg = axios.isAxiosError(err) && err.response?.data?.message
@@ -109,6 +118,13 @@ export function SendgridTab() {
     } finally {
       setRemoving(false);
     }
+  }
+
+  function handleCopyWebhook() {
+    if (!stored?.webhookUrl) return;
+    navigator.clipboard.writeText(stored.webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   if (loading) {
@@ -123,12 +139,21 @@ export function SendgridTab() {
 
   const busy = testing || saving || removing;
   const canTest = isApiKeyValid(apiKey) && !busy;
+  const sourceLabel =
+    stored?.source === 'account'
+      ? t('settings.sendgridSourceAccount')
+      : stored?.source === 'global'
+        ? t('settings.sendgridSourceGlobal')
+        : t('settings.sendgridSourceNone');
 
   return (
     <form onSubmit={handleSubmit} noValidate className="max-w-lg space-y-4">
-      <div className="bg-muted rounded-md p-3 text-xs">{t('settings.sendgridGlobalScopeHelp')}</div>
+      <div className="bg-muted rounded-md p-3 text-xs">
+        <p className="font-medium">{t('settings.sendgridSourceLabel')}</p>
+        <p className="text-muted-foreground mt-1">{sourceLabel}</p>
+      </div>
 
-      {stored?.hasKey ? (
+      {stored?.source === 'account' && stored.apiKeyMasked && (
         <div className="flex items-center justify-between rounded-md border px-3 py-2">
           <div>
             <p className="text-xs font-medium">{t('settings.sendgridStoredLabel')}</p>
@@ -136,21 +161,32 @@ export function SendgridTab() {
           </div>
           <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={handleDelete}>
             <Trash2 className="mr-1 h-4 w-4" />
-            {t('common.remove')}
+            {t('settings.sendgridUseGlobalInstead')}
           </Button>
         </div>
-      ) : (
-        <p className="text-muted-foreground text-xs">{t('settings.sendgridNoStoredKey')}</p>
+      )}
+
+      {stored?.webhookUrl && (
+        <div className="flex flex-col gap-1.5">
+          <Label>{t('settings.sendgridWebhook')}</Label>
+          <div className="flex items-center gap-2">
+            <Input value={stored.webhookUrl} readOnly className="font-mono text-xs" />
+            <Button type="button" variant="outline" size="sm" onClick={handleCopyWebhook}>
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-xs">{t('settings.sendgridWebhookHelp')}</p>
+        </div>
       )}
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="settings-sg-apikey">
-          {stored?.hasKey ? t('settings.sendgridReplaceApiKey') : t('settings.sendgridApiKey')}
+        <Label htmlFor="account-sg-apikey">
+          {stored?.source === 'account' ? t('settings.sendgridReplaceApiKey') : t('settings.sendgridApiKey')}
         </Label>
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <Input
-              id="settings-sg-apikey"
+              id="account-sg-apikey"
               type={showApiKey ? 'text' : 'password'}
               placeholder="SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
               autoComplete="off"
@@ -176,7 +212,7 @@ export function SendgridTab() {
       </div>
 
       <Button type="submit" disabled={busy || !isApiKeyValid(apiKey)}>
-        {saving ? t('common.loading') : t('common.save')}
+        {saving ? t('common.loading') : t('settings.sendgridSaveAndRegister')}
       </Button>
     </form>
   );

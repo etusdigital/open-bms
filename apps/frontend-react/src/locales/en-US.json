@@ -1683,7 +1683,19 @@
     "sendgridSaveOk": "SendGrid settings saved.",
     "sendgridSaveError": "Failed to save SendGrid settings.",
     "sendgridLoadError": "Failed to load SendGrid settings.",
-    "sendgridApiKeyInvalid": "Provide a valid API key starting with \"SG.\"."
+    "sendgridApiKeyInvalid": "Provide a valid API key starting with \"SG.\".",
+    "sendgridDeleteOk": "SendGrid key removed.",
+    "sendgridDeleteError": "Failed to remove SendGrid key.",
+    "sendgridSourceLabel": "Active source",
+    "sendgridSourceAccount": "This account is using its own SendGrid key.",
+    "sendgridSourceGlobal": "This account is using the platform-wide fallback key. Paste your own key below to override.",
+    "sendgridSourceNone": "No SendGrid key configured — outbound email will not work until a key is provided.",
+    "sendgridStoredLabel": "Stored key",
+    "sendgridReplaceApiKey": "Replace API Key",
+    "sendgridUseGlobalInstead": "Use global key",
+    "sendgridSaveAndRegister": "Save and register webhook",
+    "sendgridGlobalScopeHelp": "This key is used as a fallback by accounts that have not configured their own. Customers do not see this key.",
+    "sendgridNoStoredKey": "No global key configured."
   },
   "twofaMessages": {
     "pageTitle": "2FA",
