@@ -802,64 +802,84 @@ export class ContactsService {
   }
 
   async importContacts(data: ContactBatch) {
-    const accountConfig = await this.accountsService.getApiKeysByAccount(this.cls.get('accountId'), {
-      page: 1,
-      itemsPerPage: 1,
-    });
-    const apiKey = accountConfig.results[0].value;
+    const accountId = this.cls.get<number>('accountId');
 
-    const contacts = data.contacts.map((contact: any) => {
-      let currentContact: any = { contact: {} };
-      contact.map((contactField, index) => {
-        if (data.headers[`${index}`] === undefined) {
-          return;
-        }
+    const parsed = data.contacts
+      .map((row: any) => {
+        const contact: Partial<ContactEntity> = {};
+        const customFields: Record<string, string> = {};
 
-        const { type, value } = data.headers[`${index}`];
-        if (type === 'customField') {
-          const customFields = {
-            [value]: contactField,
-            ...(currentContact.contact.customFields ? currentContact.contact.customFields : {}),
-          };
-          currentContact.contact['customFields'] = customFields;
-        }
+        row.forEach((cell, index) => {
+          const header = data.headers[`${index}`];
+          if (!header || header.type === 'ignore') return;
 
-        if (type === 'contacts') {
-          if (value === 'fullName') {
-            const names = contactField.split(' ');
-            currentContact['contact']['firstName'] = names[0];
-            names.shift();
-            currentContact['contact']['lastName'] = names.join(' ');
+          if (header.type === 'customField') {
+            customFields[header.value] = cell;
             return;
           }
 
-          currentContact['contact'][value] = contactField;
-        }
-      });
-
-      if (data.tags.length) {
-        currentContact.tagName = data.tags;
-      }
-
-      if (data.actions) {
-        currentContact = { ...currentContact, ...data.actions };
-      }
-
-      currentContact['apiKey'] = apiKey;
-      currentContact['isImport'] = true;
-
-      return currentContact;
-    });
-
-    let delay = 0;
-    await Promise.all(
-      contacts.map(async (contact) => {
-        delay += 5;
-        return new Promise((resolve) => setTimeout(resolve, delay)).then(async () => {
-          await this.pubSubProvider.sendAsyncMessage(process.env.TOPIC_NAME_LEAD_CONCEPTION, contact, { type: 'lead' });
+          if (header.type === 'contacts') {
+            if (header.value === 'fullName') {
+              const [first, ...rest] = String(cell ?? '').split(' ');
+              contact.firstName = first;
+              contact.lastName = rest.join(' ');
+              return;
+            }
+            (contact as any)[header.value] = cell;
+          }
         });
-      }),
-    );
+
+        return { contact, customFields };
+      })
+      .filter(({ contact }) => contact.email || contact.phone || contact.whatsapp);
+
+    if (!parsed.length) return { imported: 0 };
+
+    const emails = parsed
+      .map((p) => p.contact.email)
+      .filter(Boolean)
+      .map((e) => e.toLowerCase());
+    const existing = emails.length ? await this.findContactByEmail(emails) : [];
+    const existingByEmail = new Map(existing.map((c) => [c.email.toLowerCase(), c]));
+
+    const customFieldDefs = await this.customFieldService.findAll();
+    const customFieldByName = new Map(customFieldDefs.map((cf: CustomFieldsEntity) => [cf.name, cf]));
+
+    const tagEntities = data.tags?.length
+      ? await this.contactTagRepository.manager.getRepository('tags').find({
+          where: { accountId, name: In(data.tags) },
+        } as any)
+      : [];
+
+    let imported = 0;
+    for (const { contact, customFields } of parsed) {
+      const existingContact = contact.email ? existingByEmail.get(contact.email.toLowerCase()) : null;
+
+      const saved = await this.contactRepository.save({
+        ...(existingContact ?? { accountId, isActive: true, isValid: true }),
+        ...contact,
+        accountId,
+      } as ContactEntity);
+
+      const cfRows: Partial<ContactCustomFieldEntity>[] = [];
+      for (const [name, value] of Object.entries(customFields)) {
+        const def = customFieldByName.get(name);
+        if (!def || value === undefined || value === null || value === '') continue;
+        cfRows.push({ contactId: saved.id, customFieldId: def.id, value: String(value) });
+      }
+      if (cfRows.length) {
+        await this.contactCustomFieldsRepository.createQueryBuilder().insert().values(cfRows).orUpdate(['value'], ['contact_id', 'custom_field_id']).execute();
+      }
+
+      if (tagEntities.length) {
+        const tagRows = tagEntities.map((t: any) => ({ contactId: saved.id, tagId: t.id, accountId }));
+        await this.contactTagRepository.createQueryBuilder().insert().values(tagRows).orIgnore().execute();
+      }
+
+      imported += 1;
+    }
+
+    return { imported };
   }
 
   async updateTag(params: any) {
