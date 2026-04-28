@@ -355,7 +355,7 @@ describe('SetupService', () => {
     });
   });
 
-  describe('step4 — SendGrid', () => {
+  describe('step4 — SendGrid (auto-skip)', () => {
     it('with skip=true, advances to step 5 without persisting sendgrid_settings', async () => {
       const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
@@ -366,52 +366,21 @@ describe('SetupService', () => {
       expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: expect.objectContaining({ currentStep: 5, completed: false }) }));
     });
 
-    it('persists sendgrid_settings with required fields and advances to step 5', async () => {
+    it('rejects payload with skip=false (legacy SendGrid payload)', async () => {
       const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
-
-      await service.advanceStep({
-        step: 4,
-        data: {
-          apiKey: 'SG.abcdefghij',
-          subuserEmail: 'billing@acme.io',
-          subuserPrefix: 'bms',
-          defaultIpPool: 'pool-1',
-          webhookBaseUrl: 'https://bms.io/bms/events',
-        } as any,
-      });
-
-      expect(systemConfigRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          key: 'sendgrid_settings',
-          value: expect.objectContaining({
-            apiKey: 'SG.abcdefghij',
-            subuserEmail: 'billing@acme.io',
-            subuserPrefix: 'bms',
-            defaultIpPool: 'pool-1',
-            webhookBaseUrl: 'https://bms.io/bms/events',
-          }),
+      await expect(
+        service.advanceStep({
+          step: 4,
+          data: { apiKey: 'SG.abcdefghij', subuserEmail: 'billing@acme.io' } as any,
         }),
-      );
-      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: expect.objectContaining({ currentStep: 5, completed: false }) }));
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('rejects payload without skip and without apiKey', async () => {
+    it('rejects empty payload', async () => {
       const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
       await expect(service.advanceStep({ step: 4, data: {} as any })).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('rejects payload without skip that has apiKey but misses subuserEmail', async () => {
-      const { service, systemConfigRepo } = await buildService();
-      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
-      await expect(service.advanceStep({ step: 4, data: { apiKey: 'SG.abcdefghij' } as any })).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('rejects apiKey not starting with SG.', async () => {
-      const { service, systemConfigRepo } = await buildService();
-      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 4, completed: false } });
-      await expect(service.advanceStep({ step: 4, data: { apiKey: 'nope-not-sg', subuserEmail: 'a@b.io' } as any })).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 

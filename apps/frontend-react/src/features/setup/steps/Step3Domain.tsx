@@ -8,6 +8,7 @@ import { setupGateway } from '@/features/setup/setup-gateway';
 
 interface Props {
   onComplete: () => void;
+  onBack?: () => void;
 }
 
 function isValidUrl(value: string): boolean {
@@ -19,7 +20,7 @@ function isValidUrl(value: string): boolean {
   }
 }
 
-export function Step3Domain({ onComplete }: Props) {
+export function Step3Domain({ onComplete, onBack }: Props) {
   const [baseUrl, setBaseUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +35,14 @@ export function Step3Domain({ onComplete }: Props) {
     setSubmitting(true);
     try {
       await setupGateway.advanceStep({ step: 3, data: { baseUrl: baseUrl.trim() } });
+      // SendGrid step is hidden in this UI — auto-skip on the backend so the
+      // wizard's currentStep advances past 4 before the user lands on IP Pool.
+      try {
+        await setupGateway.advanceStep({ step: 4, data: { skip: true } });
+      } catch {
+        // Idempotent on the backend; if it has already been skipped (e.g. user
+        // refreshed mid-flow), the next advance call will succeed anyway.
+      }
       onComplete();
     } catch (err) {
       const msg =
@@ -69,7 +78,14 @@ export function Step3Domain({ onComplete }: Props) {
         </Alert>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex justify-between">
+        {onBack ? (
+          <Button type="button" variant="ghost" disabled={submitting} onClick={onBack}>
+            Voltar
+          </Button>
+        ) : (
+          <span />
+        )}
         <Button type="submit" disabled={submitting}>
           {submitting ? 'Salvando...' : 'Salvar e continuar'}
         </Button>

@@ -38,11 +38,6 @@ export const setupGateway = {
   async testSmtp(data: Step2Data): Promise<void> {
     await http.post('/setup/test-smtp', data);
   },
-
-  async testSendgrid(apiKey: string): Promise<{ accountName: string | null }> {
-    const res = await http.post<{ accountName: string | null }>('/setup/test-sendgrid', { apiKey });
-    return res.data;
-  },
 };
 
 // Exported for tests that want to assert the underlying instance's config.

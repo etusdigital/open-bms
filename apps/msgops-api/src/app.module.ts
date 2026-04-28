@@ -30,6 +30,7 @@ import { LabelsModule } from './modules/labels/labels.module';
 import { IpReputationModule } from './modules/ip-reputation/ip-reputation.module';
 import { AuthzModule } from './modules/authz/authz.module';
 import { SetupModule } from './modules/setup/setup.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { SetupModule } from './modules/setup/setup.module';
     LabelsModule,
     IpReputationModule,
     SetupModule,
+    SettingsModule,
   ],
   providers: [AuditSubscriber],
 })

@@ -14,9 +14,10 @@ const IPV6_RE = /^[0-9a-fA-F:]+$/;
 
 interface Props {
   onComplete: () => void;
+  onBack?: () => void;
 }
 
-export function Step5Pool({ onComplete }: Props) {
+export function Step5Pool({ onComplete, onBack }: Props) {
   const [accountName, setAccountName] = useState('');
   const [poolName, setPoolName] = useState('');
   const [senderEmail, setSenderEmail] = useState('');
@@ -26,7 +27,6 @@ export function Step5Pool({ onComplete }: Props) {
   const [ipInput, setIpInput] = useState('');
   const [ips, setIps] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [skipping, setSkipping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function addIp() {
@@ -53,22 +53,6 @@ export function Step5Pool({ onComplete }: Props) {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
       addIp();
-    }
-  }
-
-  async function handleSkip() {
-    setSkipping(true);
-    setError(null);
-    try {
-      await setupGateway.advanceStep({ step: 5, data: { skip: true } });
-      onComplete();
-    } catch (err) {
-      const msg =
-        axios.isAxiosError(err) && err.response?.data?.message
-          ? String(err.response.data.message)
-          : 'Erro ao pular.';
-      setError(msg);
-      setSkipping(false);
     }
   }
 
@@ -120,7 +104,7 @@ export function Step5Pool({ onComplete }: Props) {
     }
   }
 
-  const busy = submitting || skipping;
+  const busy = submitting;
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
@@ -237,9 +221,13 @@ export function Step5Pool({ onComplete }: Props) {
       )}
 
       <div className="flex justify-between">
-        <Button type="button" variant="secondary" disabled={busy} onClick={handleSkip}>
-          {skipping ? 'Pulando...' : 'Pular esta etapa'}
-        </Button>
+        {onBack ? (
+          <Button type="button" variant="ghost" disabled={busy} onClick={onBack}>
+            Voltar
+          </Button>
+        ) : (
+          <span />
+        )}
         <Button type="submit" disabled={busy}>
           {submitting ? 'Salvando...' : 'Salvar e continuar'}
         </Button>

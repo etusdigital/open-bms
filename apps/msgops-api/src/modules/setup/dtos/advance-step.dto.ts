@@ -14,11 +14,12 @@ export class Step1Data {
 }
 
 export class Step2Data {
-  host: string;
-  port: number;
-  user: string;
-  pass: string;
-  from: string;
+  skip?: boolean;
+  host?: string;
+  port?: number;
+  user?: string;
+  pass?: string;
+  from?: string;
 }
 
 export class Step3Data {
@@ -27,11 +28,6 @@ export class Step3Data {
 
 export class Step4Data {
   skip?: boolean;
-  apiKey?: string;
-  subuserEmail?: string;
-  subuserPrefix?: string;
-  defaultIpPool?: string;
-  webhookBaseUrl?: string;
 }
 
 export class Step5Data {
@@ -57,15 +53,21 @@ export const step1Schema = Joi.object<Step1Data>({
   password: Joi.string().min(8).required(),
 });
 
-export const step2Schema = Joi.object<Step2Data>({
-  host: Joi.string().trim().min(1).required(),
-  port: Joi.number().integer().min(1).max(65535).required(),
-  user: Joi.string().trim().min(1).required(),
-  pass: Joi.string().min(1).required(),
-  from: Joi.string()
-    .email({ tlds: { allow: false } })
-    .required(),
-});
+// SMTP step is optional in the React wizard — accept either { skip: true } or
+// the full payload. Mirrors the discriminated pattern used by step4/step5.
+export const step2Schema = Joi.alternatives<Step2Data>().try(
+  Joi.object({ skip: Joi.valid(true).required() }),
+  Joi.object({
+    skip: Joi.valid(false).optional(),
+    host: Joi.string().trim().min(1).required(),
+    port: Joi.number().integer().min(1).max(65535).required(),
+    user: Joi.string().trim().min(1).required(),
+    pass: Joi.string().min(1).required(),
+    from: Joi.string()
+      .email({ tlds: { allow: false } })
+      .required(),
+  }),
+);
 
 export const step3Schema = Joi.object<Step3Data>({
   baseUrl: Joi.string()
@@ -73,26 +75,12 @@ export const step3Schema = Joi.object<Step3Data>({
     .required(),
 });
 
-// Two alternatives: either skip=true alone, or a full config payload.
-// `match: 'one'` ensures exactly one alternative applies — ambiguity surfaces as validation error.
-export const step4Schema = Joi.alternatives<Step4Data>().try(
-  Joi.object({ skip: Joi.valid(true).required() }),
-  Joi.object({
-    skip: Joi.valid(false).optional(),
-    apiKey: Joi.string().trim().pattern(SENDGRID_API_KEY_PATTERN, `starts with ${SENDGRID_API_KEY_PREFIX}`).min(SENDGRID_API_KEY_MIN_LENGTH).required(),
-    subuserEmail: Joi.string()
-      .email({ tlds: { allow: false } })
-      .required(),
-    subuserPrefix: Joi.string()
-      .trim()
-      .pattern(/^[a-z0-9-]+$/)
-      .optional(),
-    defaultIpPool: Joi.string().trim().optional(),
-    webhookBaseUrl: Joi.string()
-      .uri({ scheme: ['http', 'https'] })
-      .optional(),
-  }),
-);
+// SendGrid moved out of the wizard — it's now configured in /settings (super_admin)
+// post-setup. This step is auto-skipped by the React frontend; only `{skip:true}`
+// is accepted. Legacy clients sending the old payload now get a 400.
+export const step4Schema = Joi.object<Step4Data>({
+  skip: Joi.valid(true).required(),
+});
 
 // Same discriminated pattern as step4: either skip=true alone, or a full config payload
 // with skip omitted/false. `match: 'one'` makes ambiguous payloads (skip=true + accountName)

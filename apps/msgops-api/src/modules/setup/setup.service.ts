@@ -2,7 +2,6 @@ import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inj
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import * as nodemailer from 'nodemailer';
-import axios from 'axios';
 import * as amqplib from 'amqplib';
 import { S3Client, HeadBucketCommand } from '@aws-sdk/client-s3';
 import { SystemConfigEntity } from '../../entities/system-config.entity';
@@ -19,11 +18,11 @@ import { AdvanceStepDto, STEP_SCHEMAS, Step1Data, Step2Data, Step3Data, Step4Dat
 import { TestSmtpDto } from './dtos/test-smtp.dto';
 import { HealthCheckResult, ServiceHealthResult } from './dtos/health-check-result.dto';
 import { TestSendgridDto } from './dtos/test-sendgrid.dto';
+import { validateSendgridApiKey } from '../../lib/sendgrid-validator';
 
 const WIZARD_KEY = 'setup_wizard_step';
 const SMTP_KEY = 'smtp_settings';
 const DOMAIN_KEY = 'domain_settings';
-const SENDGRID_KEY = 'sendgrid_settings';
 // Shared with seedAdmin (bootstrap/seed-admin.ts) so the wizard serializes against the same lock.
 const ADVISORY_LOCK_KEY = 834729;
 // Rate limit for testSmtp/testSendgrid — window in ms and max attempts per IP in that window.
@@ -41,13 +40,6 @@ type WizardState = {
 
 type SmtpSettings = Omit<Step2Data, never>;
 type DomainSettings = Step3Data;
-type SendgridSettings = {
-  apiKey: string;
-  subuserEmail: string;
-  subuserPrefix?: string;
-  defaultIpPool?: string;
-  webhookBaseUrl?: string;
-};
 
 @Injectable()
 export class SetupService {
@@ -158,7 +150,8 @@ export class SetupService {
       }),
       this.probe(async () => {
         const smtpConfig = await this.systemConfigRepo.findOne({ where: { key: SMTP_KEY } });
-        if (!smtpConfig) throw new Error('SMTP not configured');
+        // SMTP is optional — when not configured, report as ok with zero-cost.
+        if (!smtpConfig) return;
         const { host, port, user, pass } = smtpConfig.value as SmtpSettings;
         const transporter = nodemailer.createTransport({ host, port, auth: { user, pass } });
         await transporter.verify();
@@ -240,6 +233,10 @@ export class SetupService {
   }
 
   private async step2(data: Step2Data): Promise<void> {
+    if (data.skip) {
+      await this.upsertWizard({ currentStep: 3 });
+      return;
+    }
     const value: SmtpSettings = { ...data };
     await this.systemConfigRepo.save(this.systemConfigRepo.create({ key: SMTP_KEY, value }));
     await this.upsertWizard({ currentStep: 3 });
@@ -251,20 +248,12 @@ export class SetupService {
     await this.upsertWizard({ currentStep: 4 });
   }
 
+  // Vestigial step from the time SendGrid was configured during setup. The React
+  // wizard auto-skips it after step 3 so SendGrid moves to /settings (super_admin).
+  // We keep the slot to preserve the 1-6 numbering already persisted in
+  // system_config.setup_wizard_step on existing instances.
   private async step4(data: Step4Data): Promise<void> {
-    if (data.skip) {
-      await this.upsertWizard({ currentStep: 5 });
-      return;
-    }
-
-    const value: SendgridSettings = {
-      apiKey: data.apiKey!,
-      subuserEmail: data.subuserEmail!,
-      ...(data.subuserPrefix && { subuserPrefix: data.subuserPrefix }),
-      ...(data.defaultIpPool && { defaultIpPool: data.defaultIpPool }),
-      ...(data.webhookBaseUrl && { webhookBaseUrl: data.webhookBaseUrl }),
-    };
-    await this.systemConfigRepo.save(this.systemConfigRepo.create({ key: SENDGRID_KEY, value }));
+    void data;
     await this.upsertWizard({ currentStep: 5 });
   }
 
@@ -341,33 +330,7 @@ export class SetupService {
   async testSendgrid(dto: TestSendgridDto, requesterIp?: string): Promise<{ accountName: string | null }> {
     await this.ensureNotConfigured();
     this.enforceTestRateLimit('sendgrid', requesterIp);
-
-    try {
-      const res = await axios.get('https://api.sendgrid.com/v3/user/account', {
-        headers: { Authorization: `Bearer ${dto.apiKey}` },
-        timeout: 10_000,
-        validateStatus: () => true,
-      });
-      if (res.status >= 200 && res.status < 300) {
-        // Prefer human-readable identifiers; intentionally do NOT fall back to res.data.type
-        // (the SendGrid plan tier — "free", "reseller", etc) since it would render as
-        // "✅ Conectado — free", which misleadingly looks like an account name.
-        const name: string | undefined = res.data?.first_name || res.data?.company;
-        return { accountName: name ?? null };
-      }
-      if (res.status === 401 || res.status === 403) {
-        throw new HttpException('Credenciais inválidas. Verifique se a API Key tem permissão Full Access.', HttpStatus.UNAUTHORIZED);
-      }
-      if (res.status === 429) {
-        throw new HttpException('SendGrid aplicou rate limit. Aguarde alguns segundos e tente novamente.', HttpStatus.TOO_MANY_REQUESTS);
-      }
-      this.logger.warn(`SendGrid test returned HTTP ${res.status}: ${JSON.stringify(res.data)?.slice(0, 200)}`);
-      throw new HttpException('Falha ao validar credenciais SendGrid.', HttpStatus.BAD_GATEWAY);
-    } catch (e: any) {
-      if (e instanceof HttpException) throw e;
-      this.logger.warn(`SendGrid test network error: ${e?.message ?? 'unknown'}`);
-      throw new HttpException('Não foi possível contatar o SendGrid. Verifique sua conexão.', HttpStatus.BAD_GATEWAY);
-    }
+    return validateSendgridApiKey(dto.apiKey);
   }
 
   async testSmtp(dto: TestSmtpDto, requesterIp?: string): Promise<void> {

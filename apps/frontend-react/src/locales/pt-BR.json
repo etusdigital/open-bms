@@ -1644,6 +1644,7 @@
     "pageTitle": "Configurações",
     "tabGeneral": "Geral",
     "tabEmail": "Email",
+    "tabSendgrid": "SendGrid",
     "apiKey": "API Key",
     "apiKeyTracker": "API Key Tracker",
     "timezone": "Fuso horário",
@@ -1652,7 +1653,19 @@
     "sendLimitPerUser": "Limite de envio por usuário",
     "sendLimitHelp": "0 = sem limite",
     "saveSuccess": "Configurações salvas com sucesso!",
-    "saveError": "Erro ao salvar configurações."
+    "saveError": "Erro ao salvar configurações.",
+    "sendgridApiKey": "API Key SendGrid",
+    "sendgridApiKeyHelp": "Encontre em app.sendgrid.com → Settings → API Keys (permissão Full Access).",
+    "sendgridWebhook": "URL do webhook",
+    "sendgridWebhookHelp": "Endpoint público que recebe os eventos do SendGrid (ex: https://app.empresa.com/bms/events).",
+    "sendgridTest": "Testar credenciais",
+    "sendgridTesting": "Testando...",
+    "sendgridTestOk": "Credenciais válidas",
+    "sendgridTestError": "Falha ao validar credenciais SendGrid.",
+    "sendgridSaveOk": "Configurações SendGrid salvas.",
+    "sendgridSaveError": "Erro ao salvar configurações SendGrid.",
+    "sendgridLoadError": "Erro ao carregar configurações SendGrid.",
+    "sendgridApiKeyInvalid": "Informe uma API Key válida começando com \"SG.\"."
   },
   "twofaMessages": {
     "pageTitle": "2FA",

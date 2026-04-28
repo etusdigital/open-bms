@@ -50,10 +50,4 @@ describe('setup-gateway', () => {
     expect(postSpy).toHaveBeenCalledWith('/setup/test-smtp', payload);
   });
 
-  it('testSendgrid(): wraps the apiKey in an object body', async () => {
-    postSpy.mockResolvedValueOnce({ data: { accountName: 'acme' } });
-    const r = await setupGateway.testSendgrid('SG.abc123');
-    expect(postSpy).toHaveBeenCalledWith('/setup/test-sendgrid', { apiKey: 'SG.abc123' });
-    expect(r.accountName).toBe('acme');
-  });
 });

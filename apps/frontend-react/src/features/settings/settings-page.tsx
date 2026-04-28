@@ -1,16 +1,24 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription } from '@/components/ui/form';
 import { ListPage } from '@/components/list-page';
+import { selectIsSuperAdmin, useAppStore } from '@/stores/app-store';
 import { useAccountConfig, useAccountId, useTimezone, useUpdateAccountConfigs } from './use-settings';
 import { SETTINGS_TABS, type SettingsTab } from './types';
+import { SendgridTab } from './sendgrid-tab';
 
 export default function SettingsPage() {
   const { t } = useTranslation();
+  const isSuperAdmin = useAppStore(selectIsSuperAdmin);
   const [tab, setTab] = useState<SettingsTab>('general');
+
+  const visibleTabs = useMemo<SettingsTab[]>(
+    () => (isSuperAdmin ? [...SETTINGS_TABS, 'sendgrid'] : SETTINGS_TABS),
+    [isSuperAdmin],
+  );
 
   return (
     <ListPage.Root>
@@ -18,7 +26,7 @@ export default function SettingsPage() {
 
       <ListPage.Toolbar>
         <div className="flex items-center gap-2">
-          {SETTINGS_TABS.map((tabKey) => (
+          {visibleTabs.map((tabKey) => (
             <Button
               key={tabKey}
               variant={tab === tabKey ? 'default' : 'outline'}
@@ -35,6 +43,7 @@ export default function SettingsPage() {
         <div className="p-6">
           {tab === 'general' && <GeneralTab />}
           {tab === 'email' && <EmailTab />}
+          {tab === 'sendgrid' && isSuperAdmin && <SendgridTab />}
         </div>
       </ListPage.Content>
     </ListPage.Root>

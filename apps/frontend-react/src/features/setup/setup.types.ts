@@ -26,28 +26,24 @@ export interface Step1Data {
   password: string;
 }
 
-export interface Step2Data {
-  host: string;
-  port: number;
-  user: string;
-  pass: string;
-  from: string;
-}
+export type Step2Data =
+  | { skip: true }
+  | {
+      skip?: false;
+      host: string;
+      port: number;
+      user: string;
+      pass: string;
+      from: string;
+    };
 
 export interface Step3Data {
   baseUrl: string;
 }
 
-export type Step4Data =
-  | { skip: true }
-  | {
-      skip?: false;
-      apiKey: string;
-      subuserEmail: string;
-      subuserPrefix?: string;
-      defaultIpPool?: string;
-      webhookBaseUrl?: string;
-    };
+// SendGrid moved out of the setup wizard. The frontend auto-skips this step
+// after step 3 (Domínio); the backend keeps the slot for compatibility.
+export type Step4Data = { skip: true };
 
 export type Step5Data =
   | { skip: true }

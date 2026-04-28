@@ -3,9 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Check } from 'lucide-react';
 import { setupGateway } from '@/features/setup/setup-gateway';
 import { Step1Admin } from '@/features/setup/steps/Step1Admin';
-import { Step2Smtp } from '@/features/setup/steps/Step2Smtp';
 import { Step3Domain } from '@/features/setup/steps/Step3Domain';
-import { Step4Sendgrid } from '@/features/setup/steps/Step4Sendgrid';
 import { Step5Pool } from '@/features/setup/steps/Step5Pool';
 import { Step6HealthCheck } from '@/features/setup/steps/Step6HealthCheck';
 import { LoadingScreen } from '@/components/loading-screen';
@@ -16,26 +14,27 @@ export const Route = createFileRoute('/setup')({
 
 const STEPS = [
   { num: 1, label: 'Admin' },
-  { num: 2, label: 'SMTP' },
-  { num: 3, label: 'Domínio' },
-  { num: 4, label: 'SendGrid' },
-  { num: 5, label: 'IP Pool' },
-  { num: 6, label: 'Health' },
+  { num: 2, label: 'Domínio' },
+  { num: 3, label: 'IP Pool' },
+  { num: 4, label: 'Health' },
 ] as const;
 
 const STEP_TITLES: Record<number, string> = {
   1: 'Criar conta de administrador',
-  2: 'Configurar servidor SMTP',
-  3: 'URL base da plataforma',
-  4: 'Provedor de envio em massa (SendGrid)',
-  5: 'IP Pool e primeira conta',
-  6: 'Verificação de saúde dos serviços',
+  2: 'URL base da plataforma',
+  3: 'IP Pool e primeira conta',
+  4: 'Verificação de saúde dos serviços',
 };
+
+// The backend wizard keeps 6 internal steps (1=Admin, 2=SMTP, 3=Domain,
+// 4=SendGrid, 5=Pool, 6=Health) for compatibility with existing instances.
+// SMTP (2) and SendGrid (4) are auto-skipped by the UI; the visible flow is
+// 4 steps. This map collapses backend currentStep into the visible slot.
+const UI_FROM_BACKEND: Record<number, number> = { 1: 1, 2: 2, 3: 2, 4: 2, 5: 3, 6: 4 };
 
 function SetupPage() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const [baseUrl, setBaseUrl] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,17 +44,21 @@ function SetupPage() {
       .then((status) => {
         if (cancelled) return;
         if (status.configured) {
+          // Keep loading=true so the setup form never paints during the
+          // redirect — otherwise the wizard flashes for a frame before
+          // navigation resolves and a fast user could submit the admin
+          // form against a wizard that's already complete.
           navigate({ to: '/', replace: true });
           return;
         }
-        setCurrentStep(status.currentStep || 1);
-        setBaseUrl(status.baseUrl);
+        const ui = UI_FROM_BACKEND[status.currentStep ?? 1] ?? 1;
+        setCurrentStep(ui);
+        setLoading(false);
       })
       .catch(() => {
-        if (!cancelled) setCurrentStep(1);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (cancelled) return;
+        setCurrentStep(1);
+        setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -63,7 +66,11 @@ function SetupPage() {
   }, [navigate]);
 
   function advance() {
-    setCurrentStep((s) => Math.min(s + 1, 6));
+    setCurrentStep((s) => Math.min(s + 1, 4));
+  }
+
+  function back() {
+    setCurrentStep((s) => Math.max(s - 1, 1));
   }
 
   function finish() {
@@ -92,11 +99,9 @@ function SetupPage() {
           </h2>
 
           {currentStep === 1 && <Step1Admin onComplete={advance} />}
-          {currentStep === 2 && <Step2Smtp onComplete={advance} />}
-          {currentStep === 3 && <Step3Domain onComplete={advance} />}
-          {currentStep === 4 && <Step4Sendgrid onComplete={advance} baseUrl={baseUrl} />}
-          {currentStep === 5 && <Step5Pool onComplete={advance} />}
-          {currentStep === 6 && <Step6HealthCheck onComplete={finish} />}
+          {currentStep === 2 && <Step3Domain onComplete={advance} onBack={back} />}
+          {currentStep === 3 && <Step5Pool onComplete={advance} onBack={back} />}
+          {currentStep === 4 && <Step6HealthCheck onComplete={finish} onBack={back} />}
         </div>
       </div>
     </div>
