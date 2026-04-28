@@ -53,7 +53,6 @@ export function PoolTab() {
   const [ips, setIps] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(true);
-  const [poolsLoadError, setPoolsLoadError] = useState(false);
   const [loadingIps, setLoadingIps] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -78,7 +77,9 @@ export function PoolTab() {
         return [] as Pool[];
       }),
       poolSendgridGateway.listPools().catch(() => {
-        if (!cancelled) setPoolsLoadError(true);
+        // Empty array → form treats it the same as "Free plan with no
+        // dedicated pools": user can still save a sender pool, sends
+        // fall back to SendGrid shared IPs.
         return [] as SendgridPoolOption[];
       }),
       accountSendgridGateway.get(accountId).catch(() => ({ source: 'none' as SendgridKeySource, apiKeyMasked: null, webhookUrl: null })),
