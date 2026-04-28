@@ -6,7 +6,7 @@ import { MsgopsService } from '../../msgops/msgops.service';
 import { EventPublisherService } from '../../event-publisher.service';
 import { CacheService } from '../../msgops/cache.service';
 import { GeolocationService } from '../../utils/geolocation/geolocation.service';
-import { KafkaProvider } from '../../providers/kafka.provider';
+import { AnalyticsPublisherProvider } from '../../providers/analytics-publisher.provider';
 import { PlatformType } from '../interfaces/push.interfaces';
 
 describe('PushService', () => {
@@ -44,7 +44,7 @@ describe('PushService', () => {
   const mockEventPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
   const mockCacheService = { get: jest.fn(), set: jest.fn() };
   const mockGeolocationService = { getLocation: jest.fn().mockResolvedValue({}) };
-  const mockKafkaProvider = { sendAsyncMessage: jest.fn().mockResolvedValue(undefined) };
+  const mockAnalyticsPublisherProvider = { publish: jest.fn().mockResolvedValue(undefined) };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -58,7 +58,7 @@ describe('PushService', () => {
         { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: CacheService, useValue: mockCacheService },
         { provide: GeolocationService, useValue: mockGeolocationService },
-        { provide: KafkaProvider, useValue: mockKafkaProvider },
+        { provide: AnalyticsPublisherProvider, useValue: mockAnalyticsPublisherProvider },
       ],
     }).compile();
 
@@ -192,7 +192,7 @@ describe('PushService', () => {
   describe('saveLogsPush', () => {
     it('should return early when pushEvents is empty', async () => {
       await service.saveLogsPush({ payload: [], client_info: {} } as any);
-      expect(mockKafkaProvider.sendAsyncMessage).not.toHaveBeenCalled();
+      expect(mockAnalyticsPublisherProvider.publish).not.toHaveBeenCalled();
     });
 
     it('should return early when first event missing account', async () => {
@@ -200,9 +200,9 @@ describe('PushService', () => {
       expect(mockFormatterUtils.logInfo).toHaveBeenCalled();
     });
 
-    it('should call sendKafkaMessage and saveEventsLogs with formatted values', async () => {
+    it('should call sendAnalyticsEvent and saveEventsLogs with formatted values', async () => {
       await service.saveLogsPush(makeWebhook([makeEvent()]) as any);
-      expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalled();
+      expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalled();
       expect(mockMsgopsService.saveEventsLogs).toHaveBeenCalled();
     });
 

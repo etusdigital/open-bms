@@ -156,7 +156,7 @@ export class CustomEventsService extends EventsService {
     }
 
     await this.eventsTrigger('custom_events', eventsProcess);
-    await this.sendKafkaMessage(eventsProcess);
+    await this.sendAnalyticsEvent(eventsProcess);
     await this.msgOpsService.saveEventsLogs(eventsProcess);
 
     const results = await pipeline.exec();

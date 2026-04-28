@@ -6,7 +6,7 @@ import { MsgopsService } from '../../msgops/msgops.service';
 import { EventPublisherService } from '../../event-publisher.service';
 import { CacheService } from '../../msgops/cache.service';
 import { GeolocationService } from '../../utils/geolocation/geolocation.service';
-import { KafkaProvider } from '../../providers/kafka.provider';
+import { AnalyticsPublisherProvider } from '../../providers/analytics-publisher.provider';
 import { InternalRequest } from '../interfaces/events.interfaces';
 
 describe('InternalEventsService', () => {
@@ -52,8 +52,8 @@ describe('InternalEventsService', () => {
     getLocation: jest.fn(),
   };
 
-  const mockKafkaProvider = {
-    sendAsyncMessage: jest.fn(),
+  const mockAnalyticsPublisherProvider = {
+    publish: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -68,7 +68,7 @@ describe('InternalEventsService', () => {
         { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: CacheService, useValue: mockCacheService },
         { provide: GeolocationService, useValue: mockGeolocationService },
-        { provide: KafkaProvider, useValue: mockKafkaProvider },
+        { provide: AnalyticsPublisherProvider, useValue: mockAnalyticsPublisherProvider },
       ],
     }).compile();
 
@@ -97,7 +97,7 @@ describe('InternalEventsService', () => {
         await service.internalEventsProcess(request);
 
         expect(mockFormatterUtils.logInfo).toHaveBeenCalledWith(expect.stringContaining('Invalid internal events'));
-        expect(mockKafkaProvider.sendAsyncMessage).not.toHaveBeenCalled();
+        expect(mockAnalyticsPublisherProvider.publish).not.toHaveBeenCalled();
       });
 
       it('should return early when payload is not an array', async () => {
@@ -106,7 +106,7 @@ describe('InternalEventsService', () => {
         await service.internalEventsProcess(request);
 
         expect(mockFormatterUtils.logInfo).toHaveBeenCalledWith(expect.stringContaining('Invalid internal events'));
-        expect(mockKafkaProvider.sendAsyncMessage).not.toHaveBeenCalled();
+        expect(mockAnalyticsPublisherProvider.publish).not.toHaveBeenCalled();
       });
 
       it('should skip event when accountId and apiKey are both missing', async () => {
@@ -158,39 +158,37 @@ describe('InternalEventsService', () => {
         expect(mockFormatterUtils.logInfo).toHaveBeenCalledWith(
           expect.stringContaining('No internal events to process'),
         );
-        expect(mockKafkaProvider.sendAsyncMessage).not.toHaveBeenCalled();
+        expect(mockAnalyticsPublisherProvider.publish).not.toHaveBeenCalled();
       });
     });
 
     describe('accountId resolution', () => {
       it('should use accountId directly when provided', async () => {
         mockMsgopsService.getAccountTimeZone.mockResolvedValue('America/Sao_Paulo');
-        mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
+        mockAnalyticsPublisherProvider.publish.mockResolvedValue(undefined);
 
         const request = createRequest([{ ...baseEvent, accountId: '123' }]);
 
         await service.internalEventsProcess(request);
 
         expect(mockMsgopsService.findAccountIdByApiKey).not.toHaveBeenCalled();
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ account_id: 123 }),
-          undefined,
         );
       });
 
       it('should resolve accountId via apiKey when accountId is not provided', async () => {
         mockMsgopsService.findAccountIdByApiKey.mockResolvedValue(456);
         mockMsgopsService.getAccountTimeZone.mockResolvedValue('America/Sao_Paulo');
-        mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
+        mockAnalyticsPublisherProvider.publish.mockResolvedValue(undefined);
 
         const request = createRequest([{ ...baseEvent, accountId: undefined, apiKey: 'valid-api-key' }]);
 
         await service.internalEventsProcess(request);
 
         expect(mockMsgopsService.findAccountIdByApiKey).toHaveBeenCalledWith('valid-api-key');
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ account_id: 456 }),
-          undefined,
         );
       });
     });
@@ -198,7 +196,7 @@ describe('InternalEventsService', () => {
     describe('timestamp handling', () => {
       beforeEach(() => {
         mockMsgopsService.getAccountTimeZone.mockResolvedValue('America/Sao_Paulo');
-        mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
+        mockAnalyticsPublisherProvider.publish.mockResolvedValue(undefined);
       });
 
       it('should normalize timestamp when provided as string', async () => {
@@ -231,11 +229,10 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({
-            time: expect.any(Date),
+            time: expect.stringMatching(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/),
           }),
-          undefined,
         );
 
         jest.restoreAllMocks();
@@ -251,11 +248,10 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({
-            time: new Date(now),
+            time: new Date(now).toISOString().replace('T', ' ').replace('Z', ''),
           }),
-          undefined,
         );
 
         jest.restoreAllMocks();
@@ -265,7 +261,7 @@ describe('InternalEventsService', () => {
     describe('URL processing', () => {
       beforeEach(() => {
         mockMsgopsService.getAccountTimeZone.mockResolvedValue('America/Sao_Paulo');
-        mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
+        mockAnalyticsPublisherProvider.publish.mockResolvedValue(undefined);
       });
 
       it('should extract query params from URL and add non-redundant ones to properties', async () => {
@@ -279,15 +275,13 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        const [publishedPayload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
+        expect(publishedPayload.url).toBe('https://example.com/page');
+        expect(JSON.parse(publishedPayload.properties)).toEqual(
           expect.objectContaining({
-            properties: expect.objectContaining({
-              existing: 'value',
-              custom: 'keep',
-            }),
-            url: 'https://example.com/page',
+            existing: 'value',
+            custom: 'keep',
           }),
-          undefined,
         );
       });
 
@@ -296,11 +290,10 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({
             url: 'https://example.com/page',
           }),
-          undefined,
         );
       });
 
@@ -317,11 +310,10 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({
             url: null,
           }),
-          undefined,
         );
       });
     });
@@ -329,7 +321,7 @@ describe('InternalEventsService', () => {
     describe('geolocation', () => {
       beforeEach(() => {
         mockMsgopsService.getAccountTimeZone.mockResolvedValue('America/Sao_Paulo');
-        mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
+        mockAnalyticsPublisherProvider.publish.mockResolvedValue(undefined);
       });
 
       it('should fetch geolocation data when IP is provided', async () => {
@@ -344,13 +336,12 @@ describe('InternalEventsService', () => {
         await service.internalEventsProcess(request);
 
         expect(mockGeolocationService.getLocation).toHaveBeenCalledWith('192.168.1.1');
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({
             country: 'Brazil',
             region: 'SP',
             city: 'Sao Paulo',
           }),
-          undefined,
         );
       });
 
@@ -366,7 +357,7 @@ describe('InternalEventsService', () => {
     describe('contactId resolution', () => {
       beforeEach(() => {
         mockMsgopsService.getAccountTimeZone.mockResolvedValue('America/Sao_Paulo');
-        mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
+        mockAnalyticsPublisherProvider.publish.mockResolvedValue(undefined);
       });
 
       it('should resolve contactId from uuid when contactId is missing', async () => {
@@ -378,9 +369,8 @@ describe('InternalEventsService', () => {
         await service.internalEventsProcess(request);
 
         expect(mockMsgopsService.findContactByUuid).toHaveBeenCalledWith(1, '019901e4-773f-7008-ae1e-7842dce2f8c7');
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ contact_id: 42 }),
-          undefined,
         );
       });
 
@@ -390,9 +380,8 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ email: 'resolved@example.com', contact_id: 42 }),
-          undefined,
         );
       });
 
@@ -405,9 +394,8 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ email: 'upstream@example.com' }),
-          undefined,
         );
       });
 
@@ -420,9 +408,8 @@ describe('InternalEventsService', () => {
         await service.internalEventsProcess(request);
 
         expect(mockMsgopsService.findContactByEmail).toHaveBeenCalledWith(1, 'lookup@example.com');
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ contact_id: 99 }),
-          undefined,
         );
       });
 
@@ -445,9 +432,8 @@ describe('InternalEventsService', () => {
 
         expect(mockMsgopsService.findContactByEmail).not.toHaveBeenCalled();
         expect(mockMsgopsService.findContactByUuid).not.toHaveBeenCalled();
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ contact_id: 12345 }),
-          undefined,
         );
       });
 
@@ -458,9 +444,8 @@ describe('InternalEventsService', () => {
         await service.internalEventsProcess(request);
 
         expect(mockMsgopsService.findContactByUuid).toHaveBeenCalledWith(1, 'unknown-uuid');
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ contactId: null, uuid: 'unknown-uuid' }),
-          undefined,
         );
       });
 
@@ -475,9 +460,8 @@ describe('InternalEventsService', () => {
 
         expect(mockMsgopsService.findContactByEmail).toHaveBeenCalledWith(1, 'missing@example.com');
         expect(mockMsgopsService.findContactByUuid).toHaveBeenCalledWith(1, 'uuid-value');
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ contact_id: 77 }),
-          undefined,
         );
       });
     });
@@ -488,7 +472,7 @@ describe('InternalEventsService', () => {
 
       beforeEach(() => {
         mockMsgopsService.getAccountTimeZone.mockResolvedValue('America/Sao_Paulo');
-        mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
+        mockAnalyticsPublisherProvider.publish.mockResolvedValue(undefined);
         mockMsgopsService.findMessageAssociation.mockResolvedValue({});
       });
 
@@ -497,9 +481,8 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ utm_campaign: 'cc_portobnk_hfnc_v1-32_e1_579367' }),
-          undefined,
         );
       });
 
@@ -508,9 +491,8 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ message_id: 579367 }),
-          undefined,
         );
       });
 
@@ -523,9 +505,8 @@ describe('InternalEventsService', () => {
         await service.internalEventsProcess(request);
 
         expect(mockMsgopsService.findMessageAssociation).toHaveBeenCalledWith(1, 579367, 'cc_portobnk_hfnc_v1-32');
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ campaign_id: 42, message_id: 579367 }),
-          undefined,
         );
       });
 
@@ -539,9 +520,8 @@ describe('InternalEventsService', () => {
         await service.internalEventsProcess(request);
 
         expect(mockMsgopsService.findMessageAssociation).toHaveBeenCalledWith(1, 108456, 'pecaoseu-fluxo-cc-e02-t3');
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ automation_id: 88, message_id: 108456 }),
-          undefined,
         );
       });
 
@@ -553,9 +533,8 @@ describe('InternalEventsService', () => {
         await service.internalEventsProcess(request);
 
         expect(mockMsgopsService.findMessageAssociation).not.toHaveBeenCalled();
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ utm_campaign: 'custom-value', message_id: undefined }),
-          undefined,
         );
       });
 
@@ -564,9 +543,8 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ message_id: 111 }),
-          undefined,
         );
       });
 
@@ -590,7 +568,7 @@ describe('InternalEventsService', () => {
     describe('properties sanitization', () => {
       beforeEach(() => {
         mockMsgopsService.getAccountTimeZone.mockResolvedValue('America/Sao_Paulo');
-        mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
+        mockAnalyticsPublisherProvider.publish.mockResolvedValue(undefined);
         mockMsgopsService.findMessageAssociation.mockResolvedValue({});
       });
 
@@ -604,14 +582,15 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        const kafkaCall = mockKafkaProvider.sendAsyncMessage.mock.calls[0][0];
-        expect(kafkaCall.properties).not.toHaveProperty('bmsu');
-        expect(kafkaCall.properties).not.toHaveProperty('bmsa');
-        expect(kafkaCall.properties).not.toHaveProperty('utm_source');
-        expect(kafkaCall.properties).not.toHaveProperty('utm_medium');
-        expect(kafkaCall.properties).not.toHaveProperty('utm_content');
-        expect(kafkaCall.properties).not.toHaveProperty('utm_campaign');
-        expect(kafkaCall.properties).toMatchObject({ keep: 'yes' });
+        const publishCall = mockAnalyticsPublisherProvider.publish.mock.calls[0][0];
+        const publishProps = JSON.parse(publishCall.properties);
+        expect(publishProps).not.toHaveProperty('bmsu');
+        expect(publishProps).not.toHaveProperty('bmsa');
+        expect(publishProps).not.toHaveProperty('utm_source');
+        expect(publishProps).not.toHaveProperty('utm_medium');
+        expect(publishProps).not.toHaveProperty('utm_content');
+        expect(publishProps).not.toHaveProperty('utm_campaign');
+        expect(publishProps).toMatchObject({ keep: 'yes' });
       });
 
       it('should still emit utm_campaign top-level column after stripping from properties', async () => {
@@ -619,9 +598,8 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({ utm_campaign: 'camp_e1_111' }),
-          undefined,
         );
       });
     });
@@ -629,23 +607,23 @@ describe('InternalEventsService', () => {
     describe('persistence', () => {
       beforeEach(() => {
         mockMsgopsService.getAccountTimeZone.mockResolvedValue('America/Sao_Paulo');
-        mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
+        mockAnalyticsPublisherProvider.publish.mockResolvedValue(undefined);
       });
 
-      it('should call sendKafkaMessage for processed events', async () => {
+      it('should call sendAnalyticsEvent for processed events', async () => {
         const request = createRequest([baseEvent]);
 
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalled();
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalled();
       });
 
-      it('should call sendKafkaMessage for processed events with correct shape', async () => {
+      it('should call sendAnalyticsEvent for processed events with correct shape', async () => {
         const request = createRequest([baseEvent]);
 
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({
             account_id: 1,
             event: 'resubscribed',
@@ -653,7 +631,6 @@ describe('InternalEventsService', () => {
             email: 'test@example.com',
             message_type: 'internal',
           }),
-          undefined,
         );
       });
 
@@ -674,26 +651,17 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledTimes(3);
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
-          expect.objectContaining({ contact_id: 1 }),
-          undefined,
-        );
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
-          expect.objectContaining({ contact_id: 2 }),
-          undefined,
-        );
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalledWith(
-          expect.objectContaining({ contact_id: 3 }),
-          undefined,
-        );
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledTimes(3);
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(expect.objectContaining({ contact_id: 1 }));
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(expect.objectContaining({ contact_id: 2 }));
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(expect.objectContaining({ contact_id: 3 }));
       });
     });
 
     // Hop 2 of the email click flow (tracker-redirect). When the user follows
     // a bmsclick link, apps/tracker publishes a platform='internal' event with
     // the real end-user IP. These tests guard that bot classification reaches
-    // ClickHouse via Kafka properties, so we can later correlate with hop-1
+    // ClickHouse via properties, so we can later correlate with hop-1
     // click-webhook classifications to strip Gmail-prefetch noise.
     describe('bot signal stamping for tracker-redirect', () => {
       const trackerRedirectEvent = {
@@ -709,7 +677,7 @@ describe('InternalEventsService', () => {
 
       beforeEach(() => {
         mockMsgopsService.getAccountTimeZone.mockResolvedValue('America/Sao_Paulo');
-        mockKafkaProvider.sendAsyncMessage.mockResolvedValue(undefined);
+        mockAnalyticsPublisherProvider.publish.mockResolvedValue(undefined);
       });
 
       it('stamps is_datacenter=true, is_bot=false, bot_classification="datacenter" for a GCP hosting IP', async () => {
@@ -731,10 +699,10 @@ describe('InternalEventsService', () => {
         const request = createRequest([trackerRedirectEvent]);
         await service.internalEventsProcess(request);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalled();
-        const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalled();
+        const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
         expect(payload.event).toBe('tracker-redirect');
-        expect(payload.properties).toMatchObject({
+        expect(JSON.parse(payload.properties)).toMatchObject({
           is_bot: false,
           is_datacenter: true,
           bot_classification: 'datacenter',
@@ -761,8 +729,8 @@ describe('InternalEventsService', () => {
         const request = createRequest([{ ...trackerRedirectEvent, userAgent: 'curl/8.4.0' }]);
         await service.internalEventsProcess(request);
 
-        const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
-        expect(payload.properties).toMatchObject({
+        const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
+        expect(JSON.parse(payload.properties)).toMatchObject({
           is_bot: true,
           is_datacenter: true,
           bot_classification: 'script_ua',
@@ -789,8 +757,8 @@ describe('InternalEventsService', () => {
         const request = createRequest([{ ...trackerRedirectEvent, ip: '177.1.1.1' }]);
         await service.internalEventsProcess(request);
 
-        const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
-        expect(payload.properties).toMatchObject({
+        const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
+        expect(JSON.parse(payload.properties)).toMatchObject({
           is_bot: false,
           is_datacenter: false,
           bot_classification: null,
@@ -805,8 +773,8 @@ describe('InternalEventsService', () => {
         await service.internalEventsProcess(request);
 
         expect(mockGeolocationService.getLocation).not.toHaveBeenCalled();
-        const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
-        expect(payload.properties).toMatchObject({
+        const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
+        expect(JSON.parse(payload.properties)).toMatchObject({
           is_bot: false,
           is_datacenter: false,
           bot_classification: null,

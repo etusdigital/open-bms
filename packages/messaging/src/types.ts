@@ -29,6 +29,7 @@ export type Handler<T = unknown> = (msg: T, ctx: MessageContext) => Promise<Hand
 
 export interface Publisher {
   publish(options: PublishOptions): Promise<void>;
+  ensureReady(exchange: string): Promise<void>;
   close(): Promise<void>;
 }
 

@@ -349,7 +349,7 @@ export class SendgridService extends EventsService {
   private async saveLogs(eventLogs: EventLog[][]): Promise<void> {
     await Promise.all(
       eventLogs.map(async (accountEvents) => {
-        await this.sendKafkaMessage(accountEvents);
+        await this.sendAnalyticsEvent(accountEvents);
         await this.msgOpsService.saveEventsLogs(accountEvents);
       }),
     );

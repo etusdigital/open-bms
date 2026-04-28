@@ -165,7 +165,7 @@ export class PushService extends EventsService {
       }),
     );
 
-    await this.sendKafkaMessage(values);
+    await this.sendAnalyticsEvent(values);
     await this.msgOpsService.saveEventsLogs(values);
   }
 }

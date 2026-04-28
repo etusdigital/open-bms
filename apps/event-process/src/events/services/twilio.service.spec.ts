@@ -6,7 +6,7 @@ import { MsgopsService } from '../../msgops/msgops.service';
 import { EventPublisherService } from '../../event-publisher.service';
 import { CacheService } from '../../msgops/cache.service';
 import { GeolocationService } from '../../utils/geolocation/geolocation.service';
-import { KafkaProvider } from '../../providers/kafka.provider';
+import { AnalyticsPublisherProvider } from '../../providers/analytics-publisher.provider';
 import { PlatformType } from '../interfaces/push.interfaces';
 
 describe('TwilioService', () => {
@@ -44,7 +44,7 @@ describe('TwilioService', () => {
   const mockEventPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
   const mockCacheService = { get: jest.fn(), set: jest.fn() };
   const mockGeolocationService = { getLocation: jest.fn().mockResolvedValue({}) };
-  const mockKafkaProvider = { sendAsyncMessage: jest.fn().mockResolvedValue(undefined) };
+  const mockAnalyticsPublisherProvider = { publish: jest.fn().mockResolvedValue(undefined) };
 
   const makeEvent = (overrides = {}) => ({
     platform: PlatformType.TWILIO,
@@ -74,7 +74,7 @@ describe('TwilioService', () => {
         { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: CacheService, useValue: mockCacheService },
         { provide: GeolocationService, useValue: mockGeolocationService },
-        { provide: KafkaProvider, useValue: mockKafkaProvider },
+        { provide: AnalyticsPublisherProvider, useValue: mockAnalyticsPublisherProvider },
       ],
     }).compile();
 
@@ -189,12 +189,12 @@ describe('TwilioService', () => {
   describe('saveLogsTwilio', () => {
     it('should return early for events not in expected list', async () => {
       await (service as any).saveLogsTwilio(makeEvent({ event: 'unknown' }));
-      expect(mockKafkaProvider.sendAsyncMessage).not.toHaveBeenCalled();
+      expect(mockAnalyticsPublisherProvider.publish).not.toHaveBeenCalled();
     });
 
-    it('should call sendKafkaMessage and saveEventsLogs for valid events', async () => {
+    it('should call sendAnalyticsEvent and saveEventsLogs for valid events', async () => {
       await (service as any).saveLogsTwilio(makeEvent({ event: 'delivered' }));
-      expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalled();
+      expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalled();
       expect(mockMsgopsService.saveEventsLogs).toHaveBeenCalled();
     });
 

@@ -9,7 +9,7 @@ import { MsgopsModule } from '../msgops/msgops.module';
 import { RedisModule } from '../providers/redis/redis.module';
 import { CacheService } from '../msgops/cache.service';
 import { GeolocationModule } from '../utils/geolocation/geolocation.module';
-import { KafkaProvider } from '../providers/kafka.provider';
+import { AnalyticsPublisherProvider } from '../providers/analytics-publisher.provider';
 import { InternalEventsService } from './services/internal-events.service';
 
 @Module({
@@ -23,7 +23,7 @@ import { InternalEventsService } from './services/internal-events.service';
     CustomEventsService,
     InternalEventsService,
     CacheService,
-    KafkaProvider,
+    AnalyticsPublisherProvider,
   ],
   exports: [EventsService, SendgridService, PushService, TwilioService, CustomEventsService, InternalEventsService],
 })

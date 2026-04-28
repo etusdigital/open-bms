@@ -8,6 +8,7 @@ export const EXCHANGES = {
   whatsapp: 'bms.whatsapp',
   sms: 'bms.sms',
   tags: 'bms.tags',
+  analytics: 'bms.analytics',
 } as const;
 
 export const DLX = 'bms.dlx';

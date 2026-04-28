@@ -6,7 +6,7 @@ import { MsgopsService } from '../../msgops/msgops.service';
 import { EventPublisherService } from '../../event-publisher.service';
 import { CacheService } from '../../msgops/cache.service';
 import { GeolocationService } from '../../utils/geolocation/geolocation.service';
-import { KafkaProvider } from '../../providers/kafka.provider';
+import { AnalyticsPublisherProvider } from '../../providers/analytics-publisher.provider';
 import { PlatformType } from '../interfaces/push.interfaces';
 
 describe('CustomEventsService', () => {
@@ -48,7 +48,7 @@ describe('CustomEventsService', () => {
   const mockEventPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
   const mockCacheService = { get: jest.fn(), set: jest.fn() };
   const mockGeolocationService = { getLocation: jest.fn().mockResolvedValue({}) };
-  const mockKafkaProvider = { sendAsyncMessage: jest.fn().mockResolvedValue(undefined) };
+  const mockAnalyticsPublisherProvider = { publish: jest.fn().mockResolvedValue(undefined) };
 
   const baseEvent = {
     apiKey: 'key-1',
@@ -78,7 +78,7 @@ describe('CustomEventsService', () => {
         { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: CacheService, useValue: mockCacheService },
         { provide: GeolocationService, useValue: mockGeolocationService },
-        { provide: KafkaProvider, useValue: mockKafkaProvider },
+        { provide: AnalyticsPublisherProvider, useValue: mockAnalyticsPublisherProvider },
       ],
     }).compile();
 
@@ -231,9 +231,9 @@ describe('CustomEventsService', () => {
         expect(triggerSpy).toHaveBeenCalledWith('custom_events', expect.any(Array));
       });
 
-      it('should call sendKafkaMessage for processed events', async () => {
+      it('should call sendAnalyticsEvent for processed events', async () => {
         await service.customEventsProcess(makeRequest([baseEvent]) as any);
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalled();
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalled();
       });
 
       it('should call saveEventsLogs for processed events', async () => {
@@ -262,7 +262,7 @@ describe('CustomEventsService', () => {
     // Hop 3 of the email click flow (pageview). An external service publishes
     // directly to the pubsub topic with the user's IP already embedded in
     // event.ip. These tests guard that bot classification reaches ClickHouse
-    // via Kafka properties, so we can correlate engagement across hops.
+    // via properties, so we can correlate engagement across hops.
     describe('bot signal stamping for pageview', () => {
       const pageviewEvent = {
         ...baseEvent,
@@ -290,10 +290,10 @@ describe('CustomEventsService', () => {
 
         await service.customEventsProcess(makeRequest([pageviewEvent]) as any);
 
-        expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalled();
-        const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+        expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalled();
+        const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
         expect(payload.event).toBe('pageview');
-        expect(payload.properties).toMatchObject({
+        expect(JSON.parse(payload.properties)).toMatchObject({
           is_bot: false,
           is_datacenter: false,
           bot_classification: null,
@@ -319,8 +319,8 @@ describe('CustomEventsService', () => {
 
         await service.customEventsProcess(makeRequest([{ ...pageviewEvent, userAgent: 'curl/8.4.0' }]) as any);
 
-        const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
-        expect(payload.properties).toMatchObject({
+        const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
+        expect(JSON.parse(payload.properties)).toMatchObject({
           is_bot: true,
           is_datacenter: true,
           bot_classification: 'script_ua',
@@ -333,8 +333,8 @@ describe('CustomEventsService', () => {
         await service.customEventsProcess(makeRequest([noIpEvent]) as any);
 
         expect(mockGeolocationService.getLocation).not.toHaveBeenCalled();
-        const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
-        expect(payload.properties).toMatchObject({
+        const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
+        expect(JSON.parse(payload.properties)).toMatchObject({
           is_bot: false,
           is_datacenter: false,
           bot_classification: null,

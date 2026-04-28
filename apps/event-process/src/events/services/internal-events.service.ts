@@ -169,7 +169,7 @@ export class InternalEventsService extends EventsService {
       return;
     }
 
-    await this.sendKafkaMessage(eventsProcess);
+    await this.sendAnalyticsEvent(eventsProcess);
     // TODO: turn on it after create a new postgresql only to backup
     // await this.msgOpsService.saveEventsLogs(eventsProcess);
 

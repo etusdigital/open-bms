@@ -46,6 +46,17 @@ export class AmqpPublisher implements Publisher {
     await channel.waitForConfirms();
   }
 
+  // Opens the channel and asserts an exchange (and DLX) without publishing
+  // any payload. Useful for warmup paths that just want to fail fast on
+  // misconfiguration without injecting a real or sentinel message into the
+  // exchange (which could be picked up by future wildcard bindings).
+  async ensureReady(exchange: string): Promise<void> {
+    if (this.closed) throw new PublisherClosedError();
+    const channel = await this.getChannel();
+    await this.assertExchange(channel, DLX);
+    await this.assertExchange(channel, exchange);
+  }
+
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;

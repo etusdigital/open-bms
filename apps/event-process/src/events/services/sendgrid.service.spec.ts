@@ -6,7 +6,7 @@ import { MsgopsService } from '../../msgops/msgops.service';
 import { EventPublisherService } from '../../event-publisher.service';
 import { CacheService } from '../../msgops/cache.service';
 import { GeolocationService } from '../../utils/geolocation/geolocation.service';
-import { KafkaProvider } from '../../providers/kafka.provider';
+import { AnalyticsPublisherProvider } from '../../providers/analytics-publisher.provider';
 import { SendgridBounceClassification } from '../interfaces/events.interfaces';
 
 const ACCOUNT_ID = '42';
@@ -92,7 +92,7 @@ describe('SendgridService', () => {
   const mockEventPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
   const mockCacheService = { get: jest.fn(), set: jest.fn() };
   const mockGeolocationService = { getLocation: jest.fn().mockResolvedValue({}) };
-  const mockKafkaProvider = { sendAsyncMessage: jest.fn().mockResolvedValue(undefined) };
+  const mockAnalyticsPublisherProvider = { publish: jest.fn().mockResolvedValue(undefined) };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -116,7 +116,7 @@ describe('SendgridService', () => {
         { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: CacheService, useValue: mockCacheService },
         { provide: GeolocationService, useValue: mockGeolocationService },
-        { provide: KafkaProvider, useValue: mockKafkaProvider },
+        { provide: AnalyticsPublisherProvider, useValue: mockAnalyticsPublisherProvider },
       ],
     }).compile();
 

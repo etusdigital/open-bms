@@ -412,7 +412,7 @@ export class MsgopsService {
     // Get all unique keys in a single pass. Skip internal-only fields
     // that don't map to an events_logs column:
     // - `delivered_id`: legacy join key carried on EventLog for Kafka only.
-    // - `traits`: feeds BotDetector in processMessageToKafka; the six
+    // - `traits`: feeds BotDetector in processMessageToAnalytics; the six
     //   derived signals land in `properties` instead.
     const EXCLUDED_COLUMNS = new Set(['delivered_id', 'traits']);
     const keysMap = new Map<string, string>();

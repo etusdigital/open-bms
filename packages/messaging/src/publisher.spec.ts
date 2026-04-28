@@ -237,6 +237,40 @@ describe('AmqpPublisher', () => {
     });
   });
 
+  describe('ensureReady', () => {
+    it('asserts DLX and the requested exchange without publishing', async () => {
+      const { channel, publisher } = setup();
+
+      await publisher.ensureReady(EXCHANGES.analytics);
+
+      expect(channel.assertExchange).toHaveBeenCalledWith(DLX, 'topic', { durable: true });
+      expect(channel.assertExchange).toHaveBeenCalledWith(EXCHANGES.analytics, 'topic', { durable: true });
+      expect(channel.publish).not.toHaveBeenCalled();
+      expect(channel.waitForConfirms).not.toHaveBeenCalled();
+    });
+
+    it('rejects with PublisherClosedError after close', async () => {
+      const { publisher } = setup();
+      await publisher.close();
+      await expect(publisher.ensureReady(EXCHANGES.analytics)).rejects.toBeInstanceOf(PublisherClosedError);
+    });
+
+    it('does not re-assert if a subsequent publish targets the same exchange', async () => {
+      const { channel, publisher } = setup();
+
+      await publisher.ensureReady(EXCHANGES.analytics);
+      await publisher.publish({
+        exchange: EXCHANGES.analytics,
+        routingKey: 'event.enriched',
+        payload: { ok: true },
+      });
+
+      // DLX once + analytics once across both calls
+      expect(channel.assertExchange).toHaveBeenCalledTimes(2);
+      expect(channel.publish).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('close', () => {
     it('closes channel and underlying connection', async () => {
       const { channel, conn, publisher } = setup();

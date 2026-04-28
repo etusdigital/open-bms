@@ -8,7 +8,7 @@ import { EXCHANGES } from '@bms/messaging';
 import { EventPublisherService } from '../../event-publisher.service';
 import { CacheService } from '../../msgops/cache.service';
 import { GeolocationService } from '../../utils/geolocation/geolocation.service';
-import { KafkaProvider } from '../../providers/kafka.provider';
+import { AnalyticsPublisherProvider } from '../../providers/analytics-publisher.provider';
 import { PlatformType } from '../interfaces/push.interfaces';
 
 // Concrete subclass for testing protected methods
@@ -46,8 +46,8 @@ class TestableEventsService extends EventsService {
   public testEventsTrigger(key: any, events: any, accountId?: number) {
     return this.eventsTrigger(key, events, accountId);
   }
-  public testSendKafkaMessage(events: any) {
-    return this.sendKafkaMessage(events);
+  public testSendAnalyticsEvent(events: any) {
+    return this.sendAnalyticsEvent(events);
   }
 }
 
@@ -98,8 +98,8 @@ describe('EventsService', () => {
     getLocation: jest.fn(),
   };
 
-  const mockKafkaProvider = {
-    sendAsyncMessage: jest.fn().mockResolvedValue(undefined),
+  const mockAnalyticsPublisherProvider = {
+    publish: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {
@@ -115,7 +115,7 @@ describe('EventsService', () => {
         { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: CacheService, useValue: mockCacheService },
         { provide: GeolocationService, useValue: mockGeolocationService },
-        { provide: KafkaProvider, useValue: mockKafkaProvider },
+        { provide: AnalyticsPublisherProvider, useValue: mockAnalyticsPublisherProvider },
       ],
     }).compile();
 
@@ -719,10 +719,47 @@ describe('EventsService', () => {
     });
   });
 
-  describe('sendKafkaMessage', () => {
-    it('should send each event to Kafka', async () => {
-      await service.testSendKafkaMessage([{ accountId: 1, event: 'test' }]);
-      expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalled();
+  describe('sendAnalyticsEvent', () => {
+    const FIXED_TIME = new Date('2026-04-28T12:00:00.000Z');
+
+    it('should send each event to analytics', async () => {
+      await service.testSendAnalyticsEvent([{ accountId: 1, event: 'test', time: FIXED_TIME }]);
+      expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalled();
+    });
+
+    it('drops events without `time` instead of publishing malformed rows', async () => {
+      await service.testSendAnalyticsEvent([{ accountId: 1, event: 'click' }]);
+      expect(mockAnalyticsPublisherProvider.publish).not.toHaveBeenCalled();
+      expect(mockFormatterUtils.logInfo).toHaveBeenCalledWith(expect.stringContaining('dropping event without time'));
+    });
+
+    it('skips bad events without breaking the rest of the batch', async () => {
+      await service.testSendAnalyticsEvent([
+        { accountId: 1, event: 'click' }, // no time, dropped
+        { accountId: 2, event: 'open', time: FIXED_TIME }, // valid
+      ]);
+      expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledTimes(1);
+      const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
+      expect(payload.account_id).toBe(2);
+    });
+
+    it('falls back to bot-signals-only properties when stringify of merged props throws', async () => {
+      const circular: Record<string, unknown> = { name: 'oops' };
+      circular.self = circular;
+      await service.testSendAnalyticsEvent([
+        {
+          accountId: 1,
+          event: 'click',
+          time: FIXED_TIME,
+          properties: { circular },
+        },
+      ]);
+      expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalled();
+      const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
+      const props = JSON.parse(payload.properties);
+      expect(props).toHaveProperty('is_bot');
+      expect(props).not.toHaveProperty('circular');
+      expect(mockFormatterUtils.logInfo).toHaveBeenCalledWith(expect.stringContaining('properties not serializable'));
     });
 
     const gmailTraits = {
@@ -738,10 +775,10 @@ describe('EventsService', () => {
     const gcpTraits = { ...gmailTraits, asn: 396982 };
 
     it('stamps full bot signals for a Gmail click (narrow is_bot + is_datacenter)', async () => {
-      await service.testSendKafkaMessage([{ accountId: 1, event: 'click', traits: gmailTraits }]);
-      expect(mockKafkaProvider.sendAsyncMessage).toHaveBeenCalled();
-      const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
-      expect(payload.properties).toMatchObject({
+      await service.testSendAnalyticsEvent([{ accountId: 1, event: 'click', time: FIXED_TIME, traits: gmailTraits }]);
+      expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalled();
+      const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
+      expect(JSON.parse(payload.properties)).toMatchObject({
         is_bot: true,
         is_datacenter: true,
         bot_classification: 'gmail_prefetch',
@@ -752,9 +789,9 @@ describe('EventsService', () => {
     });
 
     it('stamps is_datacenter=true but is_bot=false for a GCP click (Shop app etc.)', async () => {
-      await service.testSendKafkaMessage([{ accountId: 1, event: 'click', traits: gcpTraits }]);
-      const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
-      expect(payload.properties).toMatchObject({
+      await service.testSendAnalyticsEvent([{ accountId: 1, event: 'click', time: FIXED_TIME, traits: gcpTraits }]);
+      const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
+      expect(JSON.parse(payload.properties)).toMatchObject({
         is_bot: false,
         is_datacenter: true,
         bot_classification: 'datacenter',
@@ -763,9 +800,9 @@ describe('EventsService', () => {
     });
 
     it('stamps all-false / zero defaults when traits are missing', async () => {
-      await service.testSendKafkaMessage([{ accountId: 1, event: 'click' }]);
-      const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
-      expect(payload.properties).toMatchObject({
+      await service.testSendAnalyticsEvent([{ accountId: 1, event: 'click', time: FIXED_TIME }]);
+      const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
+      expect(JSON.parse(payload.properties)).toMatchObject({
         is_bot: false,
         is_datacenter: false,
         bot_classification: null,
@@ -776,16 +813,17 @@ describe('EventsService', () => {
     });
 
     it('preserves existing properties when merging bot fields', async () => {
-      await service.testSendKafkaMessage([
+      await service.testSendAnalyticsEvent([
         {
           accountId: 1,
           event: 'bounce',
+          time: FIXED_TIME,
           traits: gmailTraits,
           properties: { bounce_classification: 'Reputation' },
         },
       ]);
-      const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
-      expect(payload.properties).toMatchObject({
+      const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
+      expect(JSON.parse(payload.properties)).toMatchObject({
         bounce_classification: 'Reputation',
         is_bot: true,
         is_datacenter: true,
@@ -794,11 +832,11 @@ describe('EventsService', () => {
     });
 
     it('UA denylist on a GCP click flips is_bot=true with script_ua classification', async () => {
-      await service.testSendKafkaMessage([
-        { accountId: 1, event: 'click', traits: gcpTraits, userAgent: 'Shop Service' },
+      await service.testSendAnalyticsEvent([
+        { accountId: 1, event: 'click', time: FIXED_TIME, traits: gcpTraits, userAgent: 'Shop Service' },
       ]);
-      const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
-      expect(payload.properties).toMatchObject({
+      const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
+      expect(JSON.parse(payload.properties)).toMatchObject({
         is_bot: true,
         is_datacenter: true,
         bot_classification: 'script_ua',
@@ -807,17 +845,17 @@ describe('EventsService', () => {
     });
 
     it('reads snake_case user_agent when camelCase userAgent is absent', async () => {
-      await service.testSendKafkaMessage([
-        { accountId: 1, event: 'click', traits: gcpTraits, user_agent: 'curl/8.4.0' },
+      await service.testSendAnalyticsEvent([
+        { accountId: 1, event: 'click', time: FIXED_TIME, traits: gcpTraits, user_agent: 'curl/8.4.0' },
       ]);
-      const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
-      expect(payload.properties.is_bot).toBe(true);
-      expect(payload.properties.bot_classification).toBe('script_ua');
+      const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
+      expect(JSON.parse(payload.properties).is_bot).toBe(true);
+      expect(JSON.parse(payload.properties).bot_classification).toBe('script_ua');
     });
 
-    it('strips top-level traits from the Kafka payload (no column in ClickHouse)', async () => {
-      await service.testSendKafkaMessage([{ accountId: 1, event: 'click', traits: gmailTraits }]);
-      const [payload] = mockKafkaProvider.sendAsyncMessage.mock.lastCall!;
+    it('strips top-level traits from the analytics payload (no column in ClickHouse)', async () => {
+      await service.testSendAnalyticsEvent([{ accountId: 1, event: 'click', time: FIXED_TIME, traits: gmailTraits }]);
+      const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
       expect(payload).not.toHaveProperty('traits');
     });
   });

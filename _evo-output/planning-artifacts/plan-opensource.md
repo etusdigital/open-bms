@@ -78,6 +78,12 @@ O projeto está "pronto pra publicar" quando **TODOS** os itens abaixo forem ver
 | Dev A | **Gui** — Messaging & Apps (caminho crítico: devops/infra, lib RabbitMQ, bridge HTTP, 13 apps) |
 | Dev B | **Danilo** — Admin & Config (Wizard UI, Super Admin polimento `msgops-manager-frontend`, GeoDB, docs + sizing guide) |
 
+## Decisões arquiteturais registradas
+
+Decisões tomadas durante a execução do v0.1.0 que valem âncora separada (não cabem na linha única da tabela acima).
+
+- **Transporte de eventos para ClickHouse (EVO-1013):** AMQP + ClickHouse `ENGINE = RabbitMQ` + Materialized View. Substitui Kafka. Razão: teto de performance menor é desejável no OSS como diferencial vs. Enterprise. Análise completa: `_evo-output/planning-artifacts/evo-1013-event-delivery-flow-analysis.md`.
+
 ## Known Limitations (registradas explicitamente, não escondidas)
 
 Estas são limitações conhecidas na v0.1.0. Ficam no README como roadmap, não como bug:

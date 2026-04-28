@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS BMS.events_logs_v2
 ENGINE = MergeTree
 PARTITION BY (account_id, toYYYYMM(time_date))
 ORDER BY (account_id, message_type, time_date, event)
-TTL time + toIntervalDay(180)
+TTL time_date + toIntervalDay(180)
 SETTINGS index_granularity = 8192;
 
 CREATE TABLE IF NOT EXISTS BMS.tb_email_hourly_stats (

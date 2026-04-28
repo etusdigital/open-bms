@@ -11,9 +11,14 @@ import { EventLog, InternalEvent, InternalRequest, SendgridPayload } from '../in
 import { CacheService } from '../../msgops/cache.service';
 import { GeolocationService } from '../../utils/geolocation/geolocation.service';
 import type { Traits } from '../../utils/geolocation/geolocation.interface';
-import { KafkaProvider } from '../../providers/kafka.provider';
+import { AnalyticsPublisherProvider } from '../../providers/analytics-publisher.provider';
 import { BotDetector } from '../../utils/bot-detector';
 import crypto from 'crypto';
+
+function toClickhouseDateTime(value: Date | string | number): string {
+  const d = value instanceof Date ? value : new Date(value);
+  return d.toISOString().replace('T', ' ').replace('Z', '');
+}
 
 @Injectable()
 export class EventsService {
@@ -27,7 +32,7 @@ export class EventsService {
     protected readonly eventPublisher: EventPublisherService,
     private readonly cacheService: CacheService,
     private readonly geolocationService: GeolocationService,
-    protected readonly kafkaProvider: KafkaProvider,
+    protected readonly analyticsPublisher: AnalyticsPublisherProvider,
   ) {
     this.redisClient = this.redisService.getOrThrow();
     if (!EventsService.userAgentParser) {
@@ -504,16 +509,20 @@ export class EventsService {
     } as InternalRequest);
   }
 
-  protected async sendKafkaMessage(events) {
+  protected async sendAnalyticsEvent(events) {
     await Promise.all(
       events.map(async (message) => {
-        const kafkaMessage = this.processMessageToKafka(message);
-        await this.kafkaProvider.sendAsyncMessage(kafkaMessage, process.env.KAFKA_EVENTS_TOPIC);
+        const analyticsMessage = this.processMessageToAnalytics(message);
+        // processMessageToAnalytics returns null for messages we refuse to
+        // publish (e.g. missing time). Skipping here keeps the batch alive
+        // instead of feeding malformed rows into the CH RabbitMQ engine.
+        if (!analyticsMessage) return;
+        await this.analyticsPublisher.publish(analyticsMessage);
       }),
     );
   }
 
-  private processMessageToKafka(message) {
+  private processMessageToAnalytics(message) {
     // Traits arrive on the message via the upstream getGeoIpInfo() spread
     // (see event service callers that attach geoData). When absent — e.g.
     // non-click/open events or lookup failures — BotDetector returns
@@ -526,40 +535,92 @@ export class EventsService {
 
     // `traits` is an internal-only field carried on the EventLog to feed
     // BotDetector here; strip it from the outgoing payload because
-    // downstream (Kafka → ClickHouse events_logs_v2) has no `traits` column.
+    // downstream (ClickHouse events_logs_v2) has no `traits` column.
     // The six derived fields land in `properties` below instead.
     const { traits: _traits, ...rest } = message;
 
-    return {
-      ...rest,
-      account_id: message.accountId || message.account_id,
-      message_type: message.messageType || message.message_type,
-      contact_id: message.contactId || message.contact_id,
-      automation_id: message.automationId || message.automation_id,
-      campaign_id: message.campaignId || message.campaign_id,
-      message_id: message.messageId || message.message_id,
-      utm_campaign: message.utmCampaign || message.utm_campaign,
-      is_test_ab: message.isTestAb || message.is_test_ab,
-      events_logs_id: message.eventsLogsId || message.events_logs_id,
-      event_log_id: crypto.randomUUID(),
-      event_id: message.eventId || message.event_id,
-      user_agent: message.userAgent || message.user_agent,
-      is_mobile: message.isMobile || message.is_mobile,
-      os_version: message.osVersion || message.os_version,
-      link_position: message.linkPosition || message.link_position,
-      value_number: message.valueNumber || message.value_number,
-      value_time: message.valueTime || message.value_time,
-      seconds_since_sent: message.secondsSinceSent || message.seconds_since_sent,
-      provider_account: message.providerAccount || message.provider_account,
-      properties: {
-        ...(message.properties ?? {}),
+    // The CH RabbitMQ engine ignores DEFAULT/MATERIALIZED columns, so
+    // `time_date Date DEFAULT toDate(time)` (and the bare `date Date` column,
+    // which has no DEFAULT at all) would silently land as the 1970-01-01
+    // epoch and then be dropped by the 180-day TTL. Derive both producer-side.
+    // See Section 14.3 of the planning doc.
+    //
+    // CH parses DateTime64 from JSONEachRow as 'YYYY-MM-DD HH:MM:SS.sss',
+    // not the ISO 'T...Z' form that JSON.stringify(new Date()) emits, so
+    // normalize time and value_time before publish or the queue rows fail
+    // to insert with "Cannot parse input: expected '\"' before: 'Z'".
+    // Refuse to publish events without a usable `time`: the CH RabbitMQ engine
+    // cannot parse JSONEachRow rows where DateTime64 fields are missing/empty
+    // and once it sees one, it falls into a "consume + drop" state until the
+    // server is restarted (see docs/deployment.md). Skipping here keeps the
+    // pipeline healthy and surfaces the producer-side bug to logs.
+    if (!message.time) {
+      this.formatterUtils.logInfo(
+        `[Event-Process] processMessageToAnalytics: dropping event without time (event=${message.event} account_id=${message.accountId ?? message.account_id ?? 'unknown'})`,
+      );
+      return null;
+    }
+    const time = toClickhouseDateTime(message.time);
+    const timeDate = new Date(message.time).toISOString().slice(0, 10);
+    const valueTime = message.valueTime ?? message.value_time;
+    const valueTimeFormatted = valueTime ? toClickhouseDateTime(valueTime) : undefined;
+
+    // Wrap JSON.stringify so a single malformed message (circular ref, BigInt,
+    // non-serializable value) doesn't reject the whole batch via Promise.all.
+    const propertiesPayload = {
+      ...(message.properties ?? {}),
+      is_bot: signals.isBot,
+      is_datacenter: signals.isDatacenter,
+      bot_classification: signals.classification,
+      asn: signals.asn,
+      asn_org: signals.asnOrg,
+      user_type: signals.userType,
+    };
+    let propertiesString: string;
+    try {
+      propertiesString = JSON.stringify(propertiesPayload);
+    } catch (err) {
+      this.formatterUtils.logInfo(
+        `[Event-Process] processMessageToAnalytics: properties not serializable (event=${message.event}); falling back to bot signals only. Error: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      propertiesString = JSON.stringify({
         is_bot: signals.isBot,
         is_datacenter: signals.isDatacenter,
         bot_classification: signals.classification,
         asn: signals.asn,
         asn_org: signals.asnOrg,
         user_type: signals.userType,
-      },
+      });
+    }
+
+    return {
+      ...rest,
+      account_id: message.accountId ?? message.account_id,
+      message_type: message.messageType ?? message.message_type,
+      contact_id: message.contactId ?? message.contact_id,
+      automation_id: message.automationId ?? message.automation_id,
+      campaign_id: message.campaignId ?? message.campaign_id,
+      message_id: message.messageId ?? message.message_id,
+      utm_campaign: message.utmCampaign ?? message.utm_campaign,
+      is_test_ab: message.isTestAb ?? message.is_test_ab,
+      events_logs_id: message.eventsLogsId ?? message.events_logs_id,
+      event_log_id: crypto.randomUUID(),
+      event_id: message.eventId ?? message.event_id,
+      user_agent: message.userAgent ?? message.user_agent,
+      is_mobile: message.isMobile ?? message.is_mobile,
+      os_version: message.osVersion ?? message.os_version,
+      link_position: message.linkPosition ?? message.link_position,
+      value_number: message.valueNumber ?? message.value_number,
+      value_time: valueTimeFormatted,
+      seconds_since_sent: message.secondsSinceSent ?? message.seconds_since_sent,
+      provider_account: message.providerAccount ?? message.provider_account,
+      time: time,
+      time_date: timeDate,
+      date: timeDate,
+      // Serialized as a string so the CH RabbitMQ engine consumes it under
+      // a String column; the materialized view casts to JSON when inserting
+      // into events_logs_v2.properties.
+      properties: propertiesString,
     };
   }
 }
