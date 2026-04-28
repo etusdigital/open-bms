@@ -966,7 +966,7 @@ export class MessagesService {
   }
 
   async getEmailsLabels(params: EmailsLabelsDto): Promise<PaginationDto<EmailsLabelsDto>> {
-    const { product, language } = params;
+    const { language } = params;
     const sortBy = params.sortBy || 'processed_at';
     const order = params.order || 'DESC';
 
@@ -978,10 +978,6 @@ export class MessagesService {
       .andWhere('html IS NOT NULL')
       .andWhere('is_internal = :isInternal', { isInternal: false })
       .orderBy(sortBy, order);
-
-    if (product) {
-      query.andWhere('product ILIKE :product', { product });
-    }
 
     const [emailsLabels, total] = await query.getManyAndCount();
 
@@ -999,21 +995,6 @@ export class MessagesService {
 
   async getCountries(params: { language: string }) {
     return await this.emailsLabelsRepository.createQueryBuilder('emailsLabels').where({ language: params.language }).select('DISTINCT country').getRawMany();
-  }
-
-  async getProducts(params: EmailsLabelsDto) {
-    const products = this.emailsLabelsRepository
-      .createQueryBuilder('emailsLabels')
-      .where({ language: params.language })
-      .andWhere('is_internal = :isInternal', { isInternal: false })
-      .select('DISTINCT product')
-      .limit(10);
-
-    if (params.product) {
-      products.andWhere('product ilike :product', { product: `%${params.product}%` });
-    }
-
-    return await products.getRawMany();
   }
 
   private async migrateUnlayerImages(messageDto: MessageDto): Promise<MessageDto> {

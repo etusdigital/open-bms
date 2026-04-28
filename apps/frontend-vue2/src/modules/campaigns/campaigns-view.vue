@@ -26,15 +26,6 @@
               {{ $t('create.createCampaign') }}
             </span>
           </button>
-          <button
-            v-if="$store.getters.can('campaigns:create_from_rule')"
-            class="d-flex align-items-center justify-content-center cursor-pointer"
-            @click="() => (isCampaignRuleModelOpen = true)"
-          >
-            <span class="font-12 text-600">
-              {{ $t('create.createCampaignTemplate') }}
-            </span>
-          </button>
         </div>
       </div>
     </div>
@@ -659,15 +650,6 @@
         @closeMessagePreview="closeMessagePreview"
       />
     </v-dialog>
-    <v-dialog v-model="isCampaignRuleModelOpen">
-      <CampaignRulePreviewModal
-        @closeMessagePreview="
-          () => {
-            isCampaignRuleModelOpen = false;
-          }
-        "
-      />
-    </v-dialog>
   </div>
 </template>
 
@@ -690,8 +672,6 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import ToggleSwitchComponent from '@/components/toggle-switch/ToggleSwitchComponent.vue';
 import TagsService from '@/modules/tags/services/tag.service';
-import CampaignRulePreviewModal from '@/modules/campaigns-rules/views/CampaignRulePreviewModal.vue';
-import CampaignRuleService from '@/modules/campaigns-rules/services/campaign-rule.service';
 import { TagDto } from '../tags/dtos/tag.dto';
 import { SegmentDto } from '../segment/dtos/segment.dto';
 import { mapState } from 'vuex';
@@ -712,7 +692,6 @@ dayjs.extend(timezone);
     CircularProgress,
     ToggleSwitchComponent,
     MessagePreview,
-    CampaignRulePreviewModal,
   },
   computed: {
     ...mapState(['currentAccountTimezone', 'userLanguage', 'currentAccount']),
@@ -724,7 +703,6 @@ export default class CampaignsView extends Vue {
   private readonly campaignService = new CampaignService();
   private readonly tagsService = new TagsService();
   private readonly dashboardService = new DashboardService();
-  private readonly campaignRuleService = new CampaignRuleService();
   public selectedStatus: any = [];
   public selectedTypes: any = [];
   public selectedMessages: any = [];
@@ -851,8 +829,6 @@ export default class CampaignsView extends Vue {
   campaignsStatus: boolean | undefined = false;
   showCreateActions = false;
   closeTimeout: any = null;
-  hasRules: boolean | null = null;
-  isCampaignRuleModelOpen = false;
 
   async beforeMount() {
     const storedItemsPerPage = getItemsPerPage('campaigns');
@@ -868,7 +844,6 @@ export default class CampaignsView extends Vue {
       selectedSegments: this.selectedSegments,
     };
     this.filterTags('');
-    this.prefetchRulesCheck();
     this.filterSegments('');
     this.getFiltersValue();
     await this.updateCampaigns();
@@ -1642,68 +1617,11 @@ export default class CampaignsView extends Vue {
   }
 
   get showCreateSubmenu() {
-    // Only admins see the submenu (choose between blank and rule-based)
-    // Editors go directly through handleCreateClick logic
-    return this.$store.getters.can('infra:manage') && this.$store.getters.can('campaigns:create_from_rule');
+    return false;
   }
 
   handleCreateClick() {
-    if (this.showCreateSubmenu) {
-      return;
-    }
-
-    // Admins/super_admins: always direct creation
-    if (this.$store.getters.can('infra:manage')) {
-      this.$router.push('/campaigns/new');
-      return;
-    }
-
-    // Editors: check if account has rules first
-    if (this.$store.getters.can('campaigns:create_from_rule')) {
-      this.checkRulesAndRoute();
-      return;
-    }
-
-    // Fallback: direct creation
     if (this.$store.getters.can('campaigns:create')) {
-      this.$router.push('/campaigns/new');
-    }
-  }
-
-  async prefetchRulesCheck() {
-    if (!this.$store.getters.can('campaigns:create_from_rule') || this.$store.getters.can('infra:manage')) {
-      return;
-    }
-    try {
-      const rules = await this.campaignRuleService.getCampaignsRules({ page: 1, itemsPerPage: 1 });
-      this.hasRules = rules.data.totalItems > 0;
-    } catch {
-      this.hasRules = false;
-    }
-  }
-
-  checkRulesAndRoute() {
-    if (this.hasRules === null) {
-      // Still loading — fall back to async check
-      this.campaignRuleService
-        .getCampaignsRules({ page: 1, itemsPerPage: 1 })
-        .then((rules) => {
-          this.hasRules = rules.data.totalItems > 0;
-          if (this.hasRules) {
-            this.isCampaignRuleModelOpen = true;
-          } else {
-            this.$router.push('/campaigns/new');
-          }
-        })
-        .catch(() => {
-          this.$router.push('/campaigns/new');
-        });
-      return;
-    }
-
-    if (this.hasRules) {
-      this.isCampaignRuleModelOpen = true;
-    } else {
       this.$router.push('/campaigns/new');
     }
   }

@@ -3,7 +3,6 @@ import messagesRoutes from '@/modules/messages/router';
 import templatesRoutes from '@/modules/templates/router';
 import dashboardRoutes from '@/modules/dashboard/router';
 import campaignsRoutes from '@/modules/campaigns/campaigns-router';
-import campaignRulesRoutes from '@/modules/campaigns-rules/router';
 import poolsRoutes from '@/modules/pools/router';
 import contactsRouter from '@/modules/contacts/router';
 import tagRoutes from '@/modules/tags/router';
@@ -12,14 +11,11 @@ import segmentRoutes from '@/modules/segment/router';
 import customFieldsRoutes from '@/modules/customfields/router';
 import profileRoutes from '@/modules/profile/router';
 import settingsRoutes from '@/modules/settings/router';
-import warmupRoutes from '@/modules/warmup/router';
 import deniedRoutes from '@/components/access-denied/router/index';
 import Vue from 'vue';
 import Router from 'vue-router';
 import { RouteConfig } from 'vue-router/types/router';
 import store from './store';
-import triggerCampaignRoutes from './modules/trigger-campaign/router';
-import productRoutes from './modules/products/router';
 import labelsRoutes from './modules/labels/router';
 
 Vue.use(Router);
@@ -45,13 +41,9 @@ const routes = baseRoutes.concat(
   segmentRoutes,
   tagRoutes,
   templatesRoutes,
-  warmupRoutes,
   settingsRoutes,
   deniedRoutes,
   customEventsRoutes,
-  campaignRulesRoutes,
-  triggerCampaignRoutes,
-  productRoutes,
   labelsRoutes
 );
 
@@ -62,13 +54,8 @@ const router = new Router({
 
 const routePermissionByName: Record<string, string | string[]> = {
   'news-campaigns': 'campaigns:view',
-  'news-campaigns-create': ['campaigns:create', 'campaigns:create_from_rule'],
-  'news-campaigns-template-create': ['campaigns:create', 'campaigns:create_from_rule'],
+  'news-campaigns-create': 'campaigns:create',
   'news-campaigns-edit': 'campaigns:update',
-  'list-trigger-campaign': 'campaigns:view',
-  'new-trigger-campaign': ['campaigns:create', 'campaigns:create_from_rule'],
-  'edit-trigger-campaign': 'campaigns:update',
-  'product-list': 'campaigns:view',
 
   'automations/emails': 'automations:view',
   'automation/emails': 'automations:update',
@@ -95,8 +82,6 @@ const routePermissionByName: Record<string, string | string[]> = {
 
   'statistics-route': 'analytics:dashboard_view',
   'comparison-route': 'analytics:comparison_view',
-  'leads-route': 'analytics:insights_view',
-  'insights-route': 'analytics:insights_view',
 
   'contacts-list': 'audience:contacts_view',
   'contacts-view': 'audience:contacts_view',
@@ -112,12 +97,6 @@ const routePermissionByName: Record<string, string | string[]> = {
   'create-customfields': 'audience:custom_fields_manage',
   'edit-customfields': 'audience:custom_fields_manage',
 
-  'campaigns-rules': 'infra:manage',
-  'campaign-rule-create': 'infra:manage',
-  'campaign-rule-edit': 'infra:manage',
-  'campaign-rules-configs': 'infra:manage',
-  'campaign-config-create': 'infra:manage',
-  'campaign-config-edit': 'infra:manage',
   'list-custom-events': 'infra:view',
   'create-custom-events': 'infra:manage',
   'edit-custom-events': 'infra:manage',
@@ -125,9 +104,6 @@ const routePermissionByName: Record<string, string | string[]> = {
   'list-pools': 'infra:view',
   'create-pools': 'infra:manage',
   'edit-pools': 'infra:manage',
-  'warmup-list': 'infra:view',
-  'warmup-create': 'infra:manage',
-  'warmup-stats': 'infra:view',
   'list-labels': 'infra:view',
   'create-labels': 'infra:manage',
   'edit-labels': 'infra:manage',
@@ -137,9 +113,6 @@ const routePermissionByName: Record<string, string | string[]> = {
 
 // Routes that require currentAccount.isInternal === true
 const internalOnlyRoutes = new Set([
-  'warmup-list',
-  'warmup-create',
-  'warmup-stats',
   'list-pools',
   'create-pools',
   'edit-pools',
@@ -147,16 +120,9 @@ const internalOnlyRoutes = new Set([
   'create-custom-events',
   'edit-custom-events',
   'events-logs',
-  'campaigns-rules',
-  'campaign-rule-create',
-  'campaign-rule-edit',
-  'campaign-rules-configs',
-  'campaign-config-create',
-  'campaign-config-edit',
   'list-labels',
   'create-labels',
   'edit-labels',
-  'insights-route',
   'list-2fa',
   'message-2fa-create',
   'messages-2fa-edit',

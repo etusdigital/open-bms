@@ -179,7 +179,6 @@ export class MessagesController {
   @RequirePermission('messages:view')
   @Get('template/emails-labels')
   @ApiOperation({ summary: 'Get emails labels' })
-  @ApiQuery({ name: 'product', required: true })
   @ApiQuery({ name: 'language', required: true })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'itemsPerPage', required: false })
@@ -201,12 +200,5 @@ export class MessagesController {
   @ApiOperation({ summary: 'Get template messages countries' })
   async getCountry(@Query() params: { language: string }): Promise<any> {
     return await this.messagesService.getCountries(params);
-  }
-
-  @RequirePermission('messages:view')
-  @Get('template/products')
-  @ApiOperation({ summary: 'Get template messages products' })
-  async getProducts(@Query() params: EmailsLabelsDto): Promise<any> {
-    return await this.messagesService.getProducts(params);
   }
 }

@@ -41,8 +41,4 @@ export class NewPoolsDto {
   @ApiProperty()
   @JoiSchema(Joi.boolean().allow('', null).optional())
   isDefault?: boolean;
-
-  @ApiPropertyOptional()
-  @JoiSchema(Joi.boolean().allow(null).optional())
-  isWarmup?: boolean;
 }

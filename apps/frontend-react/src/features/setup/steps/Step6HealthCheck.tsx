@@ -7,6 +7,7 @@ import type { HealthCheckResult } from '@/features/setup/setup.types';
 
 interface Props {
   onComplete: () => void;
+  onBack?: () => void;
 }
 
 // Mirrors the Vue 3 wizard's 4-second debounce on "Verificar novamente"
@@ -19,12 +20,11 @@ const SERVICES = [
   { key: 'clickhouse', label: 'ClickHouse' },
   { key: 'rabbitmq', label: 'RabbitMQ' },
   { key: 's3', label: 'S3 / MinIO' },
-  { key: 'smtp', label: 'SMTP' },
 ] as const;
 
 type ServiceKey = (typeof SERVICES)[number]['key'];
 
-export function Step6HealthCheck({ onComplete }: Props) {
+export function Step6HealthCheck({ onComplete, onBack }: Props) {
   const [loading, setLoading] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [results, setResults] = useState<HealthCheckResult | null>(null);
@@ -60,8 +60,15 @@ export function Step6HealthCheck({ onComplete }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // SMTP probe is removed from the UI but the backend still includes it in the
+  // response; recompute allOk against the services we actually display so the
+  // "fail confirm" dialog doesn't trigger because of an irrelevant probe.
+  const visibleAllOk = results
+    ? SERVICES.every((s) => results[s.key as ServiceKey].ok)
+    : false;
+
   function handleComplete() {
-    if (results?.allOk) {
+    if (visibleAllOk) {
       doComplete();
     } else {
       setShowConfirm(true);
@@ -72,7 +79,7 @@ export function Step6HealthCheck({ onComplete }: Props) {
     setShowConfirm(false);
     setCompleting(true);
     try {
-      const data = results?.allOk
+      const data = visibleAllOk
         ? {}
         : { skipReason: 'Administrador optou por concluir com serviços com falha.' };
       await setupGateway.advanceStep({ step: 6, data });
@@ -143,15 +150,22 @@ export function Step6HealthCheck({ onComplete }: Props) {
             })}
           </div>
 
-          <div className="flex items-center justify-between">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={loading || completing || retryOnCooldown}
-              onClick={runCheck}
-            >
-              Verificar novamente
-            </Button>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {onBack && (
+                <Button type="button" variant="ghost" disabled={loading || completing} onClick={onBack}>
+                  Voltar
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={loading || completing || retryOnCooldown}
+                onClick={runCheck}
+              >
+                Verificar novamente
+              </Button>
+            </div>
             <Button type="button" disabled={completing || loading} onClick={handleComplete}>
               {completing ? 'Concluindo...' : 'Concluir'}
             </Button>

@@ -374,7 +374,7 @@ export class SendgridHandler {
 
   public async deleteCampaign(campaignIdExternal: string) {
     try {
-      const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+      const { value: sendgriApiKey } = (await this.accountConfigsProvider.getAccountConfigs('sendgrid_key')) ?? {};
       const response = await this.httpService
         .delete(`${this.uri}/marketing/singlesends/${campaignIdExternal}`, {
           headers: {
@@ -392,7 +392,8 @@ export class SendgridHandler {
   }
 
   public async getSiloOptions() {
-    const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+    const { value: sendgriApiKey } = (await this.accountConfigsProvider.getAccountConfigs('sendgrid_key')) ?? {};
+    if (!sendgriApiKey) return [];
     const result = await this.httpService
       .get(`${this.uri}/send_ips/pools`, {
         headers: {
@@ -405,7 +406,7 @@ export class SendgridHandler {
   }
 
   public async getIPsByAccount() {
-    const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+    const { value: sendgriApiKey } = (await this.accountConfigsProvider.getAccountConfigs('sendgrid_key')) ?? {};
     const result = await this.httpService
       .get(`${this.uri}/ips`, {
         headers: {
@@ -430,7 +431,7 @@ export class SendgridHandler {
   }
 
   public async getAudienceOptions() {
-    const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+    const { value: sendgriApiKey } = (await this.accountConfigsProvider.getAccountConfigs('sendgrid_key')) ?? {};
     const result = await this.httpService
       .get(`${this.uri}/marketing/lists`, {
         headers: {
@@ -444,7 +445,7 @@ export class SendgridHandler {
   }
 
   public async getSegmentOptions(ids: string[]) {
-    const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+    const { value: sendgriApiKey } = (await this.accountConfigsProvider.getAccountConfigs('sendgrid_key')) ?? {};
     const uri = `${this.uri}/marketing/segments?parent_list_ids=${ids.join(',')}`;
 
     const result = await this.httpService
@@ -461,7 +462,7 @@ export class SendgridHandler {
 
   async getStatsByCategories(fromDate: Date, untilDate: Date, categories: Array<string>) {
     try {
-      const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+      const { value: sendgriApiKey } = (await this.accountConfigsProvider.getAccountConfigs('sendgrid_key')) ?? {};
       const startDate = fromDate.toISOString().slice(0, 10);
       const endDate = untilDate.toISOString().slice(0, 10);
       const cats = categories.map((cat) => `categories=${cat}`).join('&');
@@ -491,7 +492,7 @@ export class SendgridHandler {
     singlesend.email_config.sender_id = senderId[0];
 
     try {
-      const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+      const { value: sendgriApiKey } = (await this.accountConfigsProvider.getAccountConfigs('sendgrid_key')) ?? {};
       const response = await this.httpService
         .post(`${this.uri}/marketing/singlesends`, singlesend, {
           headers: {
@@ -513,7 +514,7 @@ export class SendgridHandler {
   async sendSingle(id: string, sendAt: Date) {
     try {
       const scheduleDate = !sendAt || sendAt < new Date() ? 'now' : sendAt;
-      const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+      const { value: sendgriApiKey } = (await this.accountConfigsProvider.getAccountConfigs('sendgrid_key')) ?? {};
 
       const result = await this.httpService
         .put(
@@ -543,7 +544,7 @@ export class SendgridHandler {
   }
 
   async getCampaignById(id: any) {
-    const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+    const { value: sendgriApiKey } = (await this.accountConfigsProvider.getAccountConfigs('sendgrid_key')) ?? {};
     const result = await this.httpService
       .get(`${this.uri}/marketing/singlesends/${id}`, {
         headers: {
@@ -570,7 +571,7 @@ export class SendgridHandler {
    */
   async unscheduleSingleSend(id: string): Promise<AxiosResponse<any>> {
     try {
-      const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+      const { value: sendgriApiKey } = (await this.accountConfigsProvider.getAccountConfigs('sendgrid_key')) ?? {};
       const response = await this.httpService
         .delete(`${this.uri}/marketing/singlesends/${id}/schedule`, {
           headers: {
@@ -601,7 +602,7 @@ export class SendgridHandler {
     updatedSend['send_at'] = singleSend.scheduledTo;
 
     try {
-      const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+      const { value: sendgriApiKey } = (await this.accountConfigsProvider.getAccountConfigs('sendgrid_key')) ?? {};
       const response = await this.httpService
         .patch(`${this.uri}/marketing/singlesends/${singleSend.id}`, updatedSend, {
           headers: {
@@ -722,7 +723,7 @@ export class SendgridHandler {
 
   async getVerifiedSenders() {
     try {
-      const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+      const { value: sendgriApiKey } = (await this.accountConfigsProvider.getAccountConfigs('sendgrid_key')) ?? {};
       const result = await this.httpService
         .get(`${this.uri}/verified_senders`, {
           headers: {
@@ -744,7 +745,7 @@ export class SendgridHandler {
   }
 
   public async getFieldsDefinitions() {
-    const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+    const { value: sendgriApiKey } = (await this.accountConfigsProvider.getAccountConfigs('sendgrid_key')) ?? {};
     const result = await this.httpService
       .get(`${this.uri}/marketing/field_definitions`, {
         headers: {
@@ -814,7 +815,7 @@ export class SendgridHandler {
 
   async sendSingleCustomEmail(seedList: Array<string>, fromName: string, fromMail: string, messageSubject: string, messageHtmlContent: string, ippool: string): Promise<any> {
     try {
-      const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+      const { value: sendgriApiKey } = (await this.accountConfigsProvider.getAccountConfigs('sendgrid_key')) ?? {};
       sendgrid.setApiKey(sendgriApiKey);
 
       const mail = this.createSingleCustomEmail(seedList, fromName, fromMail, messageSubject, messageHtmlContent, ippool);

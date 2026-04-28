@@ -181,9 +181,6 @@ export class MessageDto implements Labelable {
   stripUnknown: true,
 })
 export class EmailsLabelsDto extends PageDto {
-  @JoiSchema(Joi.string().optional().allow(''))
-  product: string;
-
   @JoiSchema(Joi.string().required())
   language: string;
 }

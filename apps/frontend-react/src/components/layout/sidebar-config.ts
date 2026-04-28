@@ -5,8 +5,6 @@ import {
   Mail,
   Users,
   Server,
-  Flame,
-  Shield,
   ShieldCheck,
   Tag,
   Settings,
@@ -40,50 +38,14 @@ export const MENU_ITEMS: NavItem[] = [
         route: '/analytics/compare',
         permission: 'analytics:comparison_view',
       },
-      {
-        labelKey: 'sidebar.insights',
-        route: '/analytics/insights',
-        permission: 'analytics:insights_view',
-        internalOnly: true,
-      },
-      {
-        labelKey: 'sidebar.leads',
-        route: '/analytics/leads',
-        permission: 'analytics:dashboard_view',
-        internalOnly: true,
-      },
-      {
-        labelKey: 'sidebar.emailReputation',
-        route: '/analytics/reputation',
-        permission: 'messages:view',
-      },
     ],
   },
   {
     labelKey: 'sidebar.campaigns',
     icon: Megaphone,
+    route: '/campaigns',
     permission: 'campaigns:view',
     internalOnly: true,
-    children: [
-      {
-        labelKey: 'sidebar.campaigns',
-        route: '/campaigns',
-        permission: 'campaigns:view',
-        internalOnly: true,
-      },
-      {
-        labelKey: 'sidebar.triggerCampaigns',
-        route: '/trigger-campaign',
-        permission: 'campaigns:view',
-        internalOnly: true,
-      },
-      {
-        labelKey: 'sidebar.products',
-        route: '/product',
-        permission: 'campaigns:view',
-        internalOnly: true,
-      },
-    ],
   },
   {
     labelKey: 'sidebar.automations',
@@ -175,31 +137,6 @@ export const MENU_ITEMS: NavItem[] = [
     icon: Server,
     route: '/pools',
     permission: 'infra:view',
-  },
-  {
-    labelKey: 'sidebar.warmups',
-    icon: Flame,
-    route: '/warmups',
-    superAdminOnly: true,
-  },
-  {
-    labelKey: 'sidebar.campaignRules',
-    icon: Shield,
-    route: '/campaign-rules',
-    permission: 'infra:view',
-    internalOnly: true,
-    children: [
-      {
-        labelKey: 'sidebar.rules',
-        route: '/campaign-rules',
-        permission: 'infra:view',
-      },
-      {
-        labelKey: 'sidebar.configs',
-        route: '/campaign-rules/configs',
-        permission: 'infra:view',
-      },
-    ],
   },
   {
     labelKey: 'sidebar.labels',

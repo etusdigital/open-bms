@@ -14,7 +14,6 @@ import { RedisModule } from './providers/redis/redis.module';
 import { typeOrmConfig } from './ormconfig';
 import {
   QueuePublisher,
-  QUEUE_MESSAGE_TRIGGER,
   QUEUE_ANALYTICS,
   QUEUE_SEGMENT_ANALYTICS,
   QUEUE_CONTACTS_BATCH,
@@ -40,7 +39,6 @@ import { TagProcessConsumerService } from './tag-process-consumer.service';
       },
     }),
     BullModule.registerQueue(
-      { name: QUEUE_MESSAGE_TRIGGER },
       { name: QUEUE_ANALYTICS },
       { name: QUEUE_SEGMENT_ANALYTICS },
       { name: QUEUE_CONTACTS_BATCH },

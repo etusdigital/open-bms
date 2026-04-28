@@ -10,7 +10,6 @@ import { CampaignMessageEntity } from '../../entities/campaign-message.entity';
 import { CampaignRecurrenceFrequency, CampaignsMessageType, CampaignsStatus, CampaignsType } from './campaigns.interface';
 import { env } from 'process';
 import { CampaignFilterDto } from './campaign-filter.dto';
-import { CampaignsConfigsEntity } from '../../entities/campaigns-configs.entity';
 import { PostgresErrorCode } from 'src/shared.interfaces';
 import { ClsService } from 'nestjs-cls';
 import { replaceSpecialChars } from 'src/utils/utils.service';
@@ -42,8 +41,6 @@ export class CampaignsService {
     private readonly contactDevicesRepository: Repository<ContactDeviceEntity>,
     @InjectRepository(CampaignEntity)
     private readonly campaignRepository: Repository<CampaignEntity>,
-    @InjectRepository(CampaignsConfigsEntity)
-    private readonly campaignsConfigsRepository: Repository<CampaignsConfigsEntity>,
     @InjectRepository(CampaignMessageEntity)
     private readonly campaignMessageRepository: Repository<CampaignMessageEntity>,
     @InjectRepository(CampaignContactEntity)
@@ -64,113 +61,6 @@ export class CampaignsService {
     ajvErrors(this.ajv);
   }
 
-  async getProducts(params: any) {
-    const timezone = params.timezone || 'UTC';
-    const date = params.date || dayjs().tz(timezone).format('YYYY-MM-DD');
-    // extract products from campaigns
-    const extractedProductsQuery = `
-    SELECT
-      to_char(timezone('${timezone}', c.schedule_to), 'YYYY-MM-DD') as date_str,
-      to_char(timezone('${timezone}', c.schedule_to), 'HH24:MI') as hour_str,
-      c.title as title,
-      c.tags as tags,
-      m.name as message_name,
-      m.subject as message_subject,
-      m.from_mail as message_sender,
-      m.from_name as message_sender_name,
-      cm.statistics as campaign_message_statistics,
-      cm.winner as campaign_message_winner,
-      regexp_replace(
-        regexp_replace(
-          regexp_replace(
-            regexp_replace(
-              unnest(
-                regexp_matches(
-                  m.content, 
-                  '<a[^>]*href=''([^'']*)''[^>]*>|<a[^>]*href="([^"]*)"[^>]*>', 
-                  'gi'
-                )
-              ),
-              '&quot;', '"', 'g'  -- decode &quot; to "
-            ),
-            '&amp;', '&', 'g'    -- decode &amp; to &
-          ),
-          '&lt;', '<', 'g'      -- decode &lt; to <
-        ),
-        '&gt;', '>', 'g'        -- decode &gt; to >
-      ) as link
-    FROM campaigns c 
-    INNER JOIN campaigns_messages cm ON cm.campaign_id = c.id 
-    INNER JOIN messages m ON m.id = cm.message_id
-    WHERE c.account_id = ${this.cls.get('accountId')}
-    AND c.deleted_at is null
-    AND c.schedule_to BETWEEN date('${date}') AND date('${date}') + interval '7 days'
-      AND m.content ~ '<a[^>]*href='
-      AND m.type = 'email'
-  `;
-
-    //group links and messages
-    const groupedLinksAndMessagesQuery = `
-    SELECT date_str, 
-      hour_str, 
-      title, 
-      tags, 
-      ARRAY_AGG(DISTINCT link) as concatenated_link,
-      JSON_AGG(DISTINCT jsonb_build_object('message_name', message_name, 'message_subject', message_subject, 'message_sender', message_sender, 'message_sender_name', message_sender_name, 'campaign_message_statistics', campaign_message_statistics, 'campaign_message_winner', campaign_message_winner)) as messages
-      FROM (
-      ${extractedProductsQuery}
-    ) extracted_products
-    WHERE link NOT IN ('unsubscribe_link', ' unsubscribe_link', '[unsubscribe_link]')
-    GROUP BY date_str, hour_str, title, tags
-    `;
-
-    // group products by hour
-    const hourlyProductsQuery = `
-      SELECT 
-        date_str,
-        hour_str,
-        json_agg(
-          json_build_object(
-            'title', title,
-            'link', concatenated_link,
-            'messages', messages,
-            'tags', tags
-          )
-        ) as products
-      FROM (${groupedLinksAndMessagesQuery}) grouped_links_and_messages
-      GROUP BY date_str, hour_str
-    `;
-
-    // group by day
-    const dailyDataQuery = `
-      SELECT 
-        date_str,
-        json_object_agg(
-          hour_str,
-          json_build_object('products', products)
-        ) as hours_data
-      FROM (${hourlyProductsQuery}) hourly_products
-      GROUP BY date_str
-    `;
-
-    // final query for expected format
-    const finalQuery = `
-      SELECT json_agg(
-        json_build_object(date_str, hours_data) 
-        ORDER BY date_str
-      ) as products
-      FROM (${dailyDataQuery}) daily_data
-    `;
-
-    const [results] = await this.campaignRepository.query(finalQuery);
-    if (!results.products) {
-      return {
-        products: [],
-      };
-    }
-    return results;
-  }
-
   async findAll(params: CampaignFilterDto): Promise<PaginationDto<CampaignDto>> {
     try {
       const sortBy = params.sortBy ? params.sortBy : 'scheduleTo';
@@ -181,7 +71,6 @@ export class CampaignsService {
         .leftJoinAndSelect('campaigns.labelContent', 'labelContent', 'labelContent.entity_name = :entityName', { entityName: 'campaigns' })
         .leftJoinAndSelect('labelContent.label', 'label')
         .where({ accountId: this.cls.get('accountId') })
-        .andWhere({ isWarmup: params.isWarmup || false })
         .skip((params.page - 1) * params.itemsPerPage)
         .take(params.itemsPerPage)
         .orderBy(`campaigns.${sortBy}`, `${order}`);
@@ -338,24 +227,6 @@ export class CampaignsService {
     }
     campaignDto = this.splitStepsAndTriggers(campaignDto);
     return { isValid: true, result: campaignDto };
-  }
-
-  async createOneFromConfig(configId: number, campaignDto: CampaignDto, accountId?: number): Promise<any> {
-    const targetAccountId = accountId || this.cls.get('accountId');
-    const config = await this.campaignsConfigsRepository.findOne({ where: { id: configId, accountId: targetAccountId } });
-
-    if (!config) {
-      throw new HttpException('Campaign config not found', HttpStatus.NOT_FOUND);
-    }
-
-    const baseConfig = (config.configs || {}) as Partial<CampaignDto>;
-    const mergedCampaign = { ...baseConfig, ...campaignDto } as CampaignDto;
-
-    if (!mergedCampaign.campaignMessage && Array.isArray((baseConfig as any).campaignMessage)) {
-      mergedCampaign.campaignMessage = (baseConfig as any).campaignMessage as any;
-    }
-
-    return this.createOne(mergedCampaign, targetAccountId);
   }
 
   async createOne(campaignDto: CampaignDto, accountId?: number, queryRunner?: QueryRunner): Promise<any> {

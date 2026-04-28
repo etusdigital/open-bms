@@ -3,7 +3,6 @@ import Vue from 'vue';
 import Router, { RouteConfig } from 'vue-router';
 import CampaignsModule from './campaigns-module.vue';
 import CampaignsView from './campaigns-view.vue';
-import CampaignsTemplateView from './campaigns-template-view.vue';
 import CampaignsEditor from './campaigns-editor-view.vue';
 
 Vue.use(Router);
@@ -23,12 +22,6 @@ const router: Array<RouteConfig> = [
         path: 'new',
         name: 'news-campaigns-create',
         component: CampaignsEditor,
-        props: true,
-      },
-      {
-        path: 'new-template',
-        name: 'news-campaigns-template-create',
-        component: CampaignsTemplateView,
         props: true,
       },
       {

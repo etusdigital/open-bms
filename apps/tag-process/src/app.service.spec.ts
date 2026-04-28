@@ -59,7 +59,6 @@ describe('AppService', () => {
     } as any;
 
     queuePublisher = {
-      sendToMessageTrigger: jest.fn().mockResolvedValue(undefined),
       publishAnalyticsEvent: jest.fn().mockResolvedValue(undefined),
       publishSegmentData: jest.fn().mockResolvedValue(undefined),
       publishContactsBatch: jest.fn().mockResolvedValue(undefined),

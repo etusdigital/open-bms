@@ -2,7 +2,6 @@
 export const ALL_PERMISSIONS = [
   'analytics:dashboard_view',
   'analytics:comparison_view',
-  'analytics:insights_view',
   'analytics:dashboard_export',
   'campaigns:view',
   'campaigns:create',
@@ -32,7 +31,6 @@ export const ALL_PERMISSIONS = [
   'infra:create',
   'infra:update',
   'infra:manage',
-  'campaigns:create_from_rule',
   'campaigns:duplicate',
   'account:settings_view',
   'account:settings_update',

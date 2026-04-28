@@ -9,10 +9,6 @@ export class PoolPageDto extends PageDto {
   public name?: string;
 
   @ApiPropertyOptional()
-  @JoiSchema(Joi.allow(null).optional())
-  isWarmup?: boolean;
-
-  @ApiPropertyOptional()
   @JoiSchema(Joi.number().allow(null).optional())
   accountId?: number;
 }

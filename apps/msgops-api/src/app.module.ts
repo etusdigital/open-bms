@@ -21,13 +21,10 @@ import { UsersModule } from './modules/users/users.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
 import { VerifyModule } from './modules/verify/verify.module';
 import { ClsMiddleware, ClsModule } from 'nestjs-cls';
-import { WarmupsModule } from './modules/warmups/warmups.module';
 import { PostmasterModule } from './modules/postmaster/postmaster.module';
 import { CustomEventModule } from './modules/custom-events/custom-events.module';
 import { BatchModule } from './modules/batch/batch.module';
-import { CampaignsRulesModule } from './modules/campaigns-rules/campaigns-rules.module';
 import { LabelsModule } from './modules/labels/labels.module';
-import { IpReputationModule } from './modules/ip-reputation/ip-reputation.module';
 import { AuthzModule } from './modules/authz/authz.module';
 import { SetupModule } from './modules/setup/setup.module';
 import { SettingsModule } from './modules/settings/settings.module';
@@ -54,7 +51,6 @@ import { SettingsModule } from './modules/settings/settings.module';
     CustomFieldsModule,
     UsersModule,
     StatisticsModule,
-    WarmupsModule,
     PostmasterModule,
     ClsModule.forRoot({
       global: true,
@@ -64,9 +60,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     }),
     VerifyModule,
     BatchModule,
-    CampaignsRulesModule,
     LabelsModule,
-    IpReputationModule,
     SetupModule,
     SettingsModule,
   ],

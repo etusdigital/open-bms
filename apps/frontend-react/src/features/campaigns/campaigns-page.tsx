@@ -2,15 +2,9 @@ import { useState, useCallback, useMemo, useRef, startTransition } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { getCoreRowModel, useReactTable } from '@tanstack/react-table';
-import { Megaphone, Plus, ChevronDown, Loader2, Clock, CheckCircle2 } from 'lucide-react';
+import { Megaphone, Plus, Loader2, Clock, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTablePagination } from '@/components/data-table/data-table-pagination';
 import { DataTableSearch } from '@/components/data-table/data-table-search';
@@ -30,7 +24,6 @@ import {
 } from './use-campaigns';
 import { CampaignStatus } from './types';
 import { useCampaignsColumns } from './campaigns-columns';
-import { CampaignRulePreviewModal } from './campaign-rule-preview-modal';
 import { MessagePreviewDialog } from '@/components/message-preview-dialog';
 import { CampaignsFilterBar } from './components/campaigns-filter-bar';
 import { DateRangePicker } from '@/components/date-range-picker';
@@ -47,11 +40,8 @@ export default function CampaignsPage({ searchParams }: CampaignsPageProps) {
   const navigate = useNavigate();
   const { can } = usePermissions();
   const canCreate = can('campaigns:create');
-  const canCreateFromRule = can('campaigns:create_from_rule');
   const canDelete = can('campaigns:delete');
   const canDuplicate = can('campaigns:duplicate');
-
-  const [ruleModalOpen, setRuleModalOpen] = useState(false);
 
   const { pagination, sorting, setPagination, setSorting, setSearch } = useListSearchParams(searchParams);
 
@@ -200,33 +190,14 @@ export default function CampaignsPage({ searchParams }: CampaignsPageProps) {
     <>
       <ListPage.Root>
         <ListPage.Header title={t('campaigns.pageTitle')}>
-          {canCreate &&
-            (canCreateFromRule ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm">
-                    <Plus className="mr-1 h-4 w-4" />
-                    {t('campaigns.pageTitle')}
-                    <ChevronDown className="ml-1 h-3.5 w-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link to="/campaigns/create">{t('campaigns.createCampaignBlank')}</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setRuleModalOpen(true)}>
-                    {t('campaigns.createFromRuleButton')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button size="sm" asChild>
-                <Link to="/campaigns/create">
-                  <Plus className="mr-1 h-4 w-4" />
-                  {t('campaigns.createCampaign')}
-                </Link>
-              </Button>
-            ))}
+          {canCreate && (
+            <Button size="sm" asChild>
+              <Link to="/campaigns/create">
+                <Plus className="mr-1 h-4 w-4" />
+                {t('campaigns.createCampaign')}
+              </Link>
+            </Button>
+          )}
         </ListPage.Header>
 
         <ListPage.Toolbar>
@@ -321,8 +292,6 @@ export default function CampaignsPage({ searchParams }: CampaignsPageProps) {
         onConfirm={confirmDelete}
         loading={deleteCampaign.isPending}
       />
-
-      {canCreateFromRule && <CampaignRulePreviewModal open={ruleModalOpen} onOpenChange={setRuleModalOpen} />}
 
       {previewTarget &&
         (() => {

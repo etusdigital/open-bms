@@ -26,13 +26,6 @@ export class CampaignsController {
     return this.campaignService.findAll(params);
   }
 
-  @ApiOperation({ summary: 'Get products' })
-  @Get('products')
-  @RequirePermission('campaigns:view')
-  async getProducts(@Query() params: any) {
-    return await this.campaignService.getProducts(params);
-  }
-
   @ApiOperation({ summary: 'Get send statistics.' })
   @Get('/statistics')
   @RequirePermission('campaigns:view')
@@ -107,13 +100,6 @@ export class CampaignsController {
       throw new ForbiddenException('Campaign name is required');
     }
     return await this.campaignService.createOne(campaignDto);
-  }
-
-  @ApiOperation({ summary: 'Create a campaign from config rule (editor-safe path).' })
-  @Post('/from-config/:configId')
-  @RequirePermission('campaigns:create_from_rule')
-  async createOneFromConfig(@Param('configId') configId: number, @Body() campaignDto: CampaignDto): Promise<CampaignDto> {
-    return await this.campaignService.createOneFromConfig(Number(configId), campaignDto);
   }
 
   @ApiOperation({

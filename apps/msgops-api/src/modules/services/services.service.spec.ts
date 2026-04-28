@@ -52,7 +52,6 @@ describe('ServicesService', () => {
     senderName: 'Test Sender',
     senderReplyTo: 'test-reply@example.com',
     isDefault: false,
-    isWarmup: false,
     createdAt: new Date(),
     updatedAt: new Date(),
     deletedAt: null,

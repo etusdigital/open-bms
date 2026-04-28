@@ -57,10 +57,6 @@ export class CampaignFilterDto extends PageDto implements LabelsFilterable {
   segments?: Array<number>;
 
   @ApiPropertyOptional()
-  @JoiSchema(Joi.allow(null).optional())
-  isWarmup?: boolean;
-
-  @ApiPropertyOptional()
   @JoiSchema(Joi.array().optional())
   public campaignsIds?: Array<number>;
 

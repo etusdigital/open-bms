@@ -35,9 +35,6 @@ export class PoolEntity {
   @Column('boolean', { name: 'is_default', default: false })
   isDefault: boolean;
 
-  @Column('boolean', { name: 'is_warmup', default: false })
-  isWarmup: boolean;
-
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

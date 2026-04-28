@@ -42,7 +42,6 @@ describe('Handler: Automation', () => {
       queryEventsLogs: jest.fn(),
     } as any;
     queuePublisher = {
-      sendToMessageTrigger: jest.fn().mockResolvedValue(undefined),
       publishAnalyticsEvent: jest.fn().mockResolvedValue(undefined),
     } as any;
     trackerService = {
@@ -251,7 +250,6 @@ describe('Handler: Automation', () => {
       expect(msgopsService.createContactAutomations).toHaveBeenCalledWith(
         expect.objectContaining({ status: Status.running }),
       );
-      expect(queuePublisher.sendToMessageTrigger).toHaveBeenCalled();
     });
 
     it('should handle UNIQUE frequency - duplicate existing automation', async () => {

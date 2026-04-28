@@ -1,5 +1,0 @@
-{
-  "{src,apps,libs,test}/**/*.ts": ["eslint --fix"],
-  "./**/*.{ts,js,json}": ["prettier --write"],
-  "package.json": ["npx -y sort-package-json"]
-}

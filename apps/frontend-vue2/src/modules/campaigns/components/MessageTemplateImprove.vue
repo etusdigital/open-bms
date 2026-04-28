@@ -67,7 +67,6 @@
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import ButtonDefault from '@/components/button/ButtonDefault.vue';
 import DataLoader from '@/components/data-loader/DataLoader.vue';
-import CampaignRuleService from '@/modules/campaigns-rules/services/campaign-rule.service';
 import ToastService from '@/services/toast.service';
 import WriteEmail from '@/modules/messages/views/WriteEmail.vue';
 import htmlTemplate from './template-json/html-template.json';
@@ -84,7 +83,6 @@ export default class MessageTemplateImprove extends Vue {
   @Prop() content!: string;
   @Prop() messageId!: string;
 
-  private readonly campaignRuleService = new CampaignRuleService();
   private readonly toastService = new ToastService();
   private readonly messagesService = new MessagesService();
   public currentMessage: MessageDto = { title: '', description: '' } as MessageDto;

@@ -26,7 +26,6 @@ import { ContactEntity } from 'src/entities/contact.entity';
 import { ContactDeviceEntity } from 'src/entities/contact-device.entity';
 import { CampaignContactEntity } from 'src/entities/campaign-contact.entity';
 import { TwilioHandler } from 'src/handlers/twilio/twilio.handler';
-import { CampaignsConfigsEntity } from 'src/entities/campaigns-configs.entity';
 import { TagEntity } from 'src/entities/tag.entity';
 import { AccountEntity } from 'src/entities/account.entity';
 import { PubSubProvider } from 'src/providers/pubsub.providers';
@@ -51,7 +50,6 @@ import { BucketsService } from '../buckets/buckets.service';
       CampaignEntity,
       CampaignMessageEntity,
       CampaignContactEntity,
-      CampaignsConfigsEntity,
       ContactEntity,
       ContactDeviceEntity,
       TagEntity,

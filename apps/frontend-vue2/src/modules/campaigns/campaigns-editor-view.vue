@@ -5,11 +5,9 @@
     </template>
     <template v-else>
       <div class="edit-title campaign-title">
-        <router-link :to="!isCampaignRule ? '/campaigns' : '/campaign-rules-configs'" class="clickable-breadcrumb">
+        <router-link to="/campaigns" class="clickable-breadcrumb">
           <span class="material-symbols-rounded font-16">chevron_left</span>
-          <span class="title-crumb">{{
-            !isCampaignRule ? $t('title.campaignList') : $t('sidebar.campaignConfigs')
-          }}</span>
+          <span class="title-crumb">{{ $t('title.campaignList') }}</span>
         </router-link>
         <div class="edit-title">
           <h2 class="c-title">{{ definedTitle() }}</h2>
@@ -33,7 +31,7 @@
           :disableSimple="disableSimple"
           :isNotAvailable="isNotAvailable"
           @updateInput="updateInput"
-          :isCampaignRule="isCampaignRule"
+          :isCampaignRule="false"
           @selectLabels="selectLabels"
         ></SettingsStep>
         <AudienceStep
@@ -64,14 +62,14 @@
           v-if="currentStepRegister.name == stepsRegisterType.SCHEDULE && newCampaign.type !== 'recurring'"
           :newCampaign="newCampaign"
           @updateInput="updateInput"
-          :isCampaignRule="isCampaignRule"
+          :isCampaignRule="false"
         ></ScheduleStep>
         <RecurringStep
           v-if="currentStepRegister.name == stepsRegisterType.SCHEDULE && newCampaign.type === 'recurring'"
           :newCampaign="newCampaign"
           @updateInput="updateInput"
           @updateObjectInput="updateObjectInput"
-          :isCampaignRule="isCampaignRule"
+          :isCampaignRule="false"
         ></RecurringStep>
         <RevisionStep
           v-if="currentStepRegister.name == stepsRegisterType.REVISION"
@@ -79,7 +77,7 @@
           :tags="tags"
           :contactsTotal="contactsTotal"
           @selectTag="countContacts"
-          :isCampaignRule="isCampaignRule"
+          :isCampaignRule="false"
         ></RevisionStep>
         <div class="footer-buttons mt-7">
           <div class="flex">
@@ -88,10 +86,7 @@
             </button>
           </div>
           <button
-            v-if="
-              !isCampaignRule &&
-              (isNew || (currentStepRegister.index === 4 && newCampaign.status === statusCampaign.Draft))
-            "
+            v-if="isNew || (currentStepRegister.index === 4 && newCampaign.status === statusCampaign.Draft)"
             class="draft-button"
             type="button"
             :disabled="isSaving"
@@ -130,7 +125,6 @@ import ApiService from '@/services/api.service';
 import ToastService from '@/services/toast.service';
 import ModalService from '@/services/modal.service';
 import CampaignService from '@/services/campaign.service';
-import CampaignRuleService from '@/modules/campaigns-rules/services/campaign-rule.service';
 import { TagDto } from '@/modules/tags/dtos/tag.dto';
 import ButtonDefault from '@/components/button/ButtonDefault.vue';
 
@@ -150,7 +144,6 @@ import { mapState } from 'vuex';
 import { getAccountConfig } from '@/store';
 import { debounce } from '@/util/debounce';
 import { AccountDto } from '../accounts/dtos/account.dto';
-import { CampaignConfigDto } from '../campaigns-rules/dtos/campaign-config.dto';
 import { LabelDto } from '@/modules/labels/dtos/label.dto';
 import { replaceSpecialChars } from '@/util/characters';
 import { LabelContentDto } from '@/modules/labels/dtos/labelContent.dto';
@@ -178,7 +171,6 @@ export default class CampaignsEditor extends Vue {
   private readonly toastService = new ToastService();
   private readonly modalService = new ModalService();
   private readonly campaignService = new CampaignService();
-  private readonly campaignRuleService = new CampaignRuleService();
   private api = new ApiService();
   private tagService = new TagService();
   public currentAccount!: AccountDto;
@@ -216,13 +208,8 @@ export default class CampaignsEditor extends Vue {
   contactsTotal = null;
   campaignDraft = false;
   isSaving = false;
-  isCampaignRule = false;
 
   async beforeMount() {
-    if (this.$route.path.includes('/campaign-rules-configs')) {
-      this.isCampaignRule = true;
-      this.stepsRegister.splice(2, 1);
-    }
     this.emailSettings = JSON.parse(getAccountConfig(this.currentAccount, 'email_settings')) || {};
     this.smsSettings = JSON.parse(getAccountConfig(this.currentAccount, 'sms_settings')) || {};
     this.pushSettings = JSON.parse(getAccountConfig(this.currentAccount, 'webpush_settings')) || {};
@@ -231,15 +218,6 @@ export default class CampaignsEditor extends Vue {
     if (this.id) {
       this.isNew = false;
       this.loadingService.show();
-      if (this.isCampaignRule) {
-        const campaignConfig = await this.campaignRuleService.getCampaignConfigById(this.id);
-        this.newCampaign = this.parseConfig(campaignConfig.data);
-
-        this.loadLabelContent();
-
-        this.getTags();
-        return;
-      }
       const data = await this.getCampaign(this.id);
       this.newCampaign = this.parseCampaign(data);
 
@@ -295,20 +273,6 @@ export default class CampaignsEditor extends Vue {
   destroyed() {
     document.removeEventListener('keydown', this.captureKeys);
     document.removeEventListener('keyup', this.releaseKeys);
-  }
-
-  parseConfig(campaignConfig: CampaignConfigDto) {
-    return {
-      ...campaignConfig.configs,
-      id: campaignConfig.id,
-      scheduleTo: this.parseTimeToDateTime(campaignConfig.configs.scheduleTo),
-      testabScheduleTo: this.parseTimeToDateTime(campaignConfig.configs.testabScheduleTo),
-      testabScheduleEnd: this.parseTimeToDateTime(campaignConfig.configs.testabScheduleEnd),
-      steps:
-        typeof campaignConfig.configs.steps === 'string'
-          ? JSON.parse(campaignConfig.configs.steps)
-          : campaignConfig.configs.steps,
-    } as CampaignsDto;
   }
 
   parseTimeToDateTime(time: string) {
@@ -429,10 +393,6 @@ export default class CampaignsEditor extends Vue {
 
     if (!this.isTagValid()) {
       return;
-    }
-
-    if (this.isCampaignRule) {
-      return await this.saveConfig();
     }
 
     if (!this.hasValidMessages()) {
@@ -704,43 +664,6 @@ export default class CampaignsEditor extends Vue {
     }
   }
 
-  async saveConfig() {
-    const config: any = { ...this.newCampaign };
-    config.status = StatusCampaignEnum.Scheduled;
-    config.scheduleTo = this.extractTime(config.scheduleTo);
-    config.testabScheduleTo = this.extractTime(config.testabScheduleTo);
-    config.testabScheduleEnd = this.extractTime(config.testabScheduleEnd);
-
-    try {
-      const api = await this.api.getApi();
-      this.isSaving = true;
-      if (this.isNew) {
-        await this.campaignRuleService.createCampaignConfig({
-          name: config.title,
-          description: config.description,
-          configs: config,
-        });
-      } else {
-        await this.campaignRuleService.updateCampaignConfig({
-          id: config.id,
-          name: config.title,
-          description: config.description,
-          configs: config,
-        });
-      }
-      this.$router.push({ name: 'campaign-rules-configs' });
-      this.toastService.show({
-        type: 'success',
-        text: this.isNew ? (this.$t('modal.configCreated') as string) : (this.$t('modal.configChanged') as string),
-      });
-    } catch (e) {
-      console.error(e);
-    } finally {
-      this.campaignDraft = false;
-      this.isSaving = false;
-    }
-  }
-
   extractTime(date: Date) {
     if (!date) {
       return '00:00';
@@ -942,9 +865,6 @@ export default class CampaignsEditor extends Vue {
   }
 
   definedTitle() {
-    if (this.isCampaignRule) {
-      return this.$t('button.newCampaignConfig');
-    }
     return this.isNew ? this.$t('button.newCampaign') : this.newCampaign.title || '...';
   }
 

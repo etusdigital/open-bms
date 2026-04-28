@@ -51,8 +51,7 @@
               @mouseleave="hoverCampaigns = false"
               class="message-sidebar"
               :class="[
-                ($route.path.includes('/campaign') && !$route.path.includes('/campaign-')) ||
-                $route.path.includes('/trigger-campaign')
+                $route.path.includes('/campaign') && !$route.path.includes('/campaign-')
                   ? 'active-class'
                   : 'disable',
                 'pl-0',
@@ -69,8 +68,7 @@
                   <span
                     class="material-symbols-rounded font-20 mx-1 mt-1"
                     :class="[
-                      ($route.path.includes('/campaign') && !$route.path.includes('/campaign-')) ||
-                      $route.path.includes('/trigger-campaign')
+                      $route.path.includes('/campaign') && !$route.path.includes('/campaign-')
                         ? 'ds-blue-color'
                         : 'ds-gray-color',
                     ]"
@@ -82,8 +80,7 @@
                     <span
                       class="material-symbols-rounded font-20 mx-1 mt-1"
                       :class="[
-                        ($route.path.includes('/campaign') && !$route.path.includes('/campaign-')) ||
-                        $route.path.includes('/trigger-campaign')
+                        $route.path.includes('/campaign') && !$route.path.includes('/campaign-')
                           ? 'ds-blue-color'
                           : 'ds-gray-color',
                       ]"
@@ -98,8 +95,7 @@
                     <span
                       class="material-symbols-rounded"
                       :class="[
-                        ($route.path.includes('/campaign') && !$route.path.includes('/campaign-')) ||
-                        $route.path.includes('/trigger-campaign')
+                        $route.path.includes('/campaign') && !$route.path.includes('/campaign-')
                           ? 'ds-blue-color'
                           : 'ds-gray-color',
                       ]"
@@ -219,7 +215,6 @@
               :class="[
                 $route.path.includes('/contacts') ||
                 $route.path.includes('/tags') ||
-                $route.path.includes('/leads') ||
                 $route.path.includes('/customfields') ||
                 $route.path.includes('/suppressions/unsubscribed') ||
                 $route.path.includes('/suppressions/blocked')
@@ -239,7 +234,6 @@
                     class="material-symbols-rounded font-20 mx-1 mt-1"
                     :class="[
                       $route.path.includes('/contacts') ||
-                      $route.path.includes('/leads') ||
                       $route.path.includes('/tags') ||
                       $route.path.includes('/customfields') ||
                       $route.path.includes('/suppressions/unsubscribed') ||
@@ -331,39 +325,6 @@
               </router-link>
             </v-list-item>
             <v-list-item
-              v-if="currentAccount.isInternal && can('infra:view')"
-              :class="[$route.path.includes('/warmups') ? 'active-class' : 'disable', 'pl-0']"
-            >
-              <router-link to="/warmups" class="d-flex align-items-center flex no-underline p-0">
-                <div v-tooltip.right="$t('sidebar.warmups')" class="d-flex" v-if="hidden">
-                  <span class="material-symbols-rounded font-20 mx-1">rocket_launch</span>
-                </div>
-                <template v-else>
-                  <span class="material-symbols-rounded font-20 mx-1">rocket_launch</span>
-                  <span class="sidebar__item-list-text item-text ml-2" :hidden="hidden">
-                    {{ $t('sidebar.warmups') }}
-                  </span>
-                </template>
-              </router-link>
-            </v-list-item>
-            <v-list-item
-              v-if="currentAccount.isInternal && can('analytics:insights_view')"
-              :class="[$route.path.includes('/insights') ? 'active-class' : 'disable', 'pl-0']"
-            >
-              <router-link to="/insights" class="d-flex align-items-center flex no-underline p-0">
-                <div v-tooltip.right="$t('sidebar.insights')" class="d-flex" v-if="hidden">
-                  <span class="material-symbols-rounded font-20 mx-1">lightbulb</span>
-                </div>
-                <template v-else>
-                  <span class="material-symbols-rounded font-20 mx-1">lightbulb</span>
-                  <span class="sidebar__item-list-text item-text ml-2" :hidden="hidden">
-                    {{ $t('sidebar.insights') }}
-                  </span>
-                </template>
-              </router-link>
-            </v-list-item>
-
-            <v-list-item
               v-if="currentAccount.isInternal && can('infra:manage')"
               :class="[$route.path.includes('/messages/2FA') ? 'active-class' : 'disable', 'pl-0']"
             >
@@ -383,68 +344,6 @@
               </router-link>
             </v-list-item>
 
-            <v-list-item
-              v-if="currentAccount.isInternal && can('infra:manage')"
-              @mouseover="hoverCampaignsRules = true"
-              @mouseleave="hoverCampaignsRules = false"
-              class="message-sidebar"
-              :class="[
-                $route.path.includes('/campaign-rules') || $route.path.includes('/campaign-configs')
-                  ? 'active-class'
-                  : 'disable',
-                'pl-0',
-                isSidebarCollapsed ? 'message-gap-close' : 'message-gap-open',
-              ]"
-            >
-              <button
-                id="menu-activator"
-                class="d-flex align-items-center message-button-contacts flex"
-                v-on:click="openCampaignRulesMenu = !openCampaignRulesMenu"
-              >
-                <div v-tooltip.top="$t('sidebar.campaignRules')" class="d-flex" v-if="hidden">
-                  <span
-                    class="material-symbols-rounded font-20 mx-1 mt-1"
-                    :class="[
-                      $route.path.includes('/campaign-rules') || $route.path.includes('/campaign-configs')
-                        ? 'ds-blue-color'
-                        : 'ds-gray-color',
-                    ]"
-                    >extension</span
-                  >
-                </div>
-                <template v-else>
-                  <div class="d-flex align-items-center">
-                    <span
-                      class="material-symbols-rounded font-20 mx-1 mt-1"
-                      :class="[$route.path.includes('/campaign-rules') ? 'ds-blue-color' : 'ds-gray-color']"
-                    >
-                      extension
-                    </span>
-                    <span class="sidebar__item-list-text item-text ml-2" :hidden="hidden">
-                      {{ $t('sidebar.campaignRules') }}
-                    </span>
-                  </div>
-                  <div class="d-flex">
-                    <span
-                      class="material-symbols-rounded"
-                      :class="[$route.path.includes('/campaign-rules') ? 'ds-blue-color' : 'ds-gray-color']"
-                      >arrow_right</span
-                    >
-                  </div>
-                </template>
-              </button>
-              <div class="message-menu div-column" v-show="hoverCampaignsRules">
-                <router-link
-                  :to="message.router"
-                  :class="[{ 'message-menu-active': message.paths.includes(`${$route.name}`) }]"
-                  class="messages-actions"
-                  v-for="message in availableCampaignConfigPages"
-                  :key="message.title"
-                >
-                  {{ message.title }}
-                </router-link>
-              </div>
-            </v-list-item>
 
             <v-list-item
               v-if="currentAccount.isInternal && can('infra:view')"
@@ -530,15 +429,12 @@ export default class Sidebar extends Vue {
   isSidebarCollapsed = false;
   messagesPages: any = [];
   contactPages: any = [];
-  campaignConfigsPages: any = [];
   campaignsPages: any = [];
   openMessageMenu = false;
   openContactsMenu = false;
-  openCampaignRulesMenu = false;
   openCampaignMenu = false;
   hoverMessages = false;
   hoverContacts = false;
-  hoverCampaignsRules = false;
   hoverCampaigns = false;
 
   can(permission: string) {
@@ -551,10 +447,6 @@ export default class Sidebar extends Vue {
 
   get availableContactPages() {
     return this.contactPages.filter((contact: any) => !contact.permission || this.can(contact.permission));
-  }
-
-  get availableCampaignConfigPages() {
-    return this.campaignConfigsPages.filter((item: any) => !item.permission || this.can(item.permission));
   }
 
   get availableCampaignPages() {
@@ -607,38 +499,11 @@ export default class Sidebar extends Vue {
       },
     ];
 
-    this.campaignConfigsPages = [
-      {
-        title: this.$t('sidebar.campaignRules'),
-        router: '/campaign-rules',
-        paths: ['campaigns-rules', 'campaign-rule-create', 'campaign-rule-edit'],
-        permission: 'infra:manage',
-      },
-      {
-        title: this.$t('sidebar.campaignConfigs'),
-        router: '/campaign-rules-configs',
-        paths: ['campaign-rules-configs', 'campaign-config-create', 'campaign-config-edit'],
-        permission: 'infra:manage',
-      },
-    ];
-
     this.campaignsPages = [
       {
         title: this.$t('sidebar.regularCampaign'),
         router: '/campaigns',
         paths: ['news-campaigns', 'news-campaigns-create', 'news-campaigns-template-create', 'news-campaigns-edit'],
-        permission: 'campaigns:view',
-      },
-      {
-        title: this.$t('sidebar.triggerCampaign'),
-        router: '/trigger-campaign',
-        paths: ['list-trigger-campaign', 'new-trigger-campaign', 'edit-trigger-campaign'],
-        permission: 'campaigns:view',
-      },
-      {
-        title: this.$t('sidebar.products'),
-        router: '/product',
-        paths: ['list-trigger-products', 'new-trigger-products', 'edit-trigger-products'],
         permission: 'campaigns:view',
       },
     ];
@@ -669,14 +534,6 @@ export default class Sidebar extends Vue {
         permission: 'audience:custom_fields_view',
       },
     ];
-    if (this.currentAccount.isInternal) {
-      this.contactPages.push({
-        title: this.$t('title.leads'),
-        router: '/leads',
-        paths: ['leads-route'],
-        permission: 'analytics:insights_view',
-      });
-    }
     if (this.can('audience:contacts_suppress')) {
       this.contactPages.push({
         title: this.$t('sidebar.unsubscribe'),

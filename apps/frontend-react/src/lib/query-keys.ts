@@ -24,12 +24,9 @@ export const queryKeys = {
   labels: createEntityQueryKeys('labels'),
   customEvents: createEntityQueryKeys('custom-events'),
   pools: createEntityQueryKeys('pools'),
-  warmups: createEntityQueryKeys('warmups'),
   segments: createEntityQueryKeys('segments'),
   contacts: createEntityQueryKeys('contacts'),
   templates: createEntityQueryKeys('templates'),
-  campaignRules: createEntityQueryKeys('campaign-rules'),
-  campaignConfigs: createEntityQueryKeys('campaign-configs'),
   messages: {
     ...createEntityQueryKeys('messages'),
     clickStatistics: (messageId: number, filterId: number, filterType: 'campaign' | 'automation') =>

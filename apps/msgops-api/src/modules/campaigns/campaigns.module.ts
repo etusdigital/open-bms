@@ -18,14 +18,13 @@ import { AccountEntity } from 'src/entities/account.entity';
 import { PubSubProvider } from 'src/providers/pubsub.providers';
 import { SlackProvider } from 'src/providers/slack.provider';
 import { LabelsIntegrationModule } from '../labels/labels-integration.module';
-import { CampaignsConfigsEntity } from '../../entities/campaigns-configs.entity';
 
 @Module({
   imports: [
     HttpModule,
     GlockModule,
     LabelsIntegrationModule,
-    TypeOrmModule.forFeature([CampaignEntity, CampaignMessageEntity, ContactEntity, ContactDeviceEntity, CampaignContactEntity, TagEntity, AccountEntity, CampaignsConfigsEntity]),
+    TypeOrmModule.forFeature([CampaignEntity, CampaignMessageEntity, ContactEntity, ContactDeviceEntity, CampaignContactEntity, TagEntity, AccountEntity]),
     RedisModule.register({
       host: process.env.REDIS_HOST,
       port: parseInt(process.env.REDIS_PORT),

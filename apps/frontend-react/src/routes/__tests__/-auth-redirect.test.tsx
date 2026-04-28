@@ -83,10 +83,10 @@ function createTestRouter(initialPath: string, auth: { isAuthenticated: boolean;
     component: () => <div data-testid="dashboard">Dashboard</div>,
   });
 
-  const leadsRoute = createRoute({
+  const contactsRoute = createRoute({
     getParentRoute: () => authenticatedRoute,
-    path: '/analytics/leads',
-    component: () => <div data-testid="leads">Leads</div>,
+    path: '/contacts',
+    component: () => <div data-testid="contacts">Contacts</div>,
   });
 
   const loginRoute = createRoute({
@@ -105,7 +105,7 @@ function createTestRouter(initialPath: string, auth: { isAuthenticated: boolean;
     }),
   });
 
-  const routeTree = rootRoute.addChildren([authenticatedRoute.addChildren([dashboardRoute, leadsRoute]), loginRoute]);
+  const routeTree = rootRoute.addChildren([authenticatedRoute.addChildren([dashboardRoute, contactsRoute]), loginRoute]);
 
   return createRouter({
     routeTree,
@@ -134,7 +134,7 @@ describe('Auth redirect preserves query params', () => {
   });
 
   it('redirects to /login with full path including query params when not authenticated', async () => {
-    const fullPath = '/analytics/leads?groupItems=utm_source%2Cutm_medium&startDate=2026-04-08&page=1';
+    const fullPath = '/contacts?groupItems=utm_source%2Cutm_medium&startDate=2026-04-08&page=1';
 
     await renderRouter(fullPath);
 
@@ -142,7 +142,7 @@ describe('Auth redirect preserves query params', () => {
       const loginPage = screen.getByTestId('login-page');
       expect(loginPage).toBeInTheDocument();
       const returnTo = loginPage.getAttribute('data-return-to');
-      expect(returnTo).toContain('/analytics/leads');
+      expect(returnTo).toContain('/contacts');
       expect(returnTo).toContain('groupItems=');
       expect(returnTo).toContain('startDate=');
       expect(returnTo).toContain('page=');
@@ -161,7 +161,7 @@ describe('Auth redirect preserves query params', () => {
   });
 
   it('preserves encoded special characters in query params', async () => {
-    const fullPath = '/analytics/leads?search=email_provider%3AYahoo%2Cutm_source%3Agoogle&page=1';
+    const fullPath = '/contacts?search=email_provider%3AYahoo%2Cutm_source%3Agoogle&page=1';
 
     await renderRouter(fullPath);
 
@@ -197,7 +197,7 @@ describe('Callback page restores returnTo with query params', () => {
 
   it('stores full path with query params in sessionStorage via onRedirectCallback', () => {
     // Simulate what main.tsx onRedirectCallback does
-    const returnTo = '/analytics/leads?groupItems=utm_source%2Cutm_medium&startDate=2026-04-08';
+    const returnTo = '/contacts?groupItems=utm_source%2Cutm_medium&startDate=2026-04-08';
     const appState = { returnTo };
 
     const safePath =
@@ -263,7 +263,7 @@ describe('Login page preserves returnTo through Auth0', () => {
   });
 
   it('passes full path with query params to loginWithRedirect', async () => {
-    const returnTo = '/analytics/leads?groupItems=utm_source%2Cutm_medium&startDate=2026-04-08&page=1';
+    const returnTo = '/contacts?groupItems=utm_source%2Cutm_medium&startDate=2026-04-08&page=1';
 
     // Create a minimal router that renders the login page with returnTo search param
     const rootRoute = createRootRoute({ component: Outlet });

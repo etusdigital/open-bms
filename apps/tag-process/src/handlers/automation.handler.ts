@@ -307,7 +307,6 @@ export class AutomationHandler {
             lastAutomationDate: dayjs().tz(accountTimeZone).toDate(),
             ...(automation.verticalType ? { lastVerticalType: automation.verticalType } : {}),
           });
-          await this.queuePublisher.sendToMessageTrigger(leadMessageCopy);
         } catch (error) {
           console.error(error);
           throw `[automation] Error parseLeadStateMessage: ${error.message}`;

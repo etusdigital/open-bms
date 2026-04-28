@@ -106,9 +106,6 @@ export class CampaignEntity {
   @Column('json', { name: 'recurrence_settings' })
   recurrenceSettings: CampaignRecurrenceSettings;
 
-  @Column('boolean', { name: 'is_warmup', default: false })
-  isWarmup: boolean;
-
   @Column('bool', { name: 'is_rate_limit' })
   isRateLimit: boolean;
 

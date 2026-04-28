@@ -84,7 +84,6 @@ export class PoolsService {
       const poolQuery = await this.poolRepository
         .createQueryBuilder('pools')
         .where('account_id = :accountId', { accountId: this.cls.get('accountId') })
-        .andWhere({ isWarmup: params.isWarmup || false })
         .skip((params.page - 1) * params.itemsPerPage)
         .take(params.itemsPerPage)
         .orderBy(`pools.${sortBy}`, `${order}`);

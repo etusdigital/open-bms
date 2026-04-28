@@ -8,9 +8,6 @@ export class EmailsLabelsEntity {
   @Column('varchar', { name: 'email_type', length: 20 })
   emailType: string;
 
-  @Column('text', { name: 'product' })
-  product: string;
-
   @Column('text', { name: 'country' })
   country: string;
 

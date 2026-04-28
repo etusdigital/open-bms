@@ -91,7 +91,6 @@ const storeInstance = new Vuex.Store({
     accountChannels: getChannels(JSON.parse(currentAccountFromLocalstorage) as AccountDto),
     authReady: false as boolean,
     showModalSuppression: false as boolean,
-    campaignRulesSchedule: {},
   },
   getters: {
     can: (state) => (permission: string) => {
@@ -153,9 +152,6 @@ const storeInstance = new Vuex.Store({
     },
     setAuthReady(state, value: boolean) {
       state.authReady = value;
-    },
-    setCampaignRulesSchedule(state, value) {
-      state.campaignRulesSchedule = value;
     },
     setAccountConfig(state, account) {
       state.userAccounts.forEach((item) => {
