@@ -4,7 +4,7 @@ import { BmsButton } from '../../../components';
 import { setupGateway, HealthCheckResult } from '../../../gateways/Setup';
 import { showToast } from '../../../utils/showToast';
 
-const emit = defineEmits<{ (e: 'step-complete'): void }>();
+const emit = defineEmits<{ 'step-complete': [] }>();
 
 const loading = ref(false);
 const completing = ref(false);

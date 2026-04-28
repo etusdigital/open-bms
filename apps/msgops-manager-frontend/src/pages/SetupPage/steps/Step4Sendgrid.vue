@@ -8,7 +8,7 @@ import { BmsTextField, BmsButton } from '../../../components';
 import { setupGateway } from '../../../gateways/Setup';
 import { showToast } from '../../../utils/showToast';
 
-const emit = defineEmits<{ (e: 'step-complete'): void }>();
+const emit = defineEmits<{ 'step-complete': [] }>();
 
 type TestResult = { accountName: string | null } | null;
 

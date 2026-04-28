@@ -6,7 +6,9 @@ import { BmsTextField, BmsButton } from '../../../components';
 import { setupGateway } from '../../../gateways/Setup';
 import { showToast } from '../../../utils/showToast';
 
-const emit = defineEmits<{ (e: 'step-complete', payload: { email: string; password: string }): void }>();
+const emit = defineEmits<{
+  'step-complete': [payload: { email: string; password: string }];
+}>();
 
 const schema = toTypedSchema(
   z.object({
