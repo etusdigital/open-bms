@@ -45,7 +45,6 @@ export const MENU_ITEMS: NavItem[] = [
     icon: Megaphone,
     route: '/campaigns',
     permission: 'campaigns:view',
-    internalOnly: true,
   },
   {
     labelKey: 'sidebar.automations',
