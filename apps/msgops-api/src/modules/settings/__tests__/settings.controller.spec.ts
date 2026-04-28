@@ -6,6 +6,7 @@ function buildController() {
   const service = {
     getSendgrid: jest.fn(),
     saveSendgrid: jest.fn(),
+    deleteSendgrid: jest.fn(),
     testSendgrid: jest.fn(),
   } as unknown as SettingsService;
   const controller = new SettingsController(service);
@@ -39,6 +40,18 @@ describe('SettingsController — super_admin gate', () => {
     service.saveSendgrid.mockResolvedValue(undefined);
     await controller.saveSendgrid({ apiKey: 'SG.x' } as any, REQ_SUPER);
     expect(service.saveSendgrid).toHaveBeenCalledWith({ apiKey: 'SG.x' });
+  });
+
+  it('DELETE /settings/sendgrid throws 403 when not super_admin', async () => {
+    const { controller } = buildController();
+    await expect(controller.deleteSendgrid(REQ_NON_SUPER)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('DELETE /settings/sendgrid calls service when super_admin', async () => {
+    const { controller, service } = buildController();
+    service.deleteSendgrid.mockResolvedValue(undefined);
+    await controller.deleteSendgrid(REQ_SUPER);
+    expect(service.deleteSendgrid).toHaveBeenCalled();
   });
 
   it('POST /settings/sendgrid/test throws 403 when not super_admin', () => {

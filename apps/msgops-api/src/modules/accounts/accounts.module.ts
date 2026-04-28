@@ -18,11 +18,22 @@ import { AccountApiKeyEntity } from '../../entities/account-api-key.entity';
 import { RoleEntity } from '../../entities/role.entity';
 import { ApiKeyRegenService } from './api-key-regen.service';
 import { ApiKeyAuditLogEntity } from '../../entities/api-key-audit-log.entity';
+import { SystemConfigEntity } from '../../entities/system-config.entity';
 
 @Module({
   imports: [
     HttpModule,
-    TypeOrmModule.forFeature([AccountEntity, AccountConfigEntity, CustomFieldsEntity, CustomEventEntity, UserAccountEntity, AccountApiKeyEntity, RoleEntity, ApiKeyAuditLogEntity]),
+    TypeOrmModule.forFeature([
+      AccountEntity,
+      AccountConfigEntity,
+      CustomFieldsEntity,
+      CustomEventEntity,
+      UserAccountEntity,
+      AccountApiKeyEntity,
+      RoleEntity,
+      ApiKeyAuditLogEntity,
+      SystemConfigEntity,
+    ]),
   ],
   controllers: [AccountsController],
   providers: [AccountsService, AccountConfigsProvider, GoogleCloudStorageProvider, GoogleTasksProvider, SendgridHandler, EvolutionHandler, AccountCacheService, ApiKeyRegenService],

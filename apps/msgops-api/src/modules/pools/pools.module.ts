@@ -3,6 +3,7 @@ import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AccountConfigEntity } from '../../entities/account-config.entity';
 import { PoolEntity } from '../../entities/pool.entity';
+import { SystemConfigEntity } from '../../entities/system-config.entity';
 import { PoolsService } from './pools.service';
 import { PoolsController } from './pools.controller';
 import { RedisModule } from '../../providers/redis.provider';
@@ -11,7 +12,7 @@ import { AccountConfigsProvider } from '../../providers/account-configs.provider
 @Module({
   imports: [
     HttpModule,
-    TypeOrmModule.forFeature([AccountConfigEntity, PoolEntity]),
+    TypeOrmModule.forFeature([AccountConfigEntity, PoolEntity, SystemConfigEntity]),
     RedisModule.register({
       host: process.env.REDIS_HOST,
       port: parseInt(process.env.REDIS_PORT),

@@ -37,19 +37,4 @@ export class CreateAccountDto {
 
   @JoiSchema(Joi.string().allow(null, '').optional())
   defaultDomain?: string;
-
-  @JoiSchema(Joi.boolean().allow(null).optional().default(false))
-  createSendgridAccount?: boolean;
-
-  @JoiSchema(Joi.string().allow(null, '').optional())
-  linkBranding?: string;
-
-  @JoiSchema(Joi.array().allow(null).optional())
-  sendgridIps?: string[];
-
-  @JoiSchema(Joi.string().allow(null, '').optional())
-  unsubscribeRedirectUrl?: string;
-
-  @JoiSchema(Joi.string().allow(null, '').optional())
-  sendgridUser?: string;
 }

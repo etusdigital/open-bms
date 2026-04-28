@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Post, Put, Req } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Post, Put, Req } from '@nestjs/common';
 import { IpAddress } from '../../decorators/ip_address.decorator';
 import { SendgridSettingsDto, TestSendgridSettingsDto } from './dtos/sendgrid-settings.dto';
 import { SettingsService } from './settings.service';
@@ -23,8 +23,14 @@ export class SettingsController {
   @Put('sendgrid')
   async saveSendgrid(@Body() dto: SendgridSettingsDto, @Req() req: any) {
     this.requireSuperAdmin(req);
-    await this.settingsService.saveSendgrid(dto);
-    return { ok: true };
+    return this.settingsService.saveSendgrid(dto);
+  }
+
+  @Delete('sendgrid')
+  @HttpCode(204)
+  async deleteSendgrid(@Req() req: any) {
+    this.requireSuperAdmin(req);
+    await this.settingsService.deleteSendgrid();
   }
 
   @Post('sendgrid/test')

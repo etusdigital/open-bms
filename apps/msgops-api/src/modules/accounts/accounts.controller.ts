@@ -60,12 +60,6 @@ export class AccountsController {
     return this.accountsService.getAllAccounts();
   }
 
-  @Get('/sendgrid-subusers')
-  getSendgridAccounts(@Query() params: any, @Req() req: any) {
-    this.requireSuperAdmin(req);
-    return this.accountsService.getSendgridAccounts(params);
-  }
-
   @Get('/configs')
   getConfigs(@Req() req: any) {
     const context = req?.authzContext;

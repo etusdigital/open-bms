@@ -28,6 +28,7 @@ import { LabelsModule } from './modules/labels/labels.module';
 import { AuthzModule } from './modules/authz/authz.module';
 import { SetupModule } from './modules/setup/setup.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { AccountSettingsModule } from './modules/account-settings/account-settings.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     LabelsModule,
     SetupModule,
     SettingsModule,
+    AccountSettingsModule,
   ],
   providers: [AuditSubscriber],
 })

@@ -34,6 +34,7 @@ import { OpenAIProvider } from 'src/providers/openai.provider';
 import { SlackProvider } from 'src/providers/slack.provider';
 import { LabelsIntegrationModule } from '../labels/labels-integration.module';
 import { BucketsService } from '../buckets/buckets.service';
+import { SystemConfigEntity } from '../../entities/system-config.entity';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { BucketsService } from '../buckets/buckets.service';
       ContactDeviceEntity,
       TagEntity,
       EmailsLabelsEntity,
+      SystemConfigEntity,
     ]),
   ],
   providers: [

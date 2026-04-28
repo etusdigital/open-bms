@@ -28,7 +28,7 @@ describe('AccountsController — @RequirePermission metadata', () => {
     expect(permissions).toEqual(expectedPermissions);
   });
 
-  const unguardedMethods = ['getAllAccounts', 'remove', 'create', 'getSendgridAccounts', 'findAll', 'getConfigs'];
+  const unguardedMethods = ['getAllAccounts', 'remove', 'create', 'findAll', 'getConfigs'];
 
   it.each(unguardedMethods)('%s has NO @RequirePermission (uses inline isSuperAdmin or scoped access)', (methodName) => {
     const permissions = reflector.get<string[]>(REQUIRED_PERMISSIONS_KEY, AccountsController.prototype[methodName]);

@@ -60,10 +60,13 @@ export class MailService {
     }
 
     try {
-      let sendgridApiKey = process.env.SENDGRID_API_KEY;
-      if (account && account.accountConfigs && !isWarmup) {
-        sendgridApiKey = this.mailUtils.getAccountConfig(account.accountConfigs, 'sendgrid_key');
-      }
+      // Resolution: per-account `sendgrid_key` first (set by tenant admin
+      // in /account-settings/sendgrid), falling back to SENDGRID_API_KEY
+      // env var which mirrors the global fallback the super-admin sets in
+      // system_config. Warmup campaigns always go through the env-var
+      // path so warmup IPs never piggyback on a tenant key.
+      const accountKey = !isWarmup && account?.accountConfigs ? this.mailUtils.getAccountConfig(account.accountConfigs, 'sendgrid_key') : null;
+      let sendgridApiKey = accountKey || process.env.SENDGRID_API_KEY;
 
       // temporary fix for replaced keys
       if (account.id === 69) {

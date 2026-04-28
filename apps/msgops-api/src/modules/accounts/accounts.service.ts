@@ -13,8 +13,6 @@ import { PageDto } from '../../dtos/filters/page.dto';
 import { RedisService } from '../../providers/redis.provider';
 import { createHash, randomBytes } from 'crypto';
 import { replaceSpecialChars } from '../../utils/utils.service';
-import { SendgridLinkBranding, SendgridSettingsUnsubscribe, SendgridSubUser } from '../../interfaces/sendgrid.interface';
-import { SendgridHandler } from '../../handlers/email/sendgrid/sendgrid.handler';
 import { GoogleCloudStorageProvider } from '../../providers/google-cloud-storage.provider';
 import { GoogleTasksProvider } from 'src/providers/google-tasks.provider';
 import dayjs from 'dayjs';
@@ -43,7 +41,6 @@ export class AccountsService {
     @InjectRepository(RoleEntity)
     private readonly roleRepository: Repository<RoleEntity>,
     private readonly redisService: RedisService,
-    private readonly sendgridHandler: SendgridHandler,
     private readonly gcsProvider: GoogleCloudStorageProvider,
     private readonly googleTasksProvider: GoogleTasksProvider,
     private readonly cls: ClsService,
@@ -207,88 +204,23 @@ export class AccountsService {
     try {
       const account = this.accountRepository.create(accountDto);
       const accountEntity = await this.accountRepository.save(account);
-      let dns = {};
+      const dns = {};
 
       if (!accountDto.accountConfigs) {
         accountDto.accountConfigs = [];
       }
 
-      let sendgridSubusername = accountDto.sendgridUser || '';
-      if (accountDto.createSendgridAccount) {
-        const subuserPrefix = process.env.SENDGRID_SUBUSER_PREFIX || 'bms';
-        const subuserEmail = process.env.SENDGRID_SUBUSER_EMAIL;
-        if (!subuserEmail) {
-          throw new Error('SENDGRID_SUBUSER_EMAIL env var is required to create SendGrid subusers');
-        }
-        const sendgridSubUser: SendgridSubUser = {
-          username: `${subuserPrefix}-${replaceSpecialChars(accountEntity.name)}`,
-          password: createHash('sha256').update(`${accountEntity.id}`).digest('base64'),
-          email: subuserEmail,
-          ips: accountDto.sendgridIps,
-        };
+      // SendGrid subaccount provisioning was removed: the OSS uses a single
+      // workspace-level API key (super-admin sets it in /settings) and a
+      // single event webhook registered against that key. Account creation
+      // is now purely a BMS-side operation; SendGrid resources are not
+      // touched here. See sendgrid.handler.ts and settings.service.ts.
 
-        const subuser = await this.sendgridHandler.createSubuser(sendgridSubUser);
-        if (subuser) {
-          sendgridSubusername = subuser.username;
-        }
-
-        //To allow sendgrid to have subuser created before sending next api calls
-        await this.delay(2000);
-        await this.sendgridHandler.createWebhook({ subUserName: sendgridSubusername });
-
-        const unsubSettings: SendgridSettingsUnsubscribe = {
-          enabled: true,
-          replace: '[unsubscribe_link]',
-          landing: accountDto.unsubscribeRedirectUrl,
-        };
-        await this.sendgridHandler.updateTrackingSubscription({
-          settings: unsubSettings,
-          subUserName: sendgridSubusername,
-        });
-      }
-
-      if (accountDto.createSendgridAccount) {
-        const sendgridKey = await this.sendgridHandler.createApiKey({
-          subUserName: sendgridSubusername,
-        });
-        accountDto.accountConfigs.push({
-          name: 'sendgrid_key',
-          value: sendgridKey.api_key,
-        });
-      }
-
-      if (accountDto.createSendgridAccount && accountDto.defaultDomain) {
-        const domain = accountDto.defaultDomain.replace(/^(http:\/\/www\.|https:\/\/www\.|http:\/\/|https:\/\/)?/i, '');
-
-        const data = {
-          domain,
-          custom_dkim_selector: 'bms',
-          automatic_security: true,
-        };
-
-        const domainSettings = await this.sendgridHandler.domainAuthentication({
-          settings: data,
-          subUserName: sendgridSubusername,
-        });
-        dns = { ...dns, ...domainSettings.dns };
-
+      if (accountDto.defaultDomain) {
         accountDto.accountConfigs.push({
           name: 'default_domain',
           value: accountDto.defaultDomain,
         });
-
-        if (accountDto.linkBranding) {
-          const data: SendgridLinkBranding = {
-            domain,
-            subdomain: accountDto.linkBranding,
-          };
-
-          const linkBranding = await this.sendgridHandler.linkBranding({
-            settings: data,
-            subUserName: sendgridSubusername,
-          });
-          dns = { ...dns, ...linkBranding.dns };
-        }
       }
 
       accountDto.accountConfigs.push({
@@ -778,10 +710,6 @@ export class AccountsService {
       console.error(e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
-  }
-
-  async getSendgridAccounts(params: any) {
-    return this.sendgridHandler.getSubUsers(params);
   }
 
   delay(time: number) {
