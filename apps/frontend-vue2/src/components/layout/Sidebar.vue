@@ -51,9 +51,7 @@
               @mouseleave="hoverCampaigns = false"
               class="message-sidebar"
               :class="[
-                $route.path.includes('/campaign') && !$route.path.includes('/campaign-')
-                  ? 'active-class'
-                  : 'disable',
+                $route.path.includes('/campaign') && !$route.path.includes('/campaign-') ? 'active-class' : 'disable',
                 'pl-0',
                 isSidebarCollapsed ? 'message-gap-close' : 'message-gap-open',
               ]"
@@ -343,7 +341,6 @@
                 </template>
               </router-link>
             </v-list-item>
-
 
             <v-list-item
               v-if="currentAccount.isInternal && can('infra:view')"
