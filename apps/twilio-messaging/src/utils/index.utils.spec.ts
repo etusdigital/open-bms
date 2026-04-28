@@ -1,6 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
 import { Utils } from './index.utils';
-import { PubSubMessage } from '../interfaces';
 
 describe('Utils', () => {
   let utils: Utils;
@@ -20,40 +18,6 @@ describe('Utils', () => {
 
     it('should handle empty string', () => {
       expect(utils.stripString('')).toBe('');
-    });
-  });
-
-  describe('parsePubSubMessage', () => {
-    it('should parse valid base64 encoded data', () => {
-      const payload = { foo: 'bar', num: 42 };
-      const encoded = Buffer.from(JSON.stringify(payload)).toString('base64');
-      const message: PubSubMessage = {
-        subscription: 'sub-1',
-        message: {
-          data: encoded,
-          attributes: {},
-          messageId: '123',
-          message_id: '123',
-          publishTime: new Date().toISOString(),
-          publish_time: new Date().toISOString(),
-        },
-      };
-      expect(utils.parsePubSubMessage(message)).toEqual(payload);
-    });
-
-    it('should throw BadRequestException for invalid data', () => {
-      const message: PubSubMessage = {
-        subscription: 'sub-1',
-        message: {
-          data: 'not-valid-base64-json!!!',
-          attributes: {},
-          messageId: '123',
-          message_id: '123',
-          publishTime: new Date().toISOString(),
-          publish_time: new Date().toISOString(),
-        },
-      };
-      expect(() => utils.parsePubSubMessage(message)).toThrow(BadRequestException);
     });
   });
 

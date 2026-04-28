@@ -1,11 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { UnauthorizedException } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { Utils } from './utils/index.utils';
-import { PubSubMessage } from './interfaces';
 
 describe('AppController', () => {
   let appController: AppController;
+
+  const VALID_TOKEN = 'dev-send-whatsapp-token-test';
 
   const mockAppService = {
     getHello: jest.fn().mockReturnValue('Hello World!'),
@@ -14,6 +16,8 @@ describe('AppController', () => {
   };
 
   beforeEach(async () => {
+    process.env.INTERNAL_AUTH_TOKEN = VALID_TOKEN;
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
       providers: [{ provide: AppService, useValue: mockAppService }, Utils],
@@ -31,7 +35,7 @@ describe('AppController', () => {
     });
   });
 
-  describe('processCampaign', () => {
+  describe('processCampaign (TODO Onda 4)', () => {
     const campaignPayload = {
       account: {
         id: 1,
@@ -52,42 +56,9 @@ describe('AppController', () => {
       expect(mockAppService.processCampaign).toHaveBeenCalledWith(campaignPayload);
       expect(result).toEqual({ status: 201, message: 'ok' });
     });
-
-    it('should decode a PubSub-wrapped campaign payload', async () => {
-      const pubSubMessage: PubSubMessage = {
-        subscription: 'projects/test/subscriptions/test-sub',
-        message: {
-          data: Buffer.from(JSON.stringify(campaignPayload)).toString('base64'),
-          messageId: 'msg-1',
-          message_id: 'msg-1',
-          publishTime: new Date().toISOString(),
-          publish_time: new Date().toISOString(),
-          attributes: {},
-        },
-      };
-
-      await appController.processCampaign(pubSubMessage);
-      expect(mockAppService.processCampaign).toHaveBeenCalledWith(campaignPayload);
-    });
-
-    it('should throw on invalid PubSub data', async () => {
-      const pubSubMessage: PubSubMessage = {
-        subscription: 'projects/test/subscriptions/test-sub',
-        message: {
-          data: 'not-valid-base64!!!',
-          messageId: 'msg-2',
-          message_id: 'msg-2',
-          publishTime: new Date().toISOString(),
-          publish_time: new Date().toISOString(),
-          attributes: {},
-        },
-      };
-
-      await expect(appController.processCampaign(pubSubMessage)).rejects.toThrow();
-    });
   });
 
-  describe('processAutomation', () => {
+  describe('processAutomation (/internal/whatsapp/automation)', () => {
     const automationPayload = {
       startedAt: Date.now(),
       automationId: 1,
@@ -109,33 +80,24 @@ describe('AppController', () => {
       },
     };
 
-    it('should process a direct automation payload', async () => {
-      const result = await appController.processAutomation(automationPayload as any);
-      expect(mockAppService.processAutomation).toHaveBeenCalledWith(automationPayload);
-      expect(result).toEqual({ status: true, message: 'sent' });
+    it('should reject with 401 when token is missing', async () => {
+      await expect(appController.processAutomation('', automationPayload as any)).rejects.toBeInstanceOf(UnauthorizedException);
     });
 
-    it('should decode a PubSub-wrapped automation payload', async () => {
-      const pubSubMessage: PubSubMessage = {
-        subscription: 'projects/test/subscriptions/test-sub',
-        message: {
-          data: Buffer.from(JSON.stringify(automationPayload)).toString('base64'),
-          messageId: 'msg-3',
-          message_id: 'msg-3',
-          publishTime: new Date().toISOString(),
-          publish_time: new Date().toISOString(),
-          attributes: {},
-        },
-      };
+    it('should reject with 401 when token mismatches', async () => {
+      await expect(appController.processAutomation('wrong-token', automationPayload as any)).rejects.toBeInstanceOf(UnauthorizedException);
+    });
 
-      await appController.processAutomation(pubSubMessage);
+    it('should process automation when token is valid', async () => {
+      const result = await appController.processAutomation(VALID_TOKEN, automationPayload as any);
       expect(mockAppService.processAutomation).toHaveBeenCalledWith(automationPayload);
+      expect(result).toEqual({ status: true, message: 'sent' });
     });
 
     it('should throw when appService.processAutomation throws', async () => {
       mockAppService.processAutomation.mockRejectedValueOnce(new Error('Evolution API down'));
 
-      await expect(appController.processAutomation(automationPayload as any)).rejects.toThrow('Evolution API down');
+      await expect(appController.processAutomation(VALID_TOKEN, automationPayload as any)).rejects.toThrow('Evolution API down');
     });
   });
 });

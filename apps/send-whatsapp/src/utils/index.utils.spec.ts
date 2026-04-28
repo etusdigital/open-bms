@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { Utils } from './index.utils';
 
 describe('Utils', () => {
@@ -19,58 +18,6 @@ describe('Utils', () => {
 
     it('should handle empty string', () => {
       expect(utils.stripString('')).toBe('');
-    });
-  });
-
-  describe('parsePubSubMessage', () => {
-    it('should decode and parse a valid base64 PubSub message', () => {
-      const payload = { key: 'value', nested: { a: 1 } };
-      const message = {
-        subscription: 'projects/test/subscriptions/sub',
-        message: {
-          data: Buffer.from(JSON.stringify(payload)).toString('base64'),
-          messageId: 'msg-1',
-          message_id: 'msg-1',
-          publishTime: new Date().toISOString(),
-          publish_time: new Date().toISOString(),
-          attributes: {},
-        },
-      };
-
-      const result = utils.parsePubSubMessage(message as any);
-      expect(result).toEqual(payload);
-    });
-
-    it('should throw BadRequestException for invalid base64 data', () => {
-      const message = {
-        subscription: 'projects/test/subscriptions/sub',
-        message: {
-          data: '!!!invalid-base64',
-          messageId: 'msg-2',
-          message_id: 'msg-2',
-          publishTime: new Date().toISOString(),
-          publish_time: new Date().toISOString(),
-          attributes: {},
-        },
-      };
-
-      expect(() => utils.parsePubSubMessage(message as any)).toThrow(BadRequestException);
-    });
-
-    it('should throw BadRequestException for non-JSON base64 data', () => {
-      const message = {
-        subscription: 'projects/test/subscriptions/sub',
-        message: {
-          data: Buffer.from('not-json-content').toString('base64'),
-          messageId: 'msg-3',
-          message_id: 'msg-3',
-          publishTime: new Date().toISOString(),
-          publish_time: new Date().toISOString(),
-          attributes: {},
-        },
-      };
-
-      expect(() => utils.parsePubSubMessage(message as any)).toThrow(BadRequestException);
     });
   });
 

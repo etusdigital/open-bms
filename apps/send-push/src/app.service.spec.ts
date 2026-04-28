@@ -1,3 +1,21 @@
+jest.mock('@bms/messaging', () => ({
+  AmqpPublisher: jest.fn(),
+  AmqpConsumer: jest.fn(),
+  createHttpBridgeHandler: jest.fn(),
+  EXCHANGES: {
+    email: 'bms.email',
+    events: 'bms.events',
+    leads: 'bms.leads',
+    campaigns: 'bms.campaigns',
+    triggers: 'bms.triggers',
+    push: 'bms.push',
+    whatsapp: 'bms.whatsapp',
+    sms: 'bms.sms',
+    tags: 'bms.tags',
+  },
+  DLX: 'bms.dlx',
+}));
+
 import { AppService } from './app.service';
 
 describe('AppService', () => {
@@ -6,8 +24,9 @@ describe('AppService', () => {
   let mockFirebaseProvider: {
     sendFirebaseMessages: jest.Mock;
   };
-  let mockPubSubProvider: {
-    sendMessage: jest.Mock;
+  let mockEventPublisher: {
+    publish: jest.Mock;
+    close: jest.Mock;
   };
   let mockRedisClient: {
     exists: jest.Mock;
@@ -82,15 +101,14 @@ describe('AppService', () => {
 
   beforeEach(() => {
     process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"default"}';
-    process.env.TOPIC_MSGOPS_EVENT_PROCESS = 'topic-event';
-    process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER = 'topic-tracker';
 
     mockFirebaseProvider = {
       sendFirebaseMessages: jest.fn().mockResolvedValue({ successCount: 1, failureCount: 0, responses: [] }),
     };
 
-    mockPubSubProvider = {
-      sendMessage: jest.fn().mockResolvedValue({ status: true }),
+    mockEventPublisher = {
+      publish: jest.fn().mockResolvedValue(undefined),
+      close: jest.fn().mockResolvedValue(undefined),
     };
 
     mockRedisClient = {
@@ -118,7 +136,7 @@ describe('AppService', () => {
     service = new AppService(
       mockRedisService as never,
       mockFirebaseProvider as never,
-      mockPubSubProvider as never,
+      mockEventPublisher as never,
       mockUtils as never
     );
   });
@@ -204,17 +222,18 @@ describe('AppService', () => {
   it('processSent should publish only when messages are present', async () => {
     await service.processSent([{ data: { id: '1' } } as never], 'web-push');
 
-    expect(mockPubSubProvider.sendMessage).toHaveBeenCalledTimes(1);
-    expect(mockPubSubProvider.sendMessage).toHaveBeenCalledWith(
+    expect(mockEventPublisher.publish).toHaveBeenCalledTimes(1);
+    expect(mockEventPublisher.publish).toHaveBeenCalledWith(
+      'bms.events',
+      'event.received.push',
       { payload: expect.any(Array) },
-      'topic-event',
-      expect.objectContaining({ platform: 'web-push' })
+      expect.objectContaining({ platform: 'push', message_type: 'web-push' })
     );
 
-    mockPubSubProvider.sendMessage.mockClear();
+    mockEventPublisher.publish.mockClear();
 
     await service.processSent([], 'web-push');
-    expect(mockPubSubProvider.sendMessage).not.toHaveBeenCalled();
+    expect(mockEventPublisher.publish).not.toHaveBeenCalled();
   });
 
   it('processSingle should return early when message is already processing', async () => {
@@ -282,7 +301,7 @@ describe('AppService', () => {
       status: true,
       message: expect.stringContaining('User without active devices'),
     });
-    expect(mockPubSubProvider.sendMessage).toHaveBeenCalledWith(nextData, 'next-topic');
+    expect(mockEventPublisher.publish).toHaveBeenCalledWith('bms.triggers', 'trigger.process', nextData);
   });
 
   it('processSingle should send firebase messages and publish next step', async () => {
@@ -308,8 +327,8 @@ describe('AppService', () => {
     const result = await service.processSingle(sendPushMessage as never, 'automation-key');
 
     expect(mockFirebaseProvider.sendFirebaseMessages).toHaveBeenCalledTimes(1);
-    expect(mockPubSubProvider.sendMessage).toHaveBeenCalled();
-    expect(result).toEqual({ status: true, message: 'message sent to next-topic.' });
+    expect(mockEventPublisher.publish).toHaveBeenCalledWith('bms.triggers', 'trigger.process', nextData);
+    expect(result).toEqual({ status: true, message: 'message sent to bms.triggers/trigger.process.' });
   });
 
   it('processSingle should log when contact uuid is empty', async () => {
@@ -418,7 +437,15 @@ describe('AppService', () => {
     const result = await service.process(campaignMessage as never, 'campaign-redis-key');
 
     expect(mockFirebaseProvider.sendFirebaseMessages).toHaveBeenCalledTimes(1);
-    expect(mockPubSubProvider.sendMessage).toHaveBeenCalledTimes(2);
+    // 1x event.received.push (processSent) + 1x campaign.tracked (sendTracker)
+    expect(mockEventPublisher.publish).toHaveBeenCalledTimes(2);
+    expect(mockEventPublisher.publish).toHaveBeenCalledWith(
+      'bms.events',
+      'event.received.push',
+      expect.any(Object),
+      expect.objectContaining({ platform: 'push' })
+    );
+    expect(mockEventPublisher.publish).toHaveBeenCalledWith('bms.campaigns', 'campaign.tracked', expect.any(Object));
     expect(result).toEqual({ status: 201, message: 'ok' });
   });
 
@@ -506,7 +533,7 @@ describe('AppService', () => {
       status: true,
       message: expect.stringContaining('User without active devices'),
     });
-    expect(mockPubSubProvider.sendMessage).not.toHaveBeenCalled();
+    expect(mockEventPublisher.publish).not.toHaveBeenCalled();
   });
 
   it('processSingle should handle null contactDevices', async () => {
@@ -578,7 +605,7 @@ describe('AppService', () => {
     const result = await service.processSingle(sendPushMessage as never, '');
 
     expect(mockFirebaseProvider.sendFirebaseMessages).toHaveBeenCalled();
-    expect(result).toEqual({ status: true, message: 'message sent to next-topic.' });
+    expect(result).toEqual({ status: true, message: 'message sent to bms.triggers/trigger.process.' });
   });
 
   it('processSingle should handle empty messageUrl (domain empty)', async () => {
@@ -621,7 +648,7 @@ describe('AppService', () => {
     const result = await service.processSingle(sendPushMessage as never, '');
 
     expect(mockFirebaseProvider.sendFirebaseMessages).toHaveBeenCalled();
-    expect(result).toEqual({ status: true, message: 'message sent to .' });
+    expect(result).toEqual({ status: true, message: 'message sent to bms.triggers/trigger.process.' });
   });
 
   it('formattedPayload should include expiryPushInSeconds headers when set', () => {
@@ -786,15 +813,16 @@ describe('AppService', () => {
 
     await service.sendTracker('SENT_PUSH_BATCH', campaignMessage as never, 10, { extra: 'data' });
 
-    expect(mockPubSubProvider.sendMessage).toHaveBeenCalledWith(
+    expect(mockEventPublisher.publish).toHaveBeenCalledWith(
+      'bms.campaigns',
+      'campaign.tracked',
       expect.objectContaining({
         campaign_id: 500,
         event: 'SENT_PUSH_BATCH',
         contacts_length: 10,
         data: { extra: 'data' },
         testabMode: true,
-      }),
-      'topic-tracker'
+      })
     );
   });
 

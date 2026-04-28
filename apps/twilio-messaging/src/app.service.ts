@@ -11,8 +11,9 @@ import {
   SingleMessage,
   CompressedAutomationPayload,
 } from './interfaces';
+import { EXCHANGES } from '@bms/messaging';
+import { EventPublisherService } from './event-publisher.service';
 import { MsgopsService } from './msgops/msgops.service';
-import { PubSubProvider } from './providers/pubsub.provider';
 import { TwilioProvider } from './providers/twilio.provider';
 import { Utils } from './utils/index.utils';
 
@@ -30,7 +31,7 @@ export class AppService {
   private redisClient: Redis;
 
   constructor(
-    private readonly pubSubProvider: PubSubProvider,
+    private readonly eventPublisher: EventPublisherService,
     private readonly redisService: RedisService,
     private readonly msgopsService: MsgopsService,
     private readonly utils: Utils,
@@ -173,14 +174,18 @@ export class AppService {
       automationKey: `automation-${automationMessage?.next?.data?.id || 0}-${automationMessage?.next?.data?.contact?.id || 0}-${Date.now()}`,
     } as CompressedAutomationPayload;
     await this.redisClient.set(compressPayload.automationKey, JSON.stringify(automationMessage.next.data), 'EX', 43200);
-    const messageId = await this.pubSubProvider.sendMessage(compressPayload, automationMessage.next.pubName);
+    await this.eventPublisher.publish(
+      EXCHANGES.triggers,
+      'trigger.process',
+      compressPayload as unknown as Record<string, any>,
+    );
     if (redisKeyPayload) {
       await this.redisClient.del(redisKeyPayload);
     }
 
     return {
       status: true,
-      message: `${messageId} send to ${automationMessage.next.pubName}.`,
+      message: `Message published to bms.triggers/trigger.process.`,
     };
   }
 
@@ -208,7 +213,7 @@ export class AppService {
     const messageNextError = `[${automationMessage.messageId}] Invalid contact: ${contact.id}.`;
     console.log(messageNextError);
     if (automationMessage.next && automationMessage.next?.pubName) {
-      await this.pubSubProvider.sendMessage(automationMessage.next.data, automationMessage.next.pubName);
+      await this.eventPublisher.publish(EXCHANGES.triggers, 'trigger.process', automationMessage.next.data);
     }
     return { status: true, message: messageNextError };
   }
@@ -244,7 +249,8 @@ export class AppService {
       testabMode: campaignMessage.campaign_test_ab_mode,
     };
 
-    return await this.pubSubProvider.sendMessage(tracker, process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER);
+    await this.eventPublisher.publish(EXCHANGES.campaigns, 'campaign.tracked', tracker);
+    return { status: true, message: 'tracker published to bms.campaigns/campaign.tracked' };
   }
 
   async createRedirectLink(opts: CreateRedirectLinkOptions) {

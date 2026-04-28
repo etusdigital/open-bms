@@ -1838,9 +1838,9 @@ importers:
 
   apps/send-push:
     dependencies:
-      '@google-cloud/pubsub':
-        specifier: ^5.3.0
-        version: 5.3.0
+      '@bms/messaging':
+        specifier: workspace:*
+        version: link:../../packages/messaging
       '@msgops/url-utils':
         specifier: workspace:*
         version: link:../../packages/url-utils
@@ -1953,9 +1953,9 @@ importers:
 
   apps/send-whatsapp:
     dependencies:
-      '@google-cloud/pubsub':
-        specifier: ^5.3.0
-        version: 5.3.0
+      '@bms/messaging':
+        specifier: workspace:*
+        version: link:../../packages/messaging
       '@msgops/url-utils':
         specifier: workspace:*
         version: link:../../packages/url-utils
@@ -2340,9 +2340,9 @@ importers:
 
   apps/twilio-messaging:
     dependencies:
-      '@google-cloud/pubsub':
-        specifier: ^5.3.0
-        version: 5.3.0
+      '@bms/messaging':
+        specifier: workspace:*
+        version: link:../../packages/messaging
       '@msgops/url-utils':
         specifier: workspace:*
         version: link:../../packages/url-utils
@@ -37665,9 +37665,7 @@ snapshots:
       pretty-format: 24.9.0
       throat: 4.1.0
     transitivePeerDependencies:
-      - bufferutil
       - supports-color
-      - utf-8-validate
 
   jest-jasmine2@26.6.3(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@20.5.1)(typescript@5.9.3)):
     dependencies:

@@ -1,7 +1,25 @@
+jest.mock('@bms/messaging', () => ({
+  AmqpPublisher: jest.fn(),
+  AmqpConsumer: jest.fn(),
+  createHttpBridgeHandler: jest.fn(),
+  EXCHANGES: {
+    email: 'bms.email',
+    events: 'bms.events',
+    leads: 'bms.leads',
+    campaigns: 'bms.campaigns',
+    triggers: 'bms.triggers',
+    push: 'bms.push',
+    whatsapp: 'bms.whatsapp',
+    sms: 'bms.sms',
+    tags: 'bms.tags',
+  },
+  DLX: 'bms.dlx',
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppService } from './app.service';
+import { EventPublisherService } from './event-publisher.service';
 import { MsgopsService } from './msgops/msgops.service';
-import { PubSubProvider } from './providers/pubsub.provider';
 import { Utils } from './utils/index.utils';
 import { CampaignMessageType } from './interfaces';
 
@@ -17,8 +35,9 @@ jest.mock('./providers/evolution.provider', () => {
 describe('AppService', () => {
   let service: AppService;
 
-  const mockPubSubProvider = {
-    sendMessage: jest.fn().mockResolvedValue({ messageId: 'pub-1', message: 'published', status: true }),
+  const mockEventPublisher = {
+    publish: jest.fn().mockResolvedValue(undefined),
+    close: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockMsgopsService = {
@@ -26,7 +45,6 @@ describe('AppService', () => {
   };
 
   const mockUtils = {
-    parsePubSubMessage: jest.fn(),
     stripString: jest.fn((text: string) => text),
     getVariables: jest.fn(),
     parseVariables: jest.fn(),
@@ -50,7 +68,7 @@ describe('AppService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AppService,
-        { provide: PubSubProvider, useValue: mockPubSubProvider },
+        { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: MsgopsService, useValue: mockMsgopsService },
         { provide: Utils, useValue: mockUtils },
       ],
@@ -110,7 +128,7 @@ describe('AppService', () => {
     it('should process all contacts and send tracker', async () => {
       const result = await service.processCampaign(campaignMessage as any);
       expect(result).toEqual({ status: 201, message: 'ok' });
-      expect(mockPubSubProvider.sendMessage).toHaveBeenCalled();
+      expect(mockEventPublisher.publish).toHaveBeenCalled();
     });
 
     it('should return 400 when account has no whatsapp_number_id', async () => {
@@ -150,8 +168,9 @@ describe('AppService', () => {
 
     it('should send SENT_WHATSAPP_BATCH tracker for whatsapp type', async () => {
       await service.processCampaign(campaignMessage as any);
-      const trackerCall = mockPubSubProvider.sendMessage.mock.calls[0];
-      expect(trackerCall[0].event).toBe('SENT_WHATSAPP_BATCH');
+      const trackerCall = mockEventPublisher.publish.mock.calls[0];
+      // publish(exchange, routingKey, payload)
+      expect(trackerCall[2].event).toBe('SENT_WHATSAPP_BATCH');
     });
 
     it('should send SENT_SMS_BATCH tracker for sms type', async () => {
@@ -160,8 +179,8 @@ describe('AppService', () => {
         message: { ...campaignMessage.message, type: CampaignMessageType.SMS },
       };
       await service.processCampaign(smsMsg as any);
-      const trackerCall = mockPubSubProvider.sendMessage.mock.calls[0];
-      expect(trackerCall[0].event).toBe('SENT_SMS_BATCH');
+      const trackerCall = mockEventPublisher.publish.mock.calls[0];
+      expect(trackerCall[2].event).toBe('SENT_SMS_BATCH');
     });
   });
 
@@ -183,7 +202,7 @@ describe('AppService', () => {
     it('should send whatsapp and publish to next topic', async () => {
       const result = await service.processAutomation(automationMessage as any);
       expect(result.status).toBe(true);
-      expect(mockPubSubProvider.sendMessage).toHaveBeenCalledWith(automationMessage.next.data, automationMessage.next.pubName);
+      expect(mockEventPublisher.publish).toHaveBeenCalledWith('bms.triggers', 'trigger.process', automationMessage.next.data);
     });
 
     it('should return 400 when account has invalid config', async () => {
@@ -233,7 +252,7 @@ describe('AppService', () => {
       const result = await service.invalidContact(contact as any, automationMessage as any);
       expect(result.status).toBe(true);
       expect(result.message).toContain('Invalid contact: 42');
-      expect(mockPubSubProvider.sendMessage).toHaveBeenCalledWith(automationMessage.next.data, automationMessage.next.pubName);
+      expect(mockEventPublisher.publish).toHaveBeenCalledWith('bms.triggers', 'trigger.process', automationMessage.next.data);
     });
 
     it('should not send to next topic when next is not available', async () => {
@@ -241,7 +260,7 @@ describe('AppService', () => {
       const automationMessage = { messageId: 'msg-1', next: null };
       const result = await service.invalidContact(contact as any, automationMessage as any);
       expect(result.status).toBe(true);
-      expect(mockPubSubProvider.sendMessage).not.toHaveBeenCalled();
+      expect(mockEventPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('should not send to next topic when next has no pubName', async () => {
@@ -249,15 +268,12 @@ describe('AppService', () => {
       const automationMessage = { messageId: 'msg-1', next: { pubName: '', data: {} } };
       const result = await service.invalidContact(contact as any, automationMessage as any);
       expect(result.status).toBe(true);
-      expect(mockPubSubProvider.sendMessage).not.toHaveBeenCalled();
+      expect(mockEventPublisher.publish).not.toHaveBeenCalled();
     });
   });
 
   describe('sendTracker', () => {
-    it('should publish tracker event to configured topic', async () => {
-      const originalEnv = process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER;
-      process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER = 'tracker-topic';
-
+    it('should publish tracker event to bms.campaigns/campaign.tracked', async () => {
       const campaignMessage = {
         campaign_id: 100,
         message: { id: 1, content: 'Hello' },
@@ -268,17 +284,16 @@ describe('AppService', () => {
 
       await service.sendTracker('SENT_WHATSAPP_BATCH', campaignMessage as any, 10);
 
-      expect(mockPubSubProvider.sendMessage).toHaveBeenCalledWith(
+      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
+        'bms.campaigns',
+        'campaign.tracked',
         expect.objectContaining({
           campaign_id: 100,
           event: 'SENT_WHATSAPP_BATCH',
           service: 'MSGOPS_SEND_BATCH_EVOLUTION',
           contacts_length: 10,
         }),
-        'tracker-topic',
       );
-
-      process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER = originalEnv;
     });
   });
 

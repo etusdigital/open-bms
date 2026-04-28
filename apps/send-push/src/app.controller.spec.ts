@@ -1,8 +1,27 @@
+jest.mock('@bms/messaging', () => ({
+  AmqpPublisher: jest.fn(),
+  AmqpConsumer: jest.fn(),
+  createHttpBridgeHandler: jest.fn(),
+  EXCHANGES: {
+    email: 'bms.email',
+    events: 'bms.events',
+    leads: 'bms.leads',
+    campaigns: 'bms.campaigns',
+    triggers: 'bms.triggers',
+    push: 'bms.push',
+    whatsapp: 'bms.whatsapp',
+    sms: 'bms.sms',
+    tags: 'bms.tags',
+  },
+  DLX: 'bms.dlx',
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
+import { UnauthorizedException } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { EventPublisherService } from './event-publisher.service';
 import { FirebaseProvider } from './providers/firebase.provider';
-import { PubSubProvider } from './providers/pubsub.provider';
 import { RedisService } from './providers/redis/redis.service';
 import { Utils } from './utils/index.utils';
 
@@ -13,22 +32,29 @@ const mockRedisClient = {
   del: jest.fn(),
 };
 
+const mockEventPublisher = {
+  publish: jest.fn().mockResolvedValue(undefined),
+  close: jest.fn().mockResolvedValue(undefined),
+};
+
 describe('AppController', () => {
   let appController: AppController;
   let appService: AppService;
 
+  const VALID_TOKEN = 'dev-send-push-token-test';
+
   beforeEach(async () => {
+    process.env.INTERNAL_AUTH_TOKEN = VALID_TOKEN;
+    process.env.AMQP_URL = 'amqp://test';
+
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
       providers: [
         AppService,
         FirebaseProvider,
-        PubSubProvider,
         Utils,
-        {
-          provide: RedisService,
-          useValue: { getClient: () => mockRedisClient },
-        },
+        { provide: EventPublisherService, useValue: mockEventPublisher },
+        { provide: RedisService, useValue: { getClient: () => mockRedisClient } },
       ],
     }).compile();
 
@@ -42,28 +68,7 @@ describe('AppController', () => {
     });
   });
 
-  describe('processRequest', () => {
-    it('should parse PubSub message and process', async () => {
-      const pubSubData = {
-        subscription: 'test-sub',
-        message: {
-          data: Buffer.from(JSON.stringify({ campaignKey: '' })).toString('base64'),
-          messageId: '123',
-          message_id: '123',
-          publishTime: '2024-01-01',
-          publish_time: '2024-01-01',
-          attributes: {},
-        },
-      };
-
-      jest.spyOn(appService, 'getDelRedis').mockResolvedValue(null);
-      jest.spyOn(appService, 'process').mockResolvedValue({ status: 201, message: 'ok' });
-
-      await appController.processRequest(pubSubData as any);
-
-      expect(appService.process).toHaveBeenCalled();
-    });
-
+  describe('processRequest (campaign — TODO Onda 4)', () => {
     it('should handle compressed campaign payload from redis', async () => {
       const data = { campaignKey: 'redis-key-1' };
       const campaignData = {
@@ -116,8 +121,18 @@ describe('AppController', () => {
     });
   });
 
-  describe('receiveMessage', () => {
-    it('should parse PubSub message and process single', async () => {
+  describe('receiveMessage (/internal/push/single)', () => {
+    it('should reject with 401 when token is missing', async () => {
+      await expect(appController.receiveMessage('', {} as any)).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('should reject with 401 when token mismatches', async () => {
+      await expect(appController.receiveMessage('wrong-token', {} as any)).rejects.toBeInstanceOf(
+        UnauthorizedException
+      );
+    });
+
+    it('should process direct payload when token is valid', async () => {
       const payload = {
         automationKey: '',
         automationId: 1,
@@ -126,21 +141,10 @@ describe('AppController', () => {
         account: { id: 1 },
         next: null,
       };
-      const pubSubData = {
-        subscription: 'test-sub',
-        message: {
-          data: Buffer.from(JSON.stringify(payload)).toString('base64'),
-          messageId: '456',
-          message_id: '456',
-          publishTime: '2024-01-01',
-          publish_time: '2024-01-01',
-          attributes: {},
-        },
-      };
 
       jest.spyOn(appService, 'processSingle').mockResolvedValue({ status: true, message: 'ok' });
 
-      await appController.receiveMessage(pubSubData as any);
+      await appController.receiveMessage(VALID_TOKEN, payload as any);
 
       expect(appService.processSingle).toHaveBeenCalled();
     });
@@ -158,7 +162,7 @@ describe('AppController', () => {
       jest.spyOn(appService, 'getDelRedis').mockResolvedValue(automationData);
       jest.spyOn(appService, 'processSingle').mockResolvedValue({ status: true, message: 'ok' });
 
-      await appController.receiveMessage(data as any);
+      await appController.receiveMessage(VALID_TOKEN, data as any);
 
       expect(appService.getDelRedis).toHaveBeenCalledWith('auto-redis-key');
     });
@@ -168,7 +172,7 @@ describe('AppController', () => {
 
       jest.spyOn(appService, 'getDelRedis').mockResolvedValue(null);
 
-      const result = await appController.receiveMessage(data as any);
+      const result = await appController.receiveMessage(VALID_TOKEN, data as any);
 
       expect(result).toBeUndefined();
     });
@@ -185,7 +189,7 @@ describe('AppController', () => {
 
       jest.spyOn(appService, 'processSingle').mockRejectedValue(new Error('single error'));
 
-      await expect(appController.receiveMessage(data as any)).rejects.toThrow('single error');
+      await expect(appController.receiveMessage(VALID_TOKEN, data as any)).rejects.toThrow('single error');
     });
   });
 });

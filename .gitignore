@@ -41,3 +41,4 @@ test-results/
 
 # Upstream reference clone — not part of this repo
 bms-reference/
+_evo-output/implementation-artifacts/

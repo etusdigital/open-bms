@@ -1,28 +1,11 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { Account, Contact, MapVariables, PubSubMessage, CustomFields } from '../interfaces';
+import { Injectable } from '@nestjs/common';
+import { Account, Contact, MapVariables, CustomFields } from '../interfaces';
 import Handlebars from 'handlebars';
 
 @Injectable()
 export class Utils {
   stripString(text: string) {
     return text.replace(/(<([^>]+)>)/gi, '');
-  }
-
-  parsePubSubMessage(subscriptionMessage: PubSubMessage) {
-    const {
-      message: { data },
-    } = subscriptionMessage;
-
-    try {
-      const buff = Buffer.from(data, 'base64').toString();
-      const leadMessage = JSON.parse(buff);
-
-      return leadMessage;
-    } catch (_error) {
-      throw new BadRequestException(
-        `Unable to parse data to Batch. messageId: ${JSON.stringify(subscriptionMessage)} `
-      );
-    }
   }
 
   accentsMap = {

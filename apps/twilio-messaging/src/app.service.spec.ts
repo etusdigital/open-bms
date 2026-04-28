@@ -1,12 +1,30 @@
+jest.mock('@bms/messaging', () => ({
+  AmqpPublisher: jest.fn(),
+  AmqpConsumer: jest.fn(),
+  createHttpBridgeHandler: jest.fn(),
+  EXCHANGES: {
+    email: 'bms.email',
+    events: 'bms.events',
+    leads: 'bms.leads',
+    campaigns: 'bms.campaigns',
+    triggers: 'bms.triggers',
+    push: 'bms.push',
+    whatsapp: 'bms.whatsapp',
+    sms: 'bms.sms',
+    tags: 'bms.tags',
+  },
+  DLX: 'bms.dlx',
+}));
+
 import { AppService } from './app.service';
-import { PubSubProvider } from './providers/pubsub.provider';
+import { EventPublisherService } from './event-publisher.service';
 import { RedisService } from './providers/redis/redis.service';
 import { MsgopsService } from './msgops/msgops.service';
 import { Utils } from './utils/index.utils';
 
 describe('AppService', () => {
   let service: AppService;
-  let pubSubProvider: PubSubProvider;
+  let eventPublisher: EventPublisherService;
   let redisService: RedisService;
   let msgopsService: MsgopsService;
   let utils: Utils;
@@ -20,11 +38,14 @@ describe('AppService', () => {
     };
 
     redisService = { getClient: jest.fn().mockReturnValue(mockRedisClient) } as any;
-    pubSubProvider = { sendMessage: jest.fn().mockResolvedValue({ messageId: 'msg-123', status: true }) } as any;
+    eventPublisher = {
+      publish: jest.fn().mockResolvedValue(undefined),
+      close: jest.fn().mockResolvedValue(undefined),
+    } as any;
     msgopsService = { createShortLink: jest.fn().mockResolvedValue('https://short.link/abc') } as any;
     utils = new Utils();
 
-    service = new AppService(pubSubProvider, redisService, msgopsService, utils);
+    service = new AppService(eventPublisher, redisService, msgopsService, utils);
   });
 
   const makeAccount = (configs: Record<string, string> = {}) => {
@@ -269,7 +290,7 @@ describe('AppService', () => {
       };
       const result = await service.processCampaign(campaignMessage as any, '');
       expect(result).toEqual({ status: 201, message: 'ok' });
-      expect(pubSubProvider.sendMessage).toHaveBeenCalled();
+      expect(eventPublisher.publish).toHaveBeenCalled();
     });
 
     it('should process WhatsApp campaign', async () => {
@@ -359,8 +380,11 @@ describe('AppService', () => {
         totalPages: 1,
       };
       await service.processCampaign(campaignMessage as any, '');
-      const trackerCall = (pubSubProvider.sendMessage as jest.Mock).mock.calls[0];
-      expect(trackerCall[0].event).toBe('SENT_WHATSAPP_BATCH');
+      const trackerCall = (eventPublisher.publish as jest.Mock).mock.calls[0];
+      // publish(exchange, routingKey, payload)
+      expect(trackerCall[0]).toBe('bms.campaigns');
+      expect(trackerCall[1]).toBe('campaign.tracked');
+      expect(trackerCall[2].event).toBe('SENT_WHATSAPP_BATCH');
     });
   });
 
@@ -399,7 +423,7 @@ describe('AppService', () => {
       const result = await service.processAutomation(msg as any, '');
       expect(result.status).toBe(true);
       expect(mockRedisClient.set).toHaveBeenCalled();
-      expect(pubSubProvider.sendMessage).toHaveBeenCalled();
+      expect(eventPublisher.publish).toHaveBeenCalled();
     });
 
     it('should delete redis key if provided', async () => {
@@ -493,7 +517,7 @@ describe('AppService', () => {
         next: { pubName: 'next-topic', data: { foo: 'bar' } },
       } as any;
       await service.invalidContact(contact, automationMessage);
-      expect(pubSubProvider.sendMessage).toHaveBeenCalledWith({ foo: 'bar' }, 'next-topic');
+      expect(eventPublisher.publish).toHaveBeenCalledWith('bms.triggers', 'trigger.process', { foo: 'bar' });
     });
 
     it('should not send to pubsub if next has no pubName', async () => {
@@ -503,12 +527,12 @@ describe('AppService', () => {
         next: { pubName: '', data: {} },
       } as any;
       await service.invalidContact(contact, automationMessage);
-      expect(pubSubProvider.sendMessage).not.toHaveBeenCalled();
+      expect(eventPublisher.publish).not.toHaveBeenCalled();
     });
   });
 
   describe('sendTracker', () => {
-    it('should send tracker event to pubsub', async () => {
+    it('should publish tracker event to bms.campaigns/campaign.tracked', async () => {
       const campaignMessage = {
         campaign_id: 1,
         message: { id: 1, content: 'test' },
@@ -516,15 +540,15 @@ describe('AppService', () => {
         totalPages: 1,
         campaign_test_ab_mode: false,
       } as any;
-      process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER = 'tracker-topic';
       await service.sendTracker('SENT_SMS_BATCH', campaignMessage, 10);
-      expect(pubSubProvider.sendMessage).toHaveBeenCalledWith(
+      expect(eventPublisher.publish).toHaveBeenCalledWith(
+        'bms.campaigns',
+        'campaign.tracked',
         expect.objectContaining({
           event: 'SENT_SMS_BATCH',
           contacts_length: 10,
           service: 'MSGOPS_SEND_BATCH_TWILIO',
         }),
-        'tracker-topic',
       );
     });
 
@@ -537,9 +561,10 @@ describe('AppService', () => {
         campaign_test_ab_mode: false,
       } as any;
       await service.sendTracker('SENT_SMS_BATCH', campaignMessage, 5, { extra: 'info' });
-      expect(pubSubProvider.sendMessage).toHaveBeenCalledWith(
+      expect(eventPublisher.publish).toHaveBeenCalledWith(
+        'bms.campaigns',
+        'campaign.tracked',
         expect.objectContaining({ data: { extra: 'info' } }),
-        expect.any(String),
       );
     });
   });

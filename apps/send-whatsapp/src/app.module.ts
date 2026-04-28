@@ -3,13 +3,15 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { Utils } from './utils/index.utils';
-import { PubSubProvider } from './providers/pubsub.provider';
+import { MessagingModule } from './messaging.module';
+import { SendWhatsappConsumerService } from './send-whatsapp-consumer.service';
 import { MsgopsModule } from './msgops/msgops.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
+    MessagingModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.TYPEORM_HOST,
@@ -23,6 +25,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
     MsgopsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PubSubProvider, Utils],
+  providers: [AppService, SendWhatsappConsumerService, Utils],
 })
 export class AppModule {}

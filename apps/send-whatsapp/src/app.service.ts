@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { addTrailingSlash } from '@msgops/url-utils';
 import { Account, CampaignMessage, CampaignMessageType, AutomationMessage, Contact } from './interfaces';
+import { EXCHANGES } from '@bms/messaging';
+import { EventPublisherService } from './event-publisher.service';
 import { MsgopsService } from './msgops/msgops.service';
-import { PubSubProvider } from './providers/pubsub.provider';
 import { Utils } from './utils/index.utils';
 import { EvolutionProvider } from './providers/evolution.provider';
 
@@ -18,7 +19,7 @@ interface CreateRedirectLinkOptions {
 @Injectable()
 export class AppService {
   constructor(
-    private readonly pubSubProvider: PubSubProvider,
+    private readonly eventPublisher: EventPublisherService,
     private readonly msgopsService: MsgopsService,
     private readonly utils: Utils,
   ) {}
@@ -101,11 +102,11 @@ export class AppService {
       return { status: true, message: messageNextError };
     }
 
-    const messageId = await this.pubSubProvider.sendMessage(automationMessage.next.data, automationMessage.next.pubName);
+    await this.eventPublisher.publish(EXCHANGES.triggers, 'trigger.process', automationMessage.next.data);
 
     return {
       status: true,
-      message: `${messageId} send to ${automationMessage.next.pubName}.`,
+      message: `Message published to bms.triggers/trigger.process.`,
     };
   }
 
@@ -113,7 +114,7 @@ export class AppService {
     const messageNextError = `[${automationMessage.messageId}] Invalid contact: ${contact.id}.`;
     console.log(messageNextError);
     if (automationMessage.next && automationMessage.next?.pubName) {
-      await this.pubSubProvider.sendMessage(automationMessage.next.data, automationMessage.next.pubName);
+      await this.eventPublisher.publish(EXCHANGES.triggers, 'trigger.process', automationMessage.next.data);
     }
     return { status: true, message: messageNextError };
   }
@@ -149,7 +150,8 @@ export class AppService {
       testabMode: campaignMessage.campaign_test_ab_mode,
     };
 
-    return await this.pubSubProvider.sendMessage(tracker, process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER);
+    await this.eventPublisher.publish(EXCHANGES.campaigns, 'campaign.tracked', tracker);
+    return { status: true, message: 'tracker published to bms.campaigns/campaign.tracked' };
   }
 
   async createRedirectLink(opts: CreateRedirectLinkOptions) {

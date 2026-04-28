@@ -11,8 +11,9 @@ import {
   Message,
   SendPushMessage,
 } from './interfaces';
+import { EXCHANGES } from '@bms/messaging';
+import { EventPublisherService } from './event-publisher.service';
 import { FirebaseProvider } from './providers/firebase.provider';
-import { PubSubProvider } from './providers/pubsub.provider';
 import { RedisService } from './providers/redis/redis.service';
 import { Utils } from './utils/index.utils';
 import * as crypto from 'crypto';
@@ -29,7 +30,7 @@ export class AppService implements OnApplicationShutdown {
   constructor(
     private readonly redisService: RedisService,
     private readonly firebaseProvider: FirebaseProvider,
-    private readonly pubSubProvider: PubSubProvider,
+    private readonly eventPublisher: EventPublisherService,
     private readonly utils: Utils
   ) {
     this.redisClient = this.redisService.getClient();
@@ -62,7 +63,7 @@ export class AppService implements OnApplicationShutdown {
     if (!sendPushMessage.contact.contactDevices.length) {
       this.logInfo('User without active devices', JSON.stringify(sendPushMessage));
       if (sendPushMessage.next && sendPushMessage.next?.pubName) {
-        await this.pubSubProvider.sendMessage(sendPushMessage.next.data, sendPushMessage.next.pubName);
+        await this.eventPublisher.publish(EXCHANGES.triggers, 'trigger.process', sendPushMessage.next.data);
       }
 
       await this.redisClient.del(idempotentProcessingKey);
@@ -126,13 +127,13 @@ export class AppService implements OnApplicationShutdown {
       await this.processSent(firebaseMessages, message.type);
 
       if (sendPushMessage.next && sendPushMessage.next?.pubName) {
-        await this.pubSubProvider.sendMessage(sendPushMessage.next.data, sendPushMessage.next.pubName);
+        await this.eventPublisher.publish(EXCHANGES.triggers, 'trigger.process', sendPushMessage.next.data);
       }
 
       await this.redisClient.del(idempotentProcessingKey);
       await this.setRedis(idempotentKey, 'true', 180);
 
-      return { status: true, message: `message sent to ${sendPushMessage.next.pubName}.` };
+      return { status: true, message: `message sent to bms.triggers/trigger.process.` };
     } catch (error) {
       await this.redisClient.del(idempotentProcessingKey);
       throw new Error(
@@ -324,11 +325,19 @@ export class AppService implements OnApplicationShutdown {
 
     if (sentPayload.length) {
       this.logInfo(`sentPayload: ${sentPayload.length}`, JSON.stringify(sentPayload));
-      await this.pubSubProvider.sendMessage({ payload: sentPayload }, process.env.TOPIC_MSGOPS_EVENT_PROCESS, {
-        platform: messageType,
-        timestamp: timestamp.toString(),
-        events: 'sent',
-      });
+      // messageType ∈ {web-push, mobile-push} colapsa em routing-key 'push'
+      // (Onda 1 §2.1, queue event-process.event.received.push).
+      await this.eventPublisher.publish(
+        EXCHANGES.events,
+        'event.received.push',
+        { payload: sentPayload },
+        {
+          platform: 'push',
+          message_type: messageType,
+          timestamp: timestamp.toString(),
+          events: 'sent',
+        }
+      );
     }
   }
 
@@ -385,7 +394,8 @@ export class AppService implements OnApplicationShutdown {
       testabMode: campaignMessage.campaign_test_ab_mode,
     };
 
-    return await this.pubSubProvider.sendMessage(tracker, process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER);
+    await this.eventPublisher.publish(EXCHANGES.campaigns, 'campaign.tracked', tracker);
+    return { status: true, message: 'tracker published to bms.campaigns/campaign.tracked' };
   }
 
   logInfo(dsc: string, args?: string) {

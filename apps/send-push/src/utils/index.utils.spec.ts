@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { Utils } from './index.utils';
 
 describe('Utils', () => {
@@ -11,19 +10,6 @@ describe('Utils', () => {
   it('stripString should remove html tags', () => {
     expect(utils.stripString('<b>Hello</b> world')).toBe('Hello world');
     expect(utils.stripString('plain text')).toBe('plain text');
-  });
-
-  it('parsePubSubMessage should decode valid pubsub payload', () => {
-    const payload = { id: 1, name: 'test' };
-    const data = Buffer.from(JSON.stringify(payload)).toString('base64');
-
-    expect(utils.parsePubSubMessage({ message: { data } } as never)).toEqual(payload);
-  });
-
-  it('parsePubSubMessage should throw on invalid payload', () => {
-    const invalidData = Buffer.from('not-json').toString('base64');
-
-    expect(() => utils.parsePubSubMessage({ message: { data: invalidData } } as never)).toThrow(BadRequestException);
   });
 
   it('slugify should normalize accents and handle empty values', () => {
