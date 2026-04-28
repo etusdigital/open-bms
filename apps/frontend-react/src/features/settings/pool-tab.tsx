@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAppStore } from '@/stores/app-store';
 import { poolGateway, type Pool } from './pool-gateway';
-import { poolSendgridGateway, type SendgridPoolOption, type SendgridIp } from './pool-sendgrid-gateway';
+import { poolSendgridGateway, type SendgridPoolOption } from './pool-sendgrid-gateway';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
