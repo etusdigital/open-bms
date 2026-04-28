@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAppStore } from '@/stores/app-store';
 import { poolGateway, type Pool } from './pool-gateway';
 import { poolSendgridGateway, type SendgridPoolOption } from './pool-sendgrid-gateway';
+import { accountSendgridGateway, type SendgridKeySource } from './sendgrid-account-gateway';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -47,6 +48,7 @@ export function PoolTab() {
   // for this BMS account. `selectedPool` is the SendGrid pool name; `ips`
   // is the read-only set of IPs that pool advertises on SendGrid.
   const [sendgridPools, setSendgridPools] = useState<SendgridPoolOption[]>([]);
+  const [sendgridKeySource, setSendgridKeySource] = useState<SendgridKeySource>('none');
   const [selectedPool, setSelectedPool] = useState<string>('');
   const [ips, setIps] = useState<string[]>([]);
 
@@ -55,12 +57,15 @@ export function PoolTab() {
   const [loadingIps, setLoadingIps] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Load (a) the existing local pool row for this account, and (b) the list
-  // of SendGrid pools the account has access to. Both run in parallel —
-  // either failing is non-fatal: the user might be configuring this for the
-  // first time (no local pool), or might not yet have a SendGrid key set
-  // (pools list empty). We surface the SendGrid-key-missing case explicitly.
+  // Loads (a) the existing local pool row, (b) the list of SendGrid pools
+  // and (c) the SendGrid key status for this account. We need (c) to
+  // distinguish two "empty pools" cases: no key configured at all (then
+  // tell the user to configure SendGrid) vs key configured on a Free/
+  // Essentials plan that just has no dedicated IP pools (then let the
+  // user save a pool without selecting one — sends use SendGrid shared
+  // IPs by default).
   useEffect(() => {
+    if (!accountId) return;
     let cancelled = false;
     Promise.all([
       poolGateway.list().catch((err) => {
@@ -76,9 +81,11 @@ export function PoolTab() {
         if (!cancelled) setPoolsLoadError(true);
         return [] as SendgridPoolOption[];
       }),
-    ]).then(([pools, sgPools]) => {
+      accountSendgridGateway.get(accountId).catch(() => ({ source: 'none' as SendgridKeySource, apiKeyMasked: null, webhookUrl: null })),
+    ]).then(([pools, sgPools, sgStatus]) => {
       if (cancelled) return;
       setSendgridPools(sgPools);
+      setSendgridKeySource(sgStatus.source);
 
       const myPools = pools.filter((p) => p.accountId === accountId);
       const target = myPools.find((p) => p.isDefault) ?? myPools[0] ?? null;
@@ -136,7 +143,11 @@ export function PoolTab() {
 
   function validate(): string | null {
     if (!name.trim()) return t('settings.poolNameRequired');
-    if (!selectedPool) return t('settings.poolSendgridPoolRequired');
+    // SendGrid pool selection is required only when the account actually
+    // has SendGrid pools to choose from. Free/Essentials plans have none
+    // and the form lets users save without one — the worker omits
+    // ip_pool_name from the SendGrid payload and falls back to shared IPs.
+    if (sendgridPools.length > 0 && !selectedPool) return t('settings.poolSendgridPoolRequired');
     if (senderEmail && !EMAIL_RE.test(senderEmail)) return t('settings.poolSenderEmailInvalid');
     if (senderReplyTo && !EMAIL_RE.test(senderReplyTo)) return t('settings.poolReplyToInvalid');
     if (sendingLimit) {
@@ -195,11 +206,13 @@ export function PoolTab() {
     );
   }
 
-  // Empty state when the account has no SendGrid key yet (or its key has no
-  // pools): there's no point letting them save anything because the IP set
-  // can't be derived. Point them at the SendGrid tab to fix the
-  // prerequisite.
-  if (!poolsLoadError && sendgridPools.length === 0) {
+  // Hard block when the account has no SendGrid key configured at all
+  // (own key absent and no global fallback set): there's no point letting
+  // them save anything because emails wouldn't go out. Point them at the
+  // SendGrid tab to fix the prerequisite. We do NOT block when the key
+  // exists but the SendGrid plan has no IP pools — that's the Free tier
+  // case handled below in the form.
+  if (sendgridKeySource === 'none') {
     return (
       <div className="max-w-2xl rounded-md border border-amber-500/40 bg-amber-500/5 p-4">
         <div className="flex items-start gap-3">
@@ -212,6 +225,8 @@ export function PoolTab() {
       </div>
     );
   }
+
+  const hasSendgridPools = sendgridPools.length > 0;
 
   return (
     <form onSubmit={handleSubmit} noValidate className="max-w-2xl space-y-4">
@@ -230,18 +245,24 @@ export function PoolTab() {
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="settings-pool-sendgrid">{t('settings.poolSendgridPool')}</Label>
-          <Select value={selectedPool} onValueChange={setSelectedPool} disabled={saving}>
-            <SelectTrigger id="settings-pool-sendgrid">
-              <SelectValue placeholder={t('settings.poolSendgridPoolPlaceholder')} />
-            </SelectTrigger>
-            <SelectContent>
-              {sendgridPools.map((p) => (
-                <SelectItem key={p.name} value={p.name}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {hasSendgridPools ? (
+            <Select value={selectedPool} onValueChange={setSelectedPool} disabled={saving}>
+              <SelectTrigger id="settings-pool-sendgrid">
+                <SelectValue placeholder={t('settings.poolSendgridPoolPlaceholder')} />
+              </SelectTrigger>
+              <SelectContent>
+                {sendgridPools.map((p) => (
+                  <SelectItem key={p.name} value={p.name}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="bg-muted/30 rounded-md border px-3 py-2 text-xs">
+              <p className="text-muted-foreground">{t('settings.poolNoSendgridPoolsHelp')}</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -298,7 +319,9 @@ export function PoolTab() {
       <div className="flex flex-col gap-1.5">
         <Label>{t('settings.poolIps')}</Label>
         <div className="border-border bg-muted/30 rounded-md border px-3 py-2">
-          {loadingIps ? (
+          {!hasSendgridPools ? (
+            <p className="text-muted-foreground text-xs">{t('settings.poolIpsSharedSendgrid')}</p>
+          ) : loadingIps ? (
             <p className="text-muted-foreground text-xs">{t('settings.poolIpsLoading')}</p>
           ) : !selectedPool ? (
             <p className="text-muted-foreground text-xs">{t('settings.poolIpsSelectPoolFirst')}</p>

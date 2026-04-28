@@ -1,70 +1,51 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { ClsService } from 'nestjs-cls';
 import { AxiosResponse } from 'axios';
 import { SingleSend } from './single-send';
 import sendgrid from '@sendgrid/mail';
-import { SystemConfigEntity } from '../../../entities/system-config.entity';
 import { AccountConfigsProvider } from '../../../providers/account-configs.provider';
 import { SendgridSettingsWebhook } from '../../../interfaces/sendgrid.interface';
 
-const SENDGRID_SETTINGS_KEY = 'sendgrid_settings';
 const API_KEY_CACHE_TTL_MS = 60_000;
-const GLOBAL_CACHE_KEY = '__global__' as const;
-
-type ApiKeyCacheKey = number | typeof GLOBAL_CACHE_KEY;
 
 @Injectable()
 export class SendgridHandler {
   private uri: string;
-  private apiKeyCache = new Map<ApiKeyCacheKey, { value: string; loadedAt: number }>();
+  private apiKeyCache = new Map<number, { value: string; loadedAt: number }>();
 
   constructor(
     private readonly httpService: HttpService,
-    @InjectRepository(SystemConfigEntity) private readonly systemConfigRepo: Repository<SystemConfigEntity>,
     private readonly accountConfigsProvider: AccountConfigsProvider,
     private readonly cls: ClsService,
   ) {
     this.uri = `https://api.sendgrid.com/v3`;
   }
 
-  // Resolves the SendGrid API key to use for an outbound call. Resolution
-  // order: per-account `accounts_configs.sendgrid_key` → global
-  // `system_config.sendgrid_settings.apiKey` → `SENDGRID_API_KEY` env var.
-  // The per-account leg is the cleanest fit for multi-tenant deploys; the
-  // global leg is the fallback an admin sets so accounts that haven't
-  // configured their own key still send. Cached per-account so hot paths
-  // (sendCampaign, getIPs, etc.) don't hammer Postgres.
+  // Resolves the SendGrid API key to use for an outbound call: strictly
+  // per-account `accounts_configs.sendgrid_key`. There is no platform-wide
+  // fallback — multi-tenant deploys must have each tenant paste their own
+  // key in /settings (per-account tab). If the account has no key set,
+  // outbound SendGrid calls return undefined and the caller surfaces a
+  // clear error rather than silently using a shared key.
   //
   // accountId resolves from the explicit argument first, then ClsService
-  // (request-scoped accountId), then falls back to the global key.
+  // (request-scoped accountId).
   private async loadApiKey(accountId?: number): Promise<string | undefined> {
     const resolvedAccountId = accountId ?? (this.cls.get('accountId') as number | undefined);
+    if (!resolvedAccountId) return undefined;
 
-    if (resolvedAccountId) {
-      const cached = this.readCache(resolvedAccountId);
-      if (cached) return cached;
-      const row = await this.accountConfigsProvider.getByAccountId(resolvedAccountId, 'sendgrid_key');
-      if (row?.value) {
-        this.writeCache(resolvedAccountId, row.value);
-        return row.value;
-      }
+    const cached = this.readCache(resolvedAccountId);
+    if (cached) return cached;
+    const row = await this.accountConfigsProvider.getByAccountId(resolvedAccountId, 'sendgrid_key');
+    if (row?.value) {
+      this.writeCache(resolvedAccountId, row.value);
+      return row.value;
     }
-
-    const cachedGlobal = this.readCache(GLOBAL_CACHE_KEY);
-    if (cachedGlobal) return cachedGlobal;
-    const config = await this.systemConfigRepo.findOne({ where: { key: SENDGRID_SETTINGS_KEY } });
-    const value = (config?.value ?? {}) as Record<string, unknown>;
-    const globalKey = typeof value.apiKey === 'string' && value.apiKey.length > 0 ? value.apiKey : process.env.SENDGRID_API_KEY;
-    if (globalKey) {
-      this.writeCache(GLOBAL_CACHE_KEY, globalKey);
-    }
-    return globalKey;
+    return undefined;
   }
 
-  private readCache(key: ApiKeyCacheKey): string | undefined {
+  private readCache(key: number): string | undefined {
     const entry = this.apiKeyCache.get(key);
     if (!entry) return undefined;
     if (Date.now() - entry.loadedAt > API_KEY_CACHE_TTL_MS) {
@@ -74,20 +55,15 @@ export class SendgridHandler {
     return entry.value;
   }
 
-  private writeCache(key: ApiKeyCacheKey, value: string): void {
+  private writeCache(key: number, value: string): void {
     this.apiKeyCache.set(key, { value, loadedAt: Date.now() });
   }
 
   // Drops a single account's cached key (call after AccountSettingsService
-  // saves/deletes a per-account key) or the global slot (after super-admin
-  // saves the global fallback). Pass nothing to clear everything.
-  public invalidateApiKeyCache(accountId?: number | 'global'): void {
-    if (!accountId) {
+  // saves/deletes a per-account key). Pass nothing to clear everything.
+  public invalidateApiKeyCache(accountId?: number): void {
+    if (accountId === undefined) {
       this.apiKeyCache.clear();
-      return;
-    }
-    if (accountId === 'global') {
-      this.apiKeyCache.delete(GLOBAL_CACHE_KEY);
       return;
     }
     this.apiKeyCache.delete(accountId);

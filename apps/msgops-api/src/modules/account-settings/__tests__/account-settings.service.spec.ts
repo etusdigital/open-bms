@@ -6,12 +6,6 @@ import { AccountSettingsService } from '../account-settings.service';
 
 const axiosGet = require('axios').default.get as jest.Mock;
 
-function makeSystemRepo() {
-  return {
-    findOne: jest.fn(),
-  } as any;
-}
-
 function makeAccountConfigs() {
   return {
     getByAccountId: jest.fn(),
@@ -30,11 +24,10 @@ function makeHandler(opts: { createWebhookOk?: boolean } = { createWebhookOk: tr
 }
 
 function build(opts: { handler?: any } = {}) {
-  const systemRepo = makeSystemRepo();
   const accountConfigs = makeAccountConfigs();
   const handler = opts.handler ?? makeHandler();
-  const service = new AccountSettingsService(systemRepo, accountConfigs, handler);
-  return { service, systemRepo, accountConfigs, handler };
+  const service = new AccountSettingsService(accountConfigs, handler);
+  return { service, accountConfigs, handler };
 }
 
 const ORIGINAL_BASE = process.env.SENDGRID_WEBHOOK_URL_BASE;
@@ -61,46 +54,10 @@ describe('AccountSettingsService', () => {
       expect(out).toEqual({ source: 'account', apiKeyMasked: 'SG.****...1234', webhookUrl: 'https://hook?account=42' });
     });
 
-    it('returns source=global when account has no key but system_config has one', async () => {
-      const { service, systemRepo, accountConfigs } = build();
+    it('returns source=none when account has no key (no platform-wide fallback exists)', async () => {
+      const { service, accountConfigs } = build();
       accountConfigs.getByAccountId.mockResolvedValue(null);
-      systemRepo.findOne.mockResolvedValue({ key: 'sendgrid_settings', value: { apiKey: 'SG.global111' } });
-      expect(await service.getSendgrid(42)).toEqual({ source: 'global', apiKeyMasked: null, webhookUrl: null });
-    });
-
-    it('returns source=global when account has no key but env var is set', async () => {
-      const prev = process.env.SENDGRID_API_KEY;
-      process.env.SENDGRID_API_KEY = 'SG.fromenv';
-      const { service, systemRepo, accountConfigs } = build();
-      accountConfigs.getByAccountId.mockResolvedValue(null);
-      systemRepo.findOne.mockResolvedValue(null);
-      try {
-        expect(await service.getSendgrid(42)).toEqual({ source: 'global', apiKeyMasked: null, webhookUrl: null });
-      } finally {
-        if (prev === undefined) delete process.env.SENDGRID_API_KEY;
-        else process.env.SENDGRID_API_KEY = prev;
-      }
-    });
-
-    it('returns source=none when nothing is configured', async () => {
-      const prev = process.env.SENDGRID_API_KEY;
-      delete process.env.SENDGRID_API_KEY;
-      const { service, systemRepo, accountConfigs } = build();
-      accountConfigs.getByAccountId.mockResolvedValue(null);
-      systemRepo.findOne.mockResolvedValue(null);
-      try {
-        expect(await service.getSendgrid(42)).toEqual({ source: 'none', apiKeyMasked: null, webhookUrl: null });
-      } finally {
-        if (prev !== undefined) process.env.SENDGRID_API_KEY = prev;
-      }
-    });
-
-    it('never returns plaintext of the global key (clients see source only)', async () => {
-      const { service, systemRepo, accountConfigs } = build();
-      accountConfigs.getByAccountId.mockResolvedValue(null);
-      systemRepo.findOne.mockResolvedValue({ key: 'sendgrid_settings', value: { apiKey: 'SG.SECRET999' } });
-      const out = await service.getSendgrid(42);
-      expect(JSON.stringify(out)).not.toContain('SECRET');
+      expect(await service.getSendgrid(42)).toEqual({ source: 'none', apiKeyMasked: null, webhookUrl: null });
     });
   });
 

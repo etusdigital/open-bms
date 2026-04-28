@@ -233,6 +233,8 @@
     "senderReplyTo": "Reply-To",
     "poolConfig": "Pool configuration",
     "selectPool": "Select a pool",
+    "noSendgridPoolsTitle": "No dedicated IP pools on SendGrid",
+    "noSendgridPoolsHelp": "Your SendGrid account has no dedicated IP pools (Free/Essentials plans). You can save this pool anyway — sends will use SendGrid's default shared IPs.",
     "dailyLimit": "Daily Limit",
     "sendingLimit": "Sending Limit",
     "limitHelp": "0 = no limit",
@@ -1664,6 +1666,8 @@
     "poolIpsReadonlyHelp": "IPs are pulled directly from SendGrid and cannot be edited here.",
     "poolNeedsSendgridTitle": "Configure SendGrid first",
     "poolNeedsSendgridDescription": "Could not list SendGrid pools. Configure a valid API key on the SendGrid tab so that pools become available here.",
+    "poolNoSendgridPoolsHelp": "Your SendGrid account has no dedicated IP pools (Free/Essentials plans). Sends will use SendGrid's default shared IPs.",
+    "poolIpsSharedSendgrid": "Shared IPs managed by SendGrid (no dedicated pools on this account).",
     "poolNameRequired": "Enter the pool name.",
     "poolSenderEmailInvalid": "Invalid sender email.",
     "poolReplyToInvalid": "Invalid reply-to.",
@@ -1696,14 +1700,10 @@
     "sendgridDeleteError": "Failed to remove SendGrid key.",
     "sendgridSourceLabel": "Active source",
     "sendgridSourceAccount": "This account is using its own SendGrid key.",
-    "sendgridSourceGlobal": "This account is using the platform-wide fallback key. Paste your own key below to override.",
     "sendgridSourceNone": "No SendGrid key configured — outbound email will not work until a key is provided.",
     "sendgridStoredLabel": "Stored key",
     "sendgridReplaceApiKey": "Replace API Key",
-    "sendgridUseGlobalInstead": "Use global key",
-    "sendgridSaveAndRegister": "Save and register webhook",
-    "sendgridGlobalScopeHelp": "This key is used as a fallback by accounts that have not configured their own. Customers do not see this key.",
-    "sendgridNoStoredKey": "No global key configured."
+    "sendgridSaveAndRegister": "Save and register webhook"
   },
   "twofaMessages": {
     "pageTitle": "2FA",

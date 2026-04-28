@@ -233,6 +233,8 @@
     "senderReplyTo": "Reply-To",
     "poolConfig": "Configuração do pool",
     "selectPool": "Selecione um pool",
+    "noSendgridPoolsTitle": "Sem pools de IP dedicados na SendGrid",
+    "noSendgridPoolsHelp": "Sua conta SendGrid não tem pools de IP dedicados (planos Free/Essentials). Você pode salvar este pool mesmo assim — os envios usarão os IPs compartilhados padrão da SendGrid.",
     "dailyLimit": "Daily Limit",
     "sendingLimit": "Sending Limit",
     "limitHelp": "0 = sem limite",
@@ -1664,6 +1666,8 @@
     "poolIpsReadonlyHelp": "Os IPs são obtidos diretamente da SendGrid e não podem ser editados aqui.",
     "poolNeedsSendgridTitle": "Configure a SendGrid primeiro",
     "poolNeedsSendgridDescription": "Não foi possível listar pools da SendGrid. Configure uma chave de API válida na aba SendGrid para que os pools fiquem disponíveis aqui.",
+    "poolNoSendgridPoolsHelp": "Sua conta SendGrid não tem pools de IP dedicados (planos Free/Essentials). Os envios usarão os IPs compartilhados padrão da SendGrid.",
+    "poolIpsSharedSendgrid": "IPs compartilhados gerenciados pela SendGrid (sem pools dedicados nesta conta).",
     "poolNameRequired": "Informe o nome do pool.",
     "poolSenderEmailInvalid": "E-mail remetente inválido.",
     "poolReplyToInvalid": "Reply-to inválido.",
@@ -1696,14 +1700,10 @@
     "sendgridDeleteError": "Erro ao remover chave SendGrid.",
     "sendgridSourceLabel": "Fonte ativa",
     "sendgridSourceAccount": "Esta conta usa uma chave SendGrid própria.",
-    "sendgridSourceGlobal": "Esta conta está usando a chave global da plataforma. Cole sua chave abaixo para usar uma chave própria.",
     "sendgridSourceNone": "Nenhuma chave SendGrid configurada — envios de email não funcionarão até que uma chave seja informada.",
     "sendgridStoredLabel": "Chave armazenada",
     "sendgridReplaceApiKey": "Substituir API Key",
-    "sendgridUseGlobalInstead": "Usar chave global",
-    "sendgridSaveAndRegister": "Salvar e registrar webhook",
-    "sendgridGlobalScopeHelp": "Esta chave é usada como fallback por contas que não configuraram uma chave própria. Os clientes não veem esta chave.",
-    "sendgridNoStoredKey": "Nenhuma chave global configurada."
+    "sendgridSaveAndRegister": "Salvar e registrar webhook"
   },
   "twofaMessages": {
     "pageTitle": "2FA",

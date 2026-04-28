@@ -36,12 +36,16 @@ describe('poolFormSchema', () => {
     expect(result.error?.issues[0].message).toContain('validation.maxLength');
   });
 
-  it('requires poolName', () => {
+  // SendGrid Free/Essentials plans have no dedicated IP pools, so we
+  // intentionally allow saving without a pool selection — the worker
+  // omits ip_pool_name from the SendGrid mail payload and falls back
+  // to shared IPs.
+  it('allows empty poolName (SendGrid plans without dedicated IP pools)', () => {
     const result = poolFormSchema.safeParse({
       name: 'Test Pool',
       poolName: '',
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it('validates senderEmail format', () => {

@@ -1,6 +1,8 @@
 import { apiClient } from '@/lib/api-client';
 
-export type SendgridKeySource = 'account' | 'global' | 'none';
+// Per-account scheme only — no platform-wide fallback. Either the account
+// has its own SendGrid key (`account`) or it doesn't (`none`).
+export type SendgridKeySource = 'account' | 'none';
 
 export interface AccountSendgridSettings {
   source: SendgridKeySource;

@@ -13,14 +13,12 @@ import { accountSendgridGateway, type AccountSendgridSettings } from './sendgrid
 const SENDGRID_API_KEY_PREFIX = 'SG.';
 const SENDGRID_API_KEY_MIN_LENGTH = 10;
 
-// Per-account SendGrid configuration. The user pastes their own SendGrid
-// API key, and the backend registers an event webhook against that key
-// pointed at this BMS instance with `&account=<id>` so the event-process
-// worker can route incoming events to the right tenant.
-//
-// When the account has no key, mail goes through the platform-wide
-// fallback set by super_admin in /settings (sendgridGlobal tab). The
-// banner makes the active source explicit.
+// Per-account SendGrid configuration. Each tenant pastes their own
+// SendGrid API key here; the backend registers an event webhook against
+// that key pointed at this BMS instance with `&account=<id>` so the
+// event-process worker can route incoming events to the right tenant.
+// There is no platform-wide fallback — without a per-account key the
+// account simply cannot send.
 export function SendgridAccountTab() {
   const { t } = useTranslation();
   const accountId = useAccountId();
@@ -140,11 +138,7 @@ export function SendgridAccountTab() {
   const busy = testing || saving || removing;
   const canTest = isApiKeyValid(apiKey) && !busy;
   const sourceLabel =
-    stored?.source === 'account'
-      ? t('settings.sendgridSourceAccount')
-      : stored?.source === 'global'
-        ? t('settings.sendgridSourceGlobal')
-        : t('settings.sendgridSourceNone');
+    stored?.source === 'account' ? t('settings.sendgridSourceAccount') : t('settings.sendgridSourceNone');
 
   return (
     <form onSubmit={handleSubmit} noValidate className="max-w-lg space-y-4">
@@ -161,7 +155,7 @@ export function SendgridAccountTab() {
           </div>
           <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={handleDelete}>
             <Trash2 className="mr-1 h-4 w-4" />
-            {t('settings.sendgridUseGlobalInstead')}
+            {t('common.remove')}
           </Button>
         </div>
       )}

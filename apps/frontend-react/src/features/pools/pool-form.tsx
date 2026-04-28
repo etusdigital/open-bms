@@ -159,30 +159,41 @@ export function PoolForm({ defaultValues, onSubmit, isPending, sendGridPools, se
           <div className="space-y-4">
             <h3 className="text-muted-foreground text-sm font-medium">{t('pools.poolConfig')}</h3>
 
-            <FormField
-              control={form.control}
-              name="poolName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t('pools.poolName')}</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange} disabled={sendGridPoolsLoading}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={t('pools.selectPool')} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {sendGridPools?.map((pool) => (
-                        <SelectItem key={pool.name} value={pool.name}>
-                          {pool.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {!sendGridPoolsLoading && (sendGridPools?.length ?? 0) === 0 ? (
+              // Free/Essentials SendGrid plans don't expose dedicated IP pools.
+              // We hide the dropdown entirely and tell the user that sends
+              // will use SendGrid's shared IPs by default — same effect as
+              // omitting `ip_pool_name` in the mail/send payload.
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+                <p className="text-xs font-medium">{t('pools.noSendgridPoolsTitle')}</p>
+                <p className="text-muted-foreground mt-1 text-xs">{t('pools.noSendgridPoolsHelp')}</p>
+              </div>
+            ) : (
+              <FormField
+                control={form.control}
+                name="poolName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('pools.poolName')}</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange} disabled={sendGridPoolsLoading}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t('pools.selectPool')} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {sendGridPools?.map((pool) => (
+                          <SelectItem key={pool.name} value={pool.name}>
+                            {pool.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField

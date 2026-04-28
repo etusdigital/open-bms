@@ -1,20 +1,19 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { SystemConfigEntity } from '../../entities/system-config.entity';
 import { AccountConfigsProvider } from '../../providers/account-configs.provider';
 import { SendgridHandler } from '../../handlers/email/sendgrid/sendgrid.handler';
 import { validateSendgridApiKey } from '../../lib/sendgrid-validator';
 import { SaveAccountSendgridDto } from './dtos/sendgrid.dto';
-import { maskApiKey } from '../settings/settings.service';
+import { maskApiKey } from '../../lib/sendgrid-mask';
 
 const SENDGRID_KEY_NAME = 'sendgrid_key';
 const SENDGRID_WEBHOOK_NAME = 'sendgrid_webhook_url';
-const SYSTEM_SENDGRID_KEY = 'sendgrid_settings';
 const TEST_RATE_WINDOW_MS = 60_000;
 const TEST_RATE_MAX_PER_WINDOW = 5;
 
-export type SendgridKeySource = 'account' | 'global' | 'none';
+// Per-account scheme only: there is no platform-wide fallback. Either the
+// account has its own SendGrid key configured, or it doesn't (and outbound
+// email is blocked until one is set).
+export type SendgridKeySource = 'account' | 'none';
 
 export interface AccountSendgridView {
   source: SendgridKeySource;
@@ -28,15 +27,14 @@ export class AccountSettingsService {
   private readonly testHits = new Map<string, number[]>();
 
   constructor(
-    @InjectRepository(SystemConfigEntity) private readonly systemConfigRepo: Repository<SystemConfigEntity>,
     private readonly accountConfigs: AccountConfigsProvider,
     private readonly sendgridHandler: SendgridHandler,
   ) {}
 
-  // Returns the per-account SendGrid view: which source is in use (own key
-  // vs the global fallback the super-admin set vs nothing), the masked
-  // value (only for the account's own key — clients never see the global
-  // key plaintext or its mask), and the registered webhook URL if any.
+  // Returns the per-account SendGrid view: whether this account has its
+  // own SendGrid key configured (`account` vs `none`), the masked value of
+  // that key, and the webhook URL we registered on save. Plaintext never
+  // crosses the wire.
   async getSendgrid(accountId: number): Promise<AccountSendgridView> {
     const accountKey = await this.accountConfigs.getByAccountId(accountId, SENDGRID_KEY_NAME);
     if (accountKey?.value) {
@@ -47,10 +45,8 @@ export class AccountSettingsService {
         webhookUrl: webhookRow?.value ?? null,
       };
     }
-
-    const hasGlobal = await this.hasGlobalKey();
     return {
-      source: hasGlobal ? 'global' : 'none',
+      source: 'none',
       apiKeyMasked: null,
       webhookUrl: null,
     };
@@ -96,13 +92,6 @@ export class AccountSettingsService {
   async testSendgrid(apiKey: string, requesterIp?: string): Promise<{ accountName: string | null }> {
     this.enforceTestRateLimit(requesterIp);
     return validateSendgridApiKey(apiKey);
-  }
-
-  private async hasGlobalKey(): Promise<boolean> {
-    const row = await this.systemConfigRepo.findOne({ where: { key: SYSTEM_SENDGRID_KEY } });
-    const value = (row?.value ?? {}) as Record<string, unknown>;
-    if (typeof value.apiKey === 'string' && value.apiKey.length > 0) return true;
-    return Boolean(process.env.SENDGRID_API_KEY);
   }
 
   private enforceTestRateLimit(requesterIp?: string): void {
