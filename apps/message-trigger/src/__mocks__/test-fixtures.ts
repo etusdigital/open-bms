@@ -124,7 +124,7 @@ export const createMockLeadStateMessage = (overrides: Partial<LeadStateMessage> 
  * Factory function to create a mock Next
  */
 export const createMockNext = (overrides: Partial<Next> = {}): Next => ({
-  pubName: 'msgops.message.trigger',
+  pubName: process.env.TOPIC_NAME_MESSAGE_TRIGGER || 'message-trigger',
   data: createMockLeadStateMessage(),
   ...overrides,
 });

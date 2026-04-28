@@ -1,5 +1,5 @@
 import { LeadMessage, Status, TriggerType } from '../interfaces';
-import { PubSubProvider } from '../providers/pubsub.provider';
+import { QueuePublisher } from '../providers/queue/queue.publisher';
 import { AutomationHandler } from './automation.handler';
 import { MsgopsService } from '../msgops/msgops.service';
 import { TrackerService } from '../tracker/tracker.service';
@@ -17,7 +17,7 @@ describe('Handler: Automation', () => {
   let automationHandler: AutomationHandler;
   let msgopsService: jest.Mocked<MsgopsService>;
   let trackerService: jest.Mocked<TrackerService>;
-  let pubSubProvider: jest.Mocked<PubSubProvider>;
+  let queuePublisher: jest.Mocked<QueuePublisher>;
 
   beforeEach(() => {
     msgopsService = {
@@ -41,15 +41,15 @@ describe('Handler: Automation', () => {
       findLeadById: jest.fn(),
       queryEventsLogs: jest.fn(),
     } as any;
-    pubSubProvider = {
-      sendMessage: jest.fn().mockResolvedValue(undefined),
-      sendMessageClickHouse: jest.fn().mockResolvedValue(undefined),
+    queuePublisher = {
+      sendToMessageTrigger: jest.fn().mockResolvedValue(undefined),
+      publishAnalyticsEvent: jest.fn().mockResolvedValue(undefined),
     } as any;
     trackerService = {
       logInfo: jest.fn(),
       send: jest.fn(),
     } as any;
-    automationHandler = new AutomationHandler(msgopsService, pubSubProvider, trackerService);
+    automationHandler = new AutomationHandler(msgopsService, queuePublisher, trackerService);
   });
 
   afterEach(() => {
@@ -161,7 +161,7 @@ describe('Handler: Automation', () => {
       await automationHandler.addTagAndStartAutomation(leadMessage);
 
       expect(msgopsService.createContactTag).toHaveBeenCalledWith(contact.id, tag.id, tag.accountId);
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalledWith(expect.objectContaining({ event: 'tag-in' }));
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalledWith(expect.objectContaining({ event: 'tag-in' }));
     });
 
     it('should return 200 when startAutomation is false', async () => {
@@ -251,7 +251,7 @@ describe('Handler: Automation', () => {
       expect(msgopsService.createContactAutomations).toHaveBeenCalledWith(
         expect.objectContaining({ status: Status.running }),
       );
-      expect(pubSubProvider.sendMessage).toHaveBeenCalled();
+      expect(queuePublisher.sendToMessageTrigger).toHaveBeenCalled();
     });
 
     it('should handle UNIQUE frequency - duplicate existing automation', async () => {
@@ -264,7 +264,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalledWith(
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalledWith(
         expect.objectContaining({ event: `automation-${Status.duplicate}` }),
       );
     });
@@ -285,7 +285,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalledWith(
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalledWith(
         expect.objectContaining({ event: `automation-${Status.canceled}` }),
       );
     });
@@ -339,7 +339,7 @@ describe('Handler: Automation', () => {
       await automationHandler.cancelRunningAutomation(leadMessage, true);
 
       expect(msgopsService.deleteContactTag).toHaveBeenCalled();
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalledWith(expect.objectContaining({ event: 'tag-out' }));
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalledWith(expect.objectContaining({ event: 'tag-out' }));
     });
 
     it('should not delete tag when removeTag is false', async () => {
@@ -378,7 +378,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.cancelRunningAutomation(leadMessage, false);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalledWith(
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalledWith(
         expect.objectContaining({ event: `automation-${Status.canceled}` }),
       );
       expect(msgopsService.updateContactAutomations).toHaveBeenCalled();
@@ -711,7 +711,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalledWith(
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalledWith(
         expect.objectContaining({ event: 'automation-trigger-qualified' }),
       );
     });
@@ -748,7 +748,7 @@ describe('Handler: Automation', () => {
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
       // The conditional should pass (tag 1 is in the contact's tags)
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalled();
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalled();
     });
 
     it('should evaluate custom_field conditional with =', async () => {
@@ -789,7 +789,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalled();
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalled();
     });
 
     it('should evaluate user_field conditional for created_at_date with -', async () => {
@@ -829,7 +829,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalled();
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalled();
     });
 
     it('should evaluate user_field conditional for email_provider', async () => {
@@ -869,7 +869,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalled();
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalled();
     });
 
     it('should evaluate user_field conditional for communication_channels', async () => {
@@ -909,7 +909,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalled();
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalled();
     });
 
     it('should evaluate custom_event conditional (in)', async () => {
@@ -994,7 +994,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalledWith(
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalledWith(
         expect.objectContaining({ event: 'automation-trigger-qualified' }),
       );
     });
@@ -1039,7 +1039,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalled();
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalled();
     });
 
     it('should handle lead conditional', async () => {
@@ -1115,7 +1115,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalled();
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalled();
     });
 
     it('should handle custom_event with range time_type', async () => {
@@ -1199,7 +1199,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalled();
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalled();
     });
 
     it('should handle custom_event with current_week time', async () => {
@@ -1281,7 +1281,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalled();
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalled();
     });
 
     it('should handle user_field conditional for created_at_date with = operator', async () => {
@@ -1321,7 +1321,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalled();
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalled();
     });
 
     it('should handle custom_field with compare_fields filter', async () => {
@@ -1363,7 +1363,7 @@ describe('Handler: Automation', () => {
 
       await automationHandler.startAutomation([automation], leadMessage, contact, dayjs);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalled();
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalled();
     });
 
     it('should return false when contact not found in conditional', async () => {

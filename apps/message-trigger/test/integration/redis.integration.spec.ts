@@ -3,9 +3,8 @@ import { RedisModule } from '../../src/providers/redis/redis.module';
 import { RedisService } from '../../src/providers/redis/redis.service';
 import { AppService } from '../../src/app.service';
 import { ActiveStepsHandler } from '../../src/handlers/activesteps.handler';
-import { GoogleTasksService } from '../../src/google-tasks.service';
+import { QueuePublisher } from '../../src/providers/queue/queue.publisher';
 import { ConditionStep } from '../../src/steps/condition.step';
-import { PubSubProvider } from '../../src/providers/pubsub.provider';
 import { TrackerService } from '../../src/tracker/tracker.service';
 import { MsgopsService } from '../../src/msgops/msgops.service';
 import { EmailValidationProvider } from '../../src/providers/emailValidation.provider';
@@ -24,17 +23,14 @@ describe('Redis Integration Tests', () => {
     createNextLeadStateMessage: jest.fn(),
   };
 
-  const mockGoogleTasksService = {
-    post: jest.fn(),
+  const mockQueuePublisher = {
+    sendAsyncMessage: jest.fn(),
+    sendInternalEvent: jest.fn(),
+    scheduleDelayedStep: jest.fn().mockResolvedValue({ id: 'job-123' }),
   };
 
   const mockConditionStep = {
     processConditionalTime: jest.fn(),
-  };
-
-  const mockPubSubProvider = {
-    sendAsyncMessage: jest.fn(),
-    sendMessageInternalEvent: jest.fn(),
   };
 
   const mockTrackerService = {
@@ -76,9 +72,8 @@ describe('Redis Integration Tests', () => {
       providers: [
         AppService,
         { provide: ActiveStepsHandler, useValue: mockActiveStepsHandler },
-        { provide: GoogleTasksService, useValue: mockGoogleTasksService },
+        { provide: QueuePublisher, useValue: mockQueuePublisher },
         { provide: ConditionStep, useValue: mockConditionStep },
-        { provide: PubSubProvider, useValue: mockPubSubProvider },
         { provide: TrackerService, useValue: mockTrackerService },
         { provide: MsgopsService, useValue: mockMsgopsService },
         { provide: EmailValidationProvider, useValue: mockEmailValidationProvider },

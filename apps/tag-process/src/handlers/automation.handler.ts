@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { PubSubProvider } from '../providers/pubsub.provider';
+import { QueuePublisher } from '../providers/queue/queue.publisher';
 import { EventsTrigger, LeadMessage, TriggerType } from '../interfaces';
 import { TrackerService } from '../tracker/tracker.service';
 import { MsgopsEvent } from '../tracker/tracker.interface';
@@ -20,7 +20,7 @@ dayjs.extend(timezone);
 export class AutomationHandler {
   constructor(
     private readonly msgOpsService: MsgopsService,
-    private readonly pubSubProvider: PubSubProvider,
+    private readonly queuePublisher: QueuePublisher,
     private readonly trackerService: TrackerService,
   ) {}
 
@@ -46,7 +46,7 @@ export class AutomationHandler {
         await this.msgOpsService.createContactTag(contact.id, tag.id, tag.accountId);
 
         const attributesClickHouse = this.getAttributesClickHouse(leadMessage);
-        await this.pubSubProvider.sendMessageClickHouse({
+        await this.queuePublisher.publishAnalyticsEvent({
           timestamp: Date.now(),
           event: 'tag-in',
           accountId: tag.accountId,
@@ -180,7 +180,7 @@ export class AutomationHandler {
               leadMessage.isLeadFromAnotherAutomation,
             );
 
-            await this.pubSubProvider.sendMessageClickHouse({
+            await this.queuePublisher.publishAnalyticsEvent({
               timestamp: Date.now(),
               event: `automation-${Status.duplicate}`,
               automationId: automation.id,
@@ -223,7 +223,7 @@ export class AutomationHandler {
                 leadMessage.isLeadFromAnotherAutomation,
               );
 
-              await this.pubSubProvider.sendMessageClickHouse({
+              await this.queuePublisher.publishAnalyticsEvent({
                 timestamp: Date.now(),
                 event: `automation-${Status.duplicate}`,
                 automationId: automation.id,
@@ -242,7 +242,7 @@ export class AutomationHandler {
           }
 
           if (automationRunning.status === 'running') {
-            await this.pubSubProvider.sendMessageClickHouse({
+            await this.queuePublisher.publishAnalyticsEvent({
               timestamp: Date.now(),
               event: `automation-${Status.canceled}`,
               automationId: automation.id,
@@ -279,7 +279,7 @@ export class AutomationHandler {
           leadMessageCopy.startedAt = Date.parse(`${newAutomationRunning.generatedMaps[0].createdAt}`);
         }
 
-        await this.pubSubProvider.sendMessageClickHouse({
+        await this.queuePublisher.publishAnalyticsEvent({
           timestamp: Date.now(),
           event: `automation-${Status.started}`,
           automationId: automation.id,
@@ -307,7 +307,7 @@ export class AutomationHandler {
             lastAutomationDate: dayjs().tz(accountTimeZone).toDate(),
             ...(automation.verticalType ? { lastVerticalType: automation.verticalType } : {}),
           });
-          await this.pubSubProvider.sendMessage(leadMessageCopy);
+          await this.queuePublisher.sendToMessageTrigger(leadMessageCopy);
         } catch (error) {
           console.error(error);
           throw `[automation] Error parseLeadStateMessage: ${error.message}`;
@@ -336,7 +336,7 @@ export class AutomationHandler {
 
     if (removeTag) {
       await this.msgOpsService.deleteContactTag(contact.id, tag.id, tag.accountId);
-      await this.pubSubProvider.sendMessageClickHouse({
+      await this.queuePublisher.publishAnalyticsEvent({
         timestamp: Date.now(),
         event: 'tag-out',
         accountId: tag.accountId,
@@ -359,7 +359,7 @@ export class AutomationHandler {
     ]);
 
     if (automationRunning) {
-      await this.pubSubProvider.sendMessageClickHouse({
+      await this.queuePublisher.publishAnalyticsEvent({
         timestamp: Date.now(),
         event: `automation-${Status.canceled}`,
         automationId: automation.id,
@@ -560,7 +560,7 @@ export class AutomationHandler {
         return false;
       }
 
-      await this.pubSubProvider.sendMessageClickHouse({
+      await this.queuePublisher.publishAnalyticsEvent({
         timestamp: Date.now(),
         event: resultLogic ? `automation-trigger-qualified` : 'automation-trigger-filtered-out',
         automationId: automation.id,

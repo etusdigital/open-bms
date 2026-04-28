@@ -11,10 +11,8 @@ import {
 } from './interfaces';
 import { AutomationHandler } from './handlers/automation.handler';
 import { MsgopsService } from './msgops/msgops.service';
-import { PubSubProvider } from './providers/pubsub.provider';
-import { GoogleTasksProvider } from './providers/google-tasks.provider';
+import { QueuePublisher } from './providers/queue/queue.publisher';
 import { createHash } from 'crypto';
-import { env } from 'process';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -29,8 +27,7 @@ export class AppService {
   constructor(
     private readonly automationHandler: AutomationHandler,
     private readonly msgopsService: MsgopsService,
-    private readonly pubSubProvider: PubSubProvider,
-    private readonly googleTasksProvider: GoogleTasksProvider,
+    private readonly queuePublisher: QueuePublisher,
     private readonly redisService: RedisService,
     private readonly trackerService: TrackerService,
   ) {}
@@ -123,7 +120,7 @@ export class AppService {
         if (tagBatch.contacts.length && tagBatch.createContacts) {
           tagBatch.accountId = account.id;
           tagBatch.tagId = tag.id;
-          await this.pubSubProvider.sendMessage(tagBatch, process.env.TOPIC_NAME_CREATE_CONTACTS_BATCH);
+          await this.queuePublisher.publishContactsBatch(tagBatch);
         }
       }
 
@@ -168,7 +165,7 @@ export class AppService {
   }
 
   async processCompleted(leadMessage: LeadMessage) {
-    await this.pubSubProvider.sendMessageClickHouse({
+    await this.queuePublisher.publishAnalyticsEvent({
       timestamp: Date.now(),
       event: `automation-${Status.completed}`,
       automationId: leadMessage.automation.id,
@@ -245,18 +242,12 @@ export class AppService {
         .add(1, 'day')
         .set('hour', hour)
         .set('minute', minute)
-        .set('second', second)
-        .format('YYYY-MM-DD HH:mm:ss');
+        .set('second', second);
 
       if (!isCampaign) {
-        const response = await this.googleTasksProvider.create(
-          segment.id,
-          scheduleDate,
-          env.TAG_PROCESS_ENDPOINT,
-          env.GOOGLE_TASK_SEGMENT,
-        );
-
-        segment.scheduleCloudTaskId = response[0].name;
+        const diffMs = scheduleDate.diff(dayjs(), 'millisecond');
+        const job = await this.queuePublisher.scheduleSegmentRecalculation(segment.id, diffMs);
+        segment.scheduleCloudTaskId = String(job.id);
       }
 
       segment.lastCount = counts.total;
@@ -289,7 +280,7 @@ export class AppService {
           accountId: segment.accountId,
           contacts: dataInsertAndDelete.insertIds,
         };
-        await this.pubSubProvider.sendMessageSegment(dataInsert);
+        await this.queuePublisher.publishSegmentData(dataInsert);
       }
 
       if (account.isInternal && dataInsertAndDelete.deleteIds && dataInsertAndDelete.deleteIds.length) {
@@ -300,7 +291,7 @@ export class AppService {
           accountId: segment.accountId,
           contacts: dataInsertAndDelete.deleteIds,
         };
-        await this.pubSubProvider.sendMessageSegment(dataDelete);
+        await this.queuePublisher.publishSegmentData(dataDelete);
       }
 
       return await this.msgopsService.updateTag(segment.id, {
@@ -324,7 +315,7 @@ export class AppService {
       });
 
       if (currentTaskId !== segment.scheduleCloudTaskId) {
-        await this.googleTasksProvider.delete(segment.scheduleCloudTaskId, env.GOOGLE_TASK_SEGMENT);
+        await this.queuePublisher.cancelSegmentJob(segment.scheduleCloudTaskId);
         this.trackerService.logInfo(`[Segment] Duplicated task deleted: ${segment.scheduleCloudTaskId}`);
         segment.scheduleCloudTaskId = currentTaskId;
       }
@@ -483,7 +474,7 @@ export class AppService {
             }
           }
           return new Promise((resolve) => setTimeout(resolve, delay)).then(async () => {
-            await this.pubSubProvider.sendMessageClickHouse({
+            await this.queuePublisher.publishAnalyticsEvent({
               timestamp: Date.now(),
               event: segemenData.type,
               accountId: account.id,
@@ -540,7 +531,7 @@ export class AppService {
       const redisClient = await this.redisService.getOrThrow();
       await Promise.all(redisKeys.map((key) => redisClient.set(key, 'true', 'EX', 60 * 60 * 24))); // 24 hours
       const contact = await this.msgopsService.findContactsUUID([data.contactId], data.accountId);
-      await this.pubSubProvider.sendMessageClickHouse({
+      await this.queuePublisher.publishAnalyticsEvent({
         timestamp: Date.now(),
         event: `automation-${Status.completed}`,
         automationId: data.automationId,

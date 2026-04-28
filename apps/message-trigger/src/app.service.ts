@@ -3,13 +3,11 @@ import { RedisService } from './providers/redis/redis.service';
 import { ResultDto } from './dtos/result.dto';
 
 import { ActiveStepsHandler } from './handlers/activesteps.handler';
-import { GoogleTasksService } from './google-tasks.service';
 import { ConditionStep } from './steps/condition.step';
-import { PubSubProvider } from './providers/pubsub.provider';
+import { QueuePublisher } from './providers/queue/queue.publisher';
 import { TrackerService } from './tracker/tracker.service';
 import { MsgopsEvent } from './tracker/tracker.interface';
 import { EmailPriority, EmailVerify, LeadStateMessage, Next, SendEmailMessage, Step, StepType, StatusTestAb, CompressedPayload, CustomFieldKeyType } from './interfaces';
-import { google } from '@google-cloud/tasks/build/protos/protos';
 
 import * as dayjs from 'dayjs';
 import * as utc from 'dayjs/plugin/utc';
@@ -27,9 +25,8 @@ export class AppService {
   private redisClient: Redis;
   constructor(
     private readonly activeStepsHandler: ActiveStepsHandler,
-    private readonly googleTasksService: GoogleTasksService,
     private readonly conditionStep: ConditionStep,
-    private readonly pubSubProvider: PubSubProvider,
+    private readonly queuePublisher: QueuePublisher,
     private readonly redisService: RedisService,
     private readonly trackerService: TrackerService,
     private readonly msgopsService: MsgopsService,
@@ -163,7 +160,7 @@ export class AppService {
         const taskMessage = { ...nextStepMessage.data };
         const minutes = step.settings.timerType == 'hours' ? Number(step.settings.timer) * 60 : Number(step.settings.timer);
         await this.processStepToInternalEvent(leadStateMessage, { ...step.settings, minutes, stepId: step.id, stepType: step.type });
-        return await this.executePostGoogleTasks({ leadStateMessage: leadStateMessage, step: step, taskMessage: taskMessage }, minutes, messageId);
+        return await this.scheduleDelayedStep(leadStateMessage, step, taskMessage, minutes, messageId);
 
       case StepType.ADD_TAG:
       case StepType.REMOVE_TAG:
@@ -179,20 +176,20 @@ export class AppService {
           await this.processStepToInternalEvent(leadStateMessage, { tags: JSON.stringify([step.settings]), stepId: step.id, stepType: step.type });
           await this.processTag(type, step.settings.name, leadStateMessage);
         }
-        return await this.pubSubProvider.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
+        return await this.queuePublisher.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
 
       case StepType.CONDITIONAL_TIME:
         await this.processStepToInternalEvent(leadStateMessage, { ...step.settings, stepId: step.id, stepType: step.type });
         return await this.conditionStep.processConditionalTime(messageId, leadStateMessage, nextStepMessage, step, compressPayload);
 
       case StepType.CONDITIONAL:
-        return await this.pubSubProvider.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
+        return await this.queuePublisher.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
 
       case StepType.SPLIT:
-        return await this.pubSubProvider.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
+        return await this.queuePublisher.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
 
       case StepType.TESTAB:
-        return await this.pubSubProvider.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
+        return await this.queuePublisher.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
 
       case StepType.RANDOM_MESSAGE:
         step = await this.selectRandomMessage(step, leadStateMessage);
@@ -225,32 +222,32 @@ export class AppService {
       case StepType.REMOVE_AUTOMATION:
         await this.processStepToInternalEvent(leadStateMessage, { ...step.settings, stepId: step.id, stepType: step.type });
         await this.removeAutomation(leadStateMessage, step);
-        return await this.pubSubProvider.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
+        return await this.queuePublisher.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
 
       case StepType.CONTACT_VALIDATE:
         await this.processStepToInternalEvent(leadStateMessage, { stepId: step.id, stepType: step.type });
         await this.contactValidate(leadStateMessage);
-        return await this.pubSubProvider.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
+        return await this.queuePublisher.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
 
       case StepType.CONTACT_TRANSFER:
         await this.processStepToInternalEvent(leadStateMessage, { ...step.settings, stepId: step.id, stepType: step.type });
         await this.contactTransfer(leadStateMessage, step);
-        return await this.pubSubProvider.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
+        return await this.queuePublisher.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
 
       case StepType.UPDATE_CUSTOM_FIELD:
         await this.processStepToInternalEvent(leadStateMessage, { ...step.settings, stepId: step.id, stepType: step.type });
         await this.updateCustomField(leadStateMessage, step);
-        return await this.pubSubProvider.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
+        return await this.queuePublisher.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
 
       case StepType.HTTP_REQUEST:
-        await this.pubSubProvider.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
+        await this.queuePublisher.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
         leadStateMessage.automation.steps = [step];
         await this.processStepToInternalEvent(leadStateMessage, { ...step.settings, stepId: step.id, stepType: step.type });
-        return await this.pubSubProvider.sendAsyncMessage(process.env.TOPIC_NAME_HTTP_REQUEST, leadStateMessage, null);
+        return await this.queuePublisher.sendAsyncMessage(process.env.TOPIC_NAME_HTTP_REQUEST, leadStateMessage, null);
 
       case StepType.ACTIVE_CAMPAIGN:
         await this.processActiveCampaign(leadStateMessage, step);
-        return await this.pubSubProvider.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
+        return await this.queuePublisher.sendAsyncMessage(nextStepMessage.pubName, nextStepMessage.data, compressPayload);
 
       case StepType.END:
         await this.processStepToInternalEvent(leadStateMessage, { stepId: step.id || 0, stepType: step.type });
@@ -310,6 +307,7 @@ export class AppService {
   private async processTag(typeTag: string, tagName: string, leadStateMessage: LeadStateMessage): Promise<any> {
     try {
       const messageBody = {
+        type: typeTag,
         tagName,
         id: leadStateMessage.id,
         contact: { id: leadStateMessage.contact.id, uuid: leadStateMessage.contact.uuid, email: leadStateMessage.contact.email },
@@ -320,33 +318,15 @@ export class AppService {
         isLeadFromAnotherAutomation: true,
       };
 
-      const attrs = {
-        type: typeTag,
-      };
-
-      return await this.pubSubProvider.sendAsyncMessage(process.env.TOPIC_NAME_TAG_PROCESS, messageBody, null, attrs);
+      return await this.queuePublisher.sendAsyncMessage(process.env.TOPIC_NAME_TAG_PROCESS, messageBody);
     } catch (error) {
       this.processMessageCatchError(error);
     }
   }
 
-  private async executePostGoogleTasks(
-    { leadStateMessage, step, taskMessage }: { leadStateMessage: LeadStateMessage; step: Step; taskMessage: LeadStateMessage },
-    waitFor: number,
-    messageId: string,
-  ) {
+  private async scheduleDelayedStep(leadStateMessage: LeadStateMessage, step: Step, taskMessage: LeadStateMessage, waitFor: number, messageId: string) {
     try {
-      const request = {
-        payload: JSON.stringify(taskMessage),
-        waitFor: waitFor,
-      };
-
-      const urlParams = `automation_name=${leadStateMessage.automation.title}&active_step=${leadStateMessage.activeStepId}&email=${leadStateMessage.contact.email}&start_date=${leadStateMessage.startedAt}`;
-
-      const response = await this.googleTasksService.post(request, urlParams, step.type);
-
-      const [taskResponse] = response as [google.cloud.tasks.v2.ITask, google.cloud.tasks.v2.ICreateTaskRequest, object];
-      const taskId = taskResponse?.name?.split('/').pop();
+      const job = await this.queuePublisher.scheduleDelayedStep(taskMessage, waitFor, step.type);
 
       this.trackerService.send(
         MsgopsEvent.MSGOPS_CREATED_CLOUD_TASK,
@@ -358,16 +338,15 @@ export class AppService {
           active_step: leadStateMessage.activeStepId,
           active_step_type: step.type,
           message_id: messageId,
-          cloud_task_id: taskId,
-          cloud_task_schedule_time: taskResponse.scheduleTime.seconds.toString(),
+          cloud_task_id: String(job.id),
         },
         leadStateMessage.startedAt,
       );
 
-      return taskId;
+      return String(job.id);
     } catch (error) {
       console.log(`PAYLOAD ERROR: ${JSON.stringify(leadStateMessage)}`);
-      throw new BadRequestException(`[${messageId}] Error to send a task from message ${messageId} to Google Tasks. ${error}`, error);
+      throw new BadRequestException(`[${messageId}] Error scheduling delayed step. ${error}`, error);
     }
   }
 
@@ -392,7 +371,7 @@ export class AppService {
     };
 
     try {
-      return this.pubSubProvider.sendAsyncMessage(message.topic, message.message, compressPayload, message.attrs);
+      return this.queuePublisher.sendAsyncMessage(message.topic, message.message, compressPayload, message.attrs);
     } catch (error) {
       throw new BadRequestException(`[${messageId}] Error to send message to ${message.topic}`, error);
     }
@@ -415,7 +394,7 @@ export class AppService {
   }): Promise<any> {
     pubsubMessage.message = await this.parseleadStateMessageToSendNotification(leadStateMessage, currentStep, next);
     try {
-      return this.pubSubProvider.sendAsyncMessage(pubsubMessage.topic, pubsubMessage.message, compressPayload, pubsubMessage.attrs || {});
+      return this.queuePublisher.sendAsyncMessage(pubsubMessage.topic, pubsubMessage.message, compressPayload, pubsubMessage.attrs || {});
     } catch (error) {
       throw new BadRequestException(`[${messageId}] Error to send message to ${pubsubMessage.topic}`, error);
     }
@@ -689,7 +668,7 @@ export class AppService {
         const stepRedisKey = `automation_testab_step:${leadStateMessage.automation.id}:${step.id}`;
         if (!(await this.redisClient.exists(stepRedisKey))) {
           await this.redisClient.set(stepRedisKey, new Date().toString());
-          await this.pubSubProvider.sendAsyncMessage(process.env.TOPIC_NAME_API_STEP_PROCESS, { ...step, automationId: leadStateMessage.automation.id, child: [] }, null);
+          await this.queuePublisher.sendAsyncMessage(process.env.TOPIC_NAME_API_STEP_PROCESS, { ...step, automationId: leadStateMessage.automation.id, child: [] }, null);
         }
       }
     }
@@ -802,7 +781,7 @@ export class AppService {
 
   async processStepToInternalEvent(leadStateMessage: LeadStateMessage, properties) {
     try {
-      await this.pubSubProvider.sendMessageInternalEvent({
+      await this.queuePublisher.sendInternalEvent({
         timestamp: Date.now(),
         event: 'step',
         contactId: leadStateMessage.contact.id,

@@ -152,7 +152,7 @@ describe('AppService', () => {
       // Assert
       expect(result.status).toBe(true);
       expect(result.message).toContain('Executed stype type end with success');
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.tag.process', {
+      expectPubSubCalled(mocks.mockQueuePublisher, 'tag-process', {
         tagName: 'test-tag',
       });
     });
@@ -183,7 +183,7 @@ describe('AppService', () => {
       // Assert
       expect(result).toBe('message-id-123');
       expect(mocks.mockMsgopsService.getMessageById).toHaveBeenCalledWith(200);
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.send.email');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'send-email');
     });
 
     it('should increment activeEmailId for next email', async () => {
@@ -210,7 +210,7 @@ describe('AppService', () => {
       await service.receiveMessage(mockLeadStateMessage, messageId, null);
 
       // Assert
-      const pubSubCall = mocks.mockPubSubProvider.sendAsyncMessage.mock.calls[0];
+      const pubSubCall = mocks.mockQueuePublisher.sendAsyncMessage.mock.calls[0];
       const sentMessage = pubSubCall[1];
       expect(sentMessage.next.data.activeEmailId).toBe(3);
     });
@@ -240,13 +240,7 @@ describe('AppService', () => {
 
       // Assert
       expect(result).toBe('task-123');
-      expect(mocks.mockGoogleTasksService.post).toHaveBeenCalledWith(
-        expect.objectContaining({
-          waitFor: 30,
-        }),
-        expect.any(String),
-        StepType.WAIT,
-      );
+      expect(mocks.mockQueuePublisher.scheduleDelayedStep).toHaveBeenCalledWith(expect.any(Object), 30, StepType.WAIT);
       expectTrackerSendCalled(mocks.mockTrackerService, 'MSGOPS_CREATED_CLOUD_TASK', {
         active_step_type: StepType.WAIT,
       });
@@ -274,11 +268,9 @@ describe('AppService', () => {
       await service.receiveMessage(mockLeadStateMessage, messageId, null);
 
       // Assert
-      expect(mocks.mockGoogleTasksService.post).toHaveBeenCalledWith(
-        expect.objectContaining({
-          waitFor: 120, // 2 hours * 60 minutes
-        }),
-        expect.any(String),
+      expect(mocks.mockQueuePublisher.scheduleDelayedStep).toHaveBeenCalledWith(
+        expect.any(Object),
+        120, // 2 hours * 60 minutes
         StepType.WAIT,
       );
     });
@@ -300,7 +292,7 @@ describe('AppService', () => {
       const messageId = 'msg-wait-error';
 
       redisClient.exists.mockResolvedValue(0);
-      mocks.mockGoogleTasksService.post.mockRejectedValue(new Error('Task creation failed'));
+      mocks.mockQueuePublisher.scheduleDelayedStep.mockRejectedValue(new Error('Task creation failed'));
 
       // Act & Assert
       await expect(service.receiveMessage(mockLeadStateMessage, messageId, null)).rejects.toThrow(BadRequestException);
@@ -331,7 +323,7 @@ describe('AppService', () => {
 
       // Assert
       expect(result).toBe('message-id-123');
-      expect(mocks.mockPubSubProvider.sendAsyncMessage).toHaveBeenCalledWith('msgops.tag.process', expect.objectContaining({ tagName: 'new-tag' }), null, { type: 'add' });
+      expect(mocks.mockQueuePublisher.sendAsyncMessage).toHaveBeenCalledWith('tag-process', expect.objectContaining({ type: 'add', tagName: 'new-tag' }));
     });
 
     it('should process REMOVE_TAG step with single tag', async () => {
@@ -356,7 +348,7 @@ describe('AppService', () => {
       await service.receiveMessage(mockLeadStateMessage, messageId, null);
 
       // Assert
-      expect(mocks.mockPubSubProvider.sendAsyncMessage).toHaveBeenCalledWith('msgops.tag.process', expect.objectContaining({ tagName: 'old-tag' }), null, { type: 'remove' });
+      expect(mocks.mockQueuePublisher.sendAsyncMessage).toHaveBeenCalledWith('tag-process', expect.objectContaining({ type: 'remove', tagName: 'old-tag' }));
     });
 
     it('should process ADD_TAG step with multiple tags in array format', async () => {
@@ -380,8 +372,8 @@ describe('AppService', () => {
 
       redisClient.exists.mockResolvedValue(0);
       // Reset mocks from previous tests
-      mocks.mockPubSubProvider.sendAsyncMessage.mockReset();
-      mocks.mockPubSubProvider.sendAsyncMessage.mockResolvedValue('message-id-123');
+      mocks.mockQueuePublisher.sendAsyncMessage.mockReset();
+      mocks.mockQueuePublisher.sendAsyncMessage.mockResolvedValue('message-id-123');
 
       // Act
       const result = await service.receiveMessage(mockLeadStateMessage, messageId, null);
@@ -390,13 +382,13 @@ describe('AppService', () => {
       expect(result).toBe('message-id-123');
 
       // Verify processStepToInternalEvent was called with tags property
-      expect(mocks.mockPubSubProvider.sendMessageInternalEvent).toHaveBeenCalled();
+      expect(mocks.mockQueuePublisher.sendInternalEvent).toHaveBeenCalled();
 
       // Verify tag processing was called multiple times (Promise.all processes array)
-      expect(mocks.mockPubSubProvider.sendAsyncMessage).toHaveBeenCalled();
+      expect(mocks.mockQueuePublisher.sendAsyncMessage).toHaveBeenCalled();
 
       // Verify next step was published
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.message.trigger');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'message-trigger');
     });
 
     it('should process REMOVE_TAG step with multiple tags in array format', async () => {
@@ -420,8 +412,8 @@ describe('AppService', () => {
 
       redisClient.exists.mockResolvedValue(0);
       // Reset mocks from previous tests
-      mocks.mockPubSubProvider.sendAsyncMessage.mockReset();
-      mocks.mockPubSubProvider.sendAsyncMessage.mockResolvedValue('message-id-123');
+      mocks.mockQueuePublisher.sendAsyncMessage.mockReset();
+      mocks.mockQueuePublisher.sendAsyncMessage.mockResolvedValue('message-id-123');
 
       // Act
       const result = await service.receiveMessage(mockLeadStateMessage, messageId, null);
@@ -430,10 +422,10 @@ describe('AppService', () => {
       expect(result).toBe('message-id-123');
 
       // Verify tag processing was called
-      expect(mocks.mockPubSubProvider.sendAsyncMessage).toHaveBeenCalled();
+      expect(mocks.mockQueuePublisher.sendAsyncMessage).toHaveBeenCalled();
 
       // Verify next step was published
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.message.trigger');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'message-trigger');
     });
 
     it('should handle error in processTag gracefully', async () => {
@@ -454,8 +446,8 @@ describe('AppService', () => {
 
       redisClient.exists.mockResolvedValue(0);
       // Make tag processing fail
-      mocks.mockPubSubProvider.sendMessageInternalEvent.mockResolvedValue('event-id'); // For processStepToInternalEvent
-      mocks.mockPubSubProvider.sendAsyncMessage.mockRejectedValueOnce(new Error('PubSub tag processing failed')); // For processTag - this should trigger the catch block
+      mocks.mockQueuePublisher.sendInternalEvent.mockResolvedValue('event-id'); // For processStepToInternalEvent
+      mocks.mockQueuePublisher.sendAsyncMessage.mockRejectedValueOnce(new Error('PubSub tag processing failed')); // For processTag - this should trigger the catch block
 
       // Act & Assert
       await expect(service.receiveMessage(mockLeadStateMessage, messageId, null)).rejects.toThrow(BadRequestException);
@@ -515,7 +507,7 @@ describe('AppService', () => {
 
       // Assert
       expect(result).toBe('message-id-123');
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.message.trigger');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'message-trigger');
     });
 
     it('should process SPLIT step and publish next message', async () => {
@@ -541,7 +533,7 @@ describe('AppService', () => {
 
       // Assert
       expect(result).toBe('message-id-123');
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.message.trigger');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'message-trigger');
     });
 
     it('should process TESTAB step and publish next message', async () => {
@@ -573,7 +565,7 @@ describe('AppService', () => {
 
       // Assert
       expect(result).toBe('message-id-123');
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.message.trigger');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'message-trigger');
     });
 
     it('should select correct branch in SPLIT based on random percentage', async () => {
@@ -639,7 +631,7 @@ describe('AppService', () => {
       // Assert
       expect(result).toBe('message-id-123');
       // Verify pubsub was called to send next step
-      expect(mocks.mockPubSubProvider.sendAsyncMessage).toHaveBeenCalled();
+      expect(mocks.mockQueuePublisher.sendAsyncMessage).toHaveBeenCalled();
       // The test successfully exercises lines 437-440 (the branch selection logic with break statement)
 
       jest.spyOn(Math, 'random').mockRestore();
@@ -697,7 +689,7 @@ describe('AppService', () => {
       // Assert
       expect(result).toBe('message-id-123');
       // Verify pubsub was called to send next step
-      expect(mocks.mockPubSubProvider.sendAsyncMessage).toHaveBeenCalled();
+      expect(mocks.mockQueuePublisher.sendAsyncMessage).toHaveBeenCalled();
       // The test successfully exercises lines 437-440 (the branch selection logic with break statement)
 
       jest.spyOn(Math, 'random').mockRestore();
@@ -728,7 +720,7 @@ describe('AppService', () => {
 
       // Assert
       expect(result).toBe('message-id-123');
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.send.push');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'send-push');
     });
 
     it('should process SMS step successfully', async () => {
@@ -754,7 +746,7 @@ describe('AppService', () => {
 
       // Assert
       expect(result).toBe('message-id-123');
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.send.twilio');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'send-twilio');
     });
 
     it('should process WHATSAPP step successfully', async () => {
@@ -780,7 +772,7 @@ describe('AppService', () => {
 
       // Assert
       expect(result).toBe('message-id-123');
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.send.whatsapp');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'send-whatsapp');
     });
   });
 
@@ -817,7 +809,7 @@ describe('AppService', () => {
       // Assert
       expect(result).toBe('message-id-123');
       expect(mocks.mockMsgopsService.getMessageById).toHaveBeenCalledWith(101);
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.send.email');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'send-email');
 
       jest.spyOn(Math, 'random').mockRestore();
     });
@@ -856,7 +848,7 @@ describe('AppService', () => {
       // Assert
       expect(result).toBe('message-id-123');
       expect(mocks.mockMsgopsService.getMessageById).toHaveBeenCalledWith(101);
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.send.push');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'send-push');
 
       jest.spyOn(Math, 'random').mockRestore();
     });
@@ -892,7 +884,7 @@ describe('AppService', () => {
       // Assert
       expect(result).toBe('message-id-123');
       expect(mocks.mockMsgopsService.getMessageById).toHaveBeenCalledWith(200);
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.send.push');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'send-push');
 
       jest.spyOn(Math, 'random').mockRestore();
     });
@@ -1110,8 +1102,8 @@ describe('AppService', () => {
 
       // Assert
       expect(result).toBe('message-id-123');
-      expect(mocks.mockPubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
-        'msgops.http.request',
+      expect(mocks.mockQueuePublisher.sendAsyncMessage).toHaveBeenCalledWith(
+        'http-request',
         expect.objectContaining({
           automation: expect.objectContaining({
             steps: [httpStep],
@@ -1403,7 +1395,7 @@ describe('AppService', () => {
         redisClient.exists.mockResolvedValue(0);
         mocks.mockMsgopsService.getMessageById.mockResolvedValue(createMockEmail());
         // Make PubSub fail
-        mocks.mockPubSubProvider.sendAsyncMessage.mockRejectedValue(new Error('PubSub service unavailable'));
+        mocks.mockQueuePublisher.sendAsyncMessage.mockRejectedValue(new Error('PubSub service unavailable'));
 
         // Act & Assert
         await expect(service.receiveMessage(mockLeadStateMessage, 'msg-send-error', null)).rejects.toThrow(BadRequestException);
@@ -1445,13 +1437,13 @@ describe('AppService', () => {
       const mockLeadStateMessage = createMockLeadStateMessage();
       const properties = { stepId: 100, stepType: StepType.EMAIL };
 
-      mocks.mockPubSubProvider.sendMessageInternalEvent.mockResolvedValue('event-id-123');
+      mocks.mockQueuePublisher.sendInternalEvent.mockResolvedValue('event-id-123');
 
       // Act
       await service.processStepToInternalEvent(mockLeadStateMessage, properties);
 
       // Assert
-      expect(mocks.mockPubSubProvider.sendMessageInternalEvent).toHaveBeenCalledWith(
+      expect(mocks.mockQueuePublisher.sendInternalEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           event: 'step',
           contactId: mockLeadStateMessage.contact.id,
@@ -1466,7 +1458,7 @@ describe('AppService', () => {
       const mockLeadStateMessage = createMockLeadStateMessage();
       const properties = { stepId: 100 };
 
-      mocks.mockPubSubProvider.sendMessageInternalEvent.mockRejectedValue(new Error('PubSub error'));
+      mocks.mockQueuePublisher.sendInternalEvent.mockRejectedValue(new Error('PubSub error'));
 
       // Act
       const result = await service.processStepToInternalEvent(mockLeadStateMessage, properties);
@@ -1508,7 +1500,7 @@ describe('AppService', () => {
       // Assert
       expect(result).toBe('message-id-123');
       // Should publish next step
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.message.trigger');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'message-trigger');
     });
 
     it('should select winner from Redis when available', async () => {
@@ -1545,7 +1537,7 @@ describe('AppService', () => {
 
       // Assert
       expect(result).toBe('message-id-123');
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.message.trigger');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'message-trigger');
     });
 
     it('should return step.child when randomMessage is not found', async () => {
@@ -1612,7 +1604,7 @@ describe('AppService', () => {
       expect(result).toBe('message-id-123');
       expect(redisClient.set).toHaveBeenCalledWith('automation_testab_step:50:100', expect.any(String));
       // Should send to API step process topic
-      expectPubSubCalled(mocks.mockPubSubProvider, 'msgops.api.step.process');
+      expectPubSubCalled(mocks.mockQueuePublisher, 'msgops.api.step.process');
     });
   });
 

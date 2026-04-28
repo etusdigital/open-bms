@@ -2,8 +2,7 @@ import { HttpException } from '@nestjs/common';
 import { AppService } from './app.service';
 import { AutomationHandler } from './handlers/automation.handler';
 import { MsgopsService } from './msgops/msgops.service';
-import { PubSubProvider } from './providers/pubsub.provider';
-import { GoogleTasksProvider } from './providers/google-tasks.provider';
+import { QueuePublisher } from './providers/queue/queue.publisher';
 import { RedisService } from './providers/redis/redis.service';
 import { TrackerService } from './tracker/tracker.service';
 import {
@@ -20,8 +19,7 @@ describe('AppService', () => {
   let appService: AppService;
   let automationHandler: jest.Mocked<AutomationHandler>;
   let msgopsService: jest.Mocked<MsgopsService>;
-  let pubSubProvider: jest.Mocked<PubSubProvider>;
-  let googleTasksProvider: jest.Mocked<GoogleTasksProvider>;
+  let queuePublisher: jest.Mocked<QueuePublisher>;
   let redisService: jest.Mocked<RedisService>;
   let trackerService: jest.Mocked<TrackerService>;
   let mockRedisClient: any;
@@ -60,15 +58,13 @@ describe('AppService', () => {
       completeTargetedAutomations: jest.fn(),
     } as any;
 
-    pubSubProvider = {
-      sendMessage: jest.fn().mockResolvedValue(undefined),
-      sendMessageClickHouse: jest.fn().mockResolvedValue(undefined),
-      sendMessageSegment: jest.fn().mockResolvedValue(undefined),
-    } as any;
-
-    googleTasksProvider = {
-      create: jest.fn().mockResolvedValue([{ name: 'task-id-123' }]),
-      delete: jest.fn().mockResolvedValue(undefined),
+    queuePublisher = {
+      sendToMessageTrigger: jest.fn().mockResolvedValue(undefined),
+      publishAnalyticsEvent: jest.fn().mockResolvedValue(undefined),
+      publishSegmentData: jest.fn().mockResolvedValue(undefined),
+      publishContactsBatch: jest.fn().mockResolvedValue(undefined),
+      scheduleSegmentRecalculation: jest.fn().mockResolvedValue({ id: 'job-123' }),
+      cancelSegmentJob: jest.fn().mockResolvedValue(undefined),
     } as any;
 
     redisService = {
@@ -80,14 +76,7 @@ describe('AppService', () => {
       send: jest.fn(),
     } as any;
 
-    appService = new AppService(
-      automationHandler,
-      msgopsService,
-      pubSubProvider,
-      googleTasksProvider,
-      redisService,
-      trackerService,
-    );
+    appService = new AppService(automationHandler, msgopsService, queuePublisher, redisService, trackerService);
   });
 
   afterEach(() => {
@@ -206,7 +195,7 @@ describe('AppService', () => {
       msgopsService.createContactTagBatch.mockResolvedValue(true as any);
 
       await appService.processTagBatch(batch);
-      expect(pubSubProvider.sendMessage).toHaveBeenCalled();
+      expect(queuePublisher.publishContactsBatch).toHaveBeenCalled();
     });
   });
 
@@ -271,7 +260,7 @@ describe('AppService', () => {
 
       await appService.processCompleted(leadMessage);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalledWith(
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           event: `automation-${Status.completed}`,
           automationId: leadMessage.automation.id,
@@ -320,7 +309,7 @@ describe('AppService', () => {
       await appService.processSegment(segmentId);
 
       expect(msgopsService.processSegment).toHaveBeenCalled();
-      expect(googleTasksProvider.create).toHaveBeenCalled();
+      expect(queuePublisher.scheduleSegmentRecalculation).toHaveBeenCalled();
       expect(msgopsService.updateTag).toHaveBeenCalledWith(
         segmentId,
         expect.objectContaining({ status: SegmentStatus.ACTIVE }),
@@ -349,7 +338,7 @@ describe('AppService', () => {
 
       await appService.processSegment(segmentId, true);
 
-      expect(googleTasksProvider.create).not.toHaveBeenCalled();
+      expect(queuePublisher.scheduleSegmentRecalculation).not.toHaveBeenCalled();
     });
 
     it('should send segment-in pubsub when account is internal and has inserts', async () => {
@@ -375,7 +364,7 @@ describe('AppService', () => {
 
       await appService.processSegment(segmentId);
 
-      expect(pubSubProvider.sendMessageSegment).toHaveBeenCalledWith(expect.objectContaining({ type: 'segment-in' }));
+      expect(queuePublisher.publishSegmentData).toHaveBeenCalledWith(expect.objectContaining({ type: 'segment-in' }));
     });
 
     it('should send segment-out pubsub when account is internal and has deletes', async () => {
@@ -401,7 +390,7 @@ describe('AppService', () => {
 
       await appService.processSegment(segmentId);
 
-      expect(pubSubProvider.sendMessageSegment).toHaveBeenCalledWith(expect.objectContaining({ type: 'segment-out' }));
+      expect(queuePublisher.publishSegmentData).toHaveBeenCalledWith(expect.objectContaining({ type: 'segment-out' }));
     });
 
     it('should trim segmentInfo to last 100 entries', async () => {
@@ -597,7 +586,7 @@ describe('AppService', () => {
 
       await appService.processSegmentToClickHouse(segmentData);
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalled();
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalled();
     });
 
     it('should process segment-out with "00 - base size" tag and reasons', async () => {
@@ -769,7 +758,7 @@ describe('AppService', () => {
       await appService.targetAchieved({ accountId: 1, contactId: 100, automationId: 10 });
 
       expect(mockRedisClient.set).toHaveBeenCalled();
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalledWith(
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalledWith(
         expect.objectContaining({ event: `automation-${Status.completed}` }),
       );
     });
@@ -780,7 +769,7 @@ describe('AppService', () => {
 
       await appService.targetAchieved({ accountId: 1, contactId: 100, automationId: 10 });
 
-      expect(pubSubProvider.sendMessageClickHouse).not.toHaveBeenCalled();
+      expect(queuePublisher.publishAnalyticsEvent).not.toHaveBeenCalled();
     });
 
     it('should handle case when contact not found for clickhouse message', async () => {
@@ -792,7 +781,7 @@ describe('AppService', () => {
 
       await appService.targetAchieved({ accountId: 1, contactId: 100, automationId: 10 });
 
-      expect(pubSubProvider.sendMessageClickHouse).toHaveBeenCalledWith(expect.objectContaining({ contactId: 100 }));
+      expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalledWith(expect.objectContaining({ contactId: 100 }));
     });
   });
 

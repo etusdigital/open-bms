@@ -6,26 +6,23 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 import { Injectable } from '@nestjs/common';
-import { PubSubProvider } from '../providers/pubsub.provider';
-import { GoogleTasksService } from '../google-tasks.service';
+import { QueuePublisher } from '../providers/queue/queue.publisher';
 import { CompressedPayload, LeadStateMessage, Next } from '../interfaces';
 import { TrackerService } from '../tracker/tracker.service';
 import { MsgopsEvent } from '../tracker/tracker.interface';
-import { google } from '@google-cloud/tasks/build/protos/protos';
 
 @Injectable()
 export class ConditionStep {
   constructor(
-    private readonly pubSubProvider: PubSubProvider,
-    private readonly googleTasksService: GoogleTasksService,
+    private readonly queuePublisher: QueuePublisher,
     private readonly trackerService: TrackerService,
   ) {}
 
   private async processNextStep(next: Next, compressPayload: CompressedPayload) {
-    return this.pubSubProvider.sendAsyncMessage(next.pubName, next.data, compressPayload);
+    return this.queuePublisher.sendAsyncMessage(next.pubName, next.data, compressPayload);
   }
 
-  private getTaskBodyToRepeatProcess(nextLeadStateMessage: LeadStateMessage, step: any, currentValue: number, timezone: string): { payload: string; waitFor: number } {
+  private getTaskBodyToRepeatProcess(nextLeadStateMessage: LeadStateMessage, step: any, currentValue: number, timezone: string): { waitFor: number } {
     const {
       settings: { initialTime, endTime },
     } = step;
@@ -37,24 +34,17 @@ export class ConditionStep {
 
     if (currentValue > endTime) {
       const currentDate = dayjs().tz(timezone);
-
       const nextDayHour = currentDate.add(1, 'day').hour(initialTime);
       const timeDifference = nextDayHour.diff(currentDate, 'hour', true);
       waitFor = Math.ceil(timeDifference) * 60;
     }
 
-    return {
-      payload: JSON.stringify(nextLeadStateMessage),
-      waitFor: Number(waitFor),
-    };
+    return { waitFor: Number(waitFor) };
   }
 
   private async processRepeatStep(leadStateMessage: LeadStateMessage, step: any, currentValue: number, next: Next, timezone: string) {
-    const taskBody = this.getTaskBodyToRepeatProcess(next.data, step, currentValue, timezone);
-
-    const urlParams = `automation_name=${leadStateMessage.automation.title}&active_step=${leadStateMessage.activeStepId}&email=${leadStateMessage.contact.email}&start_date=${leadStateMessage.startedAt}`;
-
-    return await this.googleTasksService.post(taskBody, urlParams, step.type);
+    const { waitFor } = this.getTaskBodyToRepeatProcess(next.data, step, currentValue, timezone);
+    return this.queuePublisher.scheduleDelayedStep(next.data, waitFor, step.type);
   }
 
   async processConditionalTime(messageId: string, leadStateMessage: LeadStateMessage, next: Next, step: any, compressPayload: CompressedPayload) {
@@ -69,10 +59,7 @@ export class ConditionStep {
       return await this.processNextStep(next, compressPayload);
     }
 
-    const response = await this.processRepeatStep(leadStateMessage, step, currentValue, next, timezone);
-
-    const [taskResponse] = response as [google.cloud.tasks.v2.ITask, google.cloud.tasks.v2.ICreateTaskRequest, object];
-    const taskId = taskResponse?.name?.split('/').pop();
+    const job = await this.processRepeatStep(leadStateMessage, step, currentValue, next, timezone);
 
     this.trackerService.send(
       MsgopsEvent.MSGOPS_CREATED_CLOUD_TASK,
@@ -84,12 +71,11 @@ export class ConditionStep {
         active_step: leadStateMessage.activeStepId,
         active_step_type: step.type,
         message_id: messageId,
-        cloud_task_id: taskId,
-        cloud_task_schedule_time: taskResponse.scheduleTime.seconds.toString(),
+        cloud_task_id: String(job.id),
       },
       leadStateMessage.startedAt,
     );
 
-    return taskId;
+    return String(job.id);
   }
 }
