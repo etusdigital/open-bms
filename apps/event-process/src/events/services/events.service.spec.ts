@@ -4,7 +4,8 @@ import { EventsService } from './events.service';
 import { RedisService } from '../../providers/redis/redis.service';
 import { FormatterUtils } from '../../utils/formatter.utils';
 import { MsgopsService } from '../../msgops/msgops.service';
-import { PubSubProvider } from '../../providers/pubsub.provider';
+import { EXCHANGES } from '@bms/messaging';
+import { EventPublisherService } from '../../event-publisher.service';
 import { CacheService } from '../../msgops/cache.service';
 import { GeolocationService } from '../../utils/geolocation/geolocation.service';
 import { KafkaProvider } from '../../providers/kafka.provider';
@@ -15,8 +16,8 @@ class TestableEventsService extends EventsService {
   public testAcquireLock(id: string) {
     return this.acquireLock(id);
   }
-  public testReleaseLock(id: string) {
-    return this.releaseLock(id);
+  public testReleaseLock(id: string, token: string) {
+    return this.releaseLock(id, token);
   }
   public testIsMessageProcessed(id: string) {
     return this.isMessageProcessed(id);
@@ -67,6 +68,7 @@ describe('EventsService', () => {
     get: jest.fn().mockResolvedValue(null),
     del: jest.fn().mockResolvedValue(1),
     exists: jest.fn().mockResolvedValue(0),
+    eval: jest.fn().mockResolvedValue(1),
     pipeline: jest.fn(() => mockPipeline),
   };
 
@@ -85,10 +87,7 @@ describe('EventsService', () => {
     findContactById: jest.fn(),
   };
 
-  const mockPubSubProvider = {
-    sendAsyncMessage: jest.fn().mockResolvedValue(undefined),
-    sendAsyncMessageBms: jest.fn().mockResolvedValue(undefined),
-  };
+  const mockEventPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
 
   const mockCacheService = {
     get: jest.fn(),
@@ -106,8 +105,6 @@ describe('EventsService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     (EventsService as any).userAgentParser = null;
-    (EventsService as any).pubSubProvider = null;
-    (EventsService as any).kafkaProvider = null;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -115,7 +112,7 @@ describe('EventsService', () => {
         { provide: RedisService, useValue: mockRedisService },
         { provide: FormatterUtils, useValue: mockFormatterUtils },
         { provide: MsgopsService, useValue: mockMsgopsService },
-        { provide: PubSubProvider, useValue: mockPubSubProvider },
+        { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: CacheService, useValue: mockCacheService },
         { provide: GeolocationService, useValue: mockGeolocationService },
         { provide: KafkaProvider, useValue: mockKafkaProvider },
@@ -166,8 +163,8 @@ describe('EventsService', () => {
 
       expect(processor).toHaveBeenCalled();
       expect(result).toEqual({ data: 'result' });
-      // markMessageAsProcessed
-      expect(mockRedisClient.set).toHaveBeenCalledWith('event-process:processed_message:msg-4', '1', 'EX', 300);
+      // markMessageAsProcessed (TTL covers AMQP retry budget)
+      expect(mockRedisClient.set).toHaveBeenCalledWith('event-process:processed_message:msg-4', '1', 'EX', 3600);
     });
 
     it('should release lock in finally block even when processor throws', async () => {
@@ -176,34 +173,51 @@ describe('EventsService', () => {
 
       const processor = jest.fn().mockRejectedValue(new Error('processing error'));
       await expect(service.processWithIdempotency('msg-5', processor)).rejects.toThrow('processing error');
-      // releaseLock should still be called
-      expect(mockRedisClient.del).toHaveBeenCalledWith('event-process:processing_lock:msg-5');
+      // releaseLock runs the compare-and-delete Lua script
+      expect(mockRedisClient.eval).toHaveBeenCalledWith(
+        expect.any(String),
+        1,
+        'event-process:processing_lock:msg-5',
+        expect.any(String),
+      );
     });
   });
 
   describe('acquireLock', () => {
-    it('should return true when Redis SET NX succeeds', async () => {
+    it('should return a token when Redis SET NX succeeds', async () => {
       mockRedisClient.set.mockResolvedValueOnce('OK');
       const result = await service.testAcquireLock('test-id');
-      expect(result).toBe(true);
+      expect(typeof result).toBe('string');
+      expect(result.length).toBeGreaterThan(0);
     });
 
-    it('should return false when Redis SET NX fails', async () => {
+    it('should return null when Redis SET NX fails', async () => {
       mockRedisClient.set.mockResolvedValueOnce(null);
       const result = await service.testAcquireLock('test-id');
-      expect(result).toBe(false);
+      expect(result).toBeNull();
     });
 
-    it('should use correct key pattern and 60s TTL', async () => {
+    it('should use correct key pattern, token value, and 60s TTL', async () => {
       await service.testAcquireLock('test-id');
-      expect(mockRedisClient.set).toHaveBeenCalledWith('event-process:processing_lock:test-id', '1', 'EX', 60, 'NX');
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        'event-process:processing_lock:test-id',
+        expect.any(String),
+        'EX',
+        60,
+        'NX',
+      );
     });
   });
 
   describe('releaseLock', () => {
-    it('should call Redis DEL with correct key', async () => {
-      await service.testReleaseLock('test-id');
-      expect(mockRedisClient.del).toHaveBeenCalledWith('event-process:processing_lock:test-id');
+    it('should run compare-and-delete Lua script with key and token', async () => {
+      await service.testReleaseLock('test-id', 'token-abc');
+      expect(mockRedisClient.eval).toHaveBeenCalledWith(
+        expect.stringContaining("redis.call('GET'"),
+        1,
+        'event-process:processing_lock:test-id',
+        'token-abc',
+      );
     });
   });
 
@@ -222,9 +236,9 @@ describe('EventsService', () => {
   });
 
   describe('markMessageAsProcessed', () => {
-    it('should call Redis SET with 5-minute TTL', async () => {
+    it('should call Redis SET with 1-hour TTL (covers AMQP retry budget)', async () => {
       await service.testMarkMessageAsProcessed('test-id');
-      expect(mockRedisClient.set).toHaveBeenCalledWith('event-process:processed_message:test-id', '1', 'EX', 300);
+      expect(mockRedisClient.set).toHaveBeenCalledWith('event-process:processed_message:test-id', '1', 'EX', 3600);
     });
   });
 
@@ -509,20 +523,20 @@ describe('EventsService', () => {
   });
 
   describe('eventsTrigger', () => {
-    it('should return early when pubSubProvider is null', async () => {
-      (EventsService as any).pubSubProvider = null;
+    it('should return early when eventPublisher is null', async () => {
+      (service as any).eventPublisher = null;
       await service.testEventsTrigger('open', []);
-      expect(mockFormatterUtils.logInfo).toHaveBeenCalledWith(expect.stringContaining('PubSubProvider not available'));
+      expect(mockFormatterUtils.logInfo).toHaveBeenCalledWith(expect.stringContaining('EventPublisher not available'));
     });
 
-    it('should check Redis for trigger keys and send pubsub message', async () => {
+    it('should check Redis for trigger keys and publish AMQP message', async () => {
       mockRedisClient.exists.mockResolvedValue(1);
       mockFormatterUtils.parseEventType.mockReturnValue('100');
 
       const events = [{ contactId: 5, category: ['message_100'] }];
       await service.testEventsTrigger('open', events, 1);
 
-      expect(mockPubSubProvider.sendAsyncMessage).toHaveBeenCalled();
+      expect(mockEventPublisher.publish).toHaveBeenCalled();
     });
 
     it('should handle custom_events key with uuid', async () => {
@@ -531,7 +545,9 @@ describe('EventsService', () => {
       const events = [{ uuid: 'test-uuid', eventId: 42, contactId: 5, accountId: 1 }];
       await service.testEventsTrigger('custom_events', events);
 
-      expect(mockPubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
+      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
+        EXCHANGES.tags,
+        'tag.process',
         expect.objectContaining({ event: 'custom_events', uuid: 'test-uuid' }),
         expect.any(Object),
       );
@@ -539,11 +555,11 @@ describe('EventsService', () => {
   });
 
   describe('processActivationEvents', () => {
-    it('should send BMS message via pubsub', async () => {
+    it('should publish BMS message via AMQP', async () => {
       await service.processActivationEvents([
         { accountId: '1', timestamp: 1234, contactId: 5, event: 'activated' } as any,
       ]);
-      expect(mockPubSubProvider.sendAsyncMessageBms).toHaveBeenCalled();
+      expect(mockEventPublisher.publish).toHaveBeenCalled();
     });
   });
 

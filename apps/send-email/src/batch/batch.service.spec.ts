@@ -6,7 +6,7 @@ import { MailUtils } from '../mail/mail.utils';
 import { FormatterUtils } from '../utils/formatter.utils';
 import { RedisService } from '../providers/redis/redis.service';
 import { TrackerService } from '../tracker/tracker.service';
-import { PubSubProvider } from '../providers/pubsub.provider';
+import { EventPublisherService } from '../event-publisher.service';
 import { Batch } from '../mail/mail.interface';
 
 /**
@@ -91,7 +91,7 @@ describe('BatchService', () => {
   let mailUtils: MailUtils;
   let redisService: RedisService;
   let trackerService: TrackerService;
-  let pubSubProvider: PubSubProvider;
+  let eventPublisher: jest.Mocked<EventPublisherService>;
   let redisClient: any;
 
   beforeEach(async () => {
@@ -149,10 +149,9 @@ describe('BatchService', () => {
           },
         },
         {
-          provide: PubSubProvider,
+          provide: EventPublisherService,
           useValue: {
-            sendAsyncMessage: jest.fn().mockResolvedValue(true),
-            sendAsyncMessage2: jest.fn().mockResolvedValue(true),
+            publish: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],
@@ -164,7 +163,7 @@ describe('BatchService', () => {
     module.get<FormatterUtils>(FormatterUtils);
     redisService = module.get<RedisService>(RedisService);
     trackerService = module.get<TrackerService>(TrackerService);
-    pubSubProvider = module.get<PubSubProvider>(PubSubProvider);
+    eventPublisher = module.get(EventPublisherService);
 
     // Set environment variable for validation
     process.env.LIMIT_CONTACT_BATCH = '1000';
@@ -191,7 +190,9 @@ describe('BatchService', () => {
         await service.campaignBatch(mockBatch, null);
 
         // Critical: Must track batch start for monitoring
-        expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(eventPublisher.publish).toHaveBeenCalledWith(
+          'bms.campaigns',
+          'campaign.tracked',
           expect.objectContaining({
             campaign_id: 123,
             service: 'MSGOPS_SEND_BATCH_EMAIL',
@@ -207,7 +208,9 @@ describe('BatchService', () => {
         await service.campaignBatch(mockBatch, null);
 
         // Critical: Must track batch completion for statistics
-        expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(eventPublisher.publish).toHaveBeenCalledWith(
+          'bms.campaigns',
+          'campaign.tracked',
           expect.objectContaining({
             event: 'SENT_EMAIL_BATCH',
             campaign_id: 123,
@@ -222,7 +225,7 @@ describe('BatchService', () => {
         await service.campaignBatch(mockBatch, 'true');
 
         // When debugging, no trackers should be sent to avoid polluting analytics
-        expect(pubSubProvider.sendAsyncMessage).not.toHaveBeenCalled();
+        expect(eventPublisher.publish).not.toHaveBeenCalled();
       });
 
       it('should skip SENT_EMAIL_BATCH tracker when in warmup mode', async () => {
@@ -233,14 +236,18 @@ describe('BatchService', () => {
         await service.campaignBatch(mockBatch, null);
 
         // Should send EMAIL_BATCH (start tracker)
-        expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(eventPublisher.publish).toHaveBeenCalledWith(
+          'bms.campaigns',
+          'campaign.tracked',
           expect.objectContaining({
             event: 'EMAIL_BATCH',
           }),
         );
 
         // Should NOT send SENT_EMAIL_BATCH (end tracker) in warmup mode
-        expect(pubSubProvider.sendAsyncMessage).not.toHaveBeenCalledWith(
+        expect(eventPublisher.publish).not.toHaveBeenCalledWith(
+          'bms.campaigns',
+          'campaign.tracked',
           expect.objectContaining({
             event: 'SENT_EMAIL_BATCH',
           }),
@@ -306,7 +313,9 @@ describe('BatchService', () => {
         expect(mailService.sendBatch).not.toHaveBeenCalled();
 
         // Should still send SENT_EMAIL_BATCH tracker with empty result
-        expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(eventPublisher.publish).toHaveBeenCalledWith(
+          'bms.campaigns',
+          'campaign.tracked',
           expect.objectContaining({
             event: 'SENT_EMAIL_BATCH',
             data: {},
@@ -751,7 +760,9 @@ describe('BatchService', () => {
 
         await service.sendTracker('EMAIL_BATCH', batch);
 
-        expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(eventPublisher.publish).toHaveBeenCalledWith(
+          'bms.campaigns',
+          'campaign.tracked',
           expect.objectContaining({
             campaign_id: 123,
             service: 'MSGOPS_SEND_BATCH_EMAIL',
@@ -771,7 +782,9 @@ describe('BatchService', () => {
 
         await service.sendTracker('SENT_EMAIL_BATCH', batch, responseData);
 
-        expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
+        expect(eventPublisher.publish).toHaveBeenCalledWith(
+          'bms.campaigns',
+          'campaign.tracked',
           expect.objectContaining({
             event: 'SENT_EMAIL_BATCH',
             data: responseData,
@@ -971,13 +984,13 @@ describe('BatchService', () => {
         });
       });
 
-      describe('setPubsubErros', () => {
-        it('should send error payload via PubSub', async () => {
+      describe('publishCampaignError', () => {
+        it('should publish error payload to bms.email/email.error', async () => {
           const mockPayload = { error: 'Something failed', timestamp: Date.now() };
 
-          await service.setPubsubErros(mockPayload);
+          await service.publishCampaignError(mockPayload);
 
-          expect(pubSubProvider.sendAsyncMessage2).toHaveBeenCalledWith(mockPayload);
+          expect(eventPublisher.publish).toHaveBeenCalledWith('bms.email', 'email.error', mockPayload);
         });
       });
     });

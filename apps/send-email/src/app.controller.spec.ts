@@ -1,17 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpException } from '@nestjs/common';
+import { HttpException, UnauthorizedException } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ResultDto } from './dtos/result.dto';
+
+const VALID_TOKEN = 'dev-send-email-token-change-me-please';
 
 describe('AppController', () => {
   let controller: AppController;
   let appService: jest.Mocked<AppService>;
 
   beforeEach(async () => {
+    process.env.INTERNAL_AUTH_TOKEN = VALID_TOKEN;
     const mockAppService = {
       getState: jest.fn(),
-      parseNewMessageDtoToSendMailMessage: jest.fn(),
       getRedis: jest.fn(),
       receiveMessage: jest.fn(),
       sendToNextStep: jest.fn(),
@@ -38,8 +40,18 @@ describe('AppController', () => {
     });
   });
 
-  describe('POST / - receiveMessage', () => {
-    it('should process SendEmailMessage directly', async () => {
+  describe('POST /internal/email/send', () => {
+    it('should reject when token is missing', async () => {
+      const sendEmailMessage: any = { messageId: 'msg-123' };
+      await expect(controller.receiveMessage(undefined as any, sendEmailMessage)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should reject when token is wrong', async () => {
+      const sendEmailMessage: any = { messageId: 'msg-123' };
+      await expect(controller.receiveMessage('wrong-token', sendEmailMessage)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should process SendEmailMessage with valid token', async () => {
       const sendEmailMessage: any = {
         messageId: 'msg-123',
         contact: { id: 1, email: 'test@example.com' },
@@ -48,28 +60,10 @@ describe('AppController', () => {
       const expectedResult: ResultDto = { status: true, message: 'OK' };
       appService.receiveMessage.mockResolvedValue(expectedResult);
 
-      const result = await controller.receiveMessage(sendEmailMessage);
+      const result = await controller.receiveMessage(VALID_TOKEN, sendEmailMessage);
 
       expect(result).toEqual(expectedResult);
       expect(appService.receiveMessage).toHaveBeenCalledWith(sendEmailMessage, '');
-    });
-
-    it('should parse PubSub message format', async () => {
-      const pubsubMessage: any = {
-        subscription: 'projects/test/subscriptions/test-sub',
-        message: {
-          data: Buffer.from(JSON.stringify({ messageId: 'msg-123' })).toString('base64'),
-          messageId: 'pub-123',
-        },
-      };
-      const parsedMessage: any = { messageId: 'msg-123' };
-      appService.parseNewMessageDtoToSendMailMessage.mockReturnValue(parsedMessage);
-      appService.receiveMessage.mockResolvedValue({ status: true, message: 'OK' });
-
-      await controller.receiveMessage(pubsubMessage);
-
-      expect(appService.parseNewMessageDtoToSendMailMessage).toHaveBeenCalledWith(pubsubMessage);
-      expect(appService.receiveMessage).toHaveBeenCalledWith(parsedMessage, '');
     });
 
     it('should fetch from Redis when automationKey is provided', async () => {
@@ -78,7 +72,7 @@ describe('AppController', () => {
       appService.getRedis.mockResolvedValue(redisData);
       appService.receiveMessage.mockResolvedValue({ status: true, message: 'OK' });
 
-      await controller.receiveMessage(compressedPayload);
+      await controller.receiveMessage(VALID_TOKEN, compressedPayload);
 
       expect(appService.getRedis).toHaveBeenCalledWith('redis-key-123');
       expect(appService.receiveMessage).toHaveBeenCalledWith(redisData, 'redis-key-123');
@@ -88,24 +82,19 @@ describe('AppController', () => {
       const sendEmailMessage: any = { messageId: 'msg-123' };
       appService.receiveMessage.mockRejectedValue(new Error('Processing failed'));
 
-      await expect(controller.receiveMessage(sendEmailMessage)).rejects.toThrow(HttpException);
+      await expect(controller.receiveMessage(VALID_TOKEN, sendEmailMessage)).rejects.toThrow(HttpException);
     });
 
     it('should handle Invalid URL error gracefully', async () => {
-      const pubsubMessage: any = {
-        subscription: 'projects/test/subscriptions/test-sub',
-        message: { data: 'invalid-base64', messageId: 'pub-123' },
-      };
-      const parsedMessage: any = { next: { data: { id: 'lead-123' } } };
-      appService.parseNewMessageDtoToSendMailMessage.mockReturnValue(parsedMessage);
+      const sendEmailMessage: any = { messageId: 'msg-123', next: { data: { id: 'lead-123' } } };
       appService.receiveMessage.mockRejectedValue(new Error('Invalid URL'));
       appService.sendToNextStep.mockResolvedValue(undefined);
 
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 
-      await controller.receiveMessage(pubsubMessage);
+      await controller.receiveMessage(VALID_TOKEN, sendEmailMessage);
 
-      expect(appService.sendToNextStep).toHaveBeenCalledWith(parsedMessage.next.data, {});
+      expect(appService.sendToNextStep).toHaveBeenCalledWith(sendEmailMessage.next.data, '');
       consoleLogSpy.mockRestore();
     });
   });

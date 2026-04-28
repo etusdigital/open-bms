@@ -7,7 +7,6 @@ import { CustomEventsService } from './services/custom-events.service';
 import { FormatterUtils } from '../utils/formatter.utils';
 import { MsgopsModule } from '../msgops/msgops.module';
 import { RedisModule } from '../providers/redis/redis.module';
-import { PubSubProvider } from '../providers/pubsub.provider';
 import { CacheService } from '../msgops/cache.service';
 import { GeolocationModule } from '../utils/geolocation/geolocation.module';
 import { KafkaProvider } from '../providers/kafka.provider';
@@ -17,7 +16,6 @@ import { InternalEventsService } from './services/internal-events.service';
   imports: [MsgopsModule, RedisModule, GeolocationModule],
   providers: [
     FormatterUtils,
-    PubSubProvider,
     EventsService,
     SendgridService,
     PushService,

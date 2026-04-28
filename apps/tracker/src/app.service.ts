@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { MsgopsService } from './msgops/msgops.service';
-import { PubSubProvider } from './providers/pubsub.provider';
+import { EventPublisherService } from './event-publisher.service';
 import { ClsService } from 'nestjs-cls';
 import * as crypto from 'crypto';
 import { TrackerRedirectRequest } from './interfaces/tracker-redirect-event.interface';
@@ -10,7 +10,7 @@ export class AppService {
   private readonly logger = new Logger(AppService.name);
 
   constructor(
-    private readonly pubSubProvider: PubSubProvider,
+    private readonly eventPublisher: EventPublisherService,
     private readonly msgopsService: MsgopsService,
     private readonly cls: ClsService,
   ) {}
@@ -41,7 +41,7 @@ export class AppService {
       payload: { event: 'click', ip: ipAddress, url: `${url.origin}${url.pathname}`, headers: headers, eventID: crypto.randomUUID() },
     };
 
-    await this.pubSubProvider.sendMessage(payloadEvent, process.env.TOPIC_WEBHOOKS, {
+    await this.eventPublisher.publish(payloadEvent, {
       platform: 'twilio',
       message_type: objectParams.message_type,
     });
@@ -77,12 +77,6 @@ export class AppService {
       return;
     }
 
-    const topic = process.env.TOPIC_WEBHOOKS;
-    if (!topic) {
-      this.logger.error('TOPIC_WEBHOOKS not set — skipping tracker-redirect publish');
-      return;
-    }
-
     const body: TrackerRedirectRequest = {
       platform: 'internal',
       payload: [
@@ -100,7 +94,7 @@ export class AppService {
     };
 
     try {
-      await this.pubSubProvider.sendMessage(body, topic, {
+      await this.eventPublisher.publish(body, {
         platform: 'internal',
         message_type: 'tracker-redirect',
       });

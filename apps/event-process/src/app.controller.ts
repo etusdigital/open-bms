@@ -1,6 +1,7 @@
-import { BadRequestException, Body, Controller, Post, Headers } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Headers, Post, UnauthorizedException } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { CustomEventRequest, InternalRequest, SendgridEvent, TwilioEvent } from './events/interfaces/events.interfaces';
-import { PlatformType, PushPayload, PushWebhook } from './events/interfaces/push.interfaces';
+import { PushPayload, PushWebhook } from './events/interfaces/push.interfaces';
 import { FormatterUtils } from './utils/formatter.utils';
 import { SendgridService } from './events/services/sendgrid.service';
 import { PushService } from './events/services/push.service';
@@ -9,7 +10,7 @@ import { CustomEventsService } from './events/services/custom-events.service';
 import { EventsService } from './events/services/events.service';
 import { InternalEventsService } from './events/services/internal-events.service';
 
-@Controller()
+@Controller('internal/event')
 export class AppController {
   constructor(
     private readonly formatterUtils: FormatterUtils,
@@ -21,71 +22,85 @@ export class AppController {
     private readonly internalEventsService: InternalEventsService,
   ) {}
 
-  @Post('/*')
-  async processEvent(
-    @Body() events: SendgridEvent | TwilioEvent | PushWebhook | CustomEventRequest | InternalRequest,
-    @Headers('x-goog-pubsub-message-id') messageId: string,
-    @Headers('platform') headerPlatform: PlatformType,
-  ): Promise<any> {
-    if (!events) {
-      throw new BadRequestException('Body cannot be empty');
+  private assertAuth(token: string): void {
+    if (token !== process.env.INTERNAL_AUTH_TOKEN) {
+      throw new UnauthorizedException();
     }
+  }
 
-    const platform = events.platform || headerPlatform;
+  // Deterministic idempotency key. AMQP redelivery preserves payload content,
+  // so a content hash dedupes retries the same way Pub/Sub messageId did.
+  private idempotencyKey(payload: unknown): string {
+    return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+  }
 
-    if (platform === PlatformType.SENDGRID) {
-      return await this.eventsService.processWithIdempotency(messageId, () =>
-        this.sendgridService.processSendgrid(events as SendgridEvent),
-      );
-    }
+  @Post('sendgrid')
+  async sendgrid(@Headers('x-internal-token') token: string, @Body() events: SendgridEvent): Promise<any> {
+    this.assertAuth(token);
+    if (!events) throw new BadRequestException('Body cannot be empty');
+    return await this.eventsService.processWithIdempotency(this.idempotencyKey(events), () =>
+      this.sendgridService.processSendgrid(events),
+    );
+  }
 
-    if (platform === PlatformType.TWILIO) {
-      return await this.eventsService.processWithIdempotency(messageId, () =>
-        this.twilioService.processTwilioNotification(events as TwilioEvent),
-      );
-    }
+  @Post('sparkpost')
+  async sparkpost(@Headers('x-internal-token') token: string, @Body() events: any): Promise<any> {
+    this.assertAuth(token);
+    if (!events) throw new BadRequestException('Body cannot be empty');
+    this.formatterUtils.logInfo(`[Sparkpost] Received event: ${JSON.stringify(events)}`);
+    return;
+  }
 
-    if (platform === PlatformType.WEBPUSH || platform === PlatformType.MOBILEPUSH) {
-      return await this.eventsService.processWithIdempotency(messageId, () => {
-        if (Array.isArray(events)) {
-          return this.pushService.processPush({ payload: events as PushPayload[] } as PushWebhook);
-        }
-        return this.pushService.processPush(events as PushWebhook);
-      });
-    }
+  @Post('twilio')
+  async twilio(@Headers('x-internal-token') token: string, @Body() events: TwilioEvent): Promise<any> {
+    this.assertAuth(token);
+    if (!events) throw new BadRequestException('Body cannot be empty');
+    return await this.eventsService.processWithIdempotency(this.idempotencyKey(events), () =>
+      this.twilioService.processTwilioNotification(events),
+    );
+  }
 
-    if (platform === PlatformType.CUSTOMEVENTS) {
-      try {
-        return await this.eventsService.processWithIdempotency(messageId, () =>
-          this.customEventsService.customEventsProcess(events as CustomEventRequest),
-        );
-      } catch (error) {
-        this.formatterUtils.logInfo(
-          `Error processing custom events: ${JSON.stringify(error)} - payload: ${JSON.stringify(events)}`,
-        );
-        throw new BadRequestException('Error processing custom events');
+  @Post('push')
+  async push(@Headers('x-internal-token') token: string, @Body() events: PushWebhook | PushPayload[]): Promise<any> {
+    this.assertAuth(token);
+    if (!events) throw new BadRequestException('Body cannot be empty');
+    return await this.eventsService.processWithIdempotency(this.idempotencyKey(events), () => {
+      if (Array.isArray(events)) {
+        return this.pushService.processPush({ payload: events as PushPayload[] } as PushWebhook);
       }
-    }
+      return this.pushService.processPush(events as PushWebhook);
+    });
+  }
 
-    if (platform === PlatformType.INTERNALEVENTS) {
-      try {
-        return await this.eventsService.processWithIdempotency(messageId, () =>
-          this.internalEventsService.internalEventsProcess(events as InternalRequest),
-        );
-      } catch (error) {
-        this.formatterUtils.logInfo(
-          `Error processing internal events: ${JSON.stringify(error)} - payload: ${JSON.stringify(events)}`,
-        );
-        throw new BadRequestException('Error processing internal events');
-      }
+  @Post('custom')
+  async custom(@Headers('x-internal-token') token: string, @Body() events: CustomEventRequest): Promise<any> {
+    this.assertAuth(token);
+    if (!events) throw new BadRequestException('Body cannot be empty');
+    try {
+      return await this.eventsService.processWithIdempotency(this.idempotencyKey(events), () =>
+        this.customEventsService.customEventsProcess(events),
+      );
+    } catch (error) {
+      this.formatterUtils.logInfo(
+        `Error processing custom events: ${JSON.stringify(error)} - payload: ${JSON.stringify(events)}`,
+      );
+      throw new BadRequestException('Error processing custom events');
     }
+  }
 
-    if (platform === PlatformType.SPARKPOST) {
-      this.formatterUtils.logInfo(`[Sparkpost] Received event: ${JSON.stringify(events)}`);
-      return;
+  @Post('internal')
+  async internal(@Headers('x-internal-token') token: string, @Body() events: InternalRequest): Promise<any> {
+    this.assertAuth(token);
+    if (!events) throw new BadRequestException('Body cannot be empty');
+    try {
+      return await this.eventsService.processWithIdempotency(this.idempotencyKey(events), () =>
+        this.internalEventsService.internalEventsProcess(events),
+      );
+    } catch (error) {
+      this.formatterUtils.logInfo(
+        `Error processing internal events: ${JSON.stringify(error)} - payload: ${JSON.stringify(events)}`,
+      );
+      throw new BadRequestException('Error processing internal events');
     }
-
-    console.log('Invalid platform: ', JSON.stringify(events));
-    throw new BadRequestException('Invalid platform');
   }
 }

@@ -5,10 +5,14 @@ import { SASLOptions } from 'kafkajs';
 
 @Injectable()
 export class KafkaProvider {
-  private kafka: Kafka;
-  private producer: Producer;
+  private kafka: Kafka | null = null;
+  private producer: Producer | null = null;
 
   constructor() {
+    if (process.env.NODE_ENV !== 'production') {
+      return;
+    }
+
     const sasl: SASLOptions = {
       mechanism: 'scram-sha-512',
       username: process.env.KAFKA_USERNAME,
@@ -28,8 +32,8 @@ export class KafkaProvider {
   }
 
   async sendAsyncMessage(message: any, topic) {
-    if (process.env.NODE_ENV !== 'production') {
-      return new Promise((resolve) => resolve(crypto.randomBytes(20).toString('hex')));
+    if (!this.producer) {
+      return crypto.randomBytes(20).toString('hex');
     }
 
     const result = await this.producer.send({

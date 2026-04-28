@@ -1,24 +1,23 @@
-import { Body, Controller, Post, Query } from '@nestjs/common';
+import { Body, Controller, Headers, Post, Query, UnauthorizedException } from '@nestjs/common';
 import { BatchService } from './batch.service';
-import { Batch, SubscriptionMessage } from '../mail/mail.interface';
-import { FormatterUtils } from '../utils/formatter.utils';
+import { Batch } from '../mail/mail.interface';
 import { AutomationContactsBatch, CompressedCampaignPayload } from '../interfaces';
 import { env } from 'process';
 
-@Controller('batch')
+@Controller('internal')
 export class BatchController {
-  constructor(
-    private readonly batchService: BatchService,
-    private readonly formatterUtils: FormatterUtils,
-  ) {}
+  constructor(private readonly batchService: BatchService) {}
 
-  @Post('/campaigns')
-  async campaigns(@Body() body: Batch | SubscriptionMessage | CompressedCampaignPayload, @Query() { debug }: { debug: string }) {
-    const originalBody = body;
-
-    if ('subscription' in (body as SubscriptionMessage)) {
-      body = this.formatterUtils.parseBase64<Batch>((body as SubscriptionMessage).message.data);
+  private assertAuth(token: string): void {
+    if (token !== process.env.INTERNAL_AUTH_TOKEN) {
+      throw new UnauthorizedException();
     }
+  }
+
+  @Post('/campaigns/send')
+  async campaigns(@Headers('x-internal-token') token: string, @Body() body: Batch | CompressedCampaignPayload, @Query() { debug }: { debug: string }) {
+    this.assertAuth(token);
+    const originalBody = body;
 
     const redisKeyPayload = `${(body as CompressedCampaignPayload).campaignKey || ''}`;
     if (redisKeyPayload) {
@@ -42,17 +41,13 @@ export class BatchController {
       console.error(`[campaigns] redis body: ${JSON.stringify(body)}`);
       console.error(`[campaigns] request body: ${JSON.stringify(originalBody)}`);
       console.error(`[campaigns] error: ${error}`);
-      return await this.batchService.setPubsubErros(originalBody);
+      return await this.batchService.publishCampaignError(originalBody);
     }
   }
 
-  @Post('/automations')
-  async automations(@Body() body: AutomationContactsBatch | SubscriptionMessage, @Query() { debug }: { debug: string }) {
-    const batch =
-      'email' in (body as AutomationContactsBatch)
-        ? (body as AutomationContactsBatch)
-        : this.formatterUtils.parseBase64<AutomationContactsBatch>((body as SubscriptionMessage).message.data);
-
-    return await this.batchService.automationBatch(batch, debug);
+  @Post('/automations/process')
+  async automations(@Headers('x-internal-token') token: string, @Body() body: AutomationContactsBatch, @Query() { debug }: { debug: string }) {
+    this.assertAuth(token);
+    return await this.batchService.automationBatch(body, debug);
   }
 }

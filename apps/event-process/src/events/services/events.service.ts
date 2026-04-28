@@ -5,7 +5,8 @@ import { UAParser } from 'ua-parser-js';
 import { FormatterUtils } from '../../utils/formatter.utils';
 import { PlatformType } from '../interfaces/push.interfaces';
 import { MsgopsService } from '../../msgops/msgops.service';
-import { PubSubProvider } from '../../providers/pubsub.provider';
+import { EXCHANGES } from '@bms/messaging';
+import { EventPublisherService } from '../../event-publisher.service';
 import { EventLog, InternalEvent, InternalRequest, SendgridPayload } from '../interfaces/events.interfaces';
 import { CacheService } from '../../msgops/cache.service';
 import { GeolocationService } from '../../utils/geolocation/geolocation.service';
@@ -18,34 +19,19 @@ import crypto from 'crypto';
 export class EventsService {
   protected redisClient: Redis;
   private static userAgentParser: UAParser | null = null;
-  private static pubSubProvider: PubSubProvider | null = null;
-  private static kafkaProvider: KafkaProvider | null = null;
 
   constructor(
     protected readonly redisService: RedisService,
     protected readonly formatterUtils: FormatterUtils,
     protected readonly msgOpsService: MsgopsService,
-    protected readonly pubSubProvider: PubSubProvider,
+    protected readonly eventPublisher: EventPublisherService,
     private readonly cacheService: CacheService,
     private readonly geolocationService: GeolocationService,
-    private readonly kafkaProvider: KafkaProvider,
+    protected readonly kafkaProvider: KafkaProvider,
   ) {
     this.redisClient = this.redisService.getOrThrow();
-    this.initializeService();
-  }
-
-  private initializeService(): void {
-    if (EventsService.userAgentParser && EventsService.pubSubProvider) {
-      return;
-    }
-
-    try {
+    if (!EventsService.userAgentParser) {
       EventsService.userAgentParser = new UAParser();
-      EventsService.pubSubProvider = this.pubSubProvider;
-      EventsService.kafkaProvider = this.kafkaProvider;
-    } catch (error) {
-      console.error('Failed to initialize services:', error);
-      throw error;
     }
   }
 
@@ -113,13 +99,23 @@ export class EventsService {
     return formattedResult;
   }
 
-  protected async acquireLock(messageId: string): Promise<boolean> {
-    const result = await this.redisClient.set(`event-process:processing_lock:${messageId}`, '1', 'EX', 60, 'NX');
-    return result === 'OK';
+  // Idempotency window must outlast the AMQP retry budget so retried deliveries
+  // (initial + 3 retries with backoff) hit the processed-marker instead of
+  // re-processing. 1h covers worst-case DLQ replay tempos.
+  private static readonly PROCESSED_TTL_SECONDS = 60 * 60;
+
+  protected async acquireLock(messageId: string): Promise<string | null> {
+    const token = crypto.randomUUID();
+    const result = await this.redisClient.set(`event-process:processing_lock:${messageId}`, token, 'EX', 60, 'NX');
+    return result === 'OK' ? token : null;
   }
 
-  protected async releaseLock(messageId: string): Promise<void> {
-    await this.redisClient.del(`event-process:processing_lock:${messageId}`);
+  // Compare-and-delete via Lua so we never release a lock owned by someone else
+  // (e.g. when our processor took longer than the TTL and a sibling consumer
+  // already acquired a fresh lock with a new token).
+  protected async releaseLock(messageId: string, token: string): Promise<void> {
+    const script = `if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end`;
+    await this.redisClient.eval(script, 1, `event-process:processing_lock:${messageId}`, token);
   }
 
   protected async isMessageProcessed(messageId: string): Promise<boolean> {
@@ -128,7 +124,12 @@ export class EventsService {
   }
 
   protected async markMessageAsProcessed(messageId: string): Promise<void> {
-    await this.redisClient.set(`event-process:processed_message:${messageId}`, '1', 'EX', 60 * 5);
+    await this.redisClient.set(
+      `event-process:processed_message:${messageId}`,
+      '1',
+      'EX',
+      EventsService.PROCESSED_TTL_SECONDS,
+    );
   }
 
   async processWithIdempotency<T>(
@@ -145,8 +146,8 @@ export class EventsService {
       return { status: 'skipped', message: 'Message already processed' };
     }
 
-    const lockAcquired = await this.acquireLock(messageId);
-    if (!lockAcquired) {
+    const lockToken = await this.acquireLock(messageId);
+    if (!lockToken) {
       console.log(`[Event-Process] - Message is currently being processed: ${messageId}`);
       return { status: 'skipped', message: 'Message is currently being processed' };
     }
@@ -164,7 +165,7 @@ export class EventsService {
 
       return result;
     } finally {
-      await this.releaseLock(messageId);
+      await this.releaseLock(messageId, lockToken);
     }
   }
 
@@ -347,12 +348,12 @@ export class EventsService {
     this.handleRedisResults(results);
   }
 
-  protected async publishPubsubAutomationTarget(payload) {
-    await EventsService.pubSubProvider.sendAsyncMessage(payload, { type: 'automation-target' });
+  protected async publishAutomationTarget(payload) {
+    await this.eventPublisher.publish(EXCHANGES.tags, 'tag.process', payload, { type: 'automation-target' });
   }
 
   /**
-   * Triggers events based on the event type and sends async messages to the pubsub provider
+   * Triggers events based on the event type and publishes async messages to the AMQP exchange.
    * @param key The event type (open, click, custom_events)
    * @param events The events to process
    * @param accountId The account ID (optional for custom_events)
@@ -362,8 +363,8 @@ export class EventsService {
     events: SendgridPayload[] | EventLog[],
     accountId?: number,
   ): Promise<void> {
-    if (!EventsService.pubSubProvider) {
-      this.formatterUtils.logInfo(`[events-trigger] PubSubProvider not available for ${key} events`);
+    if (!this.eventPublisher) {
+      this.formatterUtils.logInfo(`[events-trigger] EventPublisher not available for ${key} events`);
       return;
     }
 
@@ -387,7 +388,9 @@ export class EventsService {
             contact &&
             (contact.last_open === null || contact.last_open < new Date(Date.now() - 1000 * 60 * 60 * 24 * 30))
           ) {
-            await EventsService.pubSubProvider.sendAsyncMessage(
+            await this.eventPublisher.publish(
+              EXCHANGES.tags,
+              'tag.process',
               { accountId, event: 'first_open_30_days', contactId: event.contactId, messageId: 0 },
               { type: 'events-trigger' },
             );
@@ -442,11 +445,15 @@ export class EventsService {
           payload['uuid'] = event.uuid;
           payload['eventId'] = event.eventId;
           if (hasTrigger) {
-            await EventsService.pubSubProvider.sendAsyncMessage(payload, { type: 'events-trigger' });
+            await this.eventPublisher.publish(EXCHANGES.tags, 'tag.process', payload, {
+              type: 'events-trigger',
+            });
           }
           if (hasTriggerCampaign) {
             payload['isTriggerCampaign'] = true;
-            await EventsService.pubSubProvider.sendAsyncMessage(payload, { type: 'events-trigger' });
+            await this.eventPublisher.publish(EXCHANGES.tags, 'tag.process', payload, {
+              type: 'events-trigger',
+            });
           }
         }
 
@@ -459,11 +466,15 @@ export class EventsService {
           payload['contactId'] = Number(event.contactId);
           payload['messageId'] = messageId;
           if (hasTrigger && !getAllEvents) {
-            await EventsService.pubSubProvider.sendAsyncMessage(payload, { type: 'events-trigger' });
+            await this.eventPublisher.publish(EXCHANGES.tags, 'tag.process', payload, {
+              type: 'events-trigger',
+            });
           }
           if (hasTriggerCampaign && !getAllEventsCampaign) {
             payload['isTriggerCampaign'] = true;
-            await EventsService.pubSubProvider.sendAsyncMessage(payload, { type: 'events-trigger' });
+            await this.eventPublisher.publish(EXCHANGES.tags, 'tag.process', payload, {
+              type: 'events-trigger',
+            });
           }
         }
 
@@ -471,11 +482,15 @@ export class EventsService {
           payload['contactId'] = Number(event.contactId);
           payload['messageId'] = 0;
           if (hasTrigger && getAllEvents) {
-            await EventsService.pubSubProvider.sendAsyncMessage(payload, { type: 'events-trigger' });
+            await this.eventPublisher.publish(EXCHANGES.tags, 'tag.process', payload, {
+              type: 'events-trigger',
+            });
           }
           if (hasTriggerCampaign && getAllEventsCampaign) {
             payload['isTriggerCampaign'] = true;
-            await EventsService.pubSubProvider.sendAsyncMessage(payload, { type: 'events-trigger' });
+            await this.eventPublisher.publish(EXCHANGES.tags, 'tag.process', payload, {
+              type: 'events-trigger',
+            });
           }
         }
       }
@@ -483,7 +498,7 @@ export class EventsService {
   }
 
   async processActivationEvents(events: InternalEvent[]) {
-    await EventsService.pubSubProvider.sendAsyncMessageBms({
+    await this.eventPublisher.publish(EXCHANGES.events, 'event.received.internal', {
       payload: events,
       platform: PlatformType.INTERNALEVENTS,
     } as InternalRequest);
@@ -493,7 +508,7 @@ export class EventsService {
     await Promise.all(
       events.map(async (message) => {
         const kafkaMessage = this.processMessageToKafka(message);
-        await EventsService.kafkaProvider.sendAsyncMessage(kafkaMessage, process.env.KAFKA_EVENTS_TOPIC);
+        await this.kafkaProvider.sendAsyncMessage(kafkaMessage, process.env.KAFKA_EVENTS_TOPIC);
       }),
     );
   }

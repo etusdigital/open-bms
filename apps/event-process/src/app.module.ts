@@ -5,10 +5,12 @@ import { Module } from '@nestjs/common';
 import { MsgopsModule } from './msgops/msgops.module';
 import { EventsModule } from './events/events.module';
 import { CacheService } from './msgops/cache.service';
+import { EventProcessConsumerService } from './event-process-consumer.service';
+import { MessagingModule } from './messaging.module';
 
 @Module({
-  imports: [ConfigModule.forRoot(), MsgopsModule, EventsModule],
+  imports: [ConfigModule.forRoot(), MessagingModule, MsgopsModule, EventsModule],
   controllers: [AppController],
-  providers: [FormatterUtils, CacheService],
+  providers: [FormatterUtils, CacheService, EventProcessConsumerService],
 })
 export class AppModule {}

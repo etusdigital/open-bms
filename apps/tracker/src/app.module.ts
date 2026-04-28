@@ -9,7 +9,7 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerBehindProxyGuard } from './guards/throttler-behind-proxy.guard';
 import { AppService } from './app.service';
-import { PubSubProvider } from './providers/pubsub.provider';
+import { EventPublisherService } from './event-publisher.service';
 import { ClsMiddleware, ClsModule } from 'nestjs-cls';
 import { FormatterUtils } from './utils/formatter.utils';
 import { typeOrmConfig } from './ormconfig';
@@ -44,7 +44,7 @@ import { typeOrmConfig } from './ormconfig';
       useClass: ThrottlerBehindProxyGuard,
     },
     AppService,
-    PubSubProvider,
+    EventPublisherService,
     FormatterUtils,
   ],
 })

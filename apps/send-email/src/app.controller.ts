@@ -1,7 +1,7 @@
-import { Body, Controller, Get, HttpException, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpException, HttpStatus, Post, UnauthorizedException } from '@nestjs/common';
 import { AppService } from './app.service';
 import { ResultDto } from './dtos/result.dto';
-import { SendEmailMessage, PubSubMessage, CompressedAutomationPayload } from './interfaces';
+import { SendEmailMessage, CompressedAutomationPayload } from './interfaces';
 
 @Controller()
 export class AppController {
@@ -12,12 +12,12 @@ export class AppController {
     return this.appService.getState();
   }
 
-  @Post()
-  async receiveMessage(@Body() data: SendEmailMessage | PubSubMessage | CompressedAutomationPayload): Promise<ResultDto> {
+  @Post('/internal/email/send')
+  async receiveMessage(@Headers('x-internal-token') token: string, @Body() data: SendEmailMessage | CompressedAutomationPayload): Promise<ResultDto> {
+    if (token !== process.env.INTERNAL_AUTH_TOKEN) {
+      throw new UnauthorizedException();
+    }
     try {
-      if ('subscription' in (data as PubSubMessage)) {
-        data = this.appService.parseNewMessageDtoToSendMailMessage(data as PubSubMessage);
-      }
       const redisKeyPayload = `${(data as CompressedAutomationPayload).automationKey || ''}`;
       if (redisKeyPayload) {
         data = (await this.appService.getRedis(redisKeyPayload)) as SendEmailMessage;
@@ -28,12 +28,9 @@ export class AppController {
     } catch (error) {
       const errorMessage = error.message || error;
       if (errorMessage && errorMessage.includes('Invalid URL')) {
-        if ('subscription' in (data as PubSubMessage)) {
-          data = this.appService.parseNewMessageDtoToSendMailMessage(data as PubSubMessage);
-        }
         const sendEmailMessage = data as SendEmailMessage;
         console.log(`Error URL: ${errorMessage}`, JSON.stringify(data));
-        await this.appService.sendToNextStep(sendEmailMessage.next.data, {});
+        await this.appService.sendToNextStep(sendEmailMessage.next.data, '');
         return;
       }
       console.log(`Error: ${errorMessage}`, JSON.stringify(data));

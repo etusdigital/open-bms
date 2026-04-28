@@ -3,7 +3,7 @@ import { RedisService } from '../../providers/redis/redis.service';
 import { InternalEventsService } from './internal-events.service';
 import { FormatterUtils } from '../../utils/formatter.utils';
 import { MsgopsService } from '../../msgops/msgops.service';
-import { PubSubProvider } from '../../providers/pubsub.provider';
+import { EventPublisherService } from '../../event-publisher.service';
 import { CacheService } from '../../msgops/cache.service';
 import { GeolocationService } from '../../utils/geolocation/geolocation.service';
 import { KafkaProvider } from '../../providers/kafka.provider';
@@ -41,10 +41,7 @@ describe('InternalEventsService', () => {
     findMessageAssociation: jest.fn(),
   };
 
-  const mockPubSubProvider = {
-    sendAsyncMessage: jest.fn(),
-    sendAsyncMessageBms: jest.fn(),
-  };
+  const mockEventPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
 
   const mockCacheService = {
     get: jest.fn(),
@@ -68,7 +65,7 @@ describe('InternalEventsService', () => {
         { provide: RedisService, useValue: mockRedisService },
         { provide: FormatterUtils, useValue: mockFormatterUtils },
         { provide: MsgopsService, useValue: mockMsgopsService },
-        { provide: PubSubProvider, useValue: mockPubSubProvider },
+        { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: CacheService, useValue: mockCacheService },
         { provide: GeolocationService, useValue: mockGeolocationService },
         { provide: KafkaProvider, useValue: mockKafkaProvider },

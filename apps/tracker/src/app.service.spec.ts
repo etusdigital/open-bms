@@ -1,18 +1,18 @@
 import { NotFoundException } from '@nestjs/common';
 import { AppService } from './app.service';
 import { MsgopsService } from './msgops/msgops.service';
-import { PubSubProvider } from './providers/pubsub.provider';
+import { EventPublisherService } from './event-publisher.service';
 import { ClsService } from 'nestjs-cls';
 
 describe('AppService', () => {
   let service: AppService;
-  let pubSubProvider: Partial<PubSubProvider>;
+  let eventPublisher: Partial<EventPublisherService>;
   let msgopsService: Partial<MsgopsService>;
   let clsService: Partial<ClsService>;
 
   beforeEach(() => {
-    pubSubProvider = {
-      sendMessage: jest.fn().mockResolvedValue({ messageId: 'test-id', status: true }),
+    eventPublisher = {
+      publish: jest.fn().mockResolvedValue(undefined),
     };
     msgopsService = {
       findLongUrl: jest.fn(),
@@ -22,7 +22,7 @@ describe('AppService', () => {
       get: jest.fn().mockReturnValue(42),
     };
 
-    service = new AppService(pubSubProvider as PubSubProvider, msgopsService as MsgopsService, clsService as ClsService);
+    service = new AppService(eventPublisher as EventPublisherService, msgopsService as MsgopsService, clsService as ClsService);
   });
 
   describe('getHello()', () => {
@@ -50,27 +50,24 @@ describe('AppService', () => {
     it('should redirect to long URL for valid short code', async () => {
       const longUrl = 'https://example.com/page?uuid=abc&platform=twilio&message_type=email&utm_source=test';
       (msgopsService.findLongUrl as jest.Mock).mockResolvedValue(longUrl);
-      process.env.TOPIC_WEBHOOKS = 'test-webhooks-topic';
 
       await service.processShortLink('abc123', '1.2.3.4', mockResponse, {});
 
       expect(mockResponse.cookie).toHaveBeenCalledWith('bmsUUID', 'abc', expect.any(Object));
-      expect(pubSubProvider.sendMessage).toHaveBeenCalled();
+      expect(eventPublisher.publish).toHaveBeenCalled();
       expect(mockResponse.redirect).toHaveBeenCalledWith(302, expect.any(String));
     });
 
-    it('should publish click event to Pub/Sub', async () => {
+    it('should publish click event with twilio platform attribute', async () => {
       const longUrl = 'https://example.com/page?uuid=abc&platform=twilio&message_type=sms';
       (msgopsService.findLongUrl as jest.Mock).mockResolvedValue(longUrl);
-      process.env.TOPIC_WEBHOOKS = 'webhooks-topic';
 
       await service.processShortLink('abc123', '1.2.3.4', mockResponse, { 'user-agent': 'test' });
 
-      expect(pubSubProvider.sendMessage).toHaveBeenCalledWith(
+      expect(eventPublisher.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           payload: expect.objectContaining({ event: 'click', ip: '1.2.3.4' }),
         }),
-        'webhooks-topic',
         expect.objectContaining({ platform: 'twilio', message_type: 'sms' }),
       );
     });
@@ -102,14 +99,13 @@ describe('AppService', () => {
       process.env = { ...originalEnv };
     });
 
-    it('should send message with correct body and attributes when enabled', async () => {
+    it('should publish with correct body and attributes when enabled', async () => {
       process.env.ENABLE_TRACKER_REDIRECT_EVENT = 'true';
-      process.env.TOPIC_WEBHOOKS = 'test-topic';
 
       await service.publishRedirectClick(baseParams);
 
-      expect(pubSubProvider.sendMessage).toHaveBeenCalledTimes(1);
-      expect(pubSubProvider.sendMessage).toHaveBeenCalledWith(
+      expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
+      expect(eventPublisher.publish).toHaveBeenCalledWith(
         {
           platform: 'internal',
           payload: [
@@ -125,42 +121,29 @@ describe('AppService', () => {
             }),
           ],
         },
-        'test-topic',
         { platform: 'internal', message_type: 'tracker-redirect' },
       );
     });
 
     it('should no-op when feature flag is not set', async () => {
       delete process.env.ENABLE_TRACKER_REDIRECT_EVENT;
-      process.env.TOPIC_WEBHOOKS = 'test-topic';
 
       await service.publishRedirectClick(baseParams);
 
-      expect(pubSubProvider.sendMessage).not.toHaveBeenCalled();
+      expect(eventPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('should no-op when feature flag is "false"', async () => {
       process.env.ENABLE_TRACKER_REDIRECT_EVENT = 'false';
-      process.env.TOPIC_WEBHOOKS = 'test-topic';
 
       await service.publishRedirectClick(baseParams);
 
-      expect(pubSubProvider.sendMessage).not.toHaveBeenCalled();
-    });
-
-    it('should no-op when TOPIC_WEBHOOKS is unset', async () => {
-      process.env.ENABLE_TRACKER_REDIRECT_EVENT = 'true';
-      delete process.env.TOPIC_WEBHOOKS;
-
-      await service.publishRedirectClick(baseParams);
-
-      expect(pubSubProvider.sendMessage).not.toHaveBeenCalled();
+      expect(eventPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('should swallow publish errors', async () => {
       process.env.ENABLE_TRACKER_REDIRECT_EVENT = 'true';
-      process.env.TOPIC_WEBHOOKS = 'test-topic';
-      (pubSubProvider.sendMessage as jest.Mock).mockRejectedValueOnce(new Error('boom'));
+      (eventPublisher.publish as jest.Mock).mockRejectedValueOnce(new Error('boom'));
 
       await expect(service.publishRedirectClick(baseParams)).resolves.toBeUndefined();
     });

@@ -8,7 +8,7 @@ import { RedisService } from './providers/redis/redis.service';
 import { TrackerService } from './tracker/tracker.service';
 import { SplitFeature } from './features/split/split.feature';
 import { MailUtils } from './mail/mail.utils';
-import { PubSubProvider } from './providers/pubsub.provider';
+import { EventPublisherService } from './event-publisher.service';
 
 const createMockSendEmailData = (overrides = {}) => ({
   messageId: 'msg-123',
@@ -55,21 +55,6 @@ const createMockSendEmailData = (overrides = {}) => ({
   ...overrides,
 });
 
-/**
- * Factory para criar mensagem PubSub
- */
-const createPubSubMessage = (data: any, messageId = 'msg-123') => ({
-  subscription: 'test-subscription',
-  message: {
-    data: Buffer.from(JSON.stringify(data)).toString('base64'),
-    messageId,
-    message_id: messageId,
-    publishTime: '2024-01-01T00:00:00Z',
-    publish_time: '2024-01-01T00:00:00Z',
-    attributes: {},
-  },
-});
-
 describe('AppService (Refactored)', () => {
   let service: AppService;
   let sparkPostHandler: jest.Mocked<SparkPostHandler>;
@@ -80,7 +65,7 @@ describe('AppService (Refactored)', () => {
   let trackerService: jest.Mocked<TrackerService>;
   let splitFeature: jest.Mocked<SplitFeature>;
   let mailUtils: jest.Mocked<MailUtils>;
-  let pubSubProvider: jest.Mocked<PubSubProvider>;
+  let eventPublisher: jest.Mocked<EventPublisherService>;
 
   beforeEach(async () => {
     // Mock do Redis Client
@@ -161,9 +146,9 @@ describe('AppService (Refactored)', () => {
           },
         },
         {
-          provide: PubSubProvider,
+          provide: EventPublisherService,
           useValue: {
-            sendAsyncMessage: jest.fn(),
+            publish: jest.fn(),
           },
         },
       ],
@@ -178,7 +163,7 @@ describe('AppService (Refactored)', () => {
     trackerService = module.get(TrackerService);
     splitFeature = module.get(SplitFeature);
     mailUtils = module.get(MailUtils);
-    pubSubProvider = module.get(PubSubProvider);
+    eventPublisher = module.get(EventPublisherService);
   });
 
   it('should be defined', () => {
@@ -189,80 +174,6 @@ describe('AppService (Refactored)', () => {
     it('should return status true and message Ok!', async () => {
       const result = await service.getState();
       expect(result).toEqual({ status: true, message: 'Ok!' });
-    });
-  });
-
-  describe('parseNewMessageDtoToSendMailMessage', () => {
-    it('should parse valid PubSub message and include all required fields', () => {
-      // Arrange - Remove messageId do mockData para que não conflite com o messageId do PubSubMessage
-      const { messageId: _messageId, ...mockDataWithoutMessageId } = createMockSendEmailData();
-      const pubSubMsg = createPubSubMessage(mockDataWithoutMessageId, 'test-msg-id');
-
-      // Act
-      const result = service.parseNewMessageDtoToSendMailMessage(pubSubMsg);
-
-      // Assert
-      expect(result).toMatchObject({
-        messageId: 'test-msg-id',
-        automationId: mockDataWithoutMessageId.automationId,
-        automationName: mockDataWithoutMessageId.automationName,
-        contact: expect.objectContaining({ email: 'test@example.com' }),
-        message: expect.objectContaining({ id: 456 }),
-      });
-    });
-
-    /**
-     * TESTES PARAMETRIZADOS: Valida múltiplos cenários de erro
-     * Substitui 3 testes separados com test.each
-     */
-    describe('error handling', () => {
-      it.each([
-        {
-          scenario: 'invalid base64',
-          data: 'invalid-base64-!@#$%',
-          messageId: 'msg-invalid',
-          shouldEncode: false,
-        },
-        {
-          scenario: 'malformed JSON',
-          data: '{ invalid json without closing brace',
-          messageId: 'msg-malformed',
-          shouldEncode: true,
-        },
-        {
-          scenario: 'non-JSON string',
-          data: 'This is not JSON at all',
-          messageId: 'msg-not-json',
-          shouldEncode: true,
-        },
-      ])('should throw error with details when $scenario', ({ data, messageId, shouldEncode }) => {
-        // Arrange
-        const encodedData = shouldEncode ? Buffer.from(data).toString('base64') : data;
-        const pubSubMsg = {
-          subscription: 'sub',
-          message: {
-            data: encodedData,
-            messageId,
-            message_id: messageId,
-            publishTime: '2024-01-01T00:00:00Z',
-            publish_time: '2024-01-01T00:00:00Z',
-            attributes: {},
-          },
-        };
-
-        // Act & Assert
-        expect(() => {
-          service.parseNewMessageDtoToSendMailMessage(pubSubMsg);
-        }).toThrow(/Unable to parse data to SendEmailMessage/);
-
-        // Validação adicional de conteúdo da mensagem de erro
-        try {
-          service.parseNewMessageDtoToSendMailMessage(pubSubMsg);
-        } catch (error) {
-          expect(error.message).toContain(messageId);
-          expect(error.message).toContain(encodedData);
-        }
-      });
     });
   });
 
@@ -1146,10 +1057,18 @@ describe('AppService (Refactored)', () => {
     });
 
     describe('sendToNextStep error', () => {
-      it('should throw wrapped error when pubSubProvider.sendAsyncMessage fails', async () => {
-        pubSubProvider.sendAsyncMessage.mockRejectedValue(new Error('PubSub failure'));
+      it('should throw wrapped error when eventPublisher.publish fails', async () => {
+        eventPublisher.publish.mockRejectedValue(new Error('AMQP failure'));
 
         await expect(service.sendToNextStep({ leadId: '123' }, 'redis-key')).rejects.toThrow('Error to send message to message-trigger error');
+      });
+
+      it('should publish to bms.triggers/trigger.process on success', async () => {
+        eventPublisher.publish.mockResolvedValue();
+
+        await service.sendToNextStep({ leadId: '123' }, 'redis-key');
+
+        expect(eventPublisher.publish).toHaveBeenCalledWith('bms.triggers', 'trigger.process', { leadId: '123' });
       });
     });
 

@@ -5,7 +5,7 @@ import { RedisService } from './providers/redis/redis.service';
 import { ResultDto } from './dtos/result.dto';
 import { StorageService } from './storage/storage.service';
 import { SparkPostHandler } from './handlers/sparkpost/sparkPost.handler';
-import { Email, PubSubMessage, SendEmailMessage } from './interfaces';
+import { Email, SendEmailMessage } from './interfaces';
 import { TrackerService } from './tracker/tracker.service';
 import { MsgopsEvent } from './tracker/tracker.interface';
 import { MailUtils } from './mail/mail.utils';
@@ -14,7 +14,8 @@ import { SplitFeature } from './features/split/split.feature';
 import * as dayjs from 'dayjs';
 import * as utc from 'dayjs/plugin/utc';
 import * as timezone from 'dayjs/plugin/timezone';
-import { PubSubProvider } from './providers/pubsub.provider';
+import { EXCHANGES } from '@bms/messaging';
+import { EventPublisherService } from './event-publisher.service';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -30,26 +31,11 @@ export class AppService {
     private readonly trackerService: TrackerService,
     private readonly splitFeature: SplitFeature,
     private readonly mailUtils: MailUtils,
-    private readonly pubSubProvider: PubSubProvider,
+    private readonly eventPublisher: EventPublisherService,
   ) {}
 
   async getState(): Promise<ResultDto> {
     return { status: true, message: 'Ok!' };
-  }
-
-  public parseNewMessageDtoToSendMailMessage(messageDto: PubSubMessage): SendEmailMessage {
-    const {
-      message: { data, messageId },
-    } = messageDto;
-
-    try {
-      const buff = Buffer.from(data, 'base64').toString();
-      const sendMailMessage: SendEmailMessage = { messageId, ...JSON.parse(buff) };
-
-      return sendMailMessage;
-    } catch {
-      throw new Error(`Unable to parse data to SendEmailMessage messageId: ${messageId} data: ${data} `);
-    }
   }
 
   async receiveMessage(sendEmailMessage: SendEmailMessage, redisKeyPayload: string): Promise<ResultDto> {
@@ -320,7 +306,7 @@ export class AppService {
     return this.sendToNextStep(sendEmailMessage.next.data, redisKeyPayload);
   }
 
-  async sendToNextStep(message: any, _redisKeyPayload): Promise<ResultDto> {
+  async sendToNextStep(message: any, _redisKeyPayload: string): Promise<ResultDto> {
     try {
       // const compressPayload = {
       //   automationKey: `automation-${message?.id || 0}-${message?.contact?.id || 0}-${Date.now()}`
@@ -330,11 +316,11 @@ export class AppService {
       // if (redisKeyPayload) {
       //   await redisClient.del(redisKeyPayload);
       // }
-      const messageId = await this.pubSubProvider.sendAsyncMessage(message);
+      await this.eventPublisher.publish(EXCHANGES.triggers, 'trigger.process', message);
 
       return {
         status: true,
-        message: `${messageId} send to message-trigger.`,
+        message: `Message published to bms.triggers/trigger.process.`,
       };
     } catch (error) {
       throw new Error(`Error to send message to message-trigger error: ${error}`);

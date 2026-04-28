@@ -3,7 +3,7 @@ import { RedisService } from '../../providers/redis/redis.service';
 import { PushService } from './push.service';
 import { FormatterUtils } from '../../utils/formatter.utils';
 import { MsgopsService } from '../../msgops/msgops.service';
-import { PubSubProvider } from '../../providers/pubsub.provider';
+import { EventPublisherService } from '../../event-publisher.service';
 import { CacheService } from '../../msgops/cache.service';
 import { GeolocationService } from '../../utils/geolocation/geolocation.service';
 import { KafkaProvider } from '../../providers/kafka.provider';
@@ -41,7 +41,7 @@ describe('PushService', () => {
     updateContactDevices: jest.fn().mockResolvedValue({}),
     saveEventsLogs: jest.fn().mockResolvedValue({}),
   };
-  const mockPubSubProvider = { sendAsyncMessage: jest.fn(), sendAsyncMessageBms: jest.fn() };
+  const mockEventPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
   const mockCacheService = { get: jest.fn(), set: jest.fn() };
   const mockGeolocationService = { getLocation: jest.fn().mockResolvedValue({}) };
   const mockKafkaProvider = { sendAsyncMessage: jest.fn().mockResolvedValue(undefined) };
@@ -55,7 +55,7 @@ describe('PushService', () => {
         { provide: RedisService, useValue: mockRedisService },
         { provide: FormatterUtils, useValue: mockFormatterUtils },
         { provide: MsgopsService, useValue: mockMsgopsService },
-        { provide: PubSubProvider, useValue: mockPubSubProvider },
+        { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: CacheService, useValue: mockCacheService },
         { provide: GeolocationService, useValue: mockGeolocationService },
         { provide: KafkaProvider, useValue: mockKafkaProvider },

@@ -595,7 +595,7 @@ export class SendgridService extends EventsService {
   private async processAutomationTargetEvents(events: AutomationTargetEvent[]) {
     await Promise.all(
       events.map(async (event) => {
-        await this.publishPubsubAutomationTarget(event);
+        await this.publishAutomationTarget(event);
       }),
     );
   }

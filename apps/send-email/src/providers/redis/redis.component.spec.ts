@@ -5,7 +5,7 @@ import { MailService } from '../../mail/mail.service';
 import { MailUtils } from '../../mail/mail.utils';
 import { FormatterUtils } from '../../utils/formatter.utils';
 import { TrackerService } from '../../tracker/tracker.service';
-import { PubSubProvider } from '../pubsub.provider';
+import { EventPublisherService } from '../../event-publisher.service';
 import { SparkPostHandler } from '../../handlers/sparkpost/sparkPost.handler';
 import { AppService } from '../../app.service';
 import { StorageService } from '../../storage/storage.service';
@@ -83,11 +83,9 @@ describe('Redis Integration Tests', () => {
           },
         },
         {
-          provide: PubSubProvider,
+          provide: EventPublisherService,
           useValue: {
-            sendAsyncMessage: jest.fn().mockResolvedValue(true),
-            sendAsyncMessage2: jest.fn().mockResolvedValue(true),
-            publishMessage: jest.fn().mockResolvedValue('msg-id'),
+            publish: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -291,9 +289,9 @@ describe('Redis Integration Tests', () => {
             },
           },
           {
-            provide: PubSubProvider,
+            provide: EventPublisherService,
             useValue: {
-              sendAsyncMessage: jest.fn().mockResolvedValue(true),
+              publish: jest.fn().mockResolvedValue(undefined),
             },
           },
         ],

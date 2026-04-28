@@ -1,41 +1,40 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { UnauthorizedException } from '@nestjs/common';
 import { BatchController } from './batch.controller';
 import { BatchService } from './batch.service';
-import { FormatterUtils } from '../utils/formatter.utils';
+
+const VALID_TOKEN = 'dev-send-email-token-change-me-please';
 
 describe('BatchController', () => {
   let controller: BatchController;
   let batchService: jest.Mocked<BatchService>;
-  let formatterUtils: jest.Mocked<FormatterUtils>;
 
   beforeEach(async () => {
+    process.env.INTERNAL_AUTH_TOKEN = VALID_TOKEN;
     const mockBatchService = {
       campaignBatch: jest.fn(),
       automationBatch: jest.fn(),
       getRedis: jest.fn(),
       setRedis: jest.fn(),
-      setPubsubErros: jest.fn(),
-    };
-
-    const mockFormatterUtils = {
-      parseBase64: jest.fn(),
+      publishCampaignError: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [BatchController],
-      providers: [
-        { provide: BatchService, useValue: mockBatchService },
-        { provide: FormatterUtils, useValue: mockFormatterUtils },
-      ],
+      providers: [{ provide: BatchService, useValue: mockBatchService }],
     }).compile();
 
     controller = module.get<BatchController>(BatchController);
     batchService = module.get(BatchService);
-    formatterUtils = module.get(FormatterUtils);
   });
 
-  describe('POST /batch/campaigns', () => {
-    it('should process campaign batch directly', async () => {
+  describe('POST /internal/campaigns/send', () => {
+    it('should reject when token is wrong', async () => {
+      const batch: any = { campaign_id: 123 };
+      await expect(controller.campaigns('bad-token', batch, { debug: 'false' })).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should process campaign batch with valid token', async () => {
       const batch: any = {
         campaign_id: 123,
         campaign_name: 'Test Campaign',
@@ -43,39 +42,21 @@ describe('BatchController', () => {
         message: { id: 1, subject: 'Test' },
       };
       const debug = 'false';
-      batchService.campaignBatch.mockResolvedValue({ status: true, message: 'OK' });
+      batchService.campaignBatch.mockResolvedValue({ status: true, message: 'OK' } as any);
 
-      const result = await controller.campaigns(batch, { debug });
+      const result = await controller.campaigns(VALID_TOKEN, batch, { debug });
 
       expect(result).toEqual({ status: true, message: 'OK' });
       expect(batchService.campaignBatch).toHaveBeenCalledWith(batch, debug);
-    });
-
-    it('should parse PubSub subscription message', async () => {
-      const subscriptionMessage: any = {
-        subscription: 'projects/test/subscriptions/campaigns',
-        message: {
-          data: Buffer.from(JSON.stringify({ campaign_id: 123 })).toString('base64'),
-          messageId: 'msg-123',
-        },
-      };
-      const parsedBatch: any = { campaign_id: 123 };
-      formatterUtils.parseBase64.mockReturnValue(parsedBatch);
-      batchService.campaignBatch.mockResolvedValue({ status: true, message: 'OK' });
-
-      await controller.campaigns(subscriptionMessage, { debug: 'false' });
-
-      expect(formatterUtils.parseBase64).toHaveBeenCalledWith(subscriptionMessage.message.data);
-      expect(batchService.campaignBatch).toHaveBeenCalledWith(parsedBatch, 'false');
     });
 
     it('should fetch from Redis when campaignKey is provided', async () => {
       const compressedPayload: any = { campaignKey: 'redis-campaign-key' };
       const redisBatch: any = { campaign_id: 456 };
       batchService.getRedis.mockResolvedValue(redisBatch);
-      batchService.campaignBatch.mockResolvedValue({ status: true, message: 'OK' });
+      batchService.campaignBatch.mockResolvedValue({ status: true, message: 'OK' } as any);
 
-      await controller.campaigns(compressedPayload, { debug: 'false' });
+      await controller.campaigns(VALID_TOKEN, compressedPayload, { debug: 'false' });
 
       expect(batchService.getRedis).toHaveBeenCalledWith('redis-campaign-key');
       expect(batchService.campaignBatch).toHaveBeenCalledWith(redisBatch, 'false');
@@ -86,7 +67,7 @@ describe('BatchController', () => {
       const batch: any = { campaign_id: 200 };
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 
-      const result = await controller.campaigns(batch, { debug: 'false' });
+      const result = await controller.campaigns(VALID_TOKEN, batch, { debug: 'false' });
 
       expect(result).toEqual({});
       expect(batchService.campaignBatch).not.toHaveBeenCalled();
@@ -94,16 +75,16 @@ describe('BatchController', () => {
       delete process.env.STOP_CAMPAIGNS;
     });
 
-    it('should handle errors and call setPubsubErros', async () => {
+    it('should handle errors and call publishCampaignError', async () => {
       const batch: any = { campaign_id: 123 };
       batchService.campaignBatch.mockRejectedValue(new Error('Processing failed'));
-      batchService.setPubsubErros.mockResolvedValue('error-id');
+      batchService.publishCampaignError.mockResolvedValue('error-id' as any);
 
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      const result = await controller.campaigns(batch, { debug: 'false' });
+      const result = await controller.campaigns(VALID_TOKEN, batch, { debug: 'false' });
 
-      expect(batchService.setPubsubErros).toHaveBeenCalledWith(batch);
+      expect(batchService.publishCampaignError).toHaveBeenCalledWith(batch);
       expect(result).toBe('error-id');
       consoleErrorSpy.mockRestore();
     });
@@ -113,20 +94,25 @@ describe('BatchController', () => {
       const redisBatch: any = { campaign_id: 456 };
       batchService.getRedis.mockResolvedValue(redisBatch);
       batchService.campaignBatch.mockRejectedValue(new Error('Processing failed'));
-      batchService.setPubsubErros.mockResolvedValue('error-id');
+      batchService.publishCampaignError.mockResolvedValue('error-id' as any);
 
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      await controller.campaigns(compressedPayload, { debug: 'false' });
+      await controller.campaigns(VALID_TOKEN, compressedPayload, { debug: 'false' });
 
       expect(batchService.setRedis).toHaveBeenCalledWith('redis-key', redisBatch);
-      expect(batchService.setPubsubErros).toHaveBeenCalledWith(compressedPayload);
+      expect(batchService.publishCampaignError).toHaveBeenCalledWith(compressedPayload);
       consoleErrorSpy.mockRestore();
     });
   });
 
-  describe('POST /batch/automations', () => {
-    it('should process automation batch directly', async () => {
+  describe('POST /internal/automations/process', () => {
+    it('should reject when token is wrong', async () => {
+      const batch: any = { messageId: 'msg-123' };
+      await expect(controller.automations('bad-token', batch, { debug: 'false' })).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should process automation batch with valid token', async () => {
       const batch: any = {
         email: 'exists',
         messageId: 'msg-123',
@@ -134,30 +120,12 @@ describe('BatchController', () => {
         message: { id: 1, subject: 'Test' },
       };
       const debug = 'false';
-      batchService.automationBatch.mockResolvedValue({ status: true, message: 'OK' });
+      batchService.automationBatch.mockResolvedValue({ status: true, message: 'OK' } as any);
 
-      const result = await controller.automations(batch, { debug });
+      const result = await controller.automations(VALID_TOKEN, batch, { debug });
 
       expect(result).toEqual({ status: true, message: 'OK' });
       expect(batchService.automationBatch).toHaveBeenCalledWith(batch, debug);
-    });
-
-    it('should parse PubSub subscription message for automations', async () => {
-      const subscriptionMessage: any = {
-        subscription: 'projects/test/subscriptions/automations',
-        message: {
-          data: Buffer.from(JSON.stringify({ messageId: 'msg-123' })).toString('base64'),
-          messageId: 'pub-123',
-        },
-      };
-      const parsedBatch: any = { messageId: 'msg-123' };
-      formatterUtils.parseBase64.mockReturnValue(parsedBatch);
-      batchService.automationBatch.mockResolvedValue({ status: true, message: 'OK' });
-
-      await controller.automations(subscriptionMessage, { debug: 'true' });
-
-      expect(formatterUtils.parseBase64).toHaveBeenCalledWith(subscriptionMessage.message.data);
-      expect(batchService.automationBatch).toHaveBeenCalledWith(parsedBatch, 'true');
     });
   });
 });

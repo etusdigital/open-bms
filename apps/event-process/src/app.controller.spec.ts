@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { EventsService } from './events/services/events.service';
 import { SendgridService } from './events/services/sendgrid.service';
@@ -10,38 +10,21 @@ import { InternalEventsService } from './events/services/internal-events.service
 import { FormatterUtils } from './utils/formatter.utils';
 import { PlatformType } from './events/interfaces/push.interfaces';
 
+const VALID_TOKEN = 'dev-event-process-token-change-me-please';
+
 describe('AppController', () => {
   let controller: AppController;
 
-  const mockFormatterUtils = {
-    logInfo: jest.fn(),
-  };
-
-  const mockEventsService = {
-    processWithIdempotency: jest.fn().mockImplementation((_id, fn) => fn()),
-  };
-
-  const mockSendgridService = {
-    processSendgrid: jest.fn().mockResolvedValue({}),
-  };
-
-  const mockPushService = {
-    processPush: jest.fn().mockResolvedValue({}),
-  };
-
-  const mockTwilioService = {
-    processTwilioNotification: jest.fn().mockResolvedValue({}),
-  };
-
-  const mockCustomEventsService = {
-    customEventsProcess: jest.fn().mockResolvedValue({}),
-  };
-
-  const mockInternalEventsService = {
-    internalEventsProcess: jest.fn().mockResolvedValue({}),
-  };
+  const mockFormatterUtils = { logInfo: jest.fn() };
+  const mockEventsService = { processWithIdempotency: jest.fn().mockImplementation((_id, fn) => fn()) };
+  const mockSendgridService = { processSendgrid: jest.fn().mockResolvedValue({}) };
+  const mockPushService = { processPush: jest.fn().mockResolvedValue({}) };
+  const mockTwilioService = { processTwilioNotification: jest.fn().mockResolvedValue({}) };
+  const mockCustomEventsService = { customEventsProcess: jest.fn().mockResolvedValue({}) };
+  const mockInternalEventsService = { internalEventsProcess: jest.fn().mockResolvedValue({}) };
 
   beforeEach(async () => {
+    process.env.INTERNAL_AUTH_TOKEN = VALID_TOKEN;
     jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
@@ -60,116 +43,94 @@ describe('AppController', () => {
     controller = module.get<AppController>(AppController);
   });
 
-  describe('POST /*', () => {
-    describe('sendgrid platform', () => {
-      it('should delegate to sendgridService.processSendgrid', async () => {
-        const events = { platform: PlatformType.SENDGRID, payload: [], account: 'acct' };
-        await controller.processEvent(events as any, 'msg-1', undefined);
-
-        expect(mockEventsService.processWithIdempotency).toHaveBeenCalledWith('msg-1', expect.any(Function));
-        expect(mockSendgridService.processSendgrid).toHaveBeenCalledWith(events);
-      });
-
-      it('should use platform from body when header platform is absent', async () => {
-        const events = { platform: PlatformType.SENDGRID, payload: [], account: 'acct' };
-        await controller.processEvent(events as any, 'msg-2', undefined);
-
-        expect(mockSendgridService.processSendgrid).toHaveBeenCalled();
-      });
+  describe('auth guard', () => {
+    it('rejects when token is missing', async () => {
+      await expect(controller.sendgrid(undefined as any, {} as any)).rejects.toThrow(UnauthorizedException);
     });
 
-    describe('twilio platform', () => {
-      it('should delegate to twilioService.processTwilioNotification', async () => {
-        const events = { platform: PlatformType.TWILIO, payload: {}, categories: {} };
-        await controller.processEvent(events as any, 'msg-3', undefined);
+    it('rejects when token is wrong', async () => {
+      await expect(controller.sendgrid('wrong', {} as any)).rejects.toThrow(UnauthorizedException);
+    });
+  });
 
-        expect(mockEventsService.processWithIdempotency).toHaveBeenCalledWith('msg-3', expect.any(Function));
-        expect(mockTwilioService.processTwilioNotification).toHaveBeenCalledWith(events);
-      });
+  describe('POST /internal/event/sendgrid', () => {
+    it('throws when body is empty', async () => {
+      await expect(controller.sendgrid(VALID_TOKEN, undefined as any)).rejects.toThrow(BadRequestException);
     });
 
-    describe('web-push platform', () => {
-      it('should delegate to pushService.processPush', async () => {
-        const events = { platform: PlatformType.WEBPUSH, payload: [], client_info: {} };
-        await controller.processEvent(events as any, 'msg-4', undefined);
+    it('delegates to sendgridService with content-hashed idempotency key', async () => {
+      const events = { platform: PlatformType.SENDGRID, payload: [], account: 'acct' };
+      await controller.sendgrid(VALID_TOKEN, events as any);
 
-        expect(mockPushService.processPush).toHaveBeenCalledWith(events);
-      });
+      expect(mockEventsService.processWithIdempotency).toHaveBeenCalledWith(expect.any(String), expect.any(Function));
+      expect(mockSendgridService.processSendgrid).toHaveBeenCalledWith(events);
+    });
+  });
 
-      it('should wrap array payload in PushWebhook shape when body is array', async () => {
-        const events = [{ event: 'click' }];
-        (events as any).platform = PlatformType.WEBPUSH;
-        await controller.processEvent(events as any, 'msg-5', PlatformType.WEBPUSH);
+  describe('POST /internal/event/twilio', () => {
+    it('delegates to twilioService', async () => {
+      const events = { platform: PlatformType.TWILIO, payload: {}, categories: {} };
+      await controller.twilio(VALID_TOKEN, events as any);
 
-        expect(mockPushService.processPush).toHaveBeenCalledWith(expect.objectContaining({ payload: events }));
-      });
+      expect(mockTwilioService.processTwilioNotification).toHaveBeenCalledWith(events);
+    });
+  });
+
+  describe('POST /internal/event/push', () => {
+    it('delegates to pushService for object payload', async () => {
+      const events = { platform: PlatformType.WEBPUSH, payload: [], client_info: {} };
+      await controller.push(VALID_TOKEN, events as any);
+
+      expect(mockPushService.processPush).toHaveBeenCalledWith(events);
     });
 
-    describe('mobile-push platform', () => {
-      it('should delegate to pushService.processPush', async () => {
-        const events = { platform: PlatformType.MOBILEPUSH, payload: [], client_info: {} };
-        await controller.processEvent(events as any, 'msg-6', undefined);
+    it('wraps array payload in PushWebhook shape', async () => {
+      const events = [{ event: 'click' }];
+      await controller.push(VALID_TOKEN, events as any);
 
-        expect(mockPushService.processPush).toHaveBeenCalledWith(events);
-      });
+      expect(mockPushService.processPush).toHaveBeenCalledWith(expect.objectContaining({ payload: events }));
+    });
+  });
+
+  describe('POST /internal/event/custom', () => {
+    it('delegates to customEventsService', async () => {
+      const events = { platform: PlatformType.CUSTOMEVENTS, payload: [] };
+      await controller.custom(VALID_TOKEN, events as any);
+
+      expect(mockCustomEventsService.customEventsProcess).toHaveBeenCalledWith(events);
     });
 
-    describe('custom_events platform', () => {
-      it('should delegate to customEventsService.customEventsProcess', async () => {
-        const events = { platform: PlatformType.CUSTOMEVENTS, payload: [] };
-        await controller.processEvent(events as any, 'msg-7', undefined);
+    it('throws BadRequestException on error', async () => {
+      mockCustomEventsService.customEventsProcess.mockRejectedValueOnce(new Error('fail'));
+      const events = { platform: PlatformType.CUSTOMEVENTS, payload: [] };
 
-        expect(mockCustomEventsService.customEventsProcess).toHaveBeenCalledWith(events);
-      });
+      await expect(controller.custom(VALID_TOKEN, events as any)).rejects.toThrow(BadRequestException);
+    });
+  });
 
-      it('should throw BadRequestException on error', async () => {
-        mockCustomEventsService.customEventsProcess.mockRejectedValue(new Error('fail'));
-        const events = { platform: PlatformType.CUSTOMEVENTS, payload: [] };
+  describe('POST /internal/event/internal', () => {
+    it('delegates to internalEventsService', async () => {
+      const events = { platform: PlatformType.INTERNALEVENTS, payload: [] };
+      await controller.internal(VALID_TOKEN, events as any);
 
-        await expect(controller.processEvent(events as any, 'msg-8', undefined)).rejects.toThrow(BadRequestException);
-      });
+      expect(mockInternalEventsService.internalEventsProcess).toHaveBeenCalledWith(events);
     });
 
-    describe('internal platform', () => {
-      it('should delegate to internalEventsService.internalEventsProcess', async () => {
-        const events = { platform: PlatformType.INTERNALEVENTS, payload: [] };
-        await controller.processEvent(events as any, 'msg-9', undefined);
+    it('throws BadRequestException on error', async () => {
+      mockInternalEventsService.internalEventsProcess.mockRejectedValueOnce(new Error('fail'));
+      const events = { platform: PlatformType.INTERNALEVENTS, payload: [] };
 
-        expect(mockInternalEventsService.internalEventsProcess).toHaveBeenCalledWith(events);
-      });
-
-      it('should throw BadRequestException on error', async () => {
-        mockInternalEventsService.internalEventsProcess.mockRejectedValue(new Error('fail'));
-        const events = { platform: PlatformType.INTERNALEVENTS, payload: [] };
-
-        await expect(controller.processEvent(events as any, 'msg-10', undefined)).rejects.toThrow(BadRequestException);
-      });
+      await expect(controller.internal(VALID_TOKEN, events as any)).rejects.toThrow(BadRequestException);
     });
+  });
 
-    describe('sparkpost platform', () => {
-      it('should log event and return undefined', async () => {
-        const events = { platform: PlatformType.SPARKPOST };
-        const result = await controller.processEvent(events as any, 'msg-11', undefined);
+  describe('POST /internal/event/sparkpost', () => {
+    it('logs event and returns undefined (preserves original log-only behavior)', async () => {
+      const events = { platform: PlatformType.SPARKPOST };
+      const result = await controller.sparkpost(VALID_TOKEN, events as any);
 
-        expect(mockFormatterUtils.logInfo).toHaveBeenCalledWith(expect.stringContaining('Sparkpost'));
-        expect(result).toBeUndefined();
-      });
-    });
-
-    describe('unknown platform', () => {
-      it('should throw BadRequestException', async () => {
-        const events = { platform: 'unknown-platform' };
-
-        await expect(controller.processEvent(events as any, 'msg-12', undefined)).rejects.toThrow(BadRequestException);
-      });
-
-      it('should prefer body.platform over header platform', async () => {
-        const events = { platform: PlatformType.SENDGRID, payload: [], account: 'acct' };
-        await controller.processEvent(events as any, 'msg-13', PlatformType.TWILIO);
-
-        expect(mockSendgridService.processSendgrid).toHaveBeenCalled();
-        expect(mockTwilioService.processTwilioNotification).not.toHaveBeenCalled();
-      });
+      expect(mockFormatterUtils.logInfo).toHaveBeenCalledWith(expect.stringContaining('Sparkpost'));
+      expect(result).toBeUndefined();
     });
   });
 });

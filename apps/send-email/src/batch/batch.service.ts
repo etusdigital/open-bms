@@ -9,7 +9,8 @@ import { TrackerService } from '../tracker/tracker.service';
 import * as dayjs from 'dayjs';
 import * as utc from 'dayjs/plugin/utc';
 import * as timezone from 'dayjs/plugin/timezone';
-import { PubSubProvider } from '../providers/pubsub.provider';
+import { EXCHANGES } from '@bms/messaging';
+import { EventPublisherService } from '../event-publisher.service';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -22,7 +23,7 @@ export class BatchService {
     private readonly formatterUtils: FormatterUtils,
     private readonly redisService: RedisService,
     private readonly trackerService: TrackerService,
-    private readonly pubSubProvider: PubSubProvider,
+    private readonly eventPublisher: EventPublisherService,
   ) {}
 
   async campaignBatch(batch: Batch, debug: string) {
@@ -188,7 +189,7 @@ export class BatchService {
       testabMode: batch.campaign_test_ab_mode,
     };
 
-    return this.pubSubProvider.sendAsyncMessage(tracker);
+    return this.eventPublisher.publish(EXCHANGES.campaigns, 'campaign.tracked', tracker);
   }
 
   async cleanupContacts(contacts: Contact[], category = 'duplicated', emailTitle?: string, accountId?: number): Promise<Contact[]> {
@@ -312,7 +313,7 @@ export class BatchService {
     return await redisClient.set(redisKey, JSON.stringify(payload), 'EX', 43200);
   }
 
-  async setPubsubErros(payload) {
-    return await this.pubSubProvider.sendAsyncMessage2(payload);
+  async publishCampaignError(payload) {
+    return await this.eventPublisher.publish(EXCHANGES.email, 'email.error', payload);
   }
 }

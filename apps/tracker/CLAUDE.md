@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Framework**: NestJS 8.4.6
 - **Database**: PostgreSQL via TypeORM 0.3.6
 - **Cache**: Redis (via nestjs-redis)
-- **Message Queue**: Google Cloud Pub/Sub
+- **Message Queue**: RabbitMQ (AMQP) via `@bms/messaging`
 - **Rate Limiting**: Redis-backed throttler
 - **Request Context**: nestjs-cls for request-scoped storage
 - **Package Manager**: yarn
@@ -76,7 +76,7 @@ const accountId = this.cls.get('accountId');
   - `POST /ac`, `/bms/ac`: Multi-account contact lookup by email
   - `GET /contacts`, `/bms/contacts`: Contact details with optional includes (tags, segments, customFields)
   - `GET /redirect`: URL redirect with cookie setting for tracking
-  - `GET /:shortCode`: Short link redirect with Pub/Sub event publishing
+  - `GET /:shortCode`: Short link redirect with AMQP event publishing
 
 - **MsgopsService** (`src/msgops/msgops.service.ts`): Business logic
   - Contact repository operations with TypeORM
@@ -85,12 +85,12 @@ const accountId = this.cls.get('accountId');
 
 - **AppService** (`src/app.service.ts`): Short link processing
   - Decodes short codes to long URLs via database + Redis cache
-  - Publishes click events to Pub/Sub topic (`TOPIC_WEBHOOKS`)
+  - Publishes click events to AMQP exchange `bms.events` with routing-key `event.received.<platform>`
   - Sets tracking cookies on root domain
 
-- **PubSubProvider** (`src/providers/pubsub.provider.ts`): Google Cloud Pub/Sub client
-  - Publishes messages to configured topics
-  - Skips actual publishing in non-production (mocked)
+- **EventPublisherService** (`src/event-publisher.service.ts`): RabbitMQ publisher
+  - Wraps `AmqpPublisher` from `@bms/messaging`
+  - `sanitizePlatform()` allowlists platform header before deriving routing-key
 
 ### Database Entities
 
@@ -122,7 +122,7 @@ Redis is used extensively for performance:
 
 ### Event Tracking
 
-Short link clicks publish to Pub/Sub with this payload:
+Short link clicks publish to AMQP exchange `bms.events` (routing-key `event.received.<platform>`) with this payload:
 
 ```json
 {
@@ -159,9 +159,8 @@ REDIS_HOST
 REDIS_PORT
 REDIS_PASSWORD
 
-# Google Cloud
-SERVICE_ACCOUNT          # JSON string of GCP service account
-TOPIC_WEBHOOKS          # Pub/Sub topic for click events
+# RabbitMQ
+AMQP_URL                # AMQP broker URL (e.g. amqp://guest:guest@rabbitmq:5672)
 
 # Runtime
 PORT=3000
@@ -253,8 +252,8 @@ Contact queries with `includes` options use PostgreSQL LATERAL joins for efficie
 This service is part of the larger MsgOps platform and integrates with:
 
 - **msgops-api**: Main API that manages contacts, campaigns, automations
-- **msgops-send-email**: Consumes Pub/Sub events published by this service
-- **BigQuery**: Click events flow to analytics tables via Pub/Sub subscribers
+- **msgops-event-process**: Consumes AMQP events published by this service via `@bms/messaging`
+- **ClickHouse**: Click events flow to analytics tables (transport TBD — see EVO-1013)
 
 ## Security
 
