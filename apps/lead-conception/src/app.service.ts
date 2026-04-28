@@ -2,7 +2,9 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { RedisService } from './providers/redis/redis.service';
 import { Contact, ContactDevice, DeviceType, LeadMessage, EmailVerify, CustomFieldsType } from './interfaces';
 import { ContactEntity } from './msgops/entities/contact.entity';
-import { PubSubProvider } from './providers/pubsub.provider';
+import { TagPublisherService } from './publishers/tag-publisher.service';
+import { EventPublisherService } from './publishers/event-publisher.service';
+import { TriggerPublisherService } from './publishers/trigger-publisher.service';
 import { MsgopsService } from './msgops/msgops.service';
 import { FormatterUtils } from './utils/formatter.utils';
 import { AccountEntity } from './msgops/entities/account.entity';
@@ -16,7 +18,9 @@ import { GeolocationService } from './geolocation/geolocation.service';
 @Injectable()
 export class AppService {
   constructor(
-    private readonly pubSubProvider: PubSubProvider,
+    private readonly tagPublisher: TagPublisherService,
+    private readonly eventPublisher: EventPublisherService,
+    private readonly triggerPublisher: TriggerPublisherService,
     private readonly msgopsService: MsgopsService,
     private readonly redisService: RedisService,
     private readonly formatterUtils: FormatterUtils,
@@ -233,7 +237,7 @@ export class AppService {
             },
           };
 
-          await this.pubSubProvider.sendEmcCampaignTriggerMessage(emcPayload);
+          await this.triggerPublisher.publish(emcPayload);
         }
       }
 
@@ -411,11 +415,9 @@ export class AppService {
   }
 
   async sendTagProcess(leadAutomation: LeadMessage, type) {
-    const tagProcessId = await this.pubSubProvider.sendAsyncMessage(leadAutomation, { type });
+    await this.tagPublisher.publish(leadAutomation as any, { type });
 
-    this.logInfo(
-      `Sent to tag-process: ${leadAutomation.webPush ? 'webPUsh' : leadAutomation.tagName} - ${leadAutomation.contact.email} - ${type} - Message ${tagProcessId} published.`,
-    );
+    this.logInfo(`Sent to tag-process: ${leadAutomation.webPush ? 'webPUsh' : leadAutomation.tagName} - ${leadAutomation.contact.email} - ${type}`);
   }
 
   async findOrCreateContact(leadAutomation: LeadMessage, account: AccountEntity): Promise<{ contact: ContactEntity; changedFields: Record<string, any>; isNew: boolean } | null> {
@@ -919,7 +921,7 @@ export class AppService {
     };
 
     this.logInfo(`Sending resubscribed event to event-process: ${JSON.stringify(eventPayload)}`);
-    await this.pubSubProvider.sendEventProcessMessage(eventPayload, { platform: 'internal' });
+    await this.eventPublisher.publish(eventPayload, { platform: 'internal' });
   }
 
   async processLeadSubmitted(
@@ -954,7 +956,7 @@ export class AppService {
     };
 
     this.logInfo(`Sending lead_submitted event to event-process: ${JSON.stringify(eventPayload)}`);
-    await this.pubSubProvider.sendEventProcessMessage(eventPayload, { platform: 'internal' });
+    await this.eventPublisher.publish(eventPayload, { platform: 'internal' });
   }
 
   /**

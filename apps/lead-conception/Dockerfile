@@ -2,16 +2,22 @@ FROM node:24-alpine AS base
 RUN corepack enable
 WORKDIR /app
 COPY package.json ./
+RUN pnpm pkg delete scripts.prepare
 
 FROM base AS deps
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/lead-conception/package.json ./apps/lead-conception/
+COPY packages/messaging/package.json ./packages/messaging/
+COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --filter msgops-service-lead-conception
+    pnpm install --frozen-lockfile --filter msgops-service-lead-conception...
 
 FROM deps AS build
+COPY packages/typescript-config/ ./packages/typescript-config/
+COPY packages/messaging/ ./packages/messaging/
 COPY apps/lead-conception/ ./apps/lead-conception/
+RUN pnpm --filter @bms/messaging build
 RUN pnpm --filter msgops-service-lead-conception build
 
 FROM build AS deploy

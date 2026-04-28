@@ -27,7 +27,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
-    "@google-cloud/pubsub": "^5.3.0",
+    "@bms/messaging": "workspace:*",
     "@nestjs/common": "11.1.16",
     "@nestjs/config": "4.0.3",
     "@nestjs/core": "11.1.16",

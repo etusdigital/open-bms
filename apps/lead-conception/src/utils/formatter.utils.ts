@@ -1,5 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { LeadMessage, PubSubMessage } from '../interfaces';
+import { Injectable } from '@nestjs/common';
 import { AccountConfigEntity } from 'src/msgops/entities/account-config.entity';
 import { AccountEntity } from 'src/msgops/entities/account.entity';
 
@@ -7,22 +6,6 @@ import { AccountEntity } from 'src/msgops/entities/account.entity';
 export class FormatterUtils {
   stripString(text: string) {
     return text.replace(/(<([^>]+)>)/gi, '');
-  }
-
-  parsePubSubMessage(subscriptionMessage: PubSubMessage): LeadMessage {
-    const {
-      message: { data },
-    } = subscriptionMessage;
-
-    try {
-      const buff = Buffer.from(data, 'base64').toString();
-      const leadMessage: LeadMessage = JSON.parse(buff);
-
-      return leadMessage;
-    } catch (e) {
-      console.error(e);
-      throw new BadRequestException(`Unable to parse data to Batch. messageId: ${JSON.stringify(subscriptionMessage)} `);
-    }
   }
 
   accentsMap = {

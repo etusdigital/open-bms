@@ -5,7 +5,7 @@ import { createLeadMessage, createQuizPayload, createAccountEntity } from './__m
 describe('AppService', () => {
   let service: AppService;
   let mockMsgopsService: any;
-  let mockPubsubProvider: any;
+  let mockLeadPublisher: any;
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
@@ -13,10 +13,10 @@ describe('AppService', () => {
     mockMsgopsService = {
       findAccountByApiKey: jest.fn(),
     };
-    mockPubsubProvider = {
-      sendMessage: jest.fn().mockResolvedValue({ messageId: '123', status: true }),
+    mockLeadPublisher = {
+      publish: jest.fn().mockResolvedValue(undefined),
     };
-    service = new AppService(mockMsgopsService, mockPubsubProvider);
+    service = new AppService(mockMsgopsService, mockLeadPublisher);
   });
 
   afterEach(() => {
@@ -40,7 +40,7 @@ describe('AppService', () => {
 
       const result = await service.process(message);
 
-      expect(mockPubsubProvider.sendMessage).toHaveBeenCalledWith(message, { type: 'lead' });
+      expect(mockLeadPublisher.publish).toHaveBeenCalledWith(message, { type: 'lead' });
       expect(result.status).toBe(200);
       expect(result.message).toBe('Message published successfully.');
     });
@@ -98,7 +98,7 @@ describe('AppService', () => {
 
       await service.process(message);
 
-      expect(mockPubsubProvider.sendMessage).toHaveBeenCalled();
+      expect(mockLeadPublisher.publish).toHaveBeenCalled();
     });
 
     it('should call findAccountByApiKey with the correct apiKey', async () => {
@@ -134,7 +134,7 @@ describe('AppService', () => {
 
       await service.process(message);
 
-      expect(mockPubsubProvider.sendMessage).toHaveBeenCalled();
+      expect(mockLeadPublisher.publish).toHaveBeenCalled();
     });
   });
 
@@ -154,7 +154,7 @@ describe('AppService', () => {
 
       const result = await service.updateContact(message);
 
-      expect(mockPubsubProvider.sendMessage).toHaveBeenCalledWith(message, { type: 'update' });
+      expect(mockLeadPublisher.publish).toHaveBeenCalledWith(message, { type: 'update' });
       expect(result.status).toBe(200);
     });
 

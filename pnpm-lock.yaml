@@ -1018,9 +1018,9 @@ importers:
 
   apps/lead-conception:
     dependencies:
-      '@google-cloud/pubsub':
-        specifier: 5.3.0
-        version: 5.3.0
+      '@bms/messaging':
+        specifier: workspace:*
+        version: link:../../packages/messaging
       '@grpc/grpc-js':
         specifier: ^1.14.3
         version: 1.14.3
@@ -1054,9 +1054,6 @@ importers:
       dotenv:
         specifier: ^17.3.1
         version: 17.3.1
-      google-auth-library:
-        specifier: 10.6.1
-        version: 10.6.1
       ioredis:
         specifier: ^5.10.0
         version: 5.10.1
@@ -1148,9 +1145,9 @@ importers:
 
   apps/lead-receive:
     dependencies:
-      '@google-cloud/pubsub':
-        specifier: ^5.3.0
-        version: 5.3.0
+      '@bms/messaging':
+        specifier: workspace:*
+        version: link:../../packages/messaging
       '@nestjs/common':
         specifier: 11.1.16
         version: 11.1.16(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -21873,7 +21870,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@jest/test-sequencer@26.6.3(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@20.5.1)(typescript@5.9.3))':
+  '@jest/test-sequencer@26.6.3':
     dependencies:
       '@jest/test-result': 26.6.2
       graceful-fs: 4.2.11
@@ -21881,11 +21878,7 @@ snapshots:
       jest-runner: 26.6.3(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@20.5.1)(typescript@5.9.3))
       jest-runtime: 26.6.3(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@20.5.1)(typescript@5.9.3))
     transitivePeerDependencies:
-      - bufferutil
-      - canvas
       - supports-color
-      - ts-node
-      - utf-8-validate
 
   '@jest/test-sequencer@29.7.0':
     dependencies:
@@ -32311,7 +32304,7 @@ snapshots:
   jest-config@26.6.3(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@20.5.1)(typescript@5.9.3)):
     dependencies:
       '@babel/core': 7.29.0
-      '@jest/test-sequencer': 26.6.3(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@20.5.1)(typescript@5.9.3))
+      '@jest/test-sequencer': 26.6.3
       '@jest/types': 26.6.2
       babel-jest: 26.6.3(@babel/core@7.29.0)
       chalk: 4.1.2
@@ -32321,7 +32314,7 @@ snapshots:
       jest-environment-jsdom: 26.6.2
       jest-environment-node: 26.6.2
       jest-get-type: 26.3.0
-      jest-jasmine2: 26.6.3
+      jest-jasmine2: 26.6.3(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@20.5.1)(typescript@5.9.3))
       jest-regex-util: 26.0.0
       jest-resolve: 26.6.2
       jest-util: 26.6.2
@@ -32717,7 +32710,7 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  jest-jasmine2@26.6.3:
+  jest-jasmine2@26.6.3(ts-node@10.9.2(@swc/core@1.15.18)(@types/node@20.5.1)(typescript@5.9.3)):
     dependencies:
       '@babel/traverse': 7.29.0
       '@jest/environment': 26.6.2
@@ -32738,7 +32731,11 @@ snapshots:
       pretty-format: 26.6.2
       throat: 5.0.0
     transitivePeerDependencies:
+      - bufferutil
+      - canvas
       - supports-color
+      - ts-node
+      - utf-8-validate
 
   jest-leak-detector@24.9.0:
     dependencies:

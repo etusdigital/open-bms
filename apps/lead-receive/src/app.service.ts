@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { LeadMessage, QuizMakerPayload } from './app.interfaces';
 import { MsgopsService } from './msgops/msgops.service';
-import { PubSubProvider } from './providers/pubsub.provider';
+import { LeadPublisherService } from './providers/lead-publisher.service';
 import apps from './hub-apps/apps.json';
 import { IncomingHttpHeaders } from 'http';
 
@@ -9,7 +9,7 @@ import { IncomingHttpHeaders } from 'http';
 export class AppService {
   constructor(
     private readonly msgOpsService: MsgopsService,
-    private readonly pubsubProvider: PubSubProvider,
+    private readonly leadPublisher: LeadPublisherService,
   ) {}
 
   async process(leadMessage: LeadMessage) {
@@ -33,7 +33,7 @@ export class AppService {
       leadMessage = this.cleanUpQuestions(leadMessage as QuizMakerPayload) as LeadMessage;
     }
 
-    await this.pubsubProvider.sendMessage(leadMessage, { type: 'lead' });
+    await this.leadPublisher.publish(leadMessage, { type: 'lead' });
 
     return {
       status: 200,
@@ -47,7 +47,7 @@ export class AppService {
       throw new HttpException('Account not found', HttpStatus.FORBIDDEN);
     }
 
-    await this.pubsubProvider.sendMessage(leadMessage, { type: 'update' });
+    await this.leadPublisher.publish(leadMessage, { type: 'update' });
 
     return {
       status: 200,

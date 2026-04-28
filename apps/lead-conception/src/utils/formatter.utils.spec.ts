@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { FormatterUtils } from './formatter.utils';
 
 describe('FormatterUtils', () => {
@@ -160,25 +159,6 @@ describe('FormatterUtils', () => {
       const obj = { a: 'hello\x00world\x1F' };
       const result = utils.cleanUpObjects(obj);
       expect(result).toEqual({ a: 'helloworld' });
-    });
-  });
-
-  describe('parsePubSubMessage', () => {
-    it('should decode base64 to JSON correctly', () => {
-      const jsonStr = JSON.stringify({ apiKey: 'test', contact: { email: 'a@b.com' } });
-      const base64 = Buffer.from(jsonStr).toString('base64');
-      const msg = { message: { data: base64 }, subscription: 'test-sub' } as any;
-
-      const result = utils.parsePubSubMessage(msg);
-      expect(result.apiKey).toBe('test');
-      expect(result.contact.email).toBe('a@b.com');
-    });
-
-    it('should throw BadRequestException for invalid base64 JSON', () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-      const msg = { message: { data: '!!invalid!!' }, subscription: 'test-sub' } as any;
-      expect(() => utils.parsePubSubMessage(msg)).toThrow(BadRequestException);
-      consoleSpy.mockRestore();
     });
   });
 

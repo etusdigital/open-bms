@@ -5,10 +5,16 @@ import { EmailVerify } from './interfaces';
 describe('Service: App', () => {
   let appService: AppService;
 
-  const mockPubSubProvider = {
-    sendAsyncMessage: jest.fn().mockResolvedValue('mock-tag-process-id'),
-    sendEventProcessMessage: jest.fn().mockResolvedValue('mock-message-id'),
-    sendEmcCampaignTriggerMessage: jest.fn().mockResolvedValue('mock-emc-id'),
+  const mockTagPublisher = {
+    publish: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockEventPublisher = {
+    publish: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockTriggerPublisher = {
+    publish: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockMsgopsService = {
@@ -121,7 +127,9 @@ describe('Service: App', () => {
     mockFormatterUtils.formatterEmail.mockImplementation((email) => email.toLowerCase().trim());
 
     appService = new AppService(
-      mockPubSubProvider as any,
+      mockTagPublisher as any,
+      mockEventPublisher as any,
+      mockTriggerPublisher as any,
       mockMsgopsService as any,
       mockRedisService as any,
       mockFormatterUtils as any,
@@ -402,7 +410,7 @@ describe('Service: App', () => {
         tagName: ['tag1', 'tag2'],
       } as any;
       const result = await appService.createOrUpdate(lead);
-      expect(mockPubSubProvider.sendAsyncMessage).toHaveBeenCalledTimes(2);
+      expect(mockTagPublisher.publish).toHaveBeenCalledTimes(2);
       expect(result.status).toBe(200);
     });
 
@@ -420,7 +428,7 @@ describe('Service: App', () => {
         tagName: 'add-tag',
       } as any;
       const result = await appService.createOrUpdate(lead);
-      expect(mockPubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(expect.anything(), { type: 'add' });
+      expect(mockTagPublisher.publish).toHaveBeenCalledWith(expect.anything(), { type: 'add' });
       expect(result.status).toBe(200);
     });
 
@@ -458,7 +466,7 @@ describe('Service: App', () => {
         app: 'quiz-app', // source = quizmaker
       } as any;
       await appService.createOrUpdate(lead);
-      expect(mockPubSubProvider.sendEmcCampaignTriggerMessage).toHaveBeenCalled();
+      expect(mockTriggerPublisher.publish).toHaveBeenCalled();
     });
 
     it('should send EMC campaign trigger when source is quizmaker-new type', async () => {
@@ -477,7 +485,7 @@ describe('Service: App', () => {
         type: 'quizmaker-new',
       } as any;
       await appService.createOrUpdate(lead);
-      expect(mockPubSubProvider.sendEmcCampaignTriggerMessage).toHaveBeenCalled();
+      expect(mockTriggerPublisher.publish).toHaveBeenCalled();
     });
 
     it('should NOT send EMC when redis key does not exist', async () => {
@@ -496,7 +504,7 @@ describe('Service: App', () => {
         app: 'quiz-app',
       } as any;
       await appService.createOrUpdate(lead);
-      expect(mockPubSubProvider.sendEmcCampaignTriggerMessage).not.toHaveBeenCalled();
+      expect(mockTriggerPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('should add isNew customField for lead-akross tag on new contact', async () => {
@@ -515,7 +523,7 @@ describe('Service: App', () => {
       } as any;
       await appService.createOrUpdate(lead);
       // The test verifies the flow completes without error
-      expect(mockPubSubProvider.sendAsyncMessage).toHaveBeenCalled();
+      expect(mockTagPublisher.publish).toHaveBeenCalled();
     });
 
     it('should add last_source custom field for internal accounts with utm_source', async () => {
@@ -773,7 +781,7 @@ describe('Service: App', () => {
       await appService.findOrCreateContact(lead, { ...baseAccount, groupId: 100 } as any);
 
       expect(mockMsgopsService.deleteContactTag).toHaveBeenCalled();
-      expect(mockPubSubProvider.sendEventProcessMessage).toHaveBeenCalled();
+      expect(mockEventPublisher.publish).toHaveBeenCalled();
       expect(mockRedisClient.del).toHaveBeenCalled();
       expect(mockMsgopsService.removeSuppression).toHaveBeenCalled();
     });
@@ -1017,7 +1025,7 @@ describe('Service: App', () => {
     it('should build correct LeadActivationRequest payload', async () => {
       await appService.processResubscribed(baseLeadAutomation as any, mockAccount as any, mockContact as any);
 
-      expect(mockPubSubProvider.sendEventProcessMessage).toHaveBeenCalledWith(
+      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           platform: 'internal',
           payload: expect.arrayContaining([
@@ -1038,7 +1046,7 @@ describe('Service: App', () => {
       const leadWithQuestions = { ...baseLeadAutomation, questions: [{ question: 'test', answer: 'yes' }] };
       await appService.processResubscribed(leadWithQuestions as any, mockAccount as any, mockContact as any);
 
-      expect(mockPubSubProvider.sendEventProcessMessage).toHaveBeenCalledWith(
+      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           payload: expect.arrayContaining([expect.objectContaining({ properties: { reason: 'answered quiz' } })]),
         }),
@@ -1049,7 +1057,7 @@ describe('Service: App', () => {
     it('should set reason to "api request" when no questions', async () => {
       await appService.processResubscribed(baseLeadAutomation as any, mockAccount as any, mockContact as any);
 
-      expect(mockPubSubProvider.sendEventProcessMessage).toHaveBeenCalledWith(
+      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           payload: expect.arrayContaining([expect.objectContaining({ properties: { reason: 'api request' } })]),
         }),
@@ -1067,7 +1075,7 @@ describe('Service: App', () => {
       const lead = { contact: { email: 'test@example.com', ip: null }, source_url: null };
       await appService.processResubscribed(lead as any, mockAccount as any, mockContact as any);
 
-      expect(mockPubSubProvider.sendEventProcessMessage).toHaveBeenCalledWith(
+      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           payload: expect.arrayContaining([expect.objectContaining({ ip: null })]),
         }),
@@ -1667,9 +1675,9 @@ describe('Service: App', () => {
   // sendTagProcess
   // ==========================================
   describe('sendTagProcess', () => {
-    it('should call pubSubProvider.sendAsyncMessage with type', async () => {
+    it('should call tagPublisher.publish with type', async () => {
       await appService.sendTagProcess({ tagName: 'tag', contact: { email: 'test@example.com' } } as any, 'add');
-      expect(mockPubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(expect.anything(), { type: 'add' });
+      expect(mockTagPublisher.publish).toHaveBeenCalledWith(expect.anything(), { type: 'add' });
     });
   });
 });
