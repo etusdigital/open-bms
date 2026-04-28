@@ -8,8 +8,10 @@ import { SystemConfigEntity } from '../../entities/system-config.entity';
 import { UserEntity } from '../../entities/users.entity';
 import { RoleEntity } from '../../entities/role.entity';
 import { AccountEntity } from '../../entities/account.entity';
+import { AccountConfigEntity } from '../../entities/account-config.entity';
 import { PoolEntity } from '../../entities/pool.entity';
 import { UserAccountEntity } from '../../entities/users-account.entity';
+import { createHash } from 'crypto';
 import { AUTH_PROVIDER_TOKEN, IAuthProvider } from '../auth/providers/auth.provider.interface';
 import { RedisService } from '../../providers/redis.provider';
 import { ClickhouseProvider } from '../../providers/clickhouse.provider';
@@ -250,6 +252,22 @@ export class SetupService {
             isMasterUser: true,
           }),
         );
+
+        const accountConfigRepo = em.getRepository(AccountConfigEntity);
+        await accountConfigRepo.save([
+          accountConfigRepo.create({
+            accountId: savedAccount.id,
+            name: 'api_key',
+            value: createHash('md5').update(`bms-${savedAccount.id}-api_key`).digest('hex'),
+            isLoadConfig: true,
+          }),
+          accountConfigRepo.create({
+            accountId: savedAccount.id,
+            name: 'api_key_tracker',
+            value: createHash('md5').update(`bms-${savedAccount.id}-api_key_tracker`).digest('hex'),
+            isLoadConfig: true,
+          }),
+        ]);
       }
 
       await this.upsertWizardTx(systemConfigRepo, { currentStep: 2, adminUserId });
