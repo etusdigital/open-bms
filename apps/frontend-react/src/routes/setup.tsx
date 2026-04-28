@@ -4,7 +4,6 @@ import { Check } from 'lucide-react';
 import { setupGateway } from '@/features/setup/setup-gateway';
 import { Step1Admin } from '@/features/setup/steps/Step1Admin';
 import { Step3Domain } from '@/features/setup/steps/Step3Domain';
-import { Step5Pool } from '@/features/setup/steps/Step5Pool';
 import { Step6HealthCheck } from '@/features/setup/steps/Step6HealthCheck';
 import { LoadingScreen } from '@/components/loading-screen';
 
@@ -15,22 +14,20 @@ export const Route = createFileRoute('/setup')({
 const STEPS = [
   { num: 1, label: 'Admin' },
   { num: 2, label: 'Domínio' },
-  { num: 3, label: 'IP Pool' },
-  { num: 4, label: 'Health' },
+  { num: 3, label: 'Health' },
 ] as const;
 
 const STEP_TITLES: Record<number, string> = {
   1: 'Criar conta de administrador',
   2: 'URL base da plataforma',
-  3: 'IP Pool e primeira conta',
-  4: 'Verificação de saúde dos serviços',
+  3: 'Verificação de saúde dos serviços',
 };
 
 // The backend wizard keeps 6 internal steps (1=Admin, 2=SMTP, 3=Domain,
 // 4=SendGrid, 5=Pool, 6=Health) for compatibility with existing instances.
-// SMTP (2) and SendGrid (4) are auto-skipped by the UI; the visible flow is
-// 4 steps. This map collapses backend currentStep into the visible slot.
-const UI_FROM_BACKEND: Record<number, number> = { 1: 1, 2: 2, 3: 2, 4: 2, 5: 3, 6: 4 };
+// SMTP (2), SendGrid (4) and IP Pool (5) are auto-skipped by the UI; the visible
+// flow is 3 steps (Admin/Domínio/Health). The Account is created in step1.
+const UI_FROM_BACKEND: Record<number, number> = { 1: 1, 2: 2, 3: 2, 4: 2, 5: 2, 6: 3 };
 
 function SetupPage() {
   const navigate = useNavigate();
@@ -66,7 +63,7 @@ function SetupPage() {
   }, [navigate]);
 
   function advance() {
-    setCurrentStep((s) => Math.min(s + 1, 4));
+    setCurrentStep((s) => Math.min(s + 1, 3));
   }
 
   function back() {
@@ -100,8 +97,7 @@ function SetupPage() {
 
           {currentStep === 1 && <Step1Admin onComplete={advance} />}
           {currentStep === 2 && <Step3Domain onComplete={advance} onBack={back} />}
-          {currentStep === 3 && <Step5Pool onComplete={advance} onBack={back} />}
-          {currentStep === 4 && <Step6HealthCheck onComplete={finish} onBack={back} />}
+          {currentStep === 3 && <Step6HealthCheck onComplete={finish} onBack={back} />}
         </div>
       </div>
     </div>

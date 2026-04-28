@@ -26,11 +26,12 @@ describe('Step1Admin', () => {
     onComplete = vi.fn();
   });
 
-  function fill(name: string, email: string, password: string, confirm: string) {
+  function fill(name: string, email: string, password: string, confirm: string, accountName = 'Acme') {
     fireEvent.change(screen.getByLabelText('Nome completo'), { target: { value: name } });
     fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: email } });
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: password } });
     fireEvent.change(screen.getByLabelText('Confirmar senha'), { target: { value: confirm } });
+    fireEvent.change(screen.getByLabelText('Nome da conta'), { target: { value: accountName } });
   }
 
   it('blocks submit when password is shorter than 8 characters', async () => {
@@ -51,6 +52,15 @@ describe('Step1Admin', () => {
     expect(mockAdvance).not.toHaveBeenCalled();
   });
 
+  it('blocks submit when accountName is empty', async () => {
+    render(<Step1Admin onComplete={onComplete} />);
+    fill('Admin User', 'admin@x.com', 'password1', 'password1', '');
+    fireEvent.click(screen.getByRole('button', { name: /criar e continuar/i }));
+
+    expect(await screen.findByText(/Informe o nome da conta/i)).toBeInTheDocument();
+    expect(mockAdvance).not.toHaveBeenCalled();
+  });
+
   it('on success: calls advanceStep(1) then auto-logs in then advances', async () => {
     render(<Step1Admin onComplete={onComplete} />);
     fill('Admin User', 'admin@x.com', 'password1', 'password1');
@@ -59,7 +69,7 @@ describe('Step1Admin', () => {
     await waitFor(() => {
       expect(mockAdvance).toHaveBeenCalledWith({
         step: 1,
-        data: { name: 'Admin User', email: 'admin@x.com', password: 'password1' },
+        data: { name: 'Admin User', email: 'admin@x.com', password: 'password1', accountName: 'Acme' },
       });
     });
     expect(mockLogin).toHaveBeenCalledWith('admin@x.com', 'password1');

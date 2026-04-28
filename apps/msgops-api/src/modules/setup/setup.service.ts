@@ -182,6 +182,7 @@ export class SetupService {
 
   private async step1(data: Step1Data): Promise<void> {
     const email = data.email.trim().toLowerCase();
+    const accountName = data.accountName.trim();
 
     // Serialize with seedAdmin and concurrent wizard submissions — prevents two parallel
     // POSTs from both creating a super-admin before either has committed.
@@ -190,6 +191,8 @@ export class SetupService {
 
       const userRepo = em.getRepository(UserEntity);
       const roleRepo = em.getRepository(RoleEntity);
+      const accountRepo = em.getRepository(AccountEntity);
+      const userAccountRepo = em.getRepository(UserAccountEntity);
       const systemConfigRepo = em.getRepository(SystemConfigEntity);
 
       const existing = await userRepo.findOne({ where: { email } });
@@ -228,6 +231,27 @@ export class SetupService {
         }
       }
 
+      // Ensure the admin has at least one Account linked as master_user. Without this, the
+      // app falls into the "Nenhuma conta atribuída" broken state. Idempotent: if a
+      // users_accounts row already exists for this admin, skip both account and link.
+      const existingLink = await userAccountRepo.findOne({ where: { userId: adminUserId } });
+      if (!existingLink) {
+        const account = accountRepo.create({
+          name: accountName,
+          groupId: 1,
+          isActive: true,
+          isInternal: false,
+        });
+        const savedAccount = await accountRepo.save(account);
+        await userAccountRepo.save(
+          userAccountRepo.create({
+            userId: adminUserId,
+            accountId: savedAccount.id,
+            isMasterUser: true,
+          }),
+        );
+      }
+
       await this.upsertWizardTx(systemConfigRepo, { currentStep: 2, adminUserId });
     });
   }
@@ -257,62 +281,12 @@ export class SetupService {
     await this.upsertWizard({ currentStep: 5 });
   }
 
+  // Vestigial step from the time IP Pool was configured during setup. The Account and
+  // its master_user link are now created in step1 alongside the admin. The React wizard
+  // auto-skips this step; pool/sender/IP configuration moves to a post-setup screen.
+  // The slot is preserved to keep the 1-6 numbering on existing instances.
   private async step5(data: Step5Data): Promise<void> {
-    if (data.skip) {
-      await this.upsertWizard({ currentStep: 6 });
-      return;
-    }
-
-    const account = this.accountRepo.create({
-      name: data.accountName,
-      groupId: 1,
-      isActive: true,
-      isInternal: false,
-    });
-    const savedAccount = await this.accountRepo.save(account);
-
-    const pool = this.poolRepo.create({
-      name: data.poolName,
-      poolName: data.poolName,
-      ip: data.ips ?? [],
-      accountId: savedAccount.id,
-      sendingLimit: data.sendingLimit ?? 1000,
-      senderEmail: data.senderEmail,
-      senderName: data.senderName,
-      senderReplyTo: data.replyToEmail,
-      isDefault: true,
-    });
-    await this.poolRepo.save(pool);
-
-    // Prefer the admin created by step1 (stored in wizard state). Fall back to "first
-    // super-admin" only when the wizard state has no record — preserves the original
-    // behavior for wizards started before this field existed.
-    const state = await this.readWizard();
-    let adminUser: UserEntity | null = null;
-    if (state?.adminUserId) {
-      adminUser = await this.userRepo.findOne({ where: { id: state.adminUserId } });
-    }
-    if (!adminUser) {
-      const superAdminRole = await this.roleRepo.findOne({ where: { code: ROLE_CODES.SUPER_ADMIN } });
-      if (superAdminRole) {
-        adminUser = await this.userRepo.findOne({
-          where: { globalRoleId: superAdminRole.id },
-          order: { id: 'ASC' },
-        });
-      }
-    }
-
-    if (adminUser) {
-      const userAccount = this.userAccountRepo.create({
-        userId: adminUser.id,
-        accountId: savedAccount.id,
-        isMasterUser: true,
-      });
-      await this.userAccountRepo.save(userAccount);
-    } else {
-      this.logger.warn(`Setup step5: created account ${savedAccount.id} but no admin user found to link as master`);
-    }
-
+    void data;
     await this.upsertWizard({ currentStep: 6 });
   }
 

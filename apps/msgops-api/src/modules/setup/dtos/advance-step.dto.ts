@@ -11,6 +11,7 @@ export class Step1Data {
   name: string;
   email: string;
   password: string;
+  accountName: string;
 }
 
 export class Step2Data {
@@ -32,13 +33,6 @@ export class Step4Data {
 
 export class Step5Data {
   skip?: boolean;
-  accountName?: string;
-  poolName?: string;
-  senderEmail?: string;
-  senderName?: string;
-  replyToEmail?: string;
-  sendingLimit?: number;
-  ips?: string[];
 }
 
 // Explicit Joi schemas per step, used by SetupService.advanceStep since
@@ -51,6 +45,7 @@ export const step1Schema = Joi.object<Step1Data>({
     .email({ tlds: { allow: false } })
     .required(),
   password: Joi.string().min(8).required(),
+  accountName: Joi.string().trim().min(1).required(),
 });
 
 // SMTP step is optional in the React wizard — accept either { skip: true } or
@@ -82,28 +77,11 @@ export const step4Schema = Joi.object<Step4Data>({
   skip: Joi.valid(true).required(),
 });
 
-// Same discriminated pattern as step4: either skip=true alone, or a full config payload
-// with skip omitted/false. `match: 'one'` makes ambiguous payloads (skip=true + accountName)
-// fail validation instead of silently ignoring extra fields.
-export const step5Schema = Joi.alternatives<Step5Data>().try(
-  Joi.object({ skip: Joi.valid(true).required() }),
-  Joi.object({
-    skip: Joi.valid(false).optional(),
-    accountName: Joi.string().trim().min(1).required(),
-    poolName: Joi.string().trim().min(1).optional(),
-    senderEmail: Joi.string()
-      .email({ tlds: { allow: false } })
-      .optional(),
-    senderName: Joi.string().trim().min(1).optional(),
-    replyToEmail: Joi.string()
-      .email({ tlds: { allow: false } })
-      .optional(),
-    sendingLimit: Joi.number().integer().min(1).optional(),
-    ips: Joi.array()
-      .items(Joi.string().ip({ version: ['ipv4', 'ipv6'] }))
-      .optional(),
-  }),
-);
+// Account is now created in step1 alongside the admin user. This step is
+// auto-skipped by the React frontend; only `{skip:true}` is accepted.
+export const step5Schema = Joi.object<Step5Data>({
+  skip: Joi.valid(true).required(),
+});
 
 export class Step6Data {
   skip?: boolean;

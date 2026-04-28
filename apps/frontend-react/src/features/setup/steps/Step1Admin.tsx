@@ -18,6 +18,7 @@ export function Step1Admin({ onComplete }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [accountName, setAccountName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,6 +27,7 @@ export function Step1Admin({ onComplete }: Props) {
     if (!EMAIL_RE.test(email)) return 'E-mail inválido.';
     if (password.length < 8) return 'A senha deve ter pelo menos 8 caracteres.';
     if (password !== confirmPassword) return 'As senhas não conferem.';
+    if (accountName.trim().length < 1) return 'Informe o nome da conta.';
     return null;
   }
 
@@ -41,7 +43,12 @@ export function Step1Admin({ onComplete }: Props) {
     try {
       await setupGateway.advanceStep({
         step: 1,
-        data: { name: name.trim(), email: email.trim().toLowerCase(), password },
+        data: {
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          password,
+          accountName: accountName.trim(),
+        },
       });
       // Auto-login: subsequent steps may need an authenticated session and the
       // operator just typed valid credentials. Mirrors Vue 3 wizard behavior.
@@ -50,6 +57,14 @@ export function Step1Admin({ onComplete }: Props) {
       } catch {
         // Auto-login is best-effort. Steps 2-6 are public on the backend, so
         // a failure here doesn't block the wizard.
+      }
+      // SMTP step is hidden in this UI — auto-skip it on the backend so the
+      // wizard's currentStep advances past 2 before the user lands on Domínio.
+      try {
+        await setupGateway.advanceStep({ step: 2, data: { skip: true } });
+      } catch {
+        // Idempotent on the backend; if it has already been skipped (e.g. user
+        // refreshed mid-flow), the next advance call will succeed anyway.
       }
       onComplete();
     } catch (err) {
@@ -115,6 +130,20 @@ export function Step1Admin({ onComplete }: Props) {
           onChange={(e) => setConfirmPassword(e.target.value)}
           disabled={submitting}
         />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="setup-admin-account-name">Nome da conta</Label>
+        <Input
+          id="setup-admin-account-name"
+          placeholder="Minha Empresa"
+          value={accountName}
+          onChange={(e) => setAccountName(e.target.value)}
+          disabled={submitting}
+        />
+        <p className="text-muted-foreground text-xs">
+          Identifica a primeira conta da plataforma — você pode renomear depois em Configurações.
+        </p>
       </div>
 
       {error && (

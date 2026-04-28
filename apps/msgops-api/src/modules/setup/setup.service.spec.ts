@@ -51,7 +51,7 @@ function makeAuthProvider(overrides: Partial<IAuthProvider> = {}): jest.Mocked<I
  * service already has injected. This means tests can assert on a single repo across both
  * transactional and non-transactional code paths without having to track two copies.
  */
-function makeDataSourceMock(repos: { userRepo: any; roleRepo: any; systemConfigRepo: any }): any {
+function makeDataSourceMock(repos: { userRepo: any; roleRepo: any; systemConfigRepo: any; accountRepo?: any; userAccountRepo?: any }): any {
   return {
     transaction: async (cb: (em: any) => Promise<void>) => {
       const em = {
@@ -60,6 +60,8 @@ function makeDataSourceMock(repos: { userRepo: any; roleRepo: any; systemConfigR
           if (entity === UserEntity) return repos.userRepo;
           if (entity === RoleEntity) return repos.roleRepo;
           if (entity === SystemConfigEntity) return repos.systemConfigRepo;
+          if (entity === AccountEntity) return repos.accountRepo ?? makeRepo();
+          if (entity === UserAccountEntity) return repos.userAccountRepo ?? makeRepo();
           throw new Error(`unexpected getRepository in test for ${entity?.name}`);
         },
       };
@@ -95,7 +97,7 @@ async function buildService(
   const accountRepo = overrides.accountRepo ?? makeRepo();
   const poolRepo = overrides.poolRepo ?? makeRepo();
   const userAccountRepo = overrides.userAccountRepo ?? makeRepo();
-  const dataSource = makeDataSourceMock({ userRepo, roleRepo, systemConfigRepo });
+  const dataSource = makeDataSourceMock({ userRepo, roleRepo, systemConfigRepo, accountRepo, userAccountRepo });
 
   const moduleRef = await Test.createTestingModule({
     providers: [
@@ -181,12 +183,7 @@ describe('SetupService', () => {
       const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 2, completed: false } });
 
-      await expect(
-        service.advanceStep({
-          step: 5,
-          data: { accountName: 'A', poolName: 'P', senderEmail: 'a@b.io', senderName: 'A', replyToEmail: 'a@b.io', sendingLimit: 1 } as any,
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.advanceStep({ step: 5, data: { skip: true } as any })).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('allows resubmitting the current step (idempotent re-run)', async () => {
@@ -200,12 +197,21 @@ describe('SetupService', () => {
   describe('advanceStep validation', () => {
     it('throws BadRequestException on invalid step1 payload (short password)', async () => {
       const { service } = await buildService();
-      await expect(service.advanceStep({ step: 1, data: { name: 'A', email: 'a@b.io', password: 'short' } as any })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.advanceStep({ step: 1, data: { name: 'A', email: 'a@b.io', password: 'short', accountName: 'Acme' } as any })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException on invalid email syntax (missing @)', async () => {
       const { service } = await buildService();
-      await expect(service.advanceStep({ step: 1, data: { name: 'A', email: 'not-an-email', password: 'password1' } as any })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.advanceStep({ step: 1, data: { name: 'A', email: 'not-an-email', password: 'password1', accountName: 'Acme' } as any })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('rejects step1 payload missing accountName', async () => {
+      const { service } = await buildService();
+      await expect(service.advanceStep({ step: 1, data: { name: 'A', email: 'a@b.io', password: 'password1' } as any })).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('normalizes step1 email to lowercase before lookup and createUser', async () => {
@@ -213,7 +219,7 @@ describe('SetupService', () => {
       roleRepo.findOneOrFail.mockResolvedValue(SUPER_ADMIN_ROLE);
       userRepo.findOne.mockResolvedValue(undefined);
 
-      await service.advanceStep({ step: 1, data: { name: 'Admin', email: '  Admin@BMS.Local  ', password: 'password1' } as any });
+      await service.advanceStep({ step: 1, data: { name: 'Admin', email: '  Admin@BMS.Local  ', password: 'password1', accountName: 'Acme' } as any });
 
       expect(userRepo.findOne).toHaveBeenCalledWith({ where: { email: 'admin@bms.local' } });
       expect(authProvider.createUser).toHaveBeenCalledWith({ name: 'Admin', email: 'admin@bms.local', password: 'password1' });
@@ -224,7 +230,7 @@ describe('SetupService', () => {
       roleRepo.findOneOrFail.mockResolvedValue(SUPER_ADMIN_ROLE);
       userRepo.findOne.mockResolvedValue(undefined);
 
-      await service.advanceStep({ step: 1, data: { name: 'Admin', email: 'admin@bms.local', password: 'password1' } as any });
+      await service.advanceStep({ step: 1, data: { name: 'Admin', email: 'admin@bms.local', password: 'password1', accountName: 'Acme' } as any });
       expect(authProvider.createUser).toHaveBeenCalledWith({ name: 'Admin', email: 'admin@bms.local', password: 'password1' });
     });
 
@@ -250,6 +256,8 @@ describe('SetupService', () => {
       userRepo.findOne.mockResolvedValue(undefined);
       systemConfigRepo.findOne.mockResolvedValue(undefined);
 
+      const accountRepoTx = makeRepo({ save: jest.fn().mockResolvedValue({ id: 999 }) });
+      const userAccountRepoTx = makeRepo();
       const queryMock = jest.fn().mockResolvedValue(undefined);
       const dataSource = {
         transaction: async (cb: any) => {
@@ -259,6 +267,8 @@ describe('SetupService', () => {
               if (entity === UserEntity) return userRepo;
               if (entity === RoleEntity) return roleRepo;
               if (entity === SystemConfigEntity) return systemConfigRepo;
+              if (entity === AccountEntity) return accountRepoTx;
+              if (entity === UserAccountEntity) return userAccountRepoTx;
               throw new Error('unexpected entity');
             },
           });
@@ -284,7 +294,7 @@ describe('SetupService', () => {
       }).compile();
       const service = moduleRef.get(SetupService);
 
-      await service.advanceStep({ step: 1, data: { name: 'Admin', email: 'admin@bms.io', password: 'password1' } as any });
+      await service.advanceStep({ step: 1, data: { name: 'Admin', email: 'admin@bms.io', password: 'password1', accountName: 'Acme' } as any });
 
       expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_xact_lock'), [834729]);
       expect(authProvider.createUser).toHaveBeenCalledWith({ name: 'Admin', email: 'admin@bms.io', password: 'password1' });
@@ -300,7 +310,7 @@ describe('SetupService', () => {
       userRepo.findOne.mockResolvedValue({ id: 9, email: 'admin@bms.io' });
       systemConfigRepo.findOne.mockResolvedValue(undefined);
 
-      await service.advanceStep({ step: 1, data: { name: 'Admin', email: 'admin@bms.io', password: 'password1' } as any });
+      await service.advanceStep({ step: 1, data: { name: 'Admin', email: 'admin@bms.io', password: 'password1', accountName: 'Acme' } as any });
 
       expect(authProvider.createUser).not.toHaveBeenCalled();
       expect(userRepo.save).not.toHaveBeenCalled();
@@ -314,10 +324,42 @@ describe('SetupService', () => {
       roleRepo.findOneOrFail.mockResolvedValue(SUPER_ADMIN_ROLE);
       userRepo.findOne.mockResolvedValue(undefined);
 
-      await service.advanceStep({ step: 1, data: { name: 'Admin', email: 'admin@bms.io', password: 'password1' } as any });
+      await service.advanceStep({ step: 1, data: { name: 'Admin', email: 'admin@bms.io', password: 'password1', accountName: 'Acme' } as any });
 
       expect(authProvider.createUser).toHaveBeenCalled();
       expect(authProvider.updatePassword).not.toHaveBeenCalled();
+    });
+
+    it('creates Account and links admin as master_user when no existing link', async () => {
+      const { service, accountRepo, userAccountRepo, roleRepo, userRepo } = await buildService();
+      roleRepo.findOneOrFail.mockResolvedValue(SUPER_ADMIN_ROLE);
+      userRepo.findOne.mockResolvedValue(undefined);
+      userRepo.save.mockResolvedValue({ id: 42 });
+      userAccountRepo.findOne.mockResolvedValue(null);
+      accountRepo.save.mockResolvedValue({ id: 700 });
+
+      await service.advanceStep({
+        step: 1,
+        data: { name: 'Admin', email: 'admin@bms.io', password: 'password1', accountName: 'Acme' } as any,
+      });
+
+      expect(accountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Acme', groupId: 1, isActive: true, isInternal: false }));
+      expect(userAccountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ userId: 42, accountId: 700, isMasterUser: true }));
+    });
+
+    it('skips Account creation when admin already has a users_accounts link (idempotent)', async () => {
+      const { service, accountRepo, userAccountRepo, userRepo, systemConfigRepo } = await buildService();
+      userRepo.findOne.mockResolvedValue({ id: 9, email: 'admin@bms.io' });
+      systemConfigRepo.findOne.mockResolvedValue(undefined);
+      userAccountRepo.findOne.mockResolvedValue({ userId: 9, accountId: 50, isMasterUser: true });
+
+      await service.advanceStep({
+        step: 1,
+        data: { name: 'Admin', email: 'admin@bms.io', password: 'password1', accountName: 'Ignored' } as any,
+      });
+
+      expect(accountRepo.save).not.toHaveBeenCalled();
+      expect(userAccountRepo.save).not.toHaveBeenCalled();
     });
 
     it('rolls back the user row when updatePassword fails (no orphan user left behind)', async () => {
@@ -327,7 +369,9 @@ describe('SetupService', () => {
       userRepo.findOne.mockResolvedValue(undefined);
       userRepo.save.mockResolvedValue({ id: 99, email: 'admin@bms.io' });
 
-      await expect(service.advanceStep({ step: 1, data: { name: 'Admin', email: 'admin@bms.io', password: 'password1' } as any })).rejects.toThrow(/kms unavailable/);
+      await expect(service.advanceStep({ step: 1, data: { name: 'Admin', email: 'admin@bms.io', password: 'password1', accountName: 'Acme' } as any })).rejects.toThrow(
+        /kms unavailable/,
+      );
       expect(userRepo.remove).toHaveBeenCalledWith(expect.objectContaining({ id: 99 }));
     });
   });
@@ -384,7 +428,7 @@ describe('SetupService', () => {
     });
   });
 
-  describe('step5 — account + pool', () => {
+  describe('step5 — IP Pool (auto-skip)', () => {
     it('with skip=true, advances to step 6 without touching account/pool tables', async () => {
       const { service, systemConfigRepo, accountRepo, poolRepo, userAccountRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: false } });
@@ -397,58 +441,18 @@ describe('SetupService', () => {
       expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: expect.objectContaining({ currentStep: 6, completed: false }) }));
     });
 
-    it('uses the adminUserId stored in wizard state (not "first super-admin") when linking master user', async () => {
-      const { service, roleRepo, userRepo, accountRepo, poolRepo, userAccountRepo, systemConfigRepo } = await buildService();
-      systemConfigRepo.findOne.mockResolvedValue({
-        key: 'setup_wizard_step',
-        value: { currentStep: 5, completed: false, adminUserId: 123 },
-      });
-      userRepo.findOne.mockResolvedValue({ id: 123, email: 'admin@bms.io' });
-      accountRepo.save.mockResolvedValue({ id: 100 });
-
-      await service.advanceStep({
-        step: 5,
-        data: {
-          accountName: 'Acme',
-          poolName: 'Acme Tx',
-          senderEmail: 'noreply@acme.io',
-          senderName: 'Acme',
-          replyToEmail: 'reply@acme.io',
-          sendingLimit: 5000,
-          ips: ['192.0.2.10'],
-        } as any,
-      });
-
-      expect(userRepo.findOne).toHaveBeenCalledWith({ where: { id: 123 } });
-      expect(userAccountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ userId: 123, accountId: 100, isMasterUser: true }));
-      // Did NOT fall back to role-based lookup when wizard state already had the id.
-      expect(roleRepo.findOne).not.toHaveBeenCalled();
-    });
-
-    it('falls back to the oldest super-admin (ORDER BY id ASC) when wizard state has no adminUserId', async () => {
-      const { service, roleRepo, userRepo, accountRepo, userAccountRepo, systemConfigRepo } = await buildService();
+    it('rejects payload with skip=false (legacy IP Pool payload)', async () => {
+      const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: false } });
-      roleRepo.findOne.mockResolvedValue(SUPER_ADMIN_ROLE);
-      userRepo.findOne.mockResolvedValue({ id: 7 });
-      accountRepo.save.mockResolvedValue({ id: 200 });
-
-      await service.advanceStep({
-        step: 5,
-        data: {
-          accountName: 'Acme',
-          poolName: 'Acme Tx',
-          senderEmail: 'noreply@acme.io',
-          senderName: 'Acme',
-          replyToEmail: 'reply@acme.io',
-          sendingLimit: 5000,
-        } as any,
-      });
-
-      expect(userRepo.findOne).toHaveBeenCalledWith({ where: { globalRoleId: SUPER_ADMIN_ROLE.id }, order: { id: 'ASC' } });
-      expect(userAccountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ userId: 7, accountId: 200, isMasterUser: true }));
+      await expect(
+        service.advanceStep({
+          step: 5,
+          data: { accountName: 'Acme', poolName: 'P' } as any,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('rejects step5 payload that is neither skip nor full config (Joi or-constraint)', async () => {
+    it('rejects empty payload', async () => {
       const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: false } });
       await expect(service.advanceStep({ step: 5, data: {} as any })).rejects.toBeInstanceOf(BadRequestException);

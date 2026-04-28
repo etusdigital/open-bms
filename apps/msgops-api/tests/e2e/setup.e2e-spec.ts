@@ -57,7 +57,7 @@ describe('Setup Wizard (E2E)', () => {
       .post('/setup/advance')
       .send({
         step: 1,
-        data: { name: 'Admin Test', email: 'admin@test.com', password: 'P@ssw0rd123!' },
+        data: { name: 'Admin Test', email: 'admin@test.com', password: 'P@ssw0rd123!', accountName: 'Acme E2E' },
       });
 
     expect(response.status).toBe(201);

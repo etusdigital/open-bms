@@ -35,13 +35,18 @@ export function Step3Domain({ onComplete, onBack }: Props) {
     setSubmitting(true);
     try {
       await setupGateway.advanceStep({ step: 3, data: { baseUrl: baseUrl.trim() } });
-      // SendGrid step is hidden in this UI — auto-skip on the backend so the
-      // wizard's currentStep advances past 4 before the user lands on IP Pool.
+      // SendGrid (4) and IP Pool (5) are hidden in this UI — auto-skip both on
+      // the backend so the wizard's currentStep advances straight to 6 (Health).
       try {
         await setupGateway.advanceStep({ step: 4, data: { skip: true } });
       } catch {
         // Idempotent on the backend; if it has already been skipped (e.g. user
         // refreshed mid-flow), the next advance call will succeed anyway.
+      }
+      try {
+        await setupGateway.advanceStep({ step: 5, data: { skip: true } });
+      } catch {
+        // Idempotent.
       }
       onComplete();
     } catch (err) {

@@ -24,6 +24,7 @@ export interface Step1Data {
   name: string;
   email: string;
   password: string;
+  accountName: string;
 }
 
 export type Step2Data =
@@ -45,18 +46,9 @@ export interface Step3Data {
 // after step 3 (Domínio); the backend keeps the slot for compatibility.
 export type Step4Data = { skip: true };
 
-export type Step5Data =
-  | { skip: true }
-  | {
-      skip?: false;
-      accountName: string;
-      poolName?: string;
-      senderEmail?: string;
-      senderName?: string;
-      replyToEmail?: string;
-      sendingLimit?: number;
-      ips?: string[];
-    };
+// Account is now created in step1 alongside the admin. The frontend auto-skips
+// this step; backend keeps the slot for compatibility.
+export type Step5Data = { skip: true };
 
 export type Step6Data = { skip: true } | { skip?: false; skipReason?: string };
 
