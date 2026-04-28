@@ -1,20 +1,20 @@
-import { useEffect, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { X } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAppStore } from '@/stores/app-store';
 import { poolGateway, type Pool } from './pool-gateway';
+import { poolSendgridGateway, type SendgridPoolOption, type SendgridIp } from './pool-sendgrid-gateway';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const IPV4_RE = /^(?:\d{1,3}\.){3}\d{1,3}$/;
-const IPV6_RE = /^[0-9a-fA-F:]+$/;
 
-function normalizeIps(raw: Pool['ip']): string[] {
+function normalizeStoredIps(raw: Pool['ip']): string[] {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.filter((v): v is string => typeof v === 'string');
   if (typeof raw === 'string') {
@@ -37,78 +37,106 @@ export function PoolTab() {
 
   const [pool, setPool] = useState<Pool | null>(null);
   const [name, setName] = useState('');
-  const [poolName, setPoolName] = useState('');
   const [senderEmail, setSenderEmail] = useState('');
   const [senderName, setSenderName] = useState('');
   const [senderReplyTo, setSenderReplyTo] = useState('');
   const [sendingLimit, setSendingLimit] = useState('1000');
+
+  // SendGrid-backed selection: the user can no longer type a free-form pool
+  // name or arbitrary IPs — both come from the SendGrid account configured
+  // for this BMS account. `selectedPool` is the SendGrid pool name; `ips`
+  // is the read-only set of IPs that pool advertises on SendGrid.
+  const [sendgridPools, setSendgridPools] = useState<SendgridPoolOption[]>([]);
+  const [selectedPool, setSelectedPool] = useState<string>('');
   const [ips, setIps] = useState<string[]>([]);
-  const [ipInput, setIpInput] = useState('');
 
   const [loading, setLoading] = useState(true);
+  const [poolsLoadError, setPoolsLoadError] = useState(false);
+  const [loadingIps, setLoadingIps] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Load (a) the existing local pool row for this account, and (b) the list
+  // of SendGrid pools the account has access to. Both run in parallel —
+  // either failing is non-fatal: the user might be configuring this for the
+  // first time (no local pool), or might not yet have a SendGrid key set
+  // (pools list empty). We surface the SendGrid-key-missing case explicitly.
   useEffect(() => {
     let cancelled = false;
-    poolGateway
-      .list()
-      .then((pools) => {
-        if (cancelled) return;
-        const myPools = pools.filter((p) => p.accountId === accountId);
-        const target = myPools.find((p) => p.isDefault) ?? myPools[0] ?? null;
-        if (target) {
-          setPool(target);
-          setName(target.name ?? '');
-          setPoolName(target.poolName ?? '');
-          setSenderEmail(target.senderEmail ?? '');
-          setSenderName(target.senderName ?? '');
-          setSenderReplyTo(target.senderReplyTo ?? '');
-          setSendingLimit(String(target.sendingLimit ?? 1000));
-          setIps(normalizeIps(target.ip));
+    Promise.all([
+      poolGateway.list().catch((err) => {
+        if (!axios.isAxiosError(err) || err.response?.status !== 404) {
+          const msg = axios.isAxiosError(err) && err.response?.data?.message
+            ? String(err.response.data.message)
+            : t('settings.poolLoadError');
+          toast.error(msg);
         }
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        const msg = axios.isAxiosError(err) && err.response?.data?.message
-          ? String(err.response.data.message)
-          : t('settings.poolLoadError');
-        toast.error(msg);
-        setLoading(false);
-      });
+        return [] as Pool[];
+      }),
+      poolSendgridGateway.listPools().catch(() => {
+        if (!cancelled) setPoolsLoadError(true);
+        return [] as SendgridPoolOption[];
+      }),
+    ]).then(([pools, sgPools]) => {
+      if (cancelled) return;
+      setSendgridPools(sgPools);
+
+      const myPools = pools.filter((p) => p.accountId === accountId);
+      const target = myPools.find((p) => p.isDefault) ?? myPools[0] ?? null;
+      if (target) {
+        setPool(target);
+        setName(target.name ?? '');
+        setSenderEmail(target.senderEmail ?? '');
+        setSenderName(target.senderName ?? '');
+        setSenderReplyTo(target.senderReplyTo ?? '');
+        setSendingLimit(String(target.sendingLimit ?? 1000));
+        const storedPoolName = target.poolName ?? '';
+        setSelectedPool(storedPoolName);
+        setIps(normalizeStoredIps(target.ip));
+      }
+      setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
   }, [accountId, t]);
 
-  function addIp() {
-    const v = ipInput.trim();
-    if (!v) return;
-    if (!IPV4_RE.test(v) && !IPV6_RE.test(v)) {
-      toast.error(t('settings.poolIpInvalid'));
+  // Whenever the user picks a different SendGrid pool, refresh the IP list
+  // from the SendGrid API so the saved row reflects what's actually
+  // assigned right now (IPs in pools change on the SendGrid side over
+  // time). The `read-only` semantics matter: if SendGrid says the pool has
+  // 3 IPs, we save those 3 — not whatever a stale form had.
+  useEffect(() => {
+    if (!selectedPool) {
+      setIps([]);
       return;
     }
-    if (ips.includes(v)) {
-      setIpInput('');
-      return;
-    }
-    setIps((prev) => [...prev, v]);
-    setIpInput('');
-  }
-
-  function removeIp(ip: string) {
-    setIps((prev) => prev.filter((x) => x !== ip));
-  }
-
-  function onIpKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      addIp();
-    }
-  }
+    let cancelled = false;
+    setLoadingIps(true);
+    poolSendgridGateway
+      .listIpsForPool(selectedPool)
+      .then((rows) => {
+        if (cancelled) return;
+        setIps(rows.map((r) => r.ip).filter(Boolean));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const msg = axios.isAxiosError(err) && err.response?.data?.message
+          ? String(err.response.data.message)
+          : t('settings.poolIpsLoadError');
+        toast.error(msg);
+        setIps([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingIps(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPool, t]);
 
   function validate(): string | null {
     if (!name.trim()) return t('settings.poolNameRequired');
+    if (!selectedPool) return t('settings.poolSendgridPoolRequired');
     if (senderEmail && !EMAIL_RE.test(senderEmail)) return t('settings.poolSenderEmailInvalid');
     if (senderReplyTo && !EMAIL_RE.test(senderReplyTo)) return t('settings.poolReplyToInvalid');
     if (sendingLimit) {
@@ -128,7 +156,7 @@ export function PoolTab() {
     setSaving(true);
     const payload = {
       name: name.trim(),
-      poolName: poolName.trim() || name.trim(),
+      poolName: selectedPool,
       ...(senderEmail.trim() && { senderEmail: senderEmail.trim().toLowerCase() }),
       ...(senderName.trim() && { senderName: senderName.trim() }),
       ...(senderReplyTo.trim() && { senderReplyTo: senderReplyTo.trim().toLowerCase() }),
@@ -167,6 +195,24 @@ export function PoolTab() {
     );
   }
 
+  // Empty state when the account has no SendGrid key yet (or its key has no
+  // pools): there's no point letting them save anything because the IP set
+  // can't be derived. Point them at the SendGrid tab to fix the
+  // prerequisite.
+  if (!poolsLoadError && sendgridPools.length === 0) {
+    return (
+      <div className="max-w-2xl rounded-md border border-amber-500/40 bg-amber-500/5 p-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium">{t('settings.poolNeedsSendgridTitle')}</p>
+            <p className="text-muted-foreground text-xs">{t('settings.poolNeedsSendgridDescription')}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} noValidate className="max-w-2xl space-y-4">
       <p className="text-muted-foreground text-xs">{t('settings.poolHelp')}</p>
@@ -183,14 +229,19 @@ export function PoolTab() {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="settings-pool-pool-name">{t('settings.poolInternalName')}</Label>
-          <Input
-            id="settings-pool-pool-name"
-            value={poolName}
-            onChange={(e) => setPoolName(e.target.value)}
-            disabled={saving}
-            placeholder="bms-pool-01"
-          />
+          <Label htmlFor="settings-pool-sendgrid">{t('settings.poolSendgridPool')}</Label>
+          <Select value={selectedPool} onValueChange={setSelectedPool} disabled={saving}>
+            <SelectTrigger id="settings-pool-sendgrid">
+              <SelectValue placeholder={t('settings.poolSendgridPoolPlaceholder')} />
+            </SelectTrigger>
+            <SelectContent>
+              {sendgridPools.map((p) => (
+                <SelectItem key={p.name} value={p.name}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -245,37 +296,28 @@ export function PoolTab() {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="settings-pool-ips">{t('settings.poolIps')}</Label>
-        <div className="border-border rounded-md border px-2 py-1.5">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {ips.map((ip) => (
-              <span
-                key={ip}
-                className="bg-secondary text-secondary-foreground inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs"
-              >
-                {ip}
-                <button
-                  type="button"
-                  className="hover:text-destructive"
-                  onClick={() => removeIp(ip)}
-                  aria-label={`Remover ${ip}`}
+        <Label>{t('settings.poolIps')}</Label>
+        <div className="border-border bg-muted/30 rounded-md border px-3 py-2">
+          {loadingIps ? (
+            <p className="text-muted-foreground text-xs">{t('settings.poolIpsLoading')}</p>
+          ) : !selectedPool ? (
+            <p className="text-muted-foreground text-xs">{t('settings.poolIpsSelectPoolFirst')}</p>
+          ) : ips.length === 0 ? (
+            <p className="text-muted-foreground text-xs">{t('settings.poolIpsEmpty')}</p>
+          ) : (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {ips.map((ip) => (
+                <span
+                  key={ip}
+                  className="bg-secondary text-secondary-foreground inline-flex items-center rounded-md px-2 py-0.5 text-xs"
                 >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
-            <Input
-              id="settings-pool-ips"
-              placeholder={t('settings.poolIpsPlaceholder')}
-              value={ipInput}
-              onChange={(e) => setIpInput(e.target.value)}
-              onKeyDown={onIpKeyDown}
-              onBlur={addIp}
-              disabled={saving}
-              className="h-7 flex-1 min-w-[160px] border-0 px-1 shadow-none focus-visible:ring-0"
-            />
-          </div>
+                  {ip}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
+        <p className="text-muted-foreground text-xs">{t('settings.poolIpsReadonlyHelp')}</p>
       </div>
 
       <Button type="submit" disabled={saving}>
