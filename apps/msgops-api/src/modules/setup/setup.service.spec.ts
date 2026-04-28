@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, HttpException, HttpStatus } from '@nestjs/common';
+import { HealthCheckResult } from './dtos/health-check-result.dto';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import * as nodemailer from 'nodemailer';
@@ -13,6 +14,8 @@ import { PoolEntity } from '../../entities/pool.entity';
 import { UserAccountEntity } from '../../entities/users-account.entity';
 import { AUTH_PROVIDER_TOKEN, IAuthProvider } from '../auth/providers/auth.provider.interface';
 import { ROLE_CODES } from '../authz/authz.constants';
+import { RedisService } from '../../providers/redis.provider';
+import { ClickhouseProvider } from '../../providers/clickhouse.provider';
 import { SetupService } from './setup.service';
 
 const SUPER_ADMIN_ROLE = { id: 42, code: ROLE_CODES.SUPER_ADMIN };
@@ -25,6 +28,7 @@ function makeRepo<T = any>(overrides: Partial<T> = {}): any {
     create: jest.fn((v) => v),
     save: jest.fn((v) => ({ id: 1, ...v })),
     remove: jest.fn(),
+    delete: jest.fn(),
     ...overrides,
   };
 }
@@ -104,6 +108,8 @@ async function buildService(
       { provide: getRepositoryToken(PoolEntity), useValue: poolRepo },
       { provide: getRepositoryToken(UserAccountEntity), useValue: userAccountRepo },
       { provide: AUTH_PROVIDER_TOKEN, useValue: authProvider },
+      { provide: RedisService, useValue: { getClient: jest.fn().mockReturnValue({ ping: jest.fn().mockResolvedValue('PONG') }) } },
+      { provide: ClickhouseProvider, useValue: { runQuery: jest.fn().mockResolvedValue([]) } },
     ],
   }).compile();
 
@@ -157,7 +163,7 @@ describe('SetupService', () => {
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: true } });
 
       const status = await service.getStatus();
-      expect(status).toEqual({ configured: true, currentStep: 5 });
+      expect(status).toEqual({ configured: true, currentStep: 6 });
     });
   });
 
@@ -272,6 +278,8 @@ describe('SetupService', () => {
           { provide: getRepositoryToken(PoolEntity), useValue: makeRepo() },
           { provide: getRepositoryToken(UserAccountEntity), useValue: makeRepo() },
           { provide: AUTH_PROVIDER_TOKEN, useValue: authProvider },
+          { provide: RedisService, useValue: { getClient: jest.fn().mockReturnValue({ ping: jest.fn().mockResolvedValue('PONG') }) } },
+          { provide: ClickhouseProvider, useValue: { runQuery: jest.fn().mockResolvedValue([]) } },
         ],
       }).compile();
       const service = moduleRef.get(SetupService);
@@ -408,7 +416,7 @@ describe('SetupService', () => {
   });
 
   describe('step5 — account + pool', () => {
-    it('with skip=true, marks wizard completed without touching account/pool tables', async () => {
+    it('with skip=true, advances to step 6 without touching account/pool tables', async () => {
       const { service, systemConfigRepo, accountRepo, poolRepo, userAccountRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: false } });
 
@@ -417,9 +425,7 @@ describe('SetupService', () => {
       expect(accountRepo.save).not.toHaveBeenCalled();
       expect(poolRepo.save).not.toHaveBeenCalled();
       expect(userAccountRepo.save).not.toHaveBeenCalled();
-      expect(systemConfigRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ key: 'setup_wizard_step', value: expect.objectContaining({ currentStep: 5, completed: true }) }),
-      );
+      expect(systemConfigRepo.save).toHaveBeenCalledWith(expect.objectContaining({ value: expect.objectContaining({ currentStep: 6, completed: false }) }));
     });
 
     it('uses the adminUserId stored in wizard state (not "first super-admin") when linking master user', async () => {
@@ -571,6 +577,104 @@ describe('SetupService', () => {
         expect(err).toBeInstanceOf(HttpException);
         expect(err.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
       }
+    });
+  });
+
+  describe('probe() — health check primitive', () => {
+    afterEach(() => jest.useRealTimers());
+
+    it('returns ok=true for a fast resolving function', async () => {
+      const { service } = await buildService();
+      const result = await (service as any).probe(() => Promise.resolve());
+      expect(result.ok).toBe(true);
+      expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('returns ok=false with error message when function rejects', async () => {
+      const { service } = await buildService();
+      const result = await (service as any).probe(() => Promise.reject(new Error('connection refused')));
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe('connection refused');
+    });
+
+    it('returns ok=false with "timeout" when function exceeds 5000ms', async () => {
+      const { service } = await buildService();
+      jest.useFakeTimers();
+      const probePromise = (service as any).probe(() => new Promise<void>(() => {}));
+      jest.advanceTimersByTime(5001);
+      const result = await probePromise;
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe('timeout');
+    });
+
+    it('truncates error messages longer than 150 chars', async () => {
+      const { service } = await buildService();
+      const result = await (service as any).probe(() => Promise.reject(new Error('x'.repeat(200))));
+      expect(result.ok).toBe(false);
+      expect(result.error).toHaveLength(150);
+    });
+  });
+
+  describe('step6 — health check enforcement', () => {
+    const allGreen: HealthCheckResult = {
+      postgres: { ok: true, latencyMs: 1 },
+      redis: { ok: true, latencyMs: 1 },
+      clickhouse: { ok: true, latencyMs: 1 },
+      rabbitmq: { ok: true, latencyMs: 1 },
+      s3: { ok: true, latencyMs: 1 },
+      smtp: { ok: true, latencyMs: 1 },
+      allOk: true,
+    };
+    const withFailure: HealthCheckResult = {
+      ...allGreen,
+      postgres: { ok: false, latencyMs: 5000, error: 'timeout' },
+      allOk: false,
+    };
+
+    it('completes wizard without skipReason when allOk=true', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 6, completed: false } });
+      jest.spyOn(service, 'checkHealth').mockResolvedValueOnce(allGreen);
+
+      await service.advanceStep({ step: 6, data: {} as any });
+
+      const call = systemConfigRepo.save.mock.calls.find(([v]: [any]) => v.key === 'setup_complete');
+      expect(call[0].value.complete).toBe(true);
+      expect(call[0].value.skipReason).toBeUndefined();
+    });
+
+    it('throws BadRequestException when allOk=false and no skipReason', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 6, completed: false } });
+      jest.spyOn(service, 'checkHealth').mockResolvedValueOnce(withFailure);
+
+      await expect(service.advanceStep({ step: 6, data: {} as any })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('completes wizard and saves skipReason when allOk=false but skipReason provided', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 6, completed: false } });
+      jest.spyOn(service, 'checkHealth').mockResolvedValueOnce(withFailure);
+
+      await service.advanceStep({ step: 6, data: { skipReason: 'ClickHouse indisponível em staging' } as any });
+
+      const call = systemConfigRepo.save.mock.calls.find(([v]: [any]) => v.key === 'setup_complete');
+      expect(call[0].value.skipReason).toBe('ClickHouse indisponível em staging');
+    });
+
+    it('rate-limits step 6 per IP, sharing the budget with GET /setup/health-check', async () => {
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 6, completed: false } });
+      jest.spyOn(service, 'checkHealth').mockResolvedValue(allGreen);
+
+      // 3 hits/min/IP is the configured limit; the 4th must be rejected.
+      await service.advanceStep({ step: 6, data: {} as any }, '10.0.0.1');
+      await service.advanceStep({ step: 6, data: {} as any }, '10.0.0.1');
+      await service.advanceStep({ step: 6, data: {} as any }, '10.0.0.1');
+      await expect(service.advanceStep({ step: 6, data: {} as any }, '10.0.0.1')).rejects.toMatchObject({
+        status: 429,
+      });
     });
   });
 

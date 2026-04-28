@@ -11,6 +11,7 @@ const router = createRouter({
 });
 
 let setupChecked = false;
+let isConfigured = false;
 
 router.beforeEach(async (to: RouteLocationNormalized) => {
   if ((to.meta as any)?.public || to.path === '/login') {
@@ -21,6 +22,7 @@ router.beforeEach(async (to: RouteLocationNormalized) => {
     try {
       const status = await setupGateway.getStatus();
       setupChecked = true;
+      isConfigured = status.configured;
       if (!status.configured) {
         return '/setup';
       }
@@ -35,6 +37,10 @@ router.beforeEach(async (to: RouteLocationNormalized) => {
       }
       // setupChecked stays false so we retry on the next navigation.
     }
+  }
+
+  if (isConfigured && to.path.startsWith('/setup')) {
+    return '/';
   }
 
   const { isAuthenticated, refresh } = useAuth();

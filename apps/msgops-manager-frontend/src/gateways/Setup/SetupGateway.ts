@@ -10,9 +10,30 @@ export interface SetupStatus {
   baseUrl?: string;
 }
 
+export interface ServiceHealthResult {
+  ok: boolean;
+  latencyMs: number;
+  error?: string;
+}
+
+export interface HealthCheckResult {
+  postgres: ServiceHealthResult;
+  redis: ServiceHealthResult;
+  clickhouse: ServiceHealthResult;
+  rabbitmq: ServiceHealthResult;
+  s3: ServiceHealthResult;
+  smtp: ServiceHealthResult;
+  allOk: boolean;
+}
+
 export const setupGateway = {
   async getStatus(): Promise<SetupStatus> {
     const res = await http.get<SetupStatus>('/setup/status');
+    return res.data;
+  },
+
+  async healthCheck(): Promise<HealthCheckResult> {
+    const res = await http.get<HealthCheckResult>('/setup/health-check');
     return res.data;
   },
 

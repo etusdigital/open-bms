@@ -6,7 +6,7 @@ import { BmsTextField, BmsButton } from '../../../components';
 import { setupGateway } from '../../../gateways/Setup';
 import { showToast } from '../../../utils/showToast';
 
-const emit = defineEmits<{ (e: 'step-complete'): void }>();
+const emit = defineEmits<{ (e: 'step-complete', payload: { email: string; password: string }): void }>();
 
 const schema = toTypedSchema(
   z.object({
@@ -28,7 +28,7 @@ const { handleSubmit, isSubmitting } = useForm({
 const onSubmit = handleSubmit(async (values) => {
   try {
     await setupGateway.advanceStep(1, { name: values.name, email: values.email, password: values.password });
-    emit('step-complete');
+    emit('step-complete', { email: values.email, password: values.password });
   } catch (e: any) {
     showToast({ type: 'error', description: e?.response?.data?.message || 'Erro ao criar administrador.' });
   }

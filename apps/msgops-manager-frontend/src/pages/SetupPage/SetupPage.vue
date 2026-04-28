@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { login } from '../../composables/useAuth';
 import { CheckmarkOutline } from '@vicons/ionicons5';
 import Step1Admin from './steps/Step1Admin.vue';
 import Step2Smtp from './steps/Step2Smtp.vue';
 import Step3Domain from './steps/Step3Domain.vue';
 import Step4Sendgrid from './steps/Step4Sendgrid.vue';
 import Step5Pool from './steps/Step5Pool.vue';
+import Step6HealthCheck from './steps/Step6HealthCheck.vue';
 import { setupGateway } from '../../gateways/Setup';
 
 const router = useRouter();
 
 const currentStep = ref(1);
+const adminCredentials = ref<{ email: string; password: string } | null>(null);
 
 const steps = [
   { label: 'Administrador' },
@@ -19,6 +22,7 @@ const steps = [
   { label: 'Domínio' },
   { label: 'SendGrid' },
   { label: 'IP Pool' },
+  { label: 'Health Check' },
 ];
 
 const stepTitles: Record<number, string> = {
@@ -27,6 +31,7 @@ const stepTitles: Record<number, string> = {
   3: 'URL base da plataforma',
   4: 'Provedor de envio em massa (SendGrid)',
   5: 'IP Pool e primeira conta',
+  6: 'Verificação de serviços',
 };
 
 onMounted(async () => {
@@ -42,14 +47,26 @@ onMounted(async () => {
   }
 });
 
-function advance() {
-  if (currentStep.value < 5) {
+function advance(payload?: { email: string; password: string }) {
+  if (currentStep.value === 1 && payload) {
+    adminCredentials.value = payload;
+  }
+  if (currentStep.value < 6) {
     currentStep.value++;
   }
 }
 
-function finish() {
-  router.replace('/');
+async function finish() {
+  if (adminCredentials.value) {
+    try {
+      await login(adminCredentials.value.email, adminCredentials.value.password);
+      router.replace('/');
+    } catch {
+      router.replace('/login');
+    }
+  } else {
+    router.replace('/login');
+  }
 }
 </script>
 
@@ -120,7 +137,8 @@ function finish() {
           <Step2Smtp v-else-if="currentStep === 2" @step-complete="advance" />
           <Step3Domain v-else-if="currentStep === 3" @step-complete="advance" />
           <Step4Sendgrid v-else-if="currentStep === 4" @step-complete="advance" />
-          <Step5Pool v-else-if="currentStep === 5" @step-complete="finish" />
+          <Step5Pool v-else-if="currentStep === 5" @step-complete="advance" />
+          <Step6HealthCheck v-else-if="currentStep === 6" @step-complete="finish" />
         </Transition>
       </div>
 

@@ -65,7 +65,7 @@ const getStyleDisabled = (disabled: boolean) => {
     :class="{ ...getStyleVariant(props.variant), ...getStyleDisabled(props.disabled) }"
     @click="props.click"
   >
-    <span class="tw-relative tw-flex tw-flex-secondary">
+    <span class="tw-relative tw-flex">
       <slot></slot>
     </span>
   </button>

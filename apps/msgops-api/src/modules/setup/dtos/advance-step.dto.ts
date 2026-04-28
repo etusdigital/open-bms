@@ -117,12 +117,22 @@ export const step5Schema = Joi.alternatives<Step5Data>().try(
   }),
 );
 
-export const STEP_SCHEMAS = { 1: step1Schema, 2: step2Schema, 3: step3Schema, 4: step4Schema, 5: step5Schema } as const;
+export class Step6Data {
+  skip?: boolean;
+  skipReason?: string;
+}
+
+export const step6Schema = Joi.alternatives<Step6Data>().try(
+  Joi.object({ skip: Joi.valid(true).required() }),
+  Joi.object({ skip: Joi.valid(false).optional(), skipReason: Joi.string().trim().max(500).optional() }),
+);
+
+export const STEP_SCHEMAS = { 1: step1Schema, 2: step2Schema, 3: step3Schema, 4: step4Schema, 5: step5Schema, 6: step6Schema } as const;
 
 export class AdvanceStepDto {
-  @JoiSchema(Joi.number().valid(1, 2, 3, 4, 5).required())
-  step: 1 | 2 | 3 | 4 | 5;
+  @JoiSchema(Joi.number().valid(1, 2, 3, 4, 5, 6).required())
+  step: 1 | 2 | 3 | 4 | 5 | 6;
 
   @JoiSchema(Joi.object().required())
-  data: Step1Data | Step2Data | Step3Data | Step4Data | Step5Data;
+  data: Step1Data | Step2Data | Step3Data | Step4Data | Step5Data | Step6Data;
 }

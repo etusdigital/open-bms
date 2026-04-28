@@ -3,6 +3,8 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import * as nodemailer from 'nodemailer';
 import axios from 'axios';
+import * as amqplib from 'amqplib';
+import { S3Client, HeadBucketCommand } from '@aws-sdk/client-s3';
 import { SystemConfigEntity } from '../../entities/system-config.entity';
 import { UserEntity } from '../../entities/users.entity';
 import { RoleEntity } from '../../entities/role.entity';
@@ -10,9 +12,12 @@ import { AccountEntity } from '../../entities/account.entity';
 import { PoolEntity } from '../../entities/pool.entity';
 import { UserAccountEntity } from '../../entities/users-account.entity';
 import { AUTH_PROVIDER_TOKEN, IAuthProvider } from '../auth/providers/auth.provider.interface';
+import { RedisService } from '../../providers/redis.provider';
+import { ClickhouseProvider } from '../../providers/clickhouse.provider';
 import { ROLE_CODES } from '../authz/authz.constants';
-import { AdvanceStepDto, STEP_SCHEMAS, Step1Data, Step2Data, Step3Data, Step4Data, Step5Data } from './dtos/advance-step.dto';
+import { AdvanceStepDto, STEP_SCHEMAS, Step1Data, Step2Data, Step3Data, Step4Data, Step5Data, Step6Data } from './dtos/advance-step.dto';
 import { TestSmtpDto } from './dtos/test-smtp.dto';
+import { HealthCheckResult, ServiceHealthResult } from './dtos/health-check-result.dto';
 import { TestSendgridDto } from './dtos/test-sendgrid.dto';
 
 const WIZARD_KEY = 'setup_wizard_step';
@@ -21,9 +26,12 @@ const DOMAIN_KEY = 'domain_settings';
 const SENDGRID_KEY = 'sendgrid_settings';
 // Shared with seedAdmin (bootstrap/seed-admin.ts) so the wizard serializes against the same lock.
 const ADVISORY_LOCK_KEY = 834729;
-// Rate limit for testSmtp — window in ms and max attempts per IP in that window.
+// Rate limit for testSmtp/testSendgrid — window in ms and max attempts per IP in that window.
 const TEST_RATE_WINDOW_MS = 60_000;
 const TEST_RATE_MAX_PER_WINDOW = 5;
+// Rate limit for health-check — more restrictive (each call opens 6 external connections).
+const HEALTH_CHECK_WINDOW_MS = 60_000;
+const HEALTH_CHECK_MAX_PER_WINDOW = 3;
 
 type WizardState = {
   currentStep: number;
@@ -45,6 +53,7 @@ type SendgridSettings = {
 export class SetupService {
   private readonly logger = new Logger(SetupService.name);
   private readonly testProviderHits = new Map<string, number[]>();
+  private readonly healthCheckHits = new Map<string, number[]>();
 
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
@@ -55,11 +64,13 @@ export class SetupService {
     @InjectRepository(PoolEntity) private poolRepo: Repository<PoolEntity>,
     @InjectRepository(UserAccountEntity) private userAccountRepo: Repository<UserAccountEntity>,
     @Inject(AUTH_PROVIDER_TOKEN) private readonly authProvider: IAuthProvider,
+    private readonly redisService: RedisService,
+    private readonly clickhouse: ClickhouseProvider,
   ) {}
 
   async getStatus(): Promise<{ configured: boolean; currentStep: number; baseUrl?: string }> {
     const state = await this.readWizard();
-    if (state?.completed) return { configured: true, currentStep: 5 };
+    if (state?.completed) return { configured: true, currentStep: 6 };
 
     const superAdminRole = await this.roleRepo.findOne({ where: { code: ROLE_CODES.SUPER_ADMIN } });
     if (superAdminRole) {
@@ -77,7 +88,7 @@ export class SetupService {
     return { configured: false, currentStep: state.currentStep || 1, ...(baseUrl && { baseUrl }) };
   }
 
-  async advanceStep(dto: AdvanceStepDto): Promise<void> {
+  async advanceStep(dto: AdvanceStepDto, requesterIp?: string): Promise<void> {
     await this.ensureNotConfigured();
 
     const schema = STEP_SCHEMAS[dto.step];
@@ -95,6 +106,14 @@ export class SetupService {
       throw new BadRequestException(`Passo fora de ordem: esperado ${expectedStep}, recebido ${dto.step}.`);
     }
 
+    // Step 6 fans out 6 outbound probes (Postgres/Redis/ClickHouse/RabbitMQ/S3/SMTP) via
+    // checkHealth(). Without a rate limit this public pre-completion endpoint can be
+    // looped to burn external sockets — reuse the same window as GET /setup/health-check
+    // so both paths share a budget per IP.
+    if (dto.step === 6) {
+      this.enforceHealthCheckRateLimit(requesterIp);
+    }
+
     switch (dto.step) {
       case 1:
         return this.step1(value as Step1Data);
@@ -106,6 +125,65 @@ export class SetupService {
         return this.step4(value as Step4Data);
       case 5:
         return this.step5(value as Step5Data);
+      case 6:
+        return this.step6(value as Step6Data);
+    }
+  }
+
+  async checkHealth(): Promise<HealthCheckResult> {
+    const [postgres, redis, clickhouse, rabbitmq, s3, smtp] = await Promise.all([
+      this.probe(() => this.dataSource.query('SELECT 1')),
+      this.probe(() => this.redisService.getClient().ping()),
+      this.probe(() => this.clickhouse.runQuery('SELECT 1')),
+      this.probe(async () => {
+        const url = process.env.AMQP_URL;
+        if (!url) throw new Error('AMQP_URL not configured');
+        const connPromise = amqplib.connect(url);
+        // Cleanup even when probe() abandons this lambda on timeout
+        connPromise.then((conn) => conn.close()).catch(() => undefined);
+        await connPromise;
+      }),
+      this.probe(async () => {
+        const bucket = process.env.S3_BUCKET;
+        const accessKeyId = process.env.S3_ACCESS_KEY_ID;
+        const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
+        if (!accessKeyId || !secretAccessKey || !bucket) throw new Error('S3 not configured');
+        const client = new S3Client({
+          endpoint: process.env.S3_ENDPOINT,
+          region: process.env.S3_REGION ?? 'us-east-1',
+          credentials: { accessKeyId, secretAccessKey },
+          forcePathStyle: !!process.env.S3_ENDPOINT,
+        });
+        await client.send(new HeadBucketCommand({ Bucket: bucket }));
+      }),
+      this.probe(async () => {
+        const smtpConfig = await this.systemConfigRepo.findOne({ where: { key: SMTP_KEY } });
+        if (!smtpConfig) throw new Error('SMTP not configured');
+        const { host, port, user, pass } = smtpConfig.value as SmtpSettings;
+        const transporter = nodemailer.createTransport({ host, port, auth: { user, pass } });
+        await transporter.verify();
+      }),
+    ]);
+
+    return {
+      postgres,
+      redis,
+      clickhouse,
+      rabbitmq,
+      s3,
+      smtp,
+      allOk: [postgres, redis, clickhouse, rabbitmq, s3, smtp].every((r) => r.ok),
+    };
+  }
+
+  private async probe(fn: () => Promise<unknown>): Promise<ServiceHealthResult> {
+    const start = Date.now();
+    try {
+      await Promise.race([fn(), new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))]);
+      return { ok: true, latencyMs: Date.now() - start };
+    } catch (e: any) {
+      const raw: string = e?.message ?? 'unknown error';
+      return { ok: false, latencyMs: Date.now() - start, error: raw.substring(0, 150) };
     }
   }
 
@@ -192,7 +270,7 @@ export class SetupService {
 
   private async step5(data: Step5Data): Promise<void> {
     if (data.skip) {
-      await this.completeWizard();
+      await this.upsertWizard({ currentStep: 6 });
       return;
     }
 
@@ -246,7 +324,18 @@ export class SetupService {
       this.logger.warn(`Setup step5: created account ${savedAccount.id} but no admin user found to link as master`);
     }
 
-    await this.completeWizard();
+    await this.upsertWizard({ currentStep: 6 });
+  }
+
+  private async step6(data: Step6Data): Promise<void> {
+    const health = await this.checkHealth();
+    if (!health.allOk) {
+      if (!data.skipReason) {
+        throw new BadRequestException('Health check failed. All services must be healthy or provide a skipReason to proceed.');
+      }
+      return this.completeWizard(data.skipReason);
+    }
+    return this.completeWizard();
   }
 
   async testSendgrid(dto: TestSendgridDto, requesterIp?: string): Promise<{ accountName: string | null }> {
@@ -318,6 +407,18 @@ export class SetupService {
     if (state?.completed) {
       throw new ForbiddenException('A configuração inicial já foi concluída.');
     }
+  }
+
+  enforceHealthCheckRateLimit(requesterIp?: string): void {
+    const key = requesterIp || 'unknown';
+    const now = Date.now();
+    const windowStart = now - HEALTH_CHECK_WINDOW_MS;
+    const hits = (this.healthCheckHits.get(key) || []).filter((t) => t > windowStart);
+    if (hits.length >= HEALTH_CHECK_MAX_PER_WINDOW) {
+      throw new HttpException('Too many health check attempts. Try again in a minute.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    hits.push(now);
+    this.healthCheckHits.set(key, hits);
   }
 
   private enforceTestRateLimit(provider: 'smtp' | 'sendgrid', requesterIp?: string): void {
@@ -392,13 +493,17 @@ export class SetupService {
     await repo.save(repo.create({ key: WIZARD_KEY, value: next }));
   }
 
-  private async completeWizard(): Promise<void> {
+  private async completeWizard(skipReason?: string): Promise<void> {
     const existing = await this.readWizard();
-    const next: WizardState = {
-      currentStep: existing?.currentStep ?? 5,
-      completed: true,
-      adminUserId: existing?.adminUserId,
-    };
-    await this.systemConfigRepo.save(this.systemConfigRepo.create({ key: WIZARD_KEY, value: next }));
+    await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(SystemConfigEntity);
+      await repo.save(repo.create({ key: WIZARD_KEY, value: { currentStep: 6, completed: true, adminUserId: existing?.adminUserId } }));
+      await repo.save(
+        repo.create({
+          key: 'setup_complete',
+          value: { complete: true, completedAt: new Date().toISOString(), ...(skipReason ? { skipReason } : {}) },
+        }),
+      );
+    });
   }
 }
