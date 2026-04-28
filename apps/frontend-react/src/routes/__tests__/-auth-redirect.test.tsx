@@ -16,16 +16,20 @@ import {
 
 const mockLoginWithRedirect = vi.fn();
 const mockLogout = vi.fn();
-let mockAuth0State = {
+let mockAuthState = {
   isLoading: false,
   isAuthenticated: false,
   user: null as Record<string, string> | null,
   loginWithRedirect: mockLoginWithRedirect,
   logout: mockLogout,
+  login: vi.fn(),
+  refresh: vi.fn(),
+  getAccessToken: vi.fn(),
+  getAccessTokenSilently: vi.fn(),
 };
 
-vi.mock('@auth0/auth0-react', () => ({
-  useAuth0: () => mockAuth0State,
+vi.mock('@/features/auth/use-auth', () => ({
+  useAuth: () => mockAuthState,
 }));
 
 vi.mock('@/hooks/use-auth-init', () => ({
@@ -249,7 +253,7 @@ describe('Callback page restores returnTo with query params', () => {
 describe('Login page preserves returnTo through Auth0', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAuth0State = {
+    mockAuthState = {
       isLoading: false,
       isAuthenticated: false,
       user: null,
@@ -271,7 +275,7 @@ describe('Login page preserves returnTo through Auth0', () => {
         returnTo: (search.returnTo as string) || undefined,
       }),
       component: function LoginTest() {
-        const { loginWithRedirect } = mockAuth0State;
+        const { loginWithRedirect } = mockAuthState;
         const search = loginRoute.useSearch();
         const handledRef = { current: false };
 

@@ -1,43 +1,25 @@
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, type AxiosRequestConfig } from 'axios';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
-
-// Module-scoped token cache
-let cachedToken: string | null = null;
-let tokenExpiresAt = 0;
-
-// Mutable ref for the Auth0 token getter (set by AuthBridge component)
-let tokenFetcherRef: (() => Promise<string>) | null = null;
-
-export function setTokenFetcher(fn: () => Promise<string>) {
-  tokenFetcherRef = fn;
-}
-
-async function getToken(): Promise<string> {
-  if (!tokenFetcherRef) throw new Error('Token fetcher not initialized');
-  const now = Date.now();
-  if (cachedToken && now < tokenExpiresAt - 60_000) return cachedToken;
-  cachedToken = await tokenFetcherRef();
-  const payload = JSON.parse(atob(cachedToken.split('.')[1]));
-  tokenExpiresAt = payload.exp * 1000;
-  return cachedToken;
-}
-
-export function clearTokenCache() {
-  cachedToken = null;
-  tokenExpiresAt = 0;
-}
+import { getAccessToken, refresh } from '@/features/auth/use-auth';
 
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
+  withCredentials: true,
 });
 
-// Request interceptor: inject Authorization + Account-Id headers
-apiClient.interceptors.request.use(async (config) => {
-  const token = await getToken();
-  config.headers.Authorization = `Bearer ${token}`;
+function isAuthEndpoint(url: string | undefined): boolean {
+  if (!url) return false;
+  return /\/auth\/(login|refresh|logout)\b/.test(url);
+}
 
-  // Only set Account-Id if not explicitly provided by the caller
+apiClient.interceptors.request.use(async (config) => {
+  const token = await getAccessToken().catch(() => null);
+  config.headers = config.headers || {};
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
   if (!config.headers['Account-Id']) {
     const { auth } = useAppStore.getState();
     if (auth.status === 'authenticated') {
@@ -48,36 +30,38 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Response interceptor: error handling with 401 retry
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    // Ignore cancelled requests (from AbortController during account switch)
     if (axios.isCancel(error)) return Promise.reject(error);
 
     const status = error.response?.status;
-    const originalRequest = error.config;
+    const originalRequest = error.config as (AxiosRequestConfig & { _retry?: boolean }) | undefined;
 
-    // 401: try refreshing the token once before giving up
-    if (status === 401 && originalRequest && !(originalRequest as any)._retry) {
+    if (
+      status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !isAuthEndpoint(originalRequest.url)
+    ) {
       const { auth } = useAppStore.getState();
       if (auth.status === 'switching') return Promise.reject(error);
-      (originalRequest as any)._retry = true;
-      clearTokenCache();
 
-      try {
-        const freshToken = await getToken();
-        originalRequest.headers.Authorization = `Bearer ${freshToken}`;
+      originalRequest._retry = true;
+      const newToken = await refresh();
+      if (newToken) {
+        originalRequest.headers = originalRequest.headers || {};
+        (originalRequest.headers as Record<string, string>).Authorization = `Bearer ${newToken}`;
         return apiClient(originalRequest);
-      } catch {
-        // Token refresh failed — session truly expired
-        useAppStore.getState().setError('Sessão expirada');
-        return Promise.reject(error);
       }
-    }
 
-    // 403: don't show a generic toast — let the calling code handle it
-    // with the actual error message from the response body
+      useAppStore.getState().resetAuth();
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        const returnTo = window.location.pathname + window.location.search;
+        window.location.assign(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      }
+      return Promise.reject(error);
+    }
 
     if (status && status >= 500) {
       toast.error('Não foi possível processar a requisição');

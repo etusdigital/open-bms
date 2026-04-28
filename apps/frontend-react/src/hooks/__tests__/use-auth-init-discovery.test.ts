@@ -9,11 +9,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * - Uses discovery account list in the store (not the scoped call's list)
  */
 
-// Mock auth0
-vi.mock('@auth0/auth0-react', () => ({
-  useAuth0: () => ({
+// Mock our auth shim — useAuthInit only reads isAuthenticated/user from it.
+vi.mock('@/features/auth/use-auth', () => ({
+  useAuth: () => ({
     isAuthenticated: true,
-    user: { name: 'Test', email: 'test@test.com', picture: '' },
+    isLoading: false,
+    user: {
+      id: 1,
+      name: 'Test',
+      email: 'test@test.com',
+      picture: null,
+      providerId: 'local|abc',
+    },
   }),
 }));
 
@@ -70,9 +77,9 @@ describe('useAuthInit - account discovery on every load', () => {
     mockPost.mockReset();
     mockGet.mockReset();
 
-    mockPost.mockResolvedValue({
-      data: { id: 1, name: 'Test', email: 'test@test.com' },
-    });
+    // POST /users/login is NOT called in local mode — backend returns 410 Gone.
+    // It's only called in Auth0 mode (see use-auth-init.ts) for audit logging.
+    mockPost.mockRejectedValue(new Error('POST should not be called in local mode'));
 
     mockGet.mockImplementation((url: string, opts?: any) => {
       if (url.includes('/accounts/configs')) {

@@ -1,26 +1,37 @@
 import { type Page, expect } from '@playwright/test';
 
+const AUTH_PROVIDER = (process.env.VITE_AUTH_PROVIDER ?? 'local') as 'local' | 'auth0';
+
 /**
- * Performs Auth0 Universal Login through the UI.
- * Handles the redirect to Auth0, fills credentials, and waits for callback.
+ * Performs login via the local form OR Auth0 Universal Login depending on
+ * the active provider mode. Both end with the user landing on a non-login
+ * page in the app origin.
  */
-export async function loginViaAuth0(page: Page, options: { email: string; password: string; baseURL: string }) {
-  // Navigate to login — triggers Auth0 redirect
+export async function login(page: Page, options: { email: string; password: string; baseURL: string }) {
+  if (AUTH_PROVIDER === 'auth0') {
+    return loginViaAuth0(page, options);
+  }
+  return loginViaLocalForm(page, options);
+}
+
+/** Backwards-compatible alias used by `auth.setup.ts` files in the wild. */
+export const loginViaAuth0 = (page: Page, options: { email: string; password: string; baseURL: string }) =>
+  loginViaUniversalLogin(page, options);
+
+async function loginViaUniversalLogin(
+  page: Page,
+  options: { email: string; password: string; baseURL: string },
+) {
   await page.goto(`${options.baseURL}/login`);
 
-  // Wait for Auth0 login page to load
   await page.waitForURL((url) => url.pathname.startsWith('/u/login'), {
     timeout: 15_000,
   });
 
-  // Fill credentials on Auth0 Universal Login page
   await page.locator('input[name="username"], input[name="email"]').fill(options.email);
   await page.locator('input[name="password"]').fill(options.password);
-
-  // Click the primary submit button (not "Continue with Google")
   await page.locator('button[data-action-button-primary="true"]').click();
 
-  // Wait for redirect back to the app (callback or home)
   await page.waitForURL(
     (url) => {
       const isApp = url.origin === options.baseURL;
@@ -31,25 +42,31 @@ export async function loginViaAuth0(page: Page, options: { email: string; passwo
   );
 }
 
-/**
- * Asserts the app has fully loaded after authentication.
- * Checks for sidebar (logo, account selector) — no header in new layout.
- */
+async function loginViaLocalForm(
+  page: Page,
+  options: { email: string; password: string; baseURL: string },
+) {
+  await page.goto(`${options.baseURL}/login`);
+
+  // The local form lives directly on /login.
+  await page.waitForURL((url) => url.pathname === '/login', { timeout: 10_000 });
+
+  await page.locator('input#login-email').fill(options.email);
+  await page.locator('input#login-password').fill(options.password);
+  await page.getByRole('button', { name: /entrar/i }).click();
+
+  await page.waitForURL(
+    (url) => url.origin === options.baseURL && url.pathname !== '/login',
+    { timeout: 20_000 },
+  );
+}
+
 export async function expectAppLoaded(page: Page) {
-  // Sidebar should be visible
   await expect(page.locator('aside')).toBeVisible({ timeout: 15_000 });
-
-  // Logo in sidebar should be visible
-  await expect(page.locator('aside img[alt="Etus"]')).toBeVisible();
-
-  // Account selector button should be visible
+  await expect(page.locator('aside img[alt="Etus"], aside img[alt="BMS"]').first()).toBeVisible();
   await expect(page.locator('button[role="combobox"]')).toBeVisible();
 }
 
-/**
- * Returns test credentials from environment variables.
- * Throws if not configured.
- */
 export function getTestCredentials() {
   const email = process.env.E2E_TEST_USER_EMAIL;
   const password = process.env.E2E_TEST_USER_PASSWORD;

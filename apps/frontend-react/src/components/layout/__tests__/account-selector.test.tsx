@@ -9,12 +9,19 @@ import { renderWithRouter } from '@/test-utils/render-with-router';
 import { useAppStore } from '@/stores/app-store';
 import '@/lib/i18n';
 
-// Mock Auth0
-vi.mock('@auth0/auth0-react', () => ({
-  useAuth0: () => ({
-    logout: vi.fn(),
+// Mock our auth shim — account-selector doesn't use it directly, but other
+// components imported transitively (sidebar) might.
+vi.mock('@/features/auth/use-auth', () => ({
+  useAuth: () => ({
     isAuthenticated: true,
-    user: { name: 'Test', email: 'test@test.com' },
+    isLoading: false,
+    user: { id: 1, name: 'Test', email: 'test@test.com', picture: null, providerId: 'local|abc' },
+    logout: vi.fn().mockResolvedValue(undefined),
+    login: vi.fn(),
+    refresh: vi.fn(),
+    getAccessToken: vi.fn().mockResolvedValue('tok'),
+    getAccessTokenSilently: vi.fn().mockResolvedValue('tok'),
+    loginWithRedirect: vi.fn(),
   }),
 }));
 

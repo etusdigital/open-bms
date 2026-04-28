@@ -1,50 +1,20 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { apiClient, setTokenFetcher, clearTokenCache } from '../api-client';
-import { useAppStore } from '@/stores/app-store';
-
-// Mock axios adapter
-vi.mock('axios', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('axios')>();
-  return {
-    ...actual,
-    default: {
-      ...actual.default,
-      create: actual.default.create,
-      isCancel: actual.isCancel,
-    },
-  };
-});
+import { describe, it, expect, beforeEach } from 'vitest';
+import { apiClient } from '../api-client';
 
 describe('api-client', () => {
   beforeEach(() => {
-    clearTokenCache();
-    useAppStore.setState({
-      auth: { status: 'idle' },
-      sidebarCollapsed: false,
-      savedAccountId: null,
-    });
+    // No-op: api-client has no module-level mutable state to reset.
   });
 
-  describe('setTokenFetcher', () => {
-    it('sets the token fetcher function', () => {
-      const mockFetcher = vi.fn().mockResolvedValue('test-token');
-      expect(() => setTokenFetcher(mockFetcher)).not.toThrow();
-    });
+  it('exports an axios instance with the methods we use', () => {
+    expect(apiClient).toBeDefined();
+    expect(apiClient.get).toBeInstanceOf(Function);
+    expect(apiClient.post).toBeInstanceOf(Function);
+    expect(apiClient.put).toBeInstanceOf(Function);
+    expect(apiClient.delete).toBeInstanceOf(Function);
   });
 
-  describe('clearTokenCache', () => {
-    it('clears cached token so next request fetches fresh', () => {
-      // After clearing, the next getToken call should invoke the fetcher
-      clearTokenCache();
-      // No assertion needed - just verify no throw
-    });
-  });
-
-  describe('apiClient instance', () => {
-    it('is an axios instance', () => {
-      expect(apiClient).toBeDefined();
-      expect(apiClient.get).toBeInstanceOf(Function);
-      expect(apiClient.post).toBeInstanceOf(Function);
-    });
+  it('sends credentials so the bms_refresh cookie travels with cross-origin requests', () => {
+    expect(apiClient.defaults.withCredentials).toBe(true);
   });
 });

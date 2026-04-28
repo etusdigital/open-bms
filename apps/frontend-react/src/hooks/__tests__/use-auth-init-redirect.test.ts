@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock auth0
-vi.mock('@auth0/auth0-react', () => ({
-  useAuth0: () => ({
+// Mock our auth shim
+vi.mock('@/features/auth/use-auth', () => ({
+  useAuth: () => ({
     isAuthenticated: true,
-    user: { name: 'Test', email: 'test@test.com', picture: '' },
+    isLoading: false,
+    user: { id: 1, name: 'Test', email: 'test@test.com', picture: null, providerId: 'local|abc' },
   }),
 }));
 

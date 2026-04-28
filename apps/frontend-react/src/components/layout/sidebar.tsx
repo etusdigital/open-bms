@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { PanelLeftClose, PanelLeftOpen, LogOut, User as UserIcon, Sun, Moon, ChevronsUpDown } from 'lucide-react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '@/features/auth/use-auth';
 import { useTranslation } from 'react-i18next';
 import { Link } from '@tanstack/react-router';
 import { useAppStore } from '@/stores/app-store';
@@ -105,7 +105,7 @@ function SidebarUserMenu({ collapsed }: { collapsed: boolean }) {
   const { t } = useTranslation();
   const auth = useAppStore((s) => s.auth);
   const { resolvedTheme, setTheme } = useTheme();
-  const { logout } = useAuth0();
+  const { logout } = useAuth();
 
   if (auth.status !== 'authenticated') return null;
 
@@ -117,7 +117,11 @@ function SidebarUserMenu({ collapsed }: { collapsed: boolean }) {
     .slice(0, 2)
     .toUpperCase();
 
-  const handleLogout = () => logout({ logoutParams: { returnTo: window.location.origin + '/login' } });
+  const handleLogout = () => {
+    logout().finally(() => {
+      window.location.assign('/login');
+    });
+  };
 
   const toggleTheme = () => {
     setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');

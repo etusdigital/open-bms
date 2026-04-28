@@ -9,6 +9,81 @@ pnpm install
 pnpm --filter @msgops/frontend-react dev
 ```
 
+---
+
+## Auth (local default, Auth0 opt-in)
+
+The app supports two auth providers, selected by `VITE_AUTH_PROVIDER`:
+
+| Mode              | When                                          | What runs                                                                                                      |
+| ----------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `local` (default) | Self-hosted instances.                        | Email + password against `POST /auth/login`. Refresh via httpOnly cookie `bms_refresh`. Token stays in memory. |
+| `auth0`           | Hosted Etus tenant or any IdP-fronted deploy. | `@auth0/auth0-react` SDK with redirect flow.                                                                   |
+
+**The flag MUST match the backend's `AUTH_PROVIDER`** (`apps/msgops-api`). A mismatched front + back returns 410 / 403 from the auth endpoints and the login form silently fails.
+
+### Local mode (default)
+
+```bash
+# .env
+VITE_AUTH_PROVIDER=local
+VITE_API_URL=http://localhost:5001
+```
+
+The first admin is created either by the **setup wizard** (see below) on first boot, or via `BOOTSTRAP_ADMIN_EMAIL` + `BOOTSTRAP_ADMIN_PASSWORD` on the backend.
+
+### Auth0 mode
+
+```bash
+# .env
+VITE_AUTH_PROVIDER=auth0
+VITE_AUTH0_DOMAIN=<tenant>.us.auth0.com
+VITE_AUTH0_CLIENT_ID=<spa-client-id>
+VITE_AUTH0_AUDIENCE=<api-audience>
+VITE_API_URL=http://localhost:5001
+```
+
+In local mode the Auth0 SDK is **not** included in the entry chunk (Vite DCE removes the `if (VITE_AUTH_PROVIDER === 'auth0')` branch). To verify:
+
+```bash
+VITE_AUTH_PROVIDER=local pnpm --filter @msgops/frontend-react build
+grep -E "@auth0/auth0-react|auth0-spa-js" dist/assets/index-*.js  # should print nothing
+```
+
+### Critical paths (auth)
+
+- `src/features/auth/use-auth.ts` — drop-in `useAuth0` API; token in memory, single-flight `refresh()`, `bootstrapAuth()` for hard reload
+- `src/features/auth/auth0-adapter.tsx` — bridge mounted only when `VITE_AUTH_PROVIDER=auth0`
+- `src/lib/api-client.ts` — singleton axios; 401 → refresh → retry; redirects to `/login?returnTo=…` when refresh fails
+- `src/hooks/use-auth-init.ts` — fetches `/users/me` + `/accounts/configs` and hydrates the Zustand store
+- `src/routes/login.tsx` — local form (or Auth0 redirect in `auth0` mode)
+- `src/routes/_authenticated.tsx` — protected layout guard
+
+---
+
+## Setup wizard
+
+On first boot, `GET /setup/status` returns `{ configured: false, currentStep: N }`. The router gate in `src/main.tsx` (`applySetupGate`) redirects any path → `/setup` until the wizard finishes. After completion, `/setup` redirects back to `/`.
+
+The wizard has 6 steps, each persisted server-side (idempotent: re-entering a step ≤ `currentStep` is a no-op):
+
+1. **Admin** — create the first super-admin (auto-logs in immediately)
+2. **SMTP** — host / port / from + a "send test email" button
+3. **Domain** — `baseUrl` used by webhook URLs and email links
+4. **SendGrid** — API key + subuser config (skippable; pre-fills webhook URL from step 3)
+5. **IP Pool** — first account + IP pool (skippable)
+6. **Health Check** — probes Postgres / Redis / ClickHouse / RabbitMQ / S3 / SMTP; can complete with failing services after explicit confirmation
+
+### Critical paths (setup)
+
+- `src/features/setup/setup-gateway.ts` — **isolated axios instance** (no auth interceptor) for `/setup/*`
+- `src/features/setup/setup.types.ts` — TS types mirroring `apps/msgops-api/.../advance-step.dto.ts`
+- `src/features/setup/steps/Step{1..6}*.tsx` — one component per step
+- `src/routes/setup.tsx` — standalone layout (no header/sidebar)
+- `src/main.tsx::applySetupGate()` — pre-mount redirect logic
+
+---
+
 ## Creating a New CRUD Feature
 
 Each CRUD entity follows the same patterns. Use Tags as the reference implementation.

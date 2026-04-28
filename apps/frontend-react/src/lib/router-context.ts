@@ -1,5 +1,8 @@
-import type { Auth0ContextInterface } from '@auth0/auth0-react';
+export interface AuthRouterContext {
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}
 
 export interface RouterContext {
-  auth: Auth0ContextInterface;
+  auth: AuthRouterContext;
 }
