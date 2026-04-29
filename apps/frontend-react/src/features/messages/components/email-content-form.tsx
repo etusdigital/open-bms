@@ -227,9 +227,8 @@ export function EmailContentForm({ editorRef, designJson, templateUrl }: EmailCo
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Left: form fields */}
         <div className="space-y-4">
-          {/* Pool + Sender Name side by side */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {/* Pool/Sender Address Selector */}
+          {/* Pool selector — optional. When chosen, prefills the sender fields below. */}
+          {pools.length > 0 && (
             <FormField
               control={form.control}
               name="ippool"
@@ -254,8 +253,10 @@ export function EmailContentForm({ editorRef, designJson, templateUrl }: EmailCo
                 </FormItem>
               )}
             />
+          )}
 
-            {/* Sender Name */}
+          {/* Sender Name + Sender Email side by side */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField
               control={form.control}
               name="fromName"
@@ -269,7 +270,36 @@ export function EmailContentForm({ editorRef, designJson, templateUrl }: EmailCo
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="fromMail"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('messages.senderEmail')}</FormLabel>
+                  <FormControl>
+                    <Input type="email" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
+
+          {/* Reply-To (optional) */}
+          <FormField
+            control={form.control}
+            name="replyTo"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('messages.replyTo')}</FormLabel>
+                <FormControl>
+                  <Input type="email" {...field} value={field.value ?? ''} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           {/* Subject with emoji picker + merge fields */}
           <FormField

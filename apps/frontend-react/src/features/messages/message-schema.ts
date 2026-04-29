@@ -47,10 +47,15 @@ export const MESSAGE_SUBJECT_MIN = 3;
 
 export const emailFormSchema = z.object({
   ...baseFields,
-  ippool: requiredString(100),
+  ippool: optionalString(100),
   fromName: z.string().min(MESSAGE_FROM_NAME_MIN, 'validation.required').max(100, 'validation.maxLength::100'),
   fromMail: z.string().min(1, 'validation.required').email('validation.email'),
-  replyTo: optionalString(MESSAGE_URL_MAX),
+  replyTo: z
+    .string()
+    .max(MESSAGE_URL_MAX, `validation.maxLength::${MESSAGE_URL_MAX}`)
+    .email('validation.email')
+    .optional()
+    .or(z.literal('')),
   subject: z
     .string()
     .min(MESSAGE_SUBJECT_MIN, 'validation.required')

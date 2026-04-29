@@ -149,10 +149,10 @@ describe('EmailContentForm', () => {
     expect(screen.queryByText(/prioridade/i)).not.toBeInTheDocument();
   });
 
-  it('does not render from email or reply-to fields', async () => {
+  it('renders from email and reply-to fields so users without a pool can fill the sender manually', async () => {
     await renderEmailContent();
-    expect(screen.queryByLabelText(/email do remetente/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/reply-to/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/email do remetente/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/reply-to/i)).toBeInTheDocument();
   });
 
   describe('action buttons', () => {
