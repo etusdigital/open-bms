@@ -18,6 +18,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { RedisService } from './providers/redis/redis.service';
 import { TrackerService } from './tracker/tracker.service';
+import { generateForSegment } from '@msgops/segment-query-builder';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -214,15 +215,28 @@ export class AppService {
         }
       }
 
-      const query = this.formattedTimeQuery(JSON.parse(JSON.stringify(segment.query)));
-      const formattedExternalSteps = segment.externalQuerySteps
-        ? segment.externalQuerySteps.map((item: SegmentExternalQueryPayload) => {
-            return {
-              tableName: item.tableName,
-              filterType: item?.filterType || null,
-              query: this.formattedTimeQuery(JSON.parse(JSON.stringify(item.query))),
-            } as SegmentExternalQueryPayload;
-          })
+      const accountTimeZone = (account.accountConfigs as Record<string, string>)?.time_zone;
+      const generated = generateForSegment(
+        { id: segment.id, accountId: segment.accountId },
+        {
+          steps: typeof segment.steps === 'string' ? JSON.parse(segment.steps) : (segment.steps as unknown as any[][]),
+          addBounced: segment.addBounced,
+          addUnsubscribed: segment.addUnsubscribed,
+          addInvalid: segment.addInvalid,
+          contactsLimit: segment.contactsLimit,
+        },
+        accountTimeZone,
+      );
+      const query = this.formattedTimeQuery(generated.query);
+      const formattedExternalSteps = generated.externalQuerySteps
+        ? generated.externalQuerySteps.map(
+            (item) =>
+              ({
+                tableName: item.tableName,
+                filterType: item?.filterType || null,
+                query: this.formattedTimeQuery(item.query),
+              }) as SegmentExternalQueryPayload,
+          )
         : null;
 
       const dataInsertAndDelete = await this.msgopsService.processSegment(

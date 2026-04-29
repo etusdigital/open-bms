@@ -32,14 +32,8 @@ export class TagEntity {
   @Column('varchar', { name: 'schedule_cloud_task_id', length: 255 })
   scheduleCloudTaskId: string;
 
-  @Column('text', { name: 'query', select: false })
-  query: string;
-
   @Column('json', { name: 'steps' })
   steps: string;
-
-  @Column('json', { name: 'external_query_steps', select: false })
-  externalQuerySteps: string;
 
   @Column('json', { name: 'segment_info' })
   segmentInfo: SegmentInfo[];

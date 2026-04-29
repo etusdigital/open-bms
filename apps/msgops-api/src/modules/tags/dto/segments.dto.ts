@@ -9,10 +9,6 @@ import { TagDto } from './tags.dto';
 export class SegmentDto extends TagDto {
   @ApiProperty()
   @JoiSchema(Joi.string().allow(null).optional())
-  query?: string;
-
-  @ApiProperty()
-  @JoiSchema(Joi.string().allow(null).optional())
   scheduleCloudTaskId?: string;
 
   @ApiProperty()
@@ -46,10 +42,6 @@ export class SegmentDto extends TagDto {
   @ApiProperty()
   @JoiSchema(Joi.allow(null).optional())
   isClickhouseSegment?: boolean;
-
-  @ApiProperty()
-  @JoiSchema(Joi.allow(null).optional())
-  externalQuerySteps?: any;
 
   @ApiProperty()
   @JoiSchema(Joi.allow(null).optional())

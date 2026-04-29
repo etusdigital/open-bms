@@ -8,6 +8,7 @@ FROM base AS deps
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/tag-process/package.json ./apps/tag-process/
 COPY packages/messaging/package.json ./packages/messaging/
+COPY packages/segment-query-builder/package.json ./packages/segment-query-builder/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
@@ -16,8 +17,10 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 FROM deps AS build
 COPY packages/typescript-config/ ./packages/typescript-config/
 COPY packages/messaging/ ./packages/messaging/
+COPY packages/segment-query-builder/ ./packages/segment-query-builder/
 COPY apps/tag-process/ ./apps/tag-process/
 RUN pnpm --filter @bms/messaging build
+RUN pnpm --filter @msgops/segment-query-builder build
 RUN pnpm --filter msgops-tag-process build
 
 FROM build AS deploy

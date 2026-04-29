@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, UpdateDateColumn, Entity, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 import { ContactTagEntity } from './contact-tag.entity';
-import { SegmentExternalQueryPayload, SegmentInfo } from '../../interfaces';
+import { SegmentInfo } from '../../interfaces';
 
 @Entity('tags')
 export class TagEntity {
@@ -25,11 +25,17 @@ export class TagEntity {
   @Column('varchar', { name: 'schedule_cloud_task_id', length: 255 })
   scheduleCloudTaskId: string;
 
-  @Column('text', { name: 'query' })
-  query: string;
-
   @Column('json', { name: 'steps' })
   steps: string;
+
+  @Column('boolean', { name: 'add_bounced' })
+  addBounced: boolean;
+
+  @Column('boolean', { name: 'add_unsubscribed' })
+  addUnsubscribed: boolean;
+
+  @Column('boolean', { name: 'add_invalid' })
+  addInvalid: boolean;
 
   @Column('json', { name: 'segment_info' })
   segmentInfo: SegmentInfo[];
@@ -60,9 +66,6 @@ export class TagEntity {
 
   @Column('boolean', { name: 'is_real_time_segment' })
   isRealTimeSegment: boolean;
-
-  @Column('json', { name: 'external_query_steps' })
-  externalQuerySteps: Array<SegmentExternalQueryPayload> | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

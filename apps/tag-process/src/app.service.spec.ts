@@ -288,8 +288,6 @@ describe('AppService', () => {
         id: segmentId,
         isRealTimeSegment: true,
         segmentInfo: [],
-        query: 'SELECT 1',
-        externalQuerySteps: null,
       });
       const account = createAccount();
       msgopsService.getTagById.mockResolvedValue(segment);
@@ -320,7 +318,6 @@ describe('AppService', () => {
         id: segmentId,
         isRealTimeSegment: true,
         segmentInfo: [],
-        query: 'SELECT 1',
       });
       msgopsService.getTagById.mockResolvedValue(segment);
       msgopsService.findAccount.mockResolvedValue(createAccount());
@@ -346,7 +343,6 @@ describe('AppService', () => {
         id: segmentId,
         isRealTimeSegment: true,
         segmentInfo: [],
-        query: 'SELECT 1',
       });
       msgopsService.getTagById.mockResolvedValue(segment);
       msgopsService.findAccount.mockResolvedValue(account);
@@ -372,7 +368,6 @@ describe('AppService', () => {
         id: segmentId,
         isRealTimeSegment: true,
         segmentInfo: [],
-        query: 'SELECT 1',
       });
       msgopsService.getTagById.mockResolvedValue(segment);
       msgopsService.findAccount.mockResolvedValue(account);
@@ -403,7 +398,6 @@ describe('AppService', () => {
         id: segmentId,
         isRealTimeSegment: true,
         segmentInfo: longSegmentInfo as any,
-        query: 'SELECT 1',
       });
       msgopsService.getTagById.mockResolvedValue(segment);
       msgopsService.findAccount.mockResolvedValue(createAccount());
@@ -429,7 +423,6 @@ describe('AppService', () => {
         id: segmentId,
         isRealTimeSegment: true,
         segmentInfo: [],
-        query: 'SELECT 1',
         scheduleCloudTaskId: 'old-task',
       });
       msgopsService.getTagById.mockResolvedValue(segment);
@@ -447,7 +440,6 @@ describe('AppService', () => {
         isRealTimeSegment: false,
         status: SegmentStatus.ACTIVE,
         segmentInfo: [],
-        query: 'SELECT 1',
         createdAt: new Date('2020-01-01'),
       });
       msgopsService.getTagById.mockResolvedValue(segment);
@@ -469,8 +461,6 @@ describe('AppService', () => {
         id: segmentId,
         isRealTimeSegment: true,
         segmentInfo: [],
-        query: 'SELECT 1',
-        externalQuerySteps: [{ tableName: 'temp_table', query: 'SELECT 1', filterType: 'email' }],
       });
       msgopsService.getTagById.mockResolvedValue(segment);
       msgopsService.findAccount.mockResolvedValue(createAccount());
@@ -494,7 +484,6 @@ describe('AppService', () => {
         id: segmentId,
         isRealTimeSegment: true,
         segmentInfo: [],
-        query: 'SELECT 1',
         scheduleCloudTaskId: 'old-task',
       });
       msgopsService.getTagById.mockResolvedValue(segment);

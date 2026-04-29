@@ -39,6 +39,7 @@
     "@nestjs/platform-express": "^11.1.16",
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/typeorm": "^11.0.0",
+    "@msgops/segment-query-builder": "workspace:*",
     "@sendgrid/mail": "^8.1.6",
     "@sentry/node": "^10.43.0",
     "@types/auth0": "^3.3.11",

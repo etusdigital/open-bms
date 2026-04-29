@@ -83,15 +83,12 @@ export class SendgridHandler {
     return `${base}${sep}account=${accountId}`;
   }
 
-  // Registers (or updates) the SendGrid event webhook against the supplied
-  // API key. The URL is built from SENDGRID_WEBHOOK_URL_BASE plus
-  // `&account=<accountId>` so each tenant's webhook lands distinguishable on
-  // the gateway side. SendGrid's multi-webhook API enforces URL uniqueness,
-  // so this method lists existing webhooks and PATCHes the matching one
-  // instead of POSTing a duplicate. Caller passes the freshly-saved apiKey
-  // explicitly so we don't depend on cache state mid-save. Returns the
-  // webhook URL that was registered so the caller can persist it for display
-  // in the UI.
+  // Registers the SendGrid event webhook against the supplied API key. The
+  // URL is built from SENDGRID_WEBHOOK_URL_BASE plus `&account=<accountId>`
+  // so each tenant's webhook lands distinguishable on the gateway side.
+  // Caller passes the freshly-saved apiKey explicitly so we don't depend on
+  // cache state mid-save. Returns the webhook URL that was registered so the
+  // caller can persist it for display in the UI.
   public async createWebhook(options: { apiKey: string; accountId: number }): Promise<{ url: string }> {
     const url = this.buildWebhookUrl(options.accountId);
     const payload: SendgridSettingsWebhook = {
@@ -110,24 +107,20 @@ export class SendgridHandler {
       spam_report: true,
       unsubscribe: true,
     };
-    const headers = {
-      Authorization: `Bearer ${options.apiKey}`,
-      'Content-Type': 'application/json',
-    };
 
     try {
-      const existing = await this.httpService.get<{ webhooks?: Array<{ id: string; url: string }> }>(`${this.uri}/user/webhooks/event/settings/all`, { headers }).toPromise();
-      const match = existing?.data?.webhooks?.find((w) => w.url === url);
-
-      if (match) {
-        await this.httpService.patch(`${this.uri}/user/webhooks/event/settings/${match.id}`, payload, { headers }).toPromise();
-      } else {
-        await this.httpService.post(`${this.uri}/user/webhooks/event/settings`, payload, { headers }).toPromise();
-      }
+      await this.httpService
+        .post(`${this.uri}/user/webhooks/event/settings`, payload, {
+          headers: {
+            Authorization: `Bearer ${options.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        .toPromise();
       return { url };
     } catch (error) {
-      console.log('Log - error to register sendgrid webhook', error);
-      throw new HttpException('error to register webhook', HttpStatus.INTERNAL_SERVER_ERROR, { cause: error });
+      console.log('Log - error to create sendgrid webhook', error);
+      throw new HttpException('error to create webhook', HttpStatus.INTERNAL_SERVER_ERROR, { cause: error });
     }
   }
 

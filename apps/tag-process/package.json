@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@bms/messaging": "workspace:*",
+    "@msgops/segment-query-builder": "workspace:*",
     "@clickhouse/client": "^1.18.2",
     "@google-cloud/logging": "^11.2.1",
     "@nestjs/bullmq": "^10.2.3",
