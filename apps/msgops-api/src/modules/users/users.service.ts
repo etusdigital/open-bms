@@ -148,9 +148,64 @@ export class UsersService {
     }
   }
 
+  async findAllGlobal(params: PageDto): Promise<PaginationDto<UserEntity>> {
+    try {
+      const ALLOWED_SORT_FIELDS = ['name', 'email', 'created_at', 'updated_at'];
+      const ALLOWED_ORDERS = ['ASC', 'DESC'];
+      const sortBy = ALLOWED_SORT_FIELDS.includes(params.sortBy) ? params.sortBy : 'name';
+      const order = ALLOWED_ORDERS.includes(params.order?.toUpperCase()) ? params.order.toUpperCase() : 'ASC';
+
+      const queryParams: any[] = [];
+      let paramIndex = 1;
+      let searchFilter = '';
+
+      if (params.search) {
+        searchFilter = `WHERE (name ILIKE $${paramIndex} OR email ILIKE $${paramIndex})`;
+        queryParams.push(`%${params.search}%`);
+        paramIndex++;
+      }
+
+      const offset = (params.page - 1) * params.itemsPerPage;
+      queryParams.push(offset, params.itemsPerPage);
+
+      const query = `
+        SELECT *, count(*) OVER() AS total
+        FROM users
+        ${searchFilter}
+        ORDER BY ${sortBy} ${order}
+        OFFSET $${paramIndex} LIMIT $${paramIndex + 1}
+      `;
+
+      const results = await this.userRepository.manager.query(query, queryParams);
+      results.forEach((user) => {
+        user['createdAt'] = user.created_at;
+        user['updatedAt'] = user.updated_at;
+        user['providerId'] = user.provider_id;
+      });
+
+      return new PaginationDto<UserEntity>({
+        results,
+        total: results.length ? results[0].total : 0,
+        page: params.page,
+        itemsPerPage: params.itemsPerPage,
+      });
+    } catch (e) {
+      console.error(e);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
   async findOneById(id: number) {
     try {
-      return await this.userRepository.findOneOrFail({ where: { id } });
+      const user = await this.userRepository
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.userAccount', 'userAccount')
+        .leftJoinAndSelect('userAccount.account', 'account')
+        .leftJoinAndSelect('userAccount.roleOverride', 'roleOverride')
+        .leftJoinAndSelect('user.globalRole', 'globalRole')
+        .where('user.id = :id', { id })
+        .getOneOrFail();
+      return user;
     } catch (e) {
       console.error(e);
       throw new HttpException('User not found by id', HttpStatus.NOT_FOUND);
@@ -330,7 +385,7 @@ export class UsersService {
   }
 
   private async invalidateCacheForUser(userId: number): Promise<void> {
-    const user = await this.userRepository.findOne({ where: { id: userId }, select: ['providerId'] });
+    const user = await this.userRepository.createQueryBuilder('user').select(['user.providerId']).where('user.id = :id', { id: userId }).getOne();
     if (user?.providerId) {
       await this.authzService.invalidateUserCache(user.providerId);
     }
@@ -595,16 +650,20 @@ export class UsersService {
         }
       }
 
-      const result = await this.userAccountRepository
-        .createQueryBuilder('users_accounts')
-        .insert()
-        .into('users_accounts')
-        .values(usersAccounts)
-        .orUpdate(['is_master_user', 'role_override_role_id'], ['account_id', 'user_id'])
-        .execute();
+      for (const ua of usersAccounts) {
+        const existing = await this.userAccountRepository.findOne({
+          where: { userId: ua.userId, accountId: ua.accountId },
+        });
+        if (existing) {
+          existing.isMasterUser = ua.isMasterUser;
+          existing.roleOverrideRoleId = ua.roleOverrideRoleId;
+          await this.userAccountRepository.save(existing);
+        } else {
+          await this.userAccountRepository.save(this.userAccountRepository.create(ua));
+        }
+      }
 
       await this.invalidateCacheForUser(permissionsAccountsDto.userId);
-      return result;
     } catch (e) {
       console.error(e);
       throw new HttpException('Cannot permission accounts to user', HttpStatus.INTERNAL_SERVER_ERROR);

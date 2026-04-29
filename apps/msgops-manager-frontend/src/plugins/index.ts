@@ -1,1 +1,0 @@
-export { briusLightTheme } from './vuetify';

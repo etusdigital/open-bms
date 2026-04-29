@@ -6,6 +6,7 @@ import {
   Users,
   Server,
   ShieldCheck,
+  ShieldAlert,
   Tag,
   Settings,
 } from 'lucide-react';
@@ -143,6 +144,28 @@ export const MENU_ITEMS: NavItem[] = [
     route: '/labels',
     permission: 'infra:view',
     internalOnly: true,
+  },
+  {
+    labelKey: 'sidebar.superAdmin',
+    icon: ShieldAlert,
+    superAdminOnly: true,
+    children: [
+      {
+        labelKey: 'sidebar.superAdminAccounts',
+        route: '/super-admin/accounts',
+        superAdminOnly: true,
+      },
+      {
+        labelKey: 'sidebar.superAdminUsers',
+        route: '/super-admin/users',
+        superAdminOnly: true,
+      },
+      {
+        labelKey: 'sidebar.superAdminBilling',
+        route: '/super-admin/billing',
+        superAdminOnly: true,
+      },
+    ],
   },
 ];
 

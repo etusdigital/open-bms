@@ -526,6 +526,12 @@ export class AccountsService {
     }
   }
 
+  async toggleSuspend(id: number, isActive: boolean): Promise<AccountEntity> {
+    const account = await this.accountRepository.findOneOrFail({ where: { id } });
+    account.isActive = isActive;
+    return this.accountRepository.save(account);
+  }
+
   async destroy(id: number) {
     try {
       await this.accountRepository.softDelete(id);

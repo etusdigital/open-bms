@@ -3,6 +3,7 @@ import { PageDto } from '../../dtos/filters/page.dto';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { AccountsService } from './accounts.service';
 import { CreateAccountDto } from './dtos/create-account.dto';
+import { SuspendAccountDto } from './dtos/suspend-account.dto';
 import { ApiKeyRegenService } from './api-key-regen.service';
 import { RequestRegenDto, ConfirmRegenDto } from './dtos/api-key-regen.dto';
 
@@ -199,6 +200,12 @@ export class AccountsController {
   async getApiKeysStatus(@Param('id') id: number, @Req() req: any) {
     this.assertAccountScope(req, Number(id));
     return this.apiKeyRegenService.getKeyStatus(id);
+  }
+
+  @Put(':id/suspend')
+  suspendAccount(@Param('id') id: number, @Body() dto: SuspendAccountDto, @Req() req: any) {
+    this.requireSuperAdmin(req);
+    return this.accountsService.toggleSuspend(Number(id), dto.isActive);
   }
 
   @Delete(':id')

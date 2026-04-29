@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpException, HttpStatus, Param, Post, Put, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, HttpException, HttpStatus, Param, Post, Put, Query, Req } from '@nestjs/common';
 import { AuthUser } from '../../decorators/auth-user.decorator';
 import { PublicRoute } from '../authz/public-route.decorator';
 import { RequirePermission } from '../authz/require-permission.decorator';
@@ -8,10 +8,21 @@ import { PermissionsAccountsDto } from './dtos/permission-accounts.dto';
 import { CreateUserDto } from './dtos/create-user.dto';
 import { UpdateProfileDto } from './dtos/update-profile.dto';
 import { UsersService } from './users.service';
+import { AuthService } from '../auth/auth.service';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly userService: UsersService) {}
+  constructor(
+    private readonly userService: UsersService,
+    private readonly authService: AuthService,
+  ) {}
+
+  private requireSuperAdmin(req: any) {
+    const context = req?.authzContext;
+    if (!context?.isSuperAdmin) {
+      throw new ForbiddenException('Super admin access required');
+    }
+  }
 
   private getProviderId(authUser: any): string {
     return authUser?.sub || authUser?.user_id || authUser?.provider_id;
@@ -67,6 +78,18 @@ export class UsersController {
   uploadProfilePicture(@Body() uploadBody: { name: string; data: string }, @AuthUser() authUser: any) {
     const providerId = this.getProviderId(authUser);
     return this.userService.uploadProfilePicture(providerId, uploadBody);
+  }
+
+  @Get('/all')
+  async findAllGlobal(@Query() params: PageDto, @Req() req: any) {
+    this.requireSuperAdmin(req);
+    return this.userService.findAllGlobal(params);
+  }
+
+  @Post(':id/reset-password')
+  async requestPasswordReset(@Param('id') id: number, @Req() req: any) {
+    this.requireSuperAdmin(req);
+    return this.authService.requestPasswordReset(Number(id));
   }
 
   @Get('/roles')

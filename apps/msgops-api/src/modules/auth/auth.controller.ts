@@ -4,6 +4,7 @@ import { ApiBody, ApiOkResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse 
 import { PublicRoute } from '../authz/public-route.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 import { AuthLoginResponse, AuthLogoutResponse, AuthRefreshResponse } from './dto/auth-response.dto';
 
 const REFRESH_COOKIE_NAME = 'bms_refresh';
@@ -61,6 +62,13 @@ export class AuthController {
     const { refreshToken, ...response } = await this.authService.refresh(token, extractMeta(req));
     res.cookie(REFRESH_COOKIE_NAME, refreshToken, cookieOptions());
     return response;
+  }
+
+  @Post('reset-password/confirm')
+  @PublicRoute()
+  @ApiOperation({ summary: 'Confirm password reset using token from email link' })
+  async confirmPasswordReset(@Body() dto: ConfirmPasswordResetDto) {
+    return this.authService.confirmPasswordReset(dto.token, dto.newPassword);
   }
 
   @Post('logout')

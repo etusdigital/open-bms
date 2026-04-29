@@ -1,1 +1,0 @@
-export { createPinia } from 'pinia';

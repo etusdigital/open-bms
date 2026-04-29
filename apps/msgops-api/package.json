@@ -22,6 +22,8 @@
     "typeorm:migration:generate": "pnpm typeorm migration:generate -d src/database/data-source.ts",
     "typeorm:migration:run": "pnpm typeorm migration:run -d src/database/data-source.ts",
     "typeorm:migration:revert": "pnpm typeorm migration:revert -d src/database/data-source.ts",
+    "typeorm:db:drop": "pnpm typeorm schema:drop -d src/database/data-source.ts",
+    "typeorm:db:reset": "pnpm typeorm:db:drop && pnpm typeorm:migration:run",
     "test:cov": "jest --coverage --config jest.config.ts"
   },
   "dependencies": {

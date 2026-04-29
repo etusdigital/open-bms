@@ -725,11 +725,16 @@ export class StatisticsService {
   }
 
   async getMonthUsage() {
-    return await this.accountUsageRepository
-      .createQueryBuilder()
-      .where('account_id = :accountId', { accountId: this.cls.get('accountId') })
-      .select(`DISTINCT to_char(date, 'YYYY-MM') as month`)
-      .getRawMany();
+    const isSuperAdmin = this.cls.get('isSuperAdmin');
+
+    let query = this.accountUsageRepository.createQueryBuilder().select(`DISTINCT to_char(date, 'YYYY-MM') as month`).orderBy(`to_char(date, 'YYYY-MM')`, 'DESC');
+
+    if (!isSuperAdmin) {
+      query = query.where('account_id = :accountId', { accountId: this.cls.get('accountId') });
+    }
+
+    const result = await query.getRawMany();
+    return result.map((r) => r.month);
   }
 
   async getCampaignStatistics(campaignId, date) {

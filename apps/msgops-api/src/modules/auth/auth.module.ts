@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from '../../entities/users.entity';
 import { UserCredentialsEntity } from '../../entities/user-credentials.entity';
 import { UserRefreshTokenEntity } from '../../entities/user-refresh-token.entity';
+import { SystemConfigEntity } from '../../entities/system-config.entity';
 import { AuthzModule } from '../authz/authz.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -19,7 +20,7 @@ if (authProviderChoice !== 'local' && authProviderChoice !== 'auth0') {
 const controllers = authProviderChoice === 'auth0' ? [] : [AuthController];
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UserEntity, UserCredentialsEntity, UserRefreshTokenEntity]), forwardRef(() => AuthzModule)],
+  imports: [TypeOrmModule.forFeature([UserEntity, UserCredentialsEntity, UserRefreshTokenEntity, SystemConfigEntity]), forwardRef(() => AuthzModule)],
   controllers,
   providers: [
     LocalAuthProvider,

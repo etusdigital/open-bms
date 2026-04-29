@@ -1,15 +1,23 @@
-import { ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
+import * as nodemailer from 'nodemailer';
 import { UserEntity } from '../../entities/users.entity';
+import { SystemConfigEntity } from '../../entities/system-config.entity';
+import { RedisService } from '../../providers/redis.provider';
 import { AUTH_PROVIDER_TOKEN, AuthMeta, AuthTokens, IAuthProvider } from './providers/auth.provider.interface';
 import { AuthLoginResponse, AuthRefreshResponse, AuthUserResponse } from './dto/auth-response.dto';
+
+const PWD_RESET_TTL = 3600;
 
 @Injectable()
 export class AuthService {
   constructor(
     @Inject(AUTH_PROVIDER_TOKEN) private readonly provider: IAuthProvider,
     @InjectRepository(UserEntity) private readonly userRepository: Repository<UserEntity>,
+    @InjectRepository(SystemConfigEntity) private readonly systemConfigRepository: Repository<SystemConfigEntity>,
+    private readonly redisService: RedisService,
   ) {}
 
   async login(email: string, password: string, meta: AuthMeta): Promise<AuthLoginResponse & { refreshToken: string }> {
@@ -35,6 +43,45 @@ export class AuthService {
   async logout(refreshToken: string): Promise<void> {
     this.assertCredentialLogin();
     await this.provider.logout!(refreshToken);
+  }
+
+  async requestPasswordReset(userId: number): Promise<{ message: string }> {
+    const recipient = await this.userRepository.findOneOrFail({ where: { id: userId } });
+    const token = uuidv4();
+    const redis = this.redisService.getClient();
+    await redis.set(`pwd_reset:${token}`, String(userId), 'EX', PWD_RESET_TTL);
+
+    const smtpConfig = await this.systemConfigRepository.findOne({ where: { key: 'smtp_settings' } });
+    if (!smtpConfig) {
+      throw new ServiceUnavailableException('SMTP not configured');
+    }
+
+    const { host, port, user: smtpUser, pass } = smtpConfig.value as { host: string; port: number; user: string; pass: string };
+    const transporter = nodemailer.createTransport({ host, port, auth: { user: smtpUser, pass } } as any);
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+    await transporter.sendMail({
+      from: process.env.TRANSACTIONAL_FROM_EMAIL,
+      to: recipient.email,
+      subject: 'Reset your password',
+      html: `<p>Hi ${recipient.name},</p><p>Click the link below to reset your password. This link expires in 1 hour.</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
+    });
+
+    return { message: 'Password reset email sent' };
+  }
+
+  async confirmPasswordReset(token: string, newPassword: string): Promise<{ success: boolean }> {
+    const redis = this.redisService.getClient();
+    const userIdStr = await redis.get(`pwd_reset:${token}`);
+    if (!userIdStr) {
+      throw new UnauthorizedException('Invalid or expired password reset token');
+    }
+
+    const user = await this.userRepository.findOneOrFail({ where: { id: Number(userIdStr) } });
+    await this.provider.updatePassword!(user.providerId, newPassword);
+    await redis.del(`pwd_reset:${token}`);
+
+    return { success: true };
   }
 
   private assertCredentialLogin(): void {
