@@ -21,8 +21,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.0.0",
     "@bms/messaging": "workspace:*",
-    "@google-cloud/storage": "^7.7.0",
     "@msgops/url-utils": "workspace:*",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.1.13",

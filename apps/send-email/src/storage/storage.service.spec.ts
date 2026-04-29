@@ -1,71 +1,103 @@
+import { Readable } from 'stream';
 import { StorageService } from './storage.service';
 
 describe('StorageService', () => {
-  let service: StorageService;
-  let mockDownload: jest.Mock;
-  let mockFile: jest.Mock;
-  let mockBucket: jest.Mock;
-
-  beforeEach(() => {
-    process.env.SERVICE_ACCOUNT = JSON.stringify({ project_id: 'test' });
-
-    mockDownload = jest.fn();
-    mockFile = jest.fn().mockReturnValue({ download: mockDownload });
-    mockBucket = jest.fn().mockReturnValue({ file: mockFile });
-
-    service = new StorageService();
-    // Override the private storage property
-    (service as any).storage = { bucket: mockBucket };
-  });
+  const ORIGINAL_ENV = { ...process.env };
 
   afterEach(() => {
-    delete process.env.SERVICE_ACCOUNT;
+    process.env = { ...ORIGINAL_ENV };
   });
 
   describe('constructor', () => {
-    it('should create Storage instance with credentials from env', () => {
-      expect(service).toBeDefined();
+    it('should configure S3Client with endpoint, region, credentials and forcePathStyle when env is fully set', async () => {
+      process.env.S3_ENDPOINT = 'http://localhost:9100';
+      process.env.S3_REGION = 'sa-east-1';
+      process.env.S3_ACCESS_KEY_ID = 'test-key';
+      process.env.S3_SECRET_ACCESS_KEY = 'test-secret';
+
+      const service = new StorageService();
+      const client = (service as any).s3;
+      const config = client.config;
+
+      expect(await config.endpoint()).toMatchObject({ hostname: 'localhost', port: 9100 });
+      expect(await config.region()).toBe('sa-east-1');
+      expect(await config.credentials()).toMatchObject({ accessKeyId: 'test-key', secretAccessKey: 'test-secret' });
+      expect(config.forcePathStyle).toBe(true);
     });
 
-    it('should default to empty object when SERVICE_ACCOUNT is not set', () => {
-      delete process.env.SERVICE_ACCOUNT;
-      const svc = new StorageService();
-      expect(svc).toBeDefined();
+    it('should default region to us-east-1 and disable forcePathStyle when no endpoint is set', async () => {
+      delete process.env.S3_ENDPOINT;
+      delete process.env.S3_REGION;
+      process.env.S3_ACCESS_KEY_ID = 'test-key';
+      process.env.S3_SECRET_ACCESS_KEY = 'test-secret';
+
+      const service = new StorageService();
+      const config = (service as any).s3.config;
+
+      expect(await config.region()).toBe('us-east-1');
+      expect(config.forcePathStyle).toBe(false);
+    });
+
+    it('should omit credentials when access keys are absent (lets the SDK use its provider chain)', () => {
+      delete process.env.S3_ACCESS_KEY_ID;
+      delete process.env.S3_SECRET_ACCESS_KEY;
+
+      const service = new StorageService();
+      expect(service).toBeDefined();
+      // Constructor passes credentials: undefined; SDK then resolves via default chain.
+      // We don't assert on config.credentials() here because the chain may throw if no creds are reachable.
     });
   });
 
   describe('getHtml', () => {
-    it('should download file from the correct bucket and filename', async () => {
-      const htmlContent = Buffer.from('<p>Hello</p>', 'utf8');
-      mockDownload.mockResolvedValue([htmlContent]);
+    let service: StorageService;
+    let mockSend: jest.Mock;
 
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+    const buildBodyStream = (content: string | Buffer): Readable => Readable.from([typeof content === 'string' ? Buffer.from(content, 'utf8') : content]);
+
+    beforeEach(() => {
+      process.env.S3_ENDPOINT = 'http://localhost:9100';
+      process.env.S3_ACCESS_KEY_ID = 'test-key';
+      process.env.S3_SECRET_ACCESS_KEY = 'test-secret';
+      service = new StorageService();
+      mockSend = jest.fn();
+      (service as any).s3 = { send: mockSend };
+    });
+
+    it('should issue a GetObjectCommand with the right Bucket/Key and return the body as utf8', async () => {
+      mockSend.mockResolvedValue({ Body: buildBodyStream('<p>Hello</p>') });
 
       const result = await service.getHtml('my-bucket', 'emails/test.html');
 
-      expect(mockBucket).toHaveBeenCalledWith('my-bucket');
-      expect(mockFile).toHaveBeenCalledWith('emails/test.html');
-      expect(mockDownload).toHaveBeenCalled();
+      expect(mockSend).toHaveBeenCalledTimes(1);
+      const command = mockSend.mock.calls[0][0];
+      expect(command.input).toEqual({ Bucket: 'my-bucket', Key: 'emails/test.html' });
       expect(result).toBe('<p>Hello</p>');
-      expect(consoleSpy).toHaveBeenCalledWith('Log - getHtml', 'emails/test.html');
-
-      consoleSpy.mockRestore();
     });
 
-    it('should return empty string when file content is empty', async () => {
-      mockDownload.mockResolvedValue([Buffer.from('', 'utf8')]);
-      jest.spyOn(console, 'log').mockImplementation();
+    it('should return empty string when Body is missing', async () => {
+      mockSend.mockResolvedValue({ Body: undefined });
 
-      const result = await service.getHtml('bucket', 'empty.html');
-
-      expect(result).toBe('');
+      expect(await service.getHtml('bucket', 'empty.html')).toBe('');
     });
 
-    it('should propagate errors from GCS download', async () => {
-      mockDownload.mockRejectedValue(new Error('File not found'));
-      jest.spyOn(console, 'log').mockImplementation();
+    it('should return empty string when Body stream yields no chunks', async () => {
+      mockSend.mockResolvedValue({ Body: Readable.from([]) });
 
-      await expect(service.getHtml('bucket', 'missing.html')).rejects.toThrow('File not found');
+      expect(await service.getHtml('bucket', 'empty.html')).toBe('');
+    });
+
+    it('should propagate errors from S3 send', async () => {
+      mockSend.mockRejectedValue(new Error('NoSuchKey'));
+
+      await expect(service.getHtml('bucket', 'missing.html')).rejects.toThrow('NoSuchKey');
+    });
+
+    it('should reject payloads larger than the 5 MB cap', async () => {
+      const oversize = Buffer.alloc(5 * 1024 * 1024 + 1, 0x61);
+      mockSend.mockResolvedValue({ Body: buildBodyStream(oversize) });
+
+      await expect(service.getHtml('bucket', 'big.html')).rejects.toThrow(/exceeds/);
     });
   });
 });
