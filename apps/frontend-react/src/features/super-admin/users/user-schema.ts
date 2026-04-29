@@ -10,13 +10,13 @@ export const superAdminCreateUserSchema = z
     globalRoleCode: z.enum(ROLE_CODES).default('editor'),
     accounts: z.array(
       z.object({
-        accountId: z.number().int().positive('Select an account'),
+        accountId: z.number().int().positive({ message: 'superAdmin.users.errors.selectAccount' }),
         isMasterUser: z.boolean().default(false),
       }),
     ),
   })
   .refine((data) => data.globalRoleCode === 'super_admin' || data.accounts.length > 0, {
-    message: 'At least one account is required',
+    message: 'superAdmin.users.errors.atLeastOneAccount',
     path: ['accounts'],
   });
 

@@ -42,7 +42,6 @@
     "superAdmin": "Super Admin",
     "superAdminAccounts": "Contas",
     "superAdminUsers": "Usuários",
-    "superAdminBilling": "Faturamento",
     "collapse": "Recolher menu",
     "expand": "Expandir menu",
     "signOut": "Sair",
@@ -1873,20 +1872,11 @@
       "resetPasswordHelp": "Envie um e-mail com link de redefinição de senha para este usuário.",
       "sendPasswordReset": "Enviar e-mail de redefinição",
       "passwordResetSent": "E-mail de redefinição de senha enviado!",
-      "passwordResetError": "Falha ao enviar o e-mail de redefinição."
-    },
-    "billing": {
-      "pageTitle": "Faturamento",
-      "selectAccount": "Selecionar contas",
-      "selectMonth": "Selecionar mês",
-      "selectAccountFirst": "Selecione uma ou mais contas para ver os dados de faturamento.",
-      "selectMonthFirst": "Selecione um mês para ver os dados de faturamento.",
-      "noData": "Nenhum dado para o período selecionado.",
-      "product": "Produto",
-      "quantity": "Quantidade",
-      "unitCost": "Custo unitário",
-      "cost": "Custo",
-      "totalCost": "Custo total"
+      "passwordResetError": "Falha ao enviar o e-mail de redefinição.",
+      "errors": {
+        "selectAccount": "Selecione uma conta",
+        "atLeastOneAccount": "Pelo menos uma conta é necessária"
+      }
     }
   },
   "resetPassword": {
@@ -1894,6 +1884,13 @@
     "newPassword": "Nova senha",
     "confirmPassword": "Confirmar senha",
     "submit": "Redefinir senha",
-    "invalidToken": "Este link expirou ou é inválido."
+    "invalidToken": "Este link expirou ou é inválido.",
+    "errors": {
+      "minLength": "A senha deve ter pelo menos 10 caracteres",
+      "lowercase": "Deve conter pelo menos uma letra minúscula",
+      "uppercase": "Deve conter pelo menos uma letra maiúscula",
+      "digit": "Deve conter pelo menos um dígito",
+      "mismatch": "As senhas não coincidem"
+    }
   }
 }

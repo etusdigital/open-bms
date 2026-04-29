@@ -1,21 +1,28 @@
-import { ForbiddenException, Inject, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, HttpException, HttpStatus, Inject, Injectable, InternalServerErrorException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import * as nodemailer from 'nodemailer';
 import { UserEntity } from '../../entities/users.entity';
+import { UserRefreshTokenEntity } from '../../entities/user-refresh-token.entity';
 import { SystemConfigEntity } from '../../entities/system-config.entity';
 import { RedisService } from '../../providers/redis.provider';
 import { AUTH_PROVIDER_TOKEN, AuthMeta, AuthTokens, IAuthProvider } from './providers/auth.provider.interface';
 import { AuthLoginResponse, AuthRefreshResponse, AuthUserResponse } from './dto/auth-response.dto';
 
 const PWD_RESET_TTL = 3600;
+const PWD_RESET_RATE_LIMIT_WINDOW = 3600;
+const PWD_RESET_RATE_LIMIT_MAX = 3;
 
 @Injectable()
 export class AuthService {
+  private cachedTransporter: nodemailer.Transporter | null = null;
+  private cachedTransporterFingerprint = '';
+
   constructor(
     @Inject(AUTH_PROVIDER_TOKEN) private readonly provider: IAuthProvider,
     @InjectRepository(UserEntity) private readonly userRepository: Repository<UserEntity>,
+    @InjectRepository(UserRefreshTokenEntity) private readonly refreshTokenRepository: Repository<UserRefreshTokenEntity>,
     @InjectRepository(SystemConfigEntity) private readonly systemConfigRepository: Repository<SystemConfigEntity>,
     private readonly redisService: RedisService,
   ) {}
@@ -46,9 +53,25 @@ export class AuthService {
   }
 
   async requestPasswordReset(userId: number): Promise<{ message: string }> {
+    const frontendUrl = process.env.FRONTEND_URL;
+    const fromEmail = process.env.TRANSACTIONAL_FROM_EMAIL;
+    if (!frontendUrl || !fromEmail) {
+      throw new InternalServerErrorException('Password reset email is not configured (FRONTEND_URL or TRANSACTIONAL_FROM_EMAIL missing)');
+    }
+
     const recipient = await this.userRepository.findOneOrFail({ where: { id: userId } });
-    const token = uuidv4();
     const redis = this.redisService.getClient();
+
+    const rateKey = `pwd_reset_rate:${userId}`;
+    const attempts = await redis.incr(rateKey);
+    if (attempts === 1) {
+      await redis.expire(rateKey, PWD_RESET_RATE_LIMIT_WINDOW);
+    }
+    if (attempts > PWD_RESET_RATE_LIMIT_MAX) {
+      throw new HttpException('Too many password reset requests for this user. Try again later.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    const token = uuidv4();
     await redis.set(`pwd_reset:${token}`, String(userId), 'EX', PWD_RESET_TTL);
 
     const smtpConfig = await this.systemConfigRepository.findOne({ where: { key: 'smtp_settings' } });
@@ -56,12 +79,11 @@ export class AuthService {
       throw new ServiceUnavailableException('SMTP not configured');
     }
 
-    const { host, port, user: smtpUser, pass } = smtpConfig.value as { host: string; port: number; user: string; pass: string };
-    const transporter = nodemailer.createTransport({ host, port, auth: { user: smtpUser, pass } } as any);
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    const transporter = this.getTransporter(smtpConfig.value as { host: string; port: number; user: string; pass: string });
+    const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
 
     await transporter.sendMail({
-      from: process.env.TRANSACTIONAL_FROM_EMAIL,
+      from: fromEmail,
       to: recipient.email,
       subject: 'Reset your password',
       html: `<p>Hi ${recipient.name},</p><p>Click the link below to reset your password. This link expires in 1 hour.</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
@@ -77,11 +99,23 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired password reset token');
     }
 
-    const user = await this.userRepository.findOneOrFail({ where: { id: Number(userIdStr) } });
+    const userId = Number(userIdStr);
+    const user = await this.userRepository.findOneOrFail({ where: { id: userId } });
     await this.provider.updatePassword!(user.providerId, newPassword);
     await redis.del(`pwd_reset:${token}`);
+    await this.refreshTokenRepository.delete({ userId });
 
     return { success: true };
+  }
+
+  private getTransporter(smtp: { host: string; port: number; user: string; pass: string }): nodemailer.Transporter {
+    const fingerprint = `${smtp.host}:${smtp.port}:${smtp.user}`;
+    if (this.cachedTransporter && this.cachedTransporterFingerprint === fingerprint) {
+      return this.cachedTransporter;
+    }
+    this.cachedTransporter = nodemailer.createTransport({ host: smtp.host, port: smtp.port, auth: { user: smtp.user, pass: smtp.pass } } as any);
+    this.cachedTransporterFingerprint = fingerprint;
+    return this.cachedTransporter;
   }
 
   private assertCredentialLogin(): void {

@@ -160,11 +160,6 @@ export const MENU_ITEMS: NavItem[] = [
         route: '/super-admin/users',
         superAdminOnly: true,
       },
-      {
-        labelKey: 'sidebar.superAdminBilling',
-        route: '/super-admin/billing',
-        superAdminOnly: true,
-      },
     ],
   },
 ];

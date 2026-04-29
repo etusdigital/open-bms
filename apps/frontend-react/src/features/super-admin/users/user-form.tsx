@@ -68,11 +68,19 @@ function CreateForm({ onSubmit, isPending }: UserFormCreateProps) {
   const globalRoleCode = form.watch('globalRoleCode');
   const isSuperAdmin = globalRoleCode === 'super_admin';
 
+  const handleSubmit = (data: SuperAdminCreateUserValues) => {
+    if (data.globalRoleCode === 'super_admin') {
+      onSubmit({ ...data, accounts: [] });
+      return;
+    }
+    onSubmit(data);
+  };
+
   return (
     <>
       <UnsavedChangesDialog isDirty={form.formState.isDirty} isPending={isPending} />
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
           <FormField
             control={form.control}
             name="name"

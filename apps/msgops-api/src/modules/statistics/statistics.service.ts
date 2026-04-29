@@ -725,7 +725,7 @@ export class StatisticsService {
   }
 
   async getMonthUsage() {
-    const isSuperAdmin = this.cls.get('isSuperAdmin');
+    const isSuperAdmin = this.cls.get('isSuperAdmin') === true;
 
     let query = this.accountUsageRepository.createQueryBuilder().select(`DISTINCT to_char(date, 'YYYY-MM') as month`).orderBy(`to_char(date, 'YYYY-MM')`, 'DESC');
 

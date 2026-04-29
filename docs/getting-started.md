@@ -96,10 +96,10 @@ pnpm dev
 # Apenas o backend
 pnpm --filter msgops-api dev
 
-# Apenas o frontend Vue 3 (admin/manager)
-pnpm --filter msgops-manager-frontend dev
+# Apenas o frontend React (operator + super-admin)
+pnpm --filter frontend-react dev
 
-# Apenas o frontend Vue 2 (operador)
+# Apenas o frontend Vue 2 (operador legado)
 pnpm --filter msg-ops serve
 ```
 

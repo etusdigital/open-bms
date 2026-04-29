@@ -3,8 +3,11 @@ import { selectIsSuperAdmin, useAppStore } from '@/stores/app-store';
 
 export const Route = createFileRoute('/_authenticated/_layout/super-admin')({
   beforeLoad: () => {
-    const isSuperAdmin = selectIsSuperAdmin(useAppStore.getState());
-    if (!isSuperAdmin) {
+    const state = useAppStore.getState();
+    if (state.auth.status !== 'authenticated') {
+      return;
+    }
+    if (!selectIsSuperAdmin(state)) {
       throw redirect({ to: '/' });
     }
   },

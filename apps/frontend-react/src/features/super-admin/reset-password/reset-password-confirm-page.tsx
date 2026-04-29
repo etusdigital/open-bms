@@ -12,11 +12,16 @@ import { extractApiErrorMessage } from '@/lib/api-error';
 
 const schema = z
   .object({
-    newPassword: z.string().min(10),
-    confirmPassword: z.string().min(10),
+    newPassword: z
+      .string()
+      .min(10, { message: 'resetPassword.errors.minLength' })
+      .regex(/[a-z]/, { message: 'resetPassword.errors.lowercase' })
+      .regex(/[A-Z]/, { message: 'resetPassword.errors.uppercase' })
+      .regex(/[0-9]/, { message: 'resetPassword.errors.digit' }),
+    confirmPassword: z.string().min(10, { message: 'resetPassword.errors.minLength' }),
   })
   .refine((d) => d.newPassword === d.confirmPassword, {
-    message: 'Passwords do not match',
+    message: 'resetPassword.errors.mismatch',
     path: ['confirmPassword'],
   });
 

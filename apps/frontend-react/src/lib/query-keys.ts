@@ -58,10 +58,5 @@ export const queryKeys = {
       list: (params: ListSearchParams) => ['super-admin', 'users', 'list', params] as const,
       detail: (id: number) => ['super-admin', 'users', 'detail', id] as const,
     },
-    billing: {
-      months: ['super-admin', 'billing', 'months'] as const,
-      usage: (month: string, accountIds: number[]) =>
-        ['super-admin', 'billing', 'usage', { month, accountIds }] as const,
-    },
   },
 } as const;

@@ -150,42 +150,32 @@ export class UsersService {
 
   async findAllGlobal(params: PageDto): Promise<PaginationDto<UserEntity>> {
     try {
-      const ALLOWED_SORT_FIELDS = ['name', 'email', 'created_at', 'updated_at'];
-      const ALLOWED_ORDERS = ['ASC', 'DESC'];
-      const sortBy = ALLOWED_SORT_FIELDS.includes(params.sortBy) ? params.sortBy : 'name';
-      const order = ALLOWED_ORDERS.includes(params.order?.toUpperCase()) ? params.order.toUpperCase() : 'ASC';
+      const ALLOWED_SORT_FIELDS: Record<string, string> = {
+        name: 'user.name',
+        email: 'user.email',
+        created_at: 'user.createdAt',
+        updated_at: 'user.updatedAt',
+      };
+      const sortBy = ALLOWED_SORT_FIELDS[params.sortBy] ?? ALLOWED_SORT_FIELDS.name;
+      const order = params.order?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
 
-      const queryParams: any[] = [];
-      let paramIndex = 1;
-      let searchFilter = '';
+      const qb = this.userRepository
+        .createQueryBuilder('user')
+        .select(['user.id', 'user.name', 'user.email', 'user.providerId', 'user.profile', 'user.status', 'user.createdAt', 'user.updatedAt'])
+        .leftJoinAndSelect('user.globalRole', 'globalRole')
+        .orderBy(sortBy, order as 'ASC' | 'DESC')
+        .skip((params.page - 1) * params.itemsPerPage)
+        .take(params.itemsPerPage);
 
       if (params.search) {
-        searchFilter = `WHERE (name ILIKE $${paramIndex} OR email ILIKE $${paramIndex})`;
-        queryParams.push(`%${params.search}%`);
-        paramIndex++;
+        qb.where('user.name ILIKE :search OR user.email ILIKE :search', { search: `%${params.search}%` });
       }
 
-      const offset = (params.page - 1) * params.itemsPerPage;
-      queryParams.push(offset, params.itemsPerPage);
-
-      const query = `
-        SELECT *, count(*) OVER() AS total
-        FROM users
-        ${searchFilter}
-        ORDER BY ${sortBy} ${order}
-        OFFSET $${paramIndex} LIMIT $${paramIndex + 1}
-      `;
-
-      const results = await this.userRepository.manager.query(query, queryParams);
-      results.forEach((user) => {
-        user['createdAt'] = user.created_at;
-        user['updatedAt'] = user.updated_at;
-        user['providerId'] = user.provider_id;
-      });
+      const [results, total] = await qb.getManyAndCount();
 
       return new PaginationDto<UserEntity>({
         results,
-        total: results.length ? results[0].total : 0,
+        total,
         page: params.page,
         itemsPerPage: params.itemsPerPage,
       });
@@ -650,18 +640,21 @@ export class UsersService {
         }
       }
 
-      for (const ua of usersAccounts) {
-        const existing = await this.userAccountRepository.findOne({
-          where: { userId: ua.userId, accountId: ua.accountId },
-        });
-        if (existing) {
-          existing.isMasterUser = ua.isMasterUser;
-          existing.roleOverrideRoleId = ua.roleOverrideRoleId;
-          await this.userAccountRepository.save(existing);
-        } else {
-          await this.userAccountRepository.save(this.userAccountRepository.create(ua));
+      await this.userAccountRepository.manager.transaction(async (manager) => {
+        const repo = manager.getRepository(UserAccountEntity);
+        for (const ua of usersAccounts) {
+          const existing = await repo.findOne({
+            where: { userId: ua.userId, accountId: ua.accountId },
+          });
+          if (existing) {
+            existing.isMasterUser = ua.isMasterUser;
+            existing.roleOverrideRoleId = ua.roleOverrideRoleId;
+            await repo.save(existing);
+          } else {
+            await repo.save(repo.create(ua));
+          }
         }
-      }
+      });
 
       await this.invalidateCacheForUser(permissionsAccountsDto.userId);
     } catch (e) {

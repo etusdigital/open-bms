@@ -22,14 +22,14 @@ interface SuperAdminUsersPageProps {
 export default function SuperAdminUsersPage({ searchParams }: SuperAdminUsersPageProps) {
   const { t } = useTranslation();
 
-  const { pagination, sorting, setPagination, setSorting, setSearch } = useListSearchParams(searchParams);
+  const { pagination, sorting, searchParams: normalizedParams, setPagination, setSorting, setSearch } = useListSearchParams(searchParams);
 
-  const query = useSuperAdminUsersList(searchParams);
+  const query = useSuperAdminUsersList(normalizedParams);
   const columns = useSuperAdminUsersColumns();
 
   const data = query.data?.data ?? EMPTY_ARRAY;
   const totalRows = query.data?.meta.total ?? 0;
-  const totalPages = Math.ceil(totalRows / searchParams.pageSize);
+  const totalPages = Math.ceil(totalRows / normalizedParams.pageSize);
 
   const table = useReactTable({
     columns,
@@ -57,14 +57,14 @@ export default function SuperAdminUsersPage({ searchParams }: SuperAdminUsersPag
       </ListPage.Header>
 
       <ListPage.Toolbar>
-        <DataTableSearch value={searchParams.search} onChange={setSearch} />
+        <DataTableSearch value={normalizedParams.search} onChange={setSearch} />
       </ListPage.Toolbar>
 
       {isEmpty ? (
         <ListPage.Empty>
           <DataTableEmptyState
             entityName={t('superAdmin.users.entityNamePlural')}
-            hasSearch={searchParams.search.length > 0}
+            hasSearch={normalizedParams.search.length > 0}
             onClearSearch={() => setSearch('')}
             icon={Users}
           />
@@ -84,9 +84,9 @@ export default function SuperAdminUsersPage({ searchParams }: SuperAdminUsersPag
 
           <ListPage.Pagination>
             <DataTablePagination
-              currentPage={searchParams.page}
+              currentPage={normalizedParams.page}
               totalPages={totalPages}
-              pageSize={searchParams.pageSize}
+              pageSize={normalizedParams.pageSize}
               totalRows={totalRows}
               onPageChange={(page) => setPagination((prev) => ({ ...prev, pageIndex: page - 1 }))}
               onPageSizeChange={(size) => setPagination({ pageIndex: 0, pageSize: size })}

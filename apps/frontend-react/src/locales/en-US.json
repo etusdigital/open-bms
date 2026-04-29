@@ -42,7 +42,6 @@
     "superAdmin": "Super Admin",
     "superAdminAccounts": "Accounts",
     "superAdminUsers": "Users",
-    "superAdminBilling": "Billing",
     "collapse": "Collapse menu",
     "expand": "Expand menu",
     "signOut": "Sign out",
@@ -1873,20 +1872,11 @@
       "resetPasswordHelp": "Send an email with a password reset link to this user.",
       "sendPasswordReset": "Send password reset email",
       "passwordResetSent": "Password reset email sent!",
-      "passwordResetError": "Failed to send password reset email."
-    },
-    "billing": {
-      "pageTitle": "Billing",
-      "selectAccount": "Select accounts",
-      "selectMonth": "Select month",
-      "selectAccountFirst": "Select one or more accounts to see billing data.",
-      "selectMonthFirst": "Select a month to see billing data.",
-      "noData": "No data for the selected period.",
-      "product": "Product",
-      "quantity": "Quantity",
-      "unitCost": "Unit cost",
-      "cost": "Cost",
-      "totalCost": "Total cost"
+      "passwordResetError": "Failed to send password reset email.",
+      "errors": {
+        "selectAccount": "Select an account",
+        "atLeastOneAccount": "At least one account is required"
+      }
     }
   },
   "resetPassword": {
@@ -1894,6 +1884,13 @@
     "newPassword": "New password",
     "confirmPassword": "Confirm password",
     "submit": "Reset password",
-    "invalidToken": "This link has expired or is invalid."
+    "invalidToken": "This link has expired or is invalid.",
+    "errors": {
+      "minLength": "Password must be at least 10 characters long",
+      "lowercase": "Must include at least one lowercase letter",
+      "uppercase": "Must include at least one uppercase letter",
+      "digit": "Must include at least one digit",
+      "mismatch": "Passwords do not match"
+    }
   }
 }

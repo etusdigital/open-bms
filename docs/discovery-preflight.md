@@ -98,7 +98,7 @@ grep -r "@google-cloud/datastore" apps --include="*.ts" --include="*.json"
 
 - `cors.config.ts`: `CORS_ORIGINS` e `CORS_CF_PAGES_PROJECT` via env
 - `accounts.service.ts`: `SENDGRID_SUBUSER_PREFIX` e `SENDGRID_SUBUSER_EMAIL` via env
-- `router.ts` (msgops-manager-frontend): `VITE_AUTH0_ROLES_CLAIM` e `VITE_AUTH0_BILLING_ONLY_ROLE`
+- `app-store.ts` (frontend-react): `VITE_AUTH0_ROLES_CLAIM` e roles configuráveis via env
 - `tracker/script.js`: configurável via `window.BMS_CONFIG`
 - `tracker.service.ts` (tag-process e message-trigger): `PIXEL_EVENT_STORE_URL`
 - `Settings.vue` e `EmailPostMaster.vue`: assets e postmaster via env
