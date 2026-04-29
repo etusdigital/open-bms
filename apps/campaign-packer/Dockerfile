@@ -2,6 +2,7 @@ FROM node:24-alpine AS base
 RUN corepack enable
 WORKDIR /app
 COPY package.json ./
+RUN pnpm pkg delete scripts.prepare
 
 FROM base AS deps
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./

@@ -1,4 +1,61 @@
+x-backend-env: &backend-env
+  NODE_ENV: development
+  TYPEORM_HOST: postgres
+  TYPEORM_PORT: '5432'
+  TYPEORM_USERNAME: postgres
+  TYPEORM_PASSWORD: postgres
+  TYPEORM_DATABASE: msgops
+  REDIS_HOST: redis
+  REDIS_PORT: '6379'
+  RABBITMQ_HOST_PORT: rabbitmq:5672
+  RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+  RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
+  AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@rabbitmq:5672
+  CLICKHOUSE_HOST: http://clickhouse:8123
+  CLICKHOUSE_DATABASE: BMS
+  CLICKHOUSE_USERNAME: default
+  CLICKHOUSE_PASSWORD: ''
+  INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN:-dev-internal-token}
+
+x-infra-deps: &infra-deps
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  rabbitmq:
+    condition: service_healthy
+
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: msgops
+    ports:
+      - '55432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - '56379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   rabbitmq:
     image: rabbitmq:3.13-management
     container_name: rabbitmq
@@ -16,21 +73,6 @@ services:
       timeout: 5s
       retries: 10
 
-  event-receiver:
-    build:
-      context: .
-      dockerfile: apps/event-receiver/Dockerfile
-    container_name: event-receiver
-    ports:
-      - '3011:3011'
-    environment:
-      NODE_ENV: development
-      PORT: 3011
-      AMQP_URL: amqp://guest:guest@rabbitmq:5672
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
   clickhouse:
     image: clickhouse/clickhouse-server:24.8-alpine
     container_name: clickhouse
@@ -43,9 +85,6 @@ services:
       CLICKHOUSE_PASSWORD: ''
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: '1'
       CLICKHOUSE_SKIP_USER_SETUP: '1'
-      RABBITMQ_HOST_PORT: rabbitmq:5672
-      RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER:-guest}
-      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
     ulimits:
       nofile:
         soft: 262144
@@ -68,79 +107,159 @@ services:
     env_file:
       - apps/msgops-api/.env
     environment:
-      NODE_ENV: development
-      TYPEORM_HOST: host.docker.internal
-      REDIS_HOST: host.docker.internal
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
+      <<: *backend-env
+      SERVER_PORT: '5001'
+    depends_on: *infra-deps
 
-  frontend-vue2:
-    build:
-      context: apps/frontend-vue2
-      dockerfile: Dockerfile.dev
-    container_name: frontend-vue2
-    ports:
-      - '44357:44357'
-    env_file:
-      - apps/frontend-vue2/.env
-    volumes:
-      - ./apps/frontend-vue2/src:/app/src
-      - ./apps/frontend-vue2/public:/app/public
-      - ./apps/frontend-vue2/babel.config.js:/app/babel.config.js
-      - ./apps/frontend-vue2/tsconfig.json:/app/tsconfig.json
-      - ./apps/frontend-vue2/postcss.config.js:/app/postcss.config.js
-      - ./apps/frontend-vue2/vue.config.js:/app/vue.config.js
-      - /app/node_modules
-    stdin_open: true
-    tty: true
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
-
-  backoffice-api:
+  event-receiver:
     build:
       context: .
-      dockerfile: apps/backoffice-api/Dockerfile
-    container_name: backoffice-api
+      dockerfile: apps/event-receiver/Dockerfile
+    container_name: event-receiver
     ports:
-      - '3001:3001'
-    env_file:
-      - apps/backoffice-api/.env
+      - '3011:3011'
     environment:
-      NODE_ENV: development
-      PORT: 3001
-      TYPEORM_HOST: host.docker.internal
-      TYPEORM_PORT: '5432'
-      TYPEORM_DATABASE: msgops_prd
-      CLICKHOUSE_HOST: http://clickhouse:8123
-      CLICKHOUSE_DATABASE: BMS
-      CLICKHOUSE_USERNAME: default
-      CLICKHOUSE_PASSWORD: ''
-      REDIS_URL: redis://host.docker.internal:6379
-      CORS_ORIGIN: http://localhost:3000
-    depends_on:
-      - clickhouse
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
+      <<: *backend-env
+      PORT: '3011'
+    depends_on: *infra-deps
 
-  backoffice-frontend:
+  event-receiver-probe:
     build:
       context: .
-      dockerfile: apps/backoffice-frontend/Dockerfile
-      args:
-        NEXT_PUBLIC_BACKEND_URL: http://localhost:3001
-    container_name: backoffice-frontend
+      dockerfile: apps/event-receiver-probe/Dockerfile
+    container_name: event-receiver-probe
     ports:
-      - '3000:3000'
-    env_file:
-      - apps/backoffice-frontend/.env
+      - '3012:3012'
     environment:
+      <<: *backend-env
+      PORT: '3012'
+      BRIDGE_ENDPOINT: http://event-receiver-probe:3012
+    depends_on: *infra-deps
+
+  event-process:
+    build:
+      context: .
+      dockerfile: apps/event-process/Dockerfile
+    container_name: event-process
+    env_file:
+      - apps/event-process/.env
+    environment:
+      <<: *backend-env
       PORT: '3000'
-      HOSTNAME: '0.0.0.0'
-      APP_BASE_URL: http://localhost:3000
-      NEXT_PUBLIC_BACKEND_URL: http://localhost:3001
-    depends_on:
-      - backoffice-api
+    depends_on: *infra-deps
+
+  campaign-packer:
+    build:
+      context: .
+      dockerfile: apps/campaign-packer/Dockerfile
+    container_name: campaign-packer
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  campaign-events-tracker:
+    build:
+      context: .
+      dockerfile: apps/campaign-events-tracker/Dockerfile
+    container_name: campaign-events-tracker
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  send-email:
+    build:
+      context: .
+      dockerfile: apps/send-email/Dockerfile
+    container_name: send-email
+    env_file:
+      - apps/send-email/.env
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  send-push:
+    build:
+      context: .
+      dockerfile: apps/send-push/Dockerfile
+    container_name: send-push
+    env_file:
+      - apps/send-push/.env
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  send-whatsapp:
+    build:
+      context: .
+      dockerfile: apps/send-whatsapp/Dockerfile
+    container_name: send-whatsapp
+    env_file:
+      - apps/send-whatsapp/.env
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  twilio-messaging:
+    build:
+      context: .
+      dockerfile: apps/twilio-messaging/Dockerfile
+    container_name: twilio-messaging
+    env_file:
+      - apps/twilio-messaging/.env
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  tag-process:
+    build:
+      context: .
+      dockerfile: apps/tag-process/Dockerfile
+    container_name: tag-process
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  tracker:
+    build:
+      context: .
+      dockerfile: apps/tracker/Dockerfile
+    container_name: tracker
+    env_file:
+      - apps/tracker/.env
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  email-validation:
+    build:
+      context: .
+      dockerfile: apps/email-validation/Dockerfile
+    container_name: email-validation
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  geolocation:
+    build:
+      context: .
+      dockerfile: apps/geolocation/Dockerfile
+    container_name: geolocation
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
 
 volumes:
   clickhouse-data:
   rabbitmq-data:
+  postgres-data:
+  redis-data:
