@@ -20,9 +20,9 @@ export class CampaignDto implements Labelable {
   @JoiSchema(Joi.string().required())
   title: string;
 
-  @ApiProperty()
-  @JoiSchema(Joi.string())
-  name: string;
+  // Internal: derived from title in the service (replaceSpecialChars).
+  // Not exposed to the request — stripUnknown drops anything the client sends.
+  name?: string;
 
   @ApiProperty()
   @JoiSchema(Joi.string().allow('', null).optional())
