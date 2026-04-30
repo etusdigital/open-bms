@@ -204,6 +204,12 @@ export class ContactsController {
   }
 
   @RequirePermission('audience:contacts_suppress')
+  @Post('/bulk-resubscribe')
+  bulkResubscribe(@Body() params: { emails: string[]; block?: boolean }) {
+    return this.contactsService.bulkResubscribe(params);
+  }
+
+  @RequirePermission('audience:contacts_suppress')
   @Post('/unsubscribe')
   async unsubscribe(@Body() params: ContactsPageDto, @Res() response: Response) {
     const result = await this.contactsService.unsubscribe(params);

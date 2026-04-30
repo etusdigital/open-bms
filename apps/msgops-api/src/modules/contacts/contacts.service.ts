@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ContactEntity } from './../../entities/contact.entity';
 import { Repository, In, UpdateQueryBuilder, SelectQueryBuilder } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -142,15 +142,12 @@ export class ContactsService {
         .limit(params.itemsPerPage)
         .getRawMany();
 
-      // Mask emails in raw results
-      const maskedResults = results.map((suppression) => ({
-        ...suppression,
-        email: maskEmail(suppression.email),
-      }));
-
+      // Operator-facing list: emails are intentionally returned in clear so the
+      // operator can identify whom to remove. They're already inside an
+      // authenticated, permission-gated route.
       return new PaginationDto<SuppressionEntity>({
-        results: maskedResults,
-        total: maskedResults.length,
+        results,
+        total: results.length,
         page: params.page,
         itemsPerPage: params.itemsPerPage,
       });
@@ -935,70 +932,125 @@ export class ContactsService {
   async bulkUnsubscribe(params: { emails: string[]; allAccounts?: boolean; block?: boolean }) {
     const emails = [...params.emails];
     const date = new Date();
-    if (emails.length && date) {
-      const queryRunner = this.contactRepository.manager.connection.createQueryRunner();
-      await queryRunner.startTransaction();
+    if (!emails.length) {
+      return;
+    }
 
-      try {
-        const block = params.block;
-        const groupId = 1;
-        let accountsIds = [this.cls.get('accountId')];
+    // The `allAccounts` and `is_internal` flags were a SaaS multi-tenant concept
+    // where suppression cascaded across all customer accounts managed by the
+    // operator. In OSS each deployment owns its own data, so we always scope
+    // both the contact update and the suppression record to the current account.
+    const accountId = this.cls.get<number>('accountId');
+    if (!accountId) {
+      throw new BadRequestException('Account context is required. Send the Account-Id header.');
+    }
 
-        if (params.allAccounts) {
-          const accounts = await this.accountRepository.createQueryBuilder('accounts').select('id').where('accounts.is_internal = true').getRawMany();
-          accountsIds = accounts.map((account) => account.id);
-        }
+    const queryRunner = this.contactRepository.manager.connection.createQueryRunner();
+    await queryRunner.startTransaction();
 
-        if (!accountsIds.length) {
-          throw new HttpException('Account not defined', HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    try {
+      const block = params.block;
+      const groupId = 1;
 
-        const query = queryRunner.manager.createQueryBuilder().update('contacts');
-        if (block) {
-          query.set({ isBlocked: true, blockedAt: new Date() });
-        } else {
-          query.set({ isUnsubscribed: true, unsubscribedAt: new Date() });
-        }
-        query.where('email IN (:...emails) AND account_id IN (:...accounts)', {
-          emails,
-          accounts: accountsIds,
-        });
-
-        await query.execute();
-
-        const accountUsub = await this.accountRepository.findOne({ where: { id: this.cls.get('accountId') } });
-        if (accountUsub && accountUsub.isInternal) {
-          let contacts = emails.map((email: string) => ({
-            groupId,
-            email,
-            ...(block ? { isBlocked: true, blockedAt: date, isUnsubscribed: false, unsubscribedAt: null } : { isUnsubscribed: true, unsubscribedAt: date }),
-          }));
-
-          contacts = [...new Map(contacts.map((obj) => [obj.email, obj])).values()];
-
-          await queryRunner.manager.upsert(SuppressionEntity, contacts, ['email', 'groupId']);
-        }
-
-        await queryRunner.commitTransaction();
-
-        const redisClient = this.redisService.getClient();
-        const redisExpiration = 60 * 60 * 168;
-        for (const accountId of accountsIds) {
-          for (const email of emails) {
-            if (block) {
-              await redisClient.set(`${accountId}:blocked:${email}`, 'true');
-            } else {
-              await redisClient.set(`${accountId}:unsubscribed:${email}`, 'true', 'EX', redisExpiration);
-            }
-          }
-        }
-      } catch (err) {
-        await queryRunner.rollbackTransaction();
-        console.error(err);
-        throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
-      } finally {
-        await queryRunner.release();
+      const query = queryRunner.manager.createQueryBuilder().update('contacts');
+      if (block) {
+        query.set({ isBlocked: true, blockedAt: date });
+      } else {
+        query.set({ isUnsubscribed: true, unsubscribedAt: date });
       }
+      query.where('email IN (:...emails) AND account_id = :accountId', { emails, accountId });
+
+      await query.execute();
+
+      const contacts = [
+        ...new Map(
+          emails.map((email: string) => [
+            email,
+            {
+              groupId,
+              email,
+              ...(block ? { isBlocked: true, blockedAt: date, isUnsubscribed: false, unsubscribedAt: null } : { isUnsubscribed: true, unsubscribedAt: date }),
+            },
+          ]),
+        ).values(),
+      ];
+
+      await queryRunner.manager.upsert(SuppressionEntity, contacts, ['email', 'groupId']);
+
+      await queryRunner.commitTransaction();
+
+      const redisClient = this.redisService.getClient();
+      const redisExpiration = 60 * 60 * 168;
+      for (const email of emails) {
+        if (block) {
+          await redisClient.set(`${accountId}:blocked:${email}`, 'true');
+        } else {
+          await redisClient.set(`${accountId}:unsubscribed:${email}`, 'true', 'EX', redisExpiration);
+        }
+      }
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      if (err instanceof HttpException) throw err;
+      this.logger.error('Failed to bulk unsubscribe', err?.stack || err);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async bulkResubscribe(params: { emails: string[]; block?: boolean }) {
+    const emails = [...(params.emails ?? [])];
+    if (!emails.length) {
+      return;
+    }
+
+    const accountId = this.cls.get<number>('accountId');
+    if (!accountId) {
+      throw new BadRequestException('Account context is required. Send the Account-Id header.');
+    }
+
+    const block = !!params.block;
+    const groupId = 1;
+
+    const queryRunner = this.contactRepository.manager.connection.createQueryRunner();
+    await queryRunner.startTransaction();
+
+    try {
+      // Clear the matching flag on the contact rows in this account.
+      const contactPatch = block ? { isBlocked: false, blockedAt: null } : { isUnsubscribed: false, unsubscribedAt: null };
+      await queryRunner.manager
+        .createQueryBuilder()
+        .update('contacts')
+        .set(contactPatch)
+        .where('email IN (:...emails) AND account_id = :accountId', { emails, accountId })
+        .execute();
+
+      // Drop suppression rows that match the type. bulkUnsubscribe only ever
+      // sets one flag at a time, so a row in the requested type can be deleted
+      // outright. If a future caller stores a row with both flags set, we'd
+      // need to clear the flag and delete only when both are false instead.
+      const suppressionFlag = block ? 'is_blocked = TRUE' : 'is_unsubscribed = TRUE';
+      await queryRunner.manager
+        .createQueryBuilder()
+        .delete()
+        .from('suppressions')
+        .where(`group_id = :groupId AND email IN (:...emails) AND ${suppressionFlag}`, { groupId, emails })
+        .execute();
+
+      await queryRunner.commitTransaction();
+
+      const redisClient = this.redisService.getClient();
+      const redisKeyPrefix = block ? 'blocked' : 'unsubscribed';
+      for (const email of emails) {
+        await redisClient.del(`${accountId}:${redisKeyPrefix}:${email}`);
+      }
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      if (err instanceof HttpException) throw err;
+      this.logger.error('Failed to bulk resubscribe', err?.stack || err);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    } finally {
+      await queryRunner.release();
     }
   }
 
