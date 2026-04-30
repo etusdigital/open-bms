@@ -105,6 +105,7 @@ export function useUpdateCampaign(id: number) {
       return result;
     },
     onSuccess: () => {
+      queryClient.removeQueries({ queryKey: [...queryKeys.campaigns.all, 'detail'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.campaigns.all });
       toast.success(i18n.t('common.updateSuccess', { entity: i18n.t('campaigns.entityName') }));
     },

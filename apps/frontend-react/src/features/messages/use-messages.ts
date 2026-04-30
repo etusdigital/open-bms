@@ -106,6 +106,7 @@ export function useUpdateMessage(id: number) {
       return result;
     },
     onSuccess: () => {
+      queryClient.removeQueries({ queryKey: [...queryKeys.messages.all, 'detail'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.messages.all });
       toast.success(i18n.t('common.updateSuccess', { entity: i18n.t('messages.entityName') }));
     },

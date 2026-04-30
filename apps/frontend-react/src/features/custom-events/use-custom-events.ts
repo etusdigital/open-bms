@@ -82,6 +82,7 @@ export function useUpdateCustomEvent(id: number) {
       return result;
     },
     onSuccess: () => {
+      queryClient.removeQueries({ queryKey: [...queryKeys.customEvents.all, 'detail'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.customEvents.all });
       toast.success(i18n.t('common.updateSuccess', { entity: i18n.t('customEvents.entityName') }));
     },

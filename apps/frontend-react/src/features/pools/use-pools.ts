@@ -107,6 +107,7 @@ export function useUpdatePool(id: number) {
       return result;
     },
     onSuccess: () => {
+      queryClient.removeQueries({ queryKey: [...queryKeys.pools.all, 'detail'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.pools.all });
       toast.success(i18n.t('common.updateSuccess', { entity: i18n.t('pools.entityName') }));
     },

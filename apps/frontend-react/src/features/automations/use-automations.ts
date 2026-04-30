@@ -238,7 +238,7 @@ export function useUpdateAutomation() {
       return data;
     },
     onSuccess: (_data, _variables) => {
-      // Invalidate list cache
+      queryClient.removeQueries({ queryKey: [...queryKeys.automations.all, 'detail'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.automations.all });
     },
     onError: (error) => {

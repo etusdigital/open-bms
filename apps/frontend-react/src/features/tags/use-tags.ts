@@ -79,6 +79,7 @@ export function useUpdateTag(id: number) {
       return result;
     },
     onSuccess: () => {
+      queryClient.removeQueries({ queryKey: [...queryKeys.tags.all, 'detail'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.tags.all });
       toast.success(i18n.t('common.updateSuccess', { entity: i18n.t('tags.entityName') }));
     },

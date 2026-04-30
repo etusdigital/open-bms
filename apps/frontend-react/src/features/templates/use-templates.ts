@@ -82,6 +82,7 @@ export function useUpdateTemplate(id: number) {
       return result;
     },
     onSuccess: () => {
+      queryClient.removeQueries({ queryKey: [...queryKeys.templates.all, 'detail'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.templates.all });
       toast.success(i18n.t('common.updateSuccess', { entity: i18n.t('templates.entityName') }));
     },

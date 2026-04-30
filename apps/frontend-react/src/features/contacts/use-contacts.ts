@@ -95,6 +95,7 @@ export function useUpdateContact(uuid: string) {
       return result;
     },
     onSuccess: () => {
+      queryClient.removeQueries({ queryKey: [...queryKeys.contacts.all, 'detail'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.contacts.all });
       toast.success(i18n.t('common.updateSuccess', { entity: i18n.t('contacts.entityName') }));
     },
