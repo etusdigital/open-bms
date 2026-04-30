@@ -14,11 +14,23 @@ import { createCorsOptions } from './cors.config';
 import { JoiPipe } from 'nestjs-joi';
 import { seedAdmin } from './bootstrap/seed-admin';
 
+// Sentinel committed in docker-compose.yml so `git clone && docker compose up`
+// boots in dev. Refuse to start in production with these values — anyone who
+// pulled the OSS repo would otherwise share the same forge-friendly secret.
+const INSECURE_DEV_SENTINEL_PREFIX = 'INSECURE_DEV_ONLY_';
+
 function assertAuthEnvs(): void {
   const mode = (process.env.AUTH_PROVIDER || 'local').toLowerCase();
+  const isProduction = (process.env.NODE_ENV || '').toLowerCase() === 'production';
   if (mode === 'local') {
     if (!process.env.JWT_SECRET) throw new Error('AUTH_PROVIDER=local requires JWT_SECRET');
     if (!process.env.JWT_AUDIENCE) throw new Error('AUTH_PROVIDER=local requires JWT_AUDIENCE');
+    if (isProduction && process.env.JWT_SECRET.startsWith(INSECURE_DEV_SENTINEL_PREFIX)) {
+      throw new Error('Refusing to boot: NODE_ENV=production but JWT_SECRET still uses the committed dev sentinel. Rotate with `openssl rand -hex 32`.');
+    }
+    if (isProduction && process.env.INTERNAL_AUTH_TOKEN?.startsWith(INSECURE_DEV_SENTINEL_PREFIX)) {
+      throw new Error('Refusing to boot: NODE_ENV=production but INTERNAL_AUTH_TOKEN still uses the committed dev sentinel.');
+    }
   } else if (mode === 'auth0') {
     if (!process.env.JWKS_URI) throw new Error('AUTH_PROVIDER=auth0 requires JWKS_URI');
     if (!process.env.IDP_AUDIENCE) throw new Error('AUTH_PROVIDER=auth0 requires IDP_AUDIENCE');

@@ -1,3 +1,12 @@
+# BMS OpenSource v0.1.0 — docker-compose
+# 15 apps + 5 infra services. Apps Enterprise-only não estão neste repo.
+# Defaults (postgres/postgres, guest/guest, minioadmin/minioadmin) são DEV-ONLY.
+# Para produção, sobrescreva via .env e veja docs/deployment.md (sizing guide).
+#
+# Per-app .env files (apps/*/.env) são opcionais: o anchor *backend-env já
+# fornece defaults de dev suficientes para `git clone && docker compose up`
+# funcionar out-of-the-box. Crie .env apenas para overrides locais.
+
 x-backend-env: &backend-env
   NODE_ENV: development
   TYPEORM_HOST: postgres
@@ -5,6 +14,9 @@ x-backend-env: &backend-env
   TYPEORM_USERNAME: postgres
   TYPEORM_PASSWORD: postgres
   TYPEORM_DATABASE: msgops
+  TYPEORM_MIGRATIONS_RUN: 'true'
+  TYPEORM_SYNCHRONIZE: 'false'
+  TYPEORM_SSL: 'false'
   REDIS_HOST: redis
   REDIS_PORT: '6379'
   RABBITMQ_HOST_PORT: rabbitmq:5672
@@ -15,12 +27,31 @@ x-backend-env: &backend-env
   CLICKHOUSE_DATABASE: BMS
   CLICKHOUSE_USERNAME: default
   CLICKHOUSE_PASSWORD: ''
-  INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN:-dev-internal-token}
+  INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN:-INSECURE_DEV_ONLY_internal-token-do-not-use-in-prod}
   S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
   S3_REGION: ${S3_REGION:-us-east-1}
   S3_BUCKET: ${S3_BUCKET:-msgops-dev}
   S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-minioadmin}
   S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-minioadmin}
+  # Auth (dev defaults — DO NOT use these in production; override via .env or
+  # process env). JWT_SECRET below is an obvious sentinel so `git clone &&
+  # docker compose up` boots; msgops-api refuses to start with NODE_ENV=production
+  # and the INSECURE_DEV_ONLY_ prefix still in place. Rotate via
+  # `openssl rand -hex 32` for any real deploy.
+  AUTH_PROVIDER: ${AUTH_PROVIDER:-local}
+  JWT_SECRET: ${JWT_SECRET:-INSECURE_DEV_ONLY_jwt-secret-rotate-with-openssl-rand-hex-32}
+  JWT_AUDIENCE: ${JWT_AUDIENCE:-bms-msgops-api}
+  JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-3600}
+  JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-2592000}
+  # Swagger path (also the msgops-api healthcheck target — keep in sync).
+  API_DOCS: /api-docs
+  FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+  # Vendor SDKs constructed eagerly in Nest DI (SparkPostHandler, OpenAIProvider)
+  # refuse empty keys at boot. Placeholders keep the OSS stack bootable; calls
+  # will fail cleanly at runtime if exercised without real keys.
+  SPARKPOST_API_KEY: ${SPARKPOST_API_KEY:-dev-placeholder-not-a-real-key}
+  OPEN_AI_KEY: ${OPEN_AI_KEY:-dev-placeholder-not-a-real-key}
 
 x-infra-deps: &infra-deps
   postgres:
@@ -31,11 +62,20 @@ x-infra-deps: &infra-deps
     condition: service_healthy
   minio:
     condition: service_healthy
+  clickhouse:
+    condition: service_healthy
+
+# Apps and infra share this restart policy. minio-bootstrap overrides to
+# `restart: 'no'` because it's a one-shot init job (running it again is a no-op
+# but the Exited(0) state is the success signal we want).
+x-restart-policy: &restart-policy
+  restart: unless-stopped
 
 services:
   postgres:
     image: postgres:16-alpine
     container_name: postgres
+    <<: *restart-policy
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -53,6 +93,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis
+    <<: *restart-policy
     ports:
       - '56379:6379'
     volumes:
@@ -66,6 +107,7 @@ services:
   minio:
     image: minio/minio:RELEASE.2025-01-20T14-49-07Z
     container_name: minio
+    <<: *restart-policy
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-minioadmin}
@@ -99,6 +141,7 @@ services:
   rabbitmq:
     image: rabbitmq:3.13-management
     container_name: rabbitmq
+    <<: *restart-policy
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
@@ -116,6 +159,7 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:24.8-alpine
     container_name: clickhouse
+    <<: *restart-policy
     ports:
       - '8123:8123'
       - '9000:9000'
@@ -136,26 +180,41 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:8123/ping']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
   msgops-api:
     build:
       context: .
       dockerfile: apps/msgops-api/Dockerfile
     container_name: msgops-api
+    <<: *restart-policy
     ports:
       - '5001:5001'
     env_file:
-      - apps/msgops-api/.env
+      - path: apps/msgops-api/.env
+        required: false
     environment:
       <<: *backend-env
       SERVER_PORT: '5001'
     depends_on: *infra-deps
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:5001/api-docs']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   event-receiver:
     build:
       context: .
       dockerfile: apps/event-receiver/Dockerfile
     container_name: event-receiver
+    <<: *restart-policy
     ports:
       - '3011:3011'
     environment:
@@ -168,6 +227,7 @@ services:
       context: .
       dockerfile: apps/event-receiver-probe/Dockerfile
     container_name: event-receiver-probe
+    <<: *restart-policy
     ports:
       - '3012:3012'
     environment:
@@ -181,8 +241,10 @@ services:
       context: .
       dockerfile: apps/event-process/Dockerfile
     container_name: event-process
+    <<: *restart-policy
     env_file:
-      - apps/event-process/.env
+      - path: apps/event-process/.env
+        required: false
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -193,6 +255,7 @@ services:
       context: .
       dockerfile: apps/campaign-packer/Dockerfile
     container_name: campaign-packer
+    <<: *restart-policy
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -203,6 +266,7 @@ services:
       context: .
       dockerfile: apps/campaign-events-tracker/Dockerfile
     container_name: campaign-events-tracker
+    <<: *restart-policy
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -213,8 +277,10 @@ services:
       context: .
       dockerfile: apps/send-email/Dockerfile
     container_name: send-email
+    <<: *restart-policy
     env_file:
-      - apps/send-email/.env
+      - path: apps/send-email/.env
+        required: false
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -225,8 +291,10 @@ services:
       context: .
       dockerfile: apps/send-push/Dockerfile
     container_name: send-push
+    <<: *restart-policy
     env_file:
-      - apps/send-push/.env
+      - path: apps/send-push/.env
+        required: false
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -237,8 +305,10 @@ services:
       context: .
       dockerfile: apps/send-whatsapp/Dockerfile
     container_name: send-whatsapp
+    <<: *restart-policy
     env_file:
-      - apps/send-whatsapp/.env
+      - path: apps/send-whatsapp/.env
+        required: false
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -249,8 +319,10 @@ services:
       context: .
       dockerfile: apps/twilio-messaging/Dockerfile
     container_name: twilio-messaging
+    <<: *restart-policy
     env_file:
-      - apps/twilio-messaging/.env
+      - path: apps/twilio-messaging/.env
+        required: false
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -261,6 +333,7 @@ services:
       context: .
       dockerfile: apps/tag-process/Dockerfile
     container_name: tag-process
+    <<: *restart-policy
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -271,8 +344,10 @@ services:
       context: .
       dockerfile: apps/tracker/Dockerfile
     container_name: tracker
+    <<: *restart-policy
     env_file:
-      - apps/tracker/.env
+      - path: apps/tracker/.env
+        required: false
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -283,6 +358,7 @@ services:
       context: .
       dockerfile: apps/email-validation/Dockerfile
     container_name: email-validation
+    <<: *restart-policy
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -293,10 +369,31 @@ services:
       context: .
       dockerfile: apps/geolocation/Dockerfile
     container_name: geolocation
+    <<: *restart-policy
     environment:
       <<: *backend-env
       PORT: '3000'
     depends_on: *infra-deps
+
+  frontend-react:
+    build:
+      context: .
+      dockerfile: apps/frontend-react/Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: frontend-react
+    <<: *restart-policy
+    ports:
+      - '8080:80'
+    depends_on:
+      msgops-api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1/']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
 
 volumes:
   clickhouse-data:
