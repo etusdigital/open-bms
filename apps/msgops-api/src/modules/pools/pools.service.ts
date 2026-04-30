@@ -1,4 +1,4 @@
-import { ForbiddenException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { ForbiddenException, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RedisService } from '../../providers/redis.provider';
 import { In, Repository } from 'typeorm';
@@ -14,6 +14,8 @@ import { ClsService } from 'nestjs-cls';
 
 @Injectable()
 export class PoolsService {
+  private readonly logger = new Logger(PoolsService.name);
+
   constructor(
     @InjectRepository(PoolEntity)
     private readonly poolRepository: Repository<PoolEntity>,
@@ -141,11 +143,14 @@ export class PoolsService {
   }
 
   async getPoolsSendgrid() {
+    // SendGrid is optional in OSS. If the account has no key, or the key is
+    // invalid / network is down, return an empty list so the operator-facing
+    // page still loads. Surface the cause via Logger for diagnostics.
     try {
       return await this.sendGridHandler.getSiloOptions();
     } catch (e) {
-      console.error(e);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      this.logger.warn(`SendGrid pool list unavailable: ${e?.response?.status ?? ''} ${e?.message ?? e}`);
+      return [];
     }
   }
 
@@ -154,17 +159,17 @@ export class PoolsService {
       const ipsSendgrid = await this.sendGridHandler.getIPsByAccount();
       return ipsSendgrid.filter((ip) => ip.pools.includes(poolName) ?? false);
     } catch (e) {
-      console.error(e);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      this.logger.warn(`SendGrid IP list unavailable: ${e?.response?.status ?? ''} ${e?.message ?? e}`);
+      return [];
     }
   }
 
   async getAllIps() {
     try {
-      return this.sendGridHandler.getIPs();
+      return await this.sendGridHandler.getIPs();
     } catch (e) {
-      console.error(e);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      this.logger.warn(`SendGrid IP list unavailable: ${e?.response?.status ?? ''} ${e?.message ?? e}`);
+      return [];
     }
   }
 

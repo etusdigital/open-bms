@@ -50,11 +50,11 @@ export const queryKeys = {
   },
   superAdmin: {
     accounts: {
-      all: ['super-admin', 'accounts', 'all'] as const,
+      all: ['super-admin', 'accounts'] as const,
       detail: (id: number) => ['super-admin', 'accounts', 'detail', id] as const,
     },
     users: {
-      all: ['super-admin', 'users', 'all'] as const,
+      all: ['super-admin', 'users'] as const,
       list: (params: ListSearchParams) => ['super-admin', 'users', 'list', params] as const,
       detail: (id: number) => ['super-admin', 'users', 'detail', id] as const,
     },

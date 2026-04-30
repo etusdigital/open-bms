@@ -1879,6 +1879,9 @@
       "sendPasswordReset": "Send password reset email",
       "passwordResetSent": "Password reset email sent!",
       "passwordResetError": "Failed to send password reset email.",
+      "cannotDeleteSelf": "You cannot delete your own user",
+      "bulkDeleteSuccess": "{{count}} user(s) deleted",
+      "bulkDeleteConfirmDescription": "{{count}} user(s) will be deleted. Continue?",
       "errors": {
         "selectAccount": "Select an account",
         "atLeastOneAccount": "At least one account is required"

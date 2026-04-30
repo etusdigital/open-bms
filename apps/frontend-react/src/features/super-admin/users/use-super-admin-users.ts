@@ -75,8 +75,8 @@ export function useUpdateSuperAdminUser(id: number) {
       return data;
     },
     onSuccess: () => {
+      queryClient.removeQueries({ queryKey: queryKeys.superAdmin.users.detail(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.superAdmin.users.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.superAdmin.users.detail(id) });
       toast.success(i18n.t('common.updateSuccess', { entity: i18n.t('superAdmin.users.entityName') }));
     },
     onError: (error) => {
@@ -152,6 +152,52 @@ export function useRemoveUserAccountMembership(userId: number) {
     },
     onError: (error) => {
       toast.error(extractApiErrorMessage(error) ?? i18n.t('common.error'));
+    },
+  });
+}
+
+export function useDeleteSuperAdminUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      await apiClient.delete(`/users/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.superAdmin.users.all });
+      toast.success(i18n.t('common.deleteSuccess', { entity: i18n.t('superAdmin.users.entityName') }));
+    },
+    onError: (error) => {
+      toast.error(
+        extractApiErrorMessage(error) ??
+          i18n.t('common.deleteError', { entity: i18n.t('superAdmin.users.entityName') }),
+      );
+    },
+  });
+}
+
+export function useBulkDeleteSuperAdminUsers() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: number[]) => {
+      const results = await Promise.allSettled(ids.map((id) => apiClient.delete(`/users/${id}`)));
+      const failures = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+      if (failures.length) {
+        const reason = (failures[0].reason as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        throw new Error(reason ?? `${failures.length} delete(s) failed`);
+      }
+      return { deleted: ids.length };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.superAdmin.users.all });
+      toast.success(i18n.t('superAdmin.users.bulkDeleteSuccess', { count: result.deleted }));
+    },
+    onError: (error) => {
+      toast.error(
+        extractApiErrorMessage(error) ??
+          i18n.t('common.deleteError', { entity: i18n.t('superAdmin.users.entityName') }),
+      );
     },
   });
 }

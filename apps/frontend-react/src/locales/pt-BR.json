@@ -1879,6 +1879,9 @@
       "sendPasswordReset": "Enviar e-mail de redefinição",
       "passwordResetSent": "E-mail de redefinição de senha enviado!",
       "passwordResetError": "Falha ao enviar o e-mail de redefinição.",
+      "cannotDeleteSelf": "Você não pode apagar seu próprio usuário",
+      "bulkDeleteSuccess": "{{count}} usuário(s) apagado(s)",
+      "bulkDeleteConfirmDescription": "{{count}} usuário(s) serão apagados. Continuar?",
       "errors": {
         "selectAccount": "Selecione uma conta",
         "atLeastOneAccount": "Pelo menos uma conta é necessária"

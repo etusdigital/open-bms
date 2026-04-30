@@ -67,6 +67,7 @@ function CreateForm({ onSubmit, isPending }: UserFormCreateProps) {
 
   const globalRoleCode = form.watch('globalRoleCode');
   const isSuperAdmin = globalRoleCode === 'super_admin';
+  const watchedAccounts = form.watch('accounts');
 
   const handleSubmit = (data: SuperAdminCreateUserValues) => {
     if (data.globalRoleCode === 'super_admin') {
@@ -149,6 +150,7 @@ function CreateForm({ onSubmit, isPending }: UserFormCreateProps) {
                     type="button"
                     variant="outline"
                     size="sm"
+                    disabled={fields.length >= allAccounts.length}
                     onClick={() => append({ accountId: undefined as unknown as number, isMasterUser: false })}
                   >
                     <Plus className="mr-1 h-3.5 w-3.5" />
@@ -156,39 +158,50 @@ function CreateForm({ onSubmit, isPending }: UserFormCreateProps) {
                   </Button>
                 </div>
 
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex items-center gap-2">
-                    <FormField
-                      control={form.control}
-                      name={`accounts.${index}.accountId`}
-                      render={({ field: f }) => (
-                        <FormItem className="flex-1">
-                          <Select
-                            onValueChange={(v) => f.onChange(Number(v))}
-                            value={f.value ? String(f.value) : ''}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder={t('superAdmin.users.selectAccount')} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {allAccounts.map((a) => (
-                                <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="button" variant="ghost" size="icon-xs" onClick={() => remove(index)}>
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  </div>
-                ))}
-                {form.formState.errors.accounts?.root?.message && (
-                  <p className="text-destructive text-sm">{form.formState.errors.accounts.root.message}</p>
+                {fields.map((field, index) => {
+                  const currentValue = watchedAccounts?.[index]?.accountId;
+                  const takenIds = new Set(
+                    watchedAccounts
+                      ?.map((row, i) => (i === index ? null : row?.accountId))
+                      .filter((id): id is number => typeof id === 'number'),
+                  );
+                  const availableAccounts = allAccounts.filter((a) => a.id === currentValue || !takenIds.has(a.id));
+                  return (
+                    <div key={field.id} className="flex items-center gap-2">
+                      <FormField
+                        control={form.control}
+                        name={`accounts.${index}.accountId`}
+                        render={({ field: f }) => (
+                          <FormItem className="flex-1">
+                            <Select
+                              onValueChange={(v) => f.onChange(Number(v))}
+                              value={f.value ? String(f.value) : ''}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder={t('superAdmin.users.selectAccount')} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {availableAccounts.map((a) => (
+                                  <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button type="button" variant="ghost" size="icon-xs" onClick={() => remove(index)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </div>
+                  );
+                })}
+                {(form.formState.errors.accounts?.root?.message || form.formState.errors.accounts?.message) && (
+                  <p className="text-destructive text-sm">
+                    {t((form.formState.errors.accounts?.root?.message ?? form.formState.errors.accounts?.message) as string)}
+                  </p>
                 )}
               </div>
             </>
