@@ -266,6 +266,11 @@ export class UsersService {
         if (userDto.password && this.authProvider.supportsCredentialLogin()) {
           await this.authProvider.updatePassword(existingDeleted.providerId, userDto.password);
         }
+        // users_account has no soft-delete column, so memberships from the prior
+        // life of this user are still in the table. Clear them before applying
+        // the new account selection so the admin's choice is authoritative
+        // instead of a union with whatever access the user had pre-deletion.
+        await this.userAccountRepository.delete({ userId: existingDeleted.id });
         if (userDto.accounts && userDto.accounts.length) {
           await this.permissionsAccounts({ userId: existingDeleted.id, accounts: userDto.accounts });
         }
@@ -476,6 +481,15 @@ export class UsersService {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
     await this.userRepository.softDelete(targetUserId);
+    // Revoke active refresh tokens so a deleted user can't keep rotating sessions
+    // until natural expiry. Access JWTs themselves are still valid until their TTL,
+    // but without a refresh token they expire on their own within minutes.
+    await this.userRepository.manager
+      .createQueryBuilder()
+      .update('user_refresh_tokens')
+      .set({ revoked_at: () => 'NOW()' })
+      .where('user_id = :id AND revoked_at IS NULL', { id: targetUserId })
+      .execute();
     await this.invalidateCacheForUser(targetUserId);
     return { deleted: true };
   }

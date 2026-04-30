@@ -1,4 +1,5 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { PostgresErrorCode } from 'src/shared.interfaces';
 import { ContactEntity } from './../../entities/contact.entity';
 import { Repository, In, UpdateQueryBuilder, SelectQueryBuilder } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -642,8 +643,11 @@ export class ContactsService {
       await this.contactRepository.update(contactRepository.id, patch as Partial<ContactEntity>);
       return { ...contactRepository, ...patch };
     } catch (e) {
-      this.logger.error('Failed to update contact', e?.stack || e);
+      if (e?.code === PostgresErrorCode.UniqueViolation) {
+        throw new ConflictException('A contact with that email already exists in this account');
+      }
       if (e instanceof HttpException) throw e;
+      this.logger.error('Failed to update contact', e?.stack || e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -981,13 +985,17 @@ export class ContactsService {
 
       const redisClient = this.redisService.getClient();
       const redisExpiration = 60 * 60 * 168;
+      // Pipeline so a 1k-email bulk doesn't pay 1k network round-trips. Each
+      // command is independent — no need for a Redis MULTI transaction here.
+      const pipeline = redisClient.pipeline();
       for (const email of emails) {
         if (block) {
-          await redisClient.set(`${accountId}:blocked:${email}`, 'true');
+          pipeline.set(`${accountId}:blocked:${email}`, 'true');
         } else {
-          await redisClient.set(`${accountId}:unsubscribed:${email}`, 'true', 'EX', redisExpiration);
+          pipeline.set(`${accountId}:unsubscribed:${email}`, 'true', 'EX', redisExpiration);
         }
       }
+      await pipeline.exec();
     } catch (err) {
       await queryRunner.rollbackTransaction();
       if (err instanceof HttpException) throw err;
@@ -1029,20 +1037,21 @@ export class ContactsService {
       // sets one flag at a time, so a row in the requested type can be deleted
       // outright. If a future caller stores a row with both flags set, we'd
       // need to clear the flag and delete only when both are false instead.
-      const suppressionFlag = block ? 'is_blocked = TRUE' : 'is_unsubscribed = TRUE';
-      await queryRunner.manager
-        .createQueryBuilder()
-        .delete()
-        .from('suppressions')
-        .where(`group_id = :groupId AND email IN (:...emails) AND ${suppressionFlag}`, { groupId, emails })
-        .execute();
+      const suppressionDelete = queryRunner.manager.createQueryBuilder().delete().from('suppressions').where('group_id = :groupId AND email IN (:...emails)', { groupId, emails });
+      if (block) {
+        suppressionDelete.andWhere('is_blocked = TRUE');
+      } else {
+        suppressionDelete.andWhere('is_unsubscribed = TRUE');
+      }
+      await suppressionDelete.execute();
 
       await queryRunner.commitTransaction();
 
       const redisClient = this.redisService.getClient();
       const redisKeyPrefix = block ? 'blocked' : 'unsubscribed';
-      for (const email of emails) {
-        await redisClient.del(`${accountId}:${redisKeyPrefix}:${email}`);
+      const redisKeys = emails.map((email) => `${accountId}:${redisKeyPrefix}:${email}`);
+      if (redisKeys.length) {
+        await redisClient.del(...redisKeys);
       }
     } catch (err) {
       await queryRunner.rollbackTransaction();

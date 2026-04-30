@@ -183,21 +183,30 @@ export function useBulkDeleteSuperAdminUsers() {
     mutationFn: async (ids: number[]) => {
       const results = await Promise.allSettled(ids.map((id) => apiClient.delete(`/users/${id}`)));
       const failures = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
-      if (failures.length) {
-        const reason = (failures[0].reason as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        throw new Error(reason ?? `${failures.length} delete(s) failed`);
-      }
-      return { deleted: ids.length };
+      const succeeded = ids.length - failures.length;
+      const firstReason = failures.length
+        ? (failures[0].reason as { response?: { data?: { message?: string } } })?.response?.data?.message
+        : undefined;
+      return { deleted: succeeded, failed: failures.length, total: ids.length, firstReason };
     },
-    onSuccess: (result) => {
+    // onSettled rather than onSuccess: partial-success runs still deleted
+    // rows and the list cache must refresh either way.
+    onSettled: (result) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.superAdmin.users.all });
-      toast.success(i18n.t('superAdmin.users.bulkDeleteSuccess', { count: result.deleted }));
-    },
-    onError: (error) => {
-      toast.error(
-        extractApiErrorMessage(error) ??
-          i18n.t('common.deleteError', { entity: i18n.t('superAdmin.users.entityName') }),
-      );
+      if (!result) return;
+      if (result.failed === 0) {
+        toast.success(i18n.t('superAdmin.users.bulkDeleteSuccess', { count: result.deleted }));
+      } else if (result.deleted === 0) {
+        toast.error(result.firstReason ?? i18n.t('common.deleteError', { entity: i18n.t('superAdmin.users.entityName') }));
+      } else {
+        toast.error(
+          i18n.t('superAdmin.users.bulkDeletePartial', {
+            succeeded: result.deleted,
+            total: result.total,
+            reason: result.firstReason ?? '',
+          }),
+        );
+      }
     },
   });
 }

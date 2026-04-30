@@ -1,4 +1,19 @@
-import { Controller, Body, Get, Post, ClassSerializerInterceptor, UseInterceptors, Query, Param, Res, HttpStatus, Headers, Put, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Body,
+  Get,
+  Post,
+  ClassSerializerInterceptor,
+  UseInterceptors,
+  Query,
+  Param,
+  Res,
+  HttpStatus,
+  Headers,
+  Put,
+  NotFoundException,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ContactsService } from './contacts.service';
 import { ContactDto } from './contacts.dto';
@@ -156,6 +171,9 @@ export class ContactsController {
   @RequirePermission('audience:contacts_edit')
   @Put('/:id')
   async updateContact(@Param('id') id: string, @Body() data: ContactDto): Promise<ContactDto> {
+    if (!this.cls.get('accountId')) {
+      throw new BadRequestException('Account context is required. Send the Account-Id header.');
+    }
     // Frontend may pass either numeric id or uuid for the same param.
     const isNumeric = /^\d+$/.test(id);
     const contact = await this.contactsService.findByProperty(isNumeric ? { id: Number(id) } : { uuid: id });

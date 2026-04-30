@@ -121,7 +121,7 @@ export default function SuperAdminAccountsPage() {
         {selectedCount > 0 && (
           <div className="px-1 pb-2">
             <div className="bg-muted/50 flex items-center gap-3 rounded-md border px-4 py-2">
-              <span className="text-sm font-medium">{t('contacts.bulkActionsSelected', { count: selectedCount })}</span>
+              <span className="text-sm font-medium">{t('common.bulkActionsSelected', { count: selectedCount })}</span>
               <Separator orientation="vertical" className="h-5" />
               <Button
                 variant="outline"
@@ -141,7 +141,7 @@ export default function SuperAdminAccountsPage() {
                 disabled={bulkDelete.isPending}
               >
                 <X className="mr-1 h-3 w-3" />
-                {t('contacts.clearSelection')}
+                {t('common.clearSelection')}
               </Button>
             </div>
           </div>

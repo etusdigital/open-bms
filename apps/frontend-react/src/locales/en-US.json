@@ -129,6 +129,8 @@
     "noResults": "No results found",
     "noResultsMessage": "No {{entity}} match your search.",
     "clearSearch": "Clear search",
+    "bulkActionsSelected": "{{count}} selected",
+    "clearSelection": "Clear",
     "emptyState": "No {{entity}} found",
     "emptyStateMessage": "Create your first {{entity}} to get started.",
     "deleteConfirmTitle": "Delete {{entity}}",
@@ -1858,7 +1860,8 @@
       "deleteConfirmMessage": "Deleting \"{{name}}\" is permanent and cannot be undone.",
       "cannotDeleteCurrent": "You cannot delete the account you are currently using",
       "bulkDeleteSuccess": "{{count}} account(s) deleted",
-      "bulkDeleteConfirmDescription": "{{count}} account(s) will be deleted. This action cannot be undone."
+      "bulkDeleteConfirmDescription": "{{count}} account(s) will be deleted. This action cannot be undone.",
+      "bulkDeletePartial": "{{succeeded}} of {{total}} account(s) deleted. {{reason}}"
     },
     "users": {
       "pageTitle": "Users",
@@ -1886,6 +1889,7 @@
       "deletedAccountFallback": "Account #{{id}} (deleted)",
       "bulkDeleteSuccess": "{{count}} user(s) deleted",
       "bulkDeleteConfirmDescription": "{{count}} user(s) will be deleted. Continue?",
+      "bulkDeletePartial": "{{succeeded}} of {{total}} user(s) deleted. {{reason}}",
       "errors": {
         "selectAccount": "Select an account",
         "atLeastOneAccount": "At least one account is required"

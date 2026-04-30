@@ -129,6 +129,8 @@
     "noResults": "Nenhum resultado encontrado",
     "noResultsMessage": "Nenhum {{entity}} corresponde à sua busca.",
     "clearSearch": "Limpar busca",
+    "bulkActionsSelected": "{{count}} selecionado(s)",
+    "clearSelection": "Limpar",
     "emptyState": "Nenhum {{entity}} encontrado",
     "emptyStateMessage": "Crie seu primeiro {{entity}} para começar.",
     "deleteConfirmTitle": "Excluir {{entity}}",
@@ -1858,7 +1860,8 @@
       "deleteConfirmMessage": "Excluir \"{{name}}\" é permanente e não pode ser desfeito.",
       "cannotDeleteCurrent": "Você não pode apagar a conta que está usando",
       "bulkDeleteSuccess": "{{count}} conta(s) apagada(s)",
-      "bulkDeleteConfirmDescription": "{{count}} conta(s) serão apagadas. Esta ação não pode ser desfeita."
+      "bulkDeleteConfirmDescription": "{{count}} conta(s) serão apagadas. Esta ação não pode ser desfeita.",
+      "bulkDeletePartial": "{{succeeded}} de {{total}} conta(s) apagada(s). {{reason}}"
     },
     "users": {
       "pageTitle": "Usuários",
@@ -1886,6 +1889,7 @@
       "deletedAccountFallback": "Conta #{{id}} (apagada)",
       "bulkDeleteSuccess": "{{count}} usuário(s) apagado(s)",
       "bulkDeleteConfirmDescription": "{{count}} usuário(s) serão apagados. Continuar?",
+      "bulkDeletePartial": "{{succeeded}} de {{total}} usuário(s) apagado(s). {{reason}}",
       "errors": {
         "selectAccount": "Selecione uma conta",
         "atLeastOneAccount": "Pelo menos uma conta é necessária"

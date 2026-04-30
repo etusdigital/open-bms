@@ -126,21 +126,31 @@ export function useBulkDeleteSuperAdminAccounts() {
     mutationFn: async (ids: number[]) => {
       const results = await Promise.allSettled(ids.map((id) => apiClient.delete(`/accounts/${id}`)));
       const failures = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
-      if (failures.length) {
-        const reason = (failures[0].reason as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        throw new Error(reason ?? `${failures.length} delete(s) failed`);
-      }
-      return { deleted: ids.length };
+      const succeeded = ids.length - failures.length;
+      const firstReason = failures.length
+        ? (failures[0].reason as { response?: { data?: { message?: string } } })?.response?.data?.message
+        : undefined;
+      return { deleted: succeeded, failed: failures.length, total: ids.length, firstReason };
     },
-    onSuccess: (result) => {
+    // onSettled rather than onSuccess because a partial-success run still
+    // deleted rows and the list cache must refresh — otherwise the deleted
+    // rows linger in the UI and the operator re-clicks them into 404s.
+    onSettled: (result) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.superAdmin.accounts.all });
-      toast.success(i18n.t('superAdmin.accounts.bulkDeleteSuccess', { count: result.deleted }));
-    },
-    onError: (error) => {
-      toast.error(
-        extractApiErrorMessage(error) ??
-          i18n.t('common.deleteError', { entity: i18n.t('superAdmin.accounts.entityName') }),
-      );
+      if (!result) return;
+      if (result.failed === 0) {
+        toast.success(i18n.t('superAdmin.accounts.bulkDeleteSuccess', { count: result.deleted }));
+      } else if (result.deleted === 0) {
+        toast.error(result.firstReason ?? i18n.t('common.deleteError', { entity: i18n.t('superAdmin.accounts.entityName') }));
+      } else {
+        toast.error(
+          i18n.t('superAdmin.accounts.bulkDeletePartial', {
+            succeeded: result.deleted,
+            total: result.total,
+            reason: result.firstReason ?? '',
+          }),
+        );
+      }
     },
   });
 }
