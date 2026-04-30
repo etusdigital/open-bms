@@ -1,0 +1,121 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bullmq';
+import { SchedulerJobNotFoundError, SchedulerService } from './scheduler.service';
+import { QUEUE_BMS_USAGE, QUEUE_CAMPAIGN_TESTAB, QUEUE_CAMPAIGN_TRIGGER, QUEUE_SEGMENT, QUEUE_WHATSAPP_MESSAGE } from './queue.constants';
+
+describe('SchedulerService', () => {
+  let service: SchedulerService;
+  let triggerQueue: { add: jest.Mock; getJob: jest.Mock };
+  let testabQueue: { add: jest.Mock; getJob: jest.Mock };
+  let segmentQueue: { add: jest.Mock; getJob: jest.Mock };
+  let usageQueue: { add: jest.Mock; getJob: jest.Mock };
+  let whatsappQueue: { add: jest.Mock; getJob: jest.Mock };
+
+  const buildQueueMock = () => ({ add: jest.fn().mockResolvedValue(undefined), getJob: jest.fn().mockResolvedValue(null) });
+
+  beforeEach(async () => {
+    triggerQueue = buildQueueMock();
+    testabQueue = buildQueueMock();
+    segmentQueue = buildQueueMock();
+    usageQueue = buildQueueMock();
+    whatsappQueue = buildQueueMock();
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        SchedulerService,
+        { provide: getQueueToken(QUEUE_CAMPAIGN_TRIGGER), useValue: triggerQueue },
+        { provide: getQueueToken(QUEUE_CAMPAIGN_TESTAB), useValue: testabQueue },
+        { provide: getQueueToken(QUEUE_SEGMENT), useValue: segmentQueue },
+        { provide: getQueueToken(QUEUE_BMS_USAGE), useValue: usageQueue },
+        { provide: getQueueToken(QUEUE_WHATSAPP_MESSAGE), useValue: whatsappQueue },
+      ],
+    }).compile();
+
+    service = module.get(SchedulerService);
+    process.env.GOOGLE_TASK_QUEUE_TEST_AB = 'msgops-campaign-testab';
+    process.env.GOOGLE_TASK_SEGMENT = 'segment-process';
+    process.env.GOOGLE_TASK_BMS_USAGE = 'msgops-bms-usage';
+    process.env.GOOGLE_TASK_WHATSAPP_MESSAGE = 'msgops-whatsapp-message';
+  });
+
+  describe('create', () => {
+    it('routes to campaign-trigger queue by default', async () => {
+      await service.create(123, new Date(Date.now() + 60_000), 'http://hub/campaign', 'message-trigger-timer');
+      expect(triggerQueue.add).toHaveBeenCalled();
+      expect(testabQueue.add).not.toHaveBeenCalled();
+    });
+
+    it('routes to testab queue when taskQueue matches GOOGLE_TASK_QUEUE_TEST_AB', async () => {
+      await service.create(7, new Date(Date.now() + 5_000), 'http://hub/x', process.env.GOOGLE_TASK_QUEUE_TEST_AB);
+      expect(testabQueue.add).toHaveBeenCalled();
+      expect(triggerQueue.add).not.toHaveBeenCalled();
+    });
+
+    it('routes segment to segment queue', async () => {
+      await service.create(9, new Date(), 'http://hub/seg', process.env.GOOGLE_TASK_SEGMENT);
+      expect(segmentQueue.add).toHaveBeenCalled();
+    });
+
+    it('routes whatsapp message to whatsapp queue', async () => {
+      await service.create('abc/1', new Date(), 'http://hub/m', process.env.GOOGLE_TASK_WHATSAPP_MESSAGE);
+      expect(whatsappQueue.add).toHaveBeenCalled();
+    });
+
+    it('replaces empty-string id with anon-* segment so jobName is unique', async () => {
+      await service.create('', new Date(), 'http://hub/x', 'msgops-bms-usage');
+      const [jobName] = usageQueue.add.mock.calls[0];
+      expect(jobName).toMatch(/^msgops-bms-usage:anon-[0-9a-f]{8}:[0-9a-f]{12}$/);
+    });
+
+    it('clamps past scheduleTo to delay 0', async () => {
+      const past = new Date(Date.now() - 10_000);
+      await service.create(1, past, 'http://hub/x', 'message-trigger-timer');
+      const [, , opts] = triggerQueue.add.mock.calls[0];
+      expect(opts.delay).toBe(0);
+    });
+
+    it('returns the job name in the legacy [{ name }] shape', async () => {
+      const result = await service.create(42, new Date(Date.now() + 1000), 'http://hub/x', 'message-trigger-timer');
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toMatch(/^message-trigger-timer:42:[0-9a-f]{12}$/);
+    });
+  });
+
+  describe('delete', () => {
+    it('returns false silently when the job is not found in any queue', async () => {
+      const result = await service.delete('missing', 'message-trigger-timer');
+      expect(result).toBe(false);
+    });
+
+    it('removes the job and returns true when found in the resolved queue', async () => {
+      const remove = jest.fn().mockResolvedValue(undefined);
+      triggerQueue.getJob.mockResolvedValue({ remove });
+      const result = await service.delete('foo', 'message-trigger-timer');
+      expect(remove).toHaveBeenCalled();
+      expect(result).toBe(true);
+    });
+
+    it('falls back to scanning other queues when not found in resolved queue (env rename safety)', async () => {
+      const remove = jest.fn().mockResolvedValue(undefined);
+      triggerQueue.getJob.mockResolvedValue(null);
+      testabQueue.getJob.mockResolvedValue({ remove });
+      const result = await service.delete('foo', 'message-trigger-timer');
+      expect(remove).toHaveBeenCalled();
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('callRunTask', () => {
+    it('throws SchedulerJobNotFoundError when the job is gone (legacy NOT_FOUND contract)', async () => {
+      await expect(service.callRunTask('gone', 'msgops-bms-usage')).rejects.toBeInstanceOf(SchedulerJobNotFoundError);
+    });
+
+    it('promotes the job and returns true when found', async () => {
+      const promote = jest.fn().mockResolvedValue(undefined);
+      usageQueue.getJob.mockResolvedValue({ promote });
+      const result = await service.callRunTask('here', 'msgops-bms-usage');
+      expect(promote).toHaveBeenCalled();
+      expect(result).toBe(true);
+    });
+  });
+});

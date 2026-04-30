@@ -15,7 +15,7 @@ import { TestsService } from '../tests/tests.service';
 import { RedisService } from '../../providers/redis.provider';
 import { TwilioHandler } from '../../handlers/twilio/twilio.handler';
 import { EvolutionHandler } from '../../handlers/evolution/evolution.handler';
-import { GoogleTasksProvider } from '../../providers/google-tasks.provider';
+import { SchedulerService } from '../../providers/queue/scheduler.service';
 import { AccountsService } from '../accounts/accounts.service';
 import { CampaignsService } from '../campaigns/campaigns.service';
 import { OpenAIProvider } from '../../providers/openai.provider';
@@ -88,7 +88,7 @@ describe('MessagesService - Unlayer Migration', () => {
   };
   const mockTwilioHandler = {};
   const mockEvolutionHandler = {};
-  const mockGoogleTasksProvider = {};
+  const mockSchedulerService = {};
   const mockAccountService = {};
   const mockCampaignsService = {
     messageInUse: jest.fn(() => []),
@@ -114,7 +114,7 @@ describe('MessagesService - Unlayer Migration', () => {
         { provide: RedisService, useValue: mockRedisService },
         { provide: TwilioHandler, useValue: mockTwilioHandler },
         { provide: EvolutionHandler, useValue: mockEvolutionHandler },
-        { provide: GoogleTasksProvider, useValue: mockGoogleTasksProvider },
+        { provide: SchedulerService, useValue: mockSchedulerService },
         { provide: AccountsService, useValue: mockAccountService },
         { provide: CampaignsService, useValue: mockCampaignsService },
         { provide: OpenAIProvider, useValue: mockOpenAIProvider },

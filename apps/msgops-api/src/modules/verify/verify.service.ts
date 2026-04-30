@@ -7,7 +7,8 @@ import { ClsService } from 'nestjs-cls';
 import { parseMessageToSendEmail } from 'src/utils/utils.service';
 import { AccountsService } from '../accounts/accounts.service';
 import { MessagesService } from '../messages/messages.service';
-import { PubSubProvider } from 'src/providers/pubsub.providers';
+import { EventPublisherService } from 'src/providers/messaging/event-publisher.service';
+import { EXCHANGES } from '@bms/messaging';
 import { VerifyStatisticsService, VerifyStatisticType } from './verify-statistics.service';
 
 @Injectable()
@@ -17,7 +18,7 @@ export class VerifyService {
     private readonly cls: ClsService,
     private readonly accountsService: AccountsService,
     private readonly messagesService: MessagesService,
-    private readonly pubSubProvider: PubSubProvider,
+    private readonly eventPublisher: EventPublisherService,
     private readonly verifyStatisticsService: VerifyStatisticsService,
   ) {}
 
@@ -103,7 +104,7 @@ export class VerifyService {
           body = body.replace(/{{CODE}}/gi, code.toString());
 
           const smsMessage = { to: customerPhone.number, body, account };
-          await this.pubSubProvider.sendAsyncMessage(process.env.TOPIC_NAME_SEND_SINGLE_SMS, smsMessage);
+          await this.eventPublisher.publish(EXCHANGES.sms, 'sms.send', smsMessage);
           messageSent = true;
           break;
         }
@@ -180,7 +181,7 @@ export class VerifyService {
           }
 
           const formattedEmail = parseMessageToSendEmail(message, account, { email: requestData.to, customFields: { CODE: code } });
-          await this.pubSubProvider.sendAsyncMessage(process.env.TOPIC_NAME_SEND_EMAIL, formattedEmail, {
+          await this.eventPublisher.publish(EXCHANGES.email, 'email.send', formattedEmail, {
             priority: 'transactional',
           });
           messageSent = true;
@@ -216,7 +217,7 @@ export class VerifyService {
           const whatsappMessage = await this.messagesService.getMessageById(selectedMessage.message.id);
 
           const formattedWhatsapp = parseMessageToSendEmail(whatsappMessage, account, { whatsapp: requestData.to, code: code, hasWhatsapp: true });
-          await this.pubSubProvider.sendAsyncMessage(process.env.TOPIC_NAME_SEND_WHATSAPP, formattedWhatsapp);
+          await this.eventPublisher.publish(EXCHANGES.whatsapp, 'whatsapp.send', formattedWhatsapp);
           messageSent = true;
           break;
         }

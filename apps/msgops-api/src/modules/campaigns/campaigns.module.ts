@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { S3StorageProvider } from '../../providers/s3-storage.provider';
-import { GoogleTasksProvider } from '../../providers/google-tasks.provider';
 import { CampaignsController } from './campaigns.controller';
 import { CampaignsService } from './campaigns.service';
 import { UtilsService } from '../../utils/utils.service';
@@ -15,7 +14,6 @@ import { ContactDeviceEntity } from 'src/entities/contact-device.entity';
 import { CampaignContactEntity } from 'src/entities/campaign-contact.entity';
 import { TagEntity } from 'src/entities/tag.entity';
 import { AccountEntity } from 'src/entities/account.entity';
-import { PubSubProvider } from 'src/providers/pubsub.providers';
 import { SlackProvider } from 'src/providers/slack.provider';
 import { LabelsIntegrationModule } from '../labels/labels-integration.module';
 
@@ -33,6 +31,6 @@ import { LabelsIntegrationModule } from '../labels/labels-integration.module';
   ],
   controllers: [CampaignsController],
   exports: [CampaignsService],
-  providers: [CampaignsService, UtilsService, S3StorageProvider, GoogleTasksProvider, PubSubProvider, SlackProvider],
+  providers: [CampaignsService, UtilsService, S3StorageProvider, SlackProvider],
 })
 export class CampaignModule {}

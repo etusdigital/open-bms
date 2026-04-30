@@ -12,7 +12,6 @@ import { ContactCustomFieldEntity } from '../../entities/contact-custom-field.en
 import { CustomFieldsEntity } from '../../entities/custom-fields.entity';
 import { ContactBatch } from './interfaces';
 import { AccountsService } from '../accounts/accounts.service';
-import { PubSubProvider } from '../../providers/pubsub.providers';
 import { ContactTagEntity } from 'src/entities/contact-tag.entity';
 import { SuppressionEntity } from 'src/entities/suppression.entity';
 import { ClsService } from 'nestjs-cls';
@@ -50,7 +49,6 @@ export class ContactsService {
     private readonly customFieldService: CustomFieldsService,
     private readonly customEventService: CustomEventService,
     private readonly accountsService: AccountsService,
-    private readonly pubSubProvider: PubSubProvider,
     private readonly redisService: RedisService,
     private readonly auditService: AuditService,
     private readonly cls: ClsService,
@@ -1305,13 +1303,14 @@ export class ContactsService {
   }
 
   /**
-   * Deactivates contacts that have been inactive for a specified period
-   * This function runs nightly via Google Cloud Tasks to identify and deactivate contacts that:
+   * Deactivates contacts that have been inactive for a specified period.
+   * Triggered nightly via the BullMQ scheduler (delayed job → HTTP loopback)
+   * to identify and deactivate contacts that:
    * - Have email but no other communication channels (web push, mobile push, whatsapp)
    * - Have not opened any messages for the specified number of days (default: 180)
    * - Were created more than the specified number of days ago
    *
-   * Processing is done in batches to minimize database load
+   * Processing is done in batches to minimize database load.
    */
   async deactivateInternalContacts() {
     try {

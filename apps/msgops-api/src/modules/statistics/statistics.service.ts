@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { DashboardStatisticsDto, StatisticsDto } from './dto/statistics.dto';
-import { GoogleTasksProvider } from 'src/providers/google-tasks.provider';
+import { SchedulerService } from 'src/providers/queue/scheduler.service';
 import dayjs, { Dayjs } from 'dayjs';
 import { AccountsService } from '../accounts/accounts.service';
 import { AccountUsageEntity } from 'src/entities/account-usage.entity';
@@ -28,7 +28,7 @@ dayjs.extend(isSameOrAfter);
 export class StatisticsService {
   private redisClient: Redis;
   constructor(
-    private readonly googleTasksProvider: GoogleTasksProvider,
+    private readonly scheduler: SchedulerService,
     private readonly accountService: AccountsService,
     private readonly contactService: ContactsService,
     private readonly automationService: AutomationsService,
@@ -613,12 +613,7 @@ export class StatisticsService {
     const minute = Math.floor(Math.random() * (40 - 1 + 1) + 1);
     const dateSchedule = dayjs().tz('America/Sao_Paulo').add(24, 'hour').set('minute', minute).format('YYYY-MM-DD HH:mm:ss');
     const currentDate = dayjs().tz('America/Sao_Paulo').format('YYYY-MM-DD');
-    await this.googleTasksProvider.create(
-      `${accountId}/${currentDate}`,
-      new Date(dateSchedule),
-      `${process.env.BRIUS_HOSTURL}/statistics/usage`,
-      process.env.GOOGLE_TASK_BMS_USAGE,
-    );
+    await this.scheduler.create(`${accountId}/${currentDate}`, new Date(dateSchedule), `${process.env.BRIUS_HOSTURL}/statistics/usage`, process.env.GOOGLE_TASK_BMS_USAGE);
     return;
   }
 

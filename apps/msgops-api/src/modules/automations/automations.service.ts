@@ -14,7 +14,7 @@ import { StatisticsDto, StatisticsTargetDto } from './dto/statistics.dto';
 import { AccountConfigsProvider } from '../../providers/account-configs.provider';
 import { PostgresErrorCode } from 'src/shared.interfaces';
 import { ClsService } from 'nestjs-cls';
-import { GoogleTasksProvider } from 'src/providers/google-tasks.provider';
+import { SchedulerService } from 'src/providers/queue/scheduler.service';
 import dayjs from 'dayjs';
 import { ActiveCampaignProvider } from 'src/providers/active-campaign.provider';
 import schema from './schema/automation-schema.json';
@@ -41,7 +41,7 @@ export class AutomationsService {
     private readonly redisService: RedisService,
     private readonly httpService: HttpService,
     private readonly cls: ClsService,
-    private readonly googleTasksProvider: GoogleTasksProvider,
+    private readonly scheduler: SchedulerService,
     private readonly activeCampaignProvider: ActiveCampaignProvider,
     private readonly labelsService: LabelsService,
   ) {
@@ -566,7 +566,7 @@ export class AutomationsService {
     const endDate = dayjs().tz('America/Sao_Paulo').add(step.settings.duration, 'hour').format('YYYY-MM-DD HH:mm:ss');
     const updateStep = { status: 'running', startDate, endDate };
     step.settings = { ...step.settings, ...updateStep };
-    const task = await this.googleTasksProvider.create(
+    const task = await this.scheduler.create(
       ``,
       new Date(endDate),
       `${process.env.BRIUS_HOSTURL}/automations/finish-testab`,
@@ -611,7 +611,7 @@ export class AutomationsService {
 
   async stopTestAb(step) {
     try {
-      return await this.googleTasksProvider.callRunTask(step.settings.taskId, process.env.GOOGLE_TASK_BMS_USAGE);
+      return await this.scheduler.callRunTask(step.settings.taskId, process.env.GOOGLE_TASK_BMS_USAGE);
     } catch {
       return await this.finishTestabStep(step);
     }

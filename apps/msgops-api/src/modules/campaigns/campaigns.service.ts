@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException, HttpException, HttpStatus, ForbiddenException } from '@nestjs/common';
-import { GoogleTasksProvider } from '../../providers/google-tasks.provider';
+import { SchedulerService } from '../../providers/queue/scheduler.service';
 import { CampaignDto } from './campaign.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Not, QueryRunner, Repository } from 'typeorm';
@@ -19,7 +19,6 @@ import { ContactDeviceEntity } from 'src/entities/contact-device.entity';
 import { CampaignContactEntity } from 'src/entities/campaign-contact.entity';
 import { TagEntity } from 'src/entities/tag.entity';
 import { AccountEntity } from 'src/entities/account.entity';
-import { PubSubProvider } from 'src/providers/pubsub.providers';
 import Ajv from 'ajv';
 import ajvErrors from 'ajv-errors';
 import schema from 'src/modules/automations/schema/automation-schema.json';
@@ -32,7 +31,7 @@ import { LabelsService } from '../labels/labels.service';
 export class CampaignsService {
   public ajv: Ajv;
   constructor(
-    private readonly googleTasksProvider: GoogleTasksProvider,
+    private readonly scheduler: SchedulerService,
     private readonly redisService: RedisService,
     private readonly slackProvider: SlackProvider,
     @InjectRepository(ContactEntity)
@@ -54,7 +53,6 @@ export class CampaignsService {
     @InjectRepository(LabelsEntity)
     private readonly labelsRepository: Repository<LabelsEntity>,
     private readonly cls: ClsService,
-    private readonly pubSubProvider: PubSubProvider,
     private readonly labelsService: LabelsService,
   ) {
     this.ajv = new Ajv({ allErrors: true });
@@ -248,18 +246,8 @@ export class CampaignsService {
       campaignDto = this.removeTestAbData(campaignDto);
     }
 
-    if (campaignDto.status !== CampaignsStatus.Draft) {
-      const account = await this.accountRepository.findOne({ where: { id: this.cls.get('accountId') } });
-      const managerConfigsJson = account.configByName('google_manager_config');
-      if (managerConfigsJson && managerConfigsJson.value) {
-        const keyName = replaceSpecialChars(campaignDto.name);
-        const keyValues = campaignDto.campaignMessage.map((message) => `${keyName}_e1_${message.id}`);
-        if (keyValues.length) {
-          await this.createUtmCampaign(managerConfigsJson.value, keyValues);
-        }
-      }
-    }
-
+    // Google Ad Manager (UTM) integration is SaaS-only — no consumer in OSS.
+    // Skip the network call AND the payload construction. See createUtmCampaign().
     const connection = queryRunner ? queryRunner.manager : this.campaignRepository.manager;
 
     try {
@@ -363,17 +351,7 @@ export class CampaignsService {
       oldTriggerId = campaign.triggers?.settings?.id;
     }
 
-    if (!isTriggerCampaign && campaignDto.status !== CampaignsStatus.Draft) {
-      const account = await this.accountRepository.findOne({ where: { id: this.cls.get('accountId') } });
-      const managerConfigsJson = account.configByName('google_manager_config');
-      if (managerConfigsJson && managerConfigsJson.value) {
-        const keyName = replaceSpecialChars(campaignDto.name);
-        const keyValues = campaignDto.campaignMessage.map((message) => `${keyName}_e1_${message.id}`);
-        if (keyValues.length) {
-          await this.createUtmCampaign(managerConfigsJson.value, keyValues);
-        }
-      }
-    }
+    // Google Ad Manager (UTM) integration is SaaS-only — see createUtmCampaign().
 
     if (campaignDto.messageType === CampaignsMessageType.WEB_PUSH && (!campaignDto.spreadSending || campaignDto.spreadSending < 30)) {
       campaignDto.spreadSending = 30;
@@ -561,31 +539,25 @@ export class CampaignsService {
   }
 
   async deleteTasks(campaign: CampaignEntity) {
-    try {
-      switch (campaign.type) {
-        case CampaignsType.SIMPLE:
-        case CampaignsType.SPLIT:
-        case CampaignsType.RECURRING:
-          if (campaign.scheduleToCloudTaskId) {
-            await this.googleTasksProvider.delete(campaign.scheduleToCloudTaskId, env.GOOGLE_TASK_QUEUE);
-          }
-          break;
-        case CampaignsType.TESTAB:
-          if (campaign.testabScheduleToCloudTaskId) {
-            await this.googleTasksProvider.delete(campaign.testabScheduleToCloudTaskId, env.GOOGLE_TASK_QUEUE_TEST_AB);
-          }
-          if (campaign.testabScheduleEndCloudTaskId) {
-            await this.googleTasksProvider.delete(campaign.testabScheduleEndCloudTaskId, env.GOOGLE_TASK_QUEUE_TEST_AB);
-          }
-          break;
-      }
-    } catch (error) {
-      if (error.code === 5) {
-        console.log('Delete task not found', JSON.stringify(campaign));
-        return;
-      }
-
-      throw error;
+    // SchedulerService.delete returns false (no-op) when the BullMQ job is
+    // already gone, and rethrows on Redis/other errors. No need for the
+    // legacy `error.code === 5` guard that handled CloudTasks NOT_FOUND.
+    switch (campaign.type) {
+      case CampaignsType.SIMPLE:
+      case CampaignsType.SPLIT:
+      case CampaignsType.RECURRING:
+        if (campaign.scheduleToCloudTaskId) {
+          await this.scheduler.delete(campaign.scheduleToCloudTaskId, env.GOOGLE_TASK_QUEUE);
+        }
+        break;
+      case CampaignsType.TESTAB:
+        if (campaign.testabScheduleToCloudTaskId) {
+          await this.scheduler.delete(campaign.testabScheduleToCloudTaskId, env.GOOGLE_TASK_QUEUE_TEST_AB);
+        }
+        if (campaign.testabScheduleEndCloudTaskId) {
+          await this.scheduler.delete(campaign.testabScheduleEndCloudTaskId, env.GOOGLE_TASK_QUEUE_TEST_AB);
+        }
+        break;
     }
   }
 
@@ -596,16 +568,16 @@ export class CampaignsService {
       case CampaignsType.RECURRING: {
         const endpointTask = campaignDto.type === CampaignsType.SPLIT ? env.CAMPAIGN_TEST_AB_ENDPOINT : env.CAMPAIGN_TRIGGER_ENDPOINT;
         const taskName = campaignDto.type === CampaignsType.SPLIT ? env.GOOGLE_TASK_QUEUE_TEST_AB : env.GOOGLE_TASK_QUEUE;
-        const response = await this.googleTasksProvider.create(campaign.id, campaignDto.scheduleTo, endpointTask, taskName);
+        const response = await this.scheduler.create(campaign.id, campaignDto.scheduleTo, endpointTask, taskName);
         campaign.scheduleToCloudTaskId = response[0].name;
         break;
       }
       case CampaignsType.TESTAB: {
         const finalEndpoint = env.CAMPAIGN_TEST_AB_ENDPOINT;
         const finalResultEndpoint = env.CAMPAIGN_RESULT_TEST_AB_ENDPOINT;
-        const testab = await this.googleTasksProvider.create(campaign.id, campaignDto.testabScheduleTo, finalEndpoint, env.GOOGLE_TASK_QUEUE_TEST_AB);
+        const testab = await this.scheduler.create(campaign.id, campaignDto.testabScheduleTo, finalEndpoint, env.GOOGLE_TASK_QUEUE_TEST_AB);
         campaign.testabScheduleToCloudTaskId = testab[0].name;
-        const result = await this.googleTasksProvider.create(campaign.id, campaignDto.scheduleTo, finalResultEndpoint, env.GOOGLE_TASK_QUEUE_TEST_AB);
+        const result = await this.scheduler.create(campaign.id, campaignDto.scheduleTo, finalResultEndpoint, env.GOOGLE_TASK_QUEUE_TEST_AB);
         campaign.testabScheduleEndCloudTaskId = result[0].name;
         break;
       }
@@ -620,38 +592,30 @@ export class CampaignsService {
         where: { id, accountId: this.cls.get('accountId') },
       });
 
-      try {
-        if (campaign.type === CampaignsType.TRIGGER) {
-          const eventType = campaign.triggers?.settings?.eventType || '';
-          const triggerId = campaign.triggers?.settings?.id || 0;
-          const remainsCampaign = await this.campaignRepository
-            .createQueryBuilder('campaigns')
-            .where('campaigns.account_id = :accountId', { accountId: this.cls.get('accountId') })
-            .where('campaigns.id != :campaignId', { campaignId: campaign.id })
-            .andWhere(`campaigns.triggers->'settings'->>'eventType' = :eventType`, { eventType })
-            .andWhere(`campaigns.triggers->'settings'->>'id' = :messageId`, { messageId: triggerId })
-            .getOne();
+      if (campaign.type === CampaignsType.TRIGGER) {
+        const eventType = campaign.triggers?.settings?.eventType || '';
+        const triggerId = campaign.triggers?.settings?.id || 0;
+        const remainsCampaign = await this.campaignRepository
+          .createQueryBuilder('campaigns')
+          .where('campaigns.account_id = :accountId', { accountId: this.cls.get('accountId') })
+          .where('campaigns.id != :campaignId', { campaignId: campaign.id })
+          .andWhere(`campaigns.triggers->'settings'->>'eventType' = :eventType`, { eventType })
+          .andWhere(`campaigns.triggers->'settings'->>'id' = :messageId`, { messageId: triggerId })
+          .getOne();
 
-          const redisClient = await this.redisService.getClient();
-          if (!remainsCampaign) {
-            await redisClient.del([`events_trigger:campaign:${this.cls.get('accountId')}:${eventType}:${triggerId}`]);
-          }
-          await redisClient.del([`events_trigger:${this.cls.get('accountId')}:${eventType}:${triggerId}:campaigns`]);
-        } else {
-          if (campaign.testabScheduleToCloudTaskId && campaign.testabScheduleEndCloudTaskId) {
-            await this.googleTasksProvider.delete(campaign.testabScheduleToCloudTaskId, env.GOOGLE_TASK_QUEUE_TEST_AB);
-            await this.googleTasksProvider.delete(campaign.testabScheduleEndCloudTaskId, env.GOOGLE_TASK_QUEUE_TEST_AB);
-          }
-
-          if (campaign.scheduleToCloudTaskId) {
-            await this.googleTasksProvider.delete(campaign.scheduleToCloudTaskId, env.GOOGLE_TASK_QUEUE);
-          }
+        const redisClient = await this.redisService.getClient();
+        if (!remainsCampaign) {
+          await redisClient.del([`events_trigger:campaign:${this.cls.get('accountId')}:${eventType}:${triggerId}`]);
         }
-      } catch (error) {
-        if (error.code === 5) {
-          console.log('Delete task not found', JSON.stringify(campaign));
-        } else {
-          throw error;
+        await redisClient.del([`events_trigger:${this.cls.get('accountId')}:${eventType}:${triggerId}:campaigns`]);
+      } else {
+        if (campaign.testabScheduleToCloudTaskId && campaign.testabScheduleEndCloudTaskId) {
+          await this.scheduler.delete(campaign.testabScheduleToCloudTaskId, env.GOOGLE_TASK_QUEUE_TEST_AB);
+          await this.scheduler.delete(campaign.testabScheduleEndCloudTaskId, env.GOOGLE_TASK_QUEUE_TEST_AB);
+        }
+
+        if (campaign.scheduleToCloudTaskId) {
+          await this.scheduler.delete(campaign.scheduleToCloudTaskId, env.GOOGLE_TASK_QUEUE);
         }
       }
       delete campaign.campaignMessage;
@@ -1065,17 +1029,11 @@ export class CampaignsService {
     return await this.campaignRepository.query(query, params);
   }
 
-  async createUtmCampaign(networkCode, keys) {
-    const data = {
-      domain: 'abc',
-      gam_id: networkCode,
-      steps: ['create_key_values'],
-      key_values: {
-        utm_campaign: keys,
-      },
-    };
-    const dataBuffer = Buffer.from(JSON.stringify(data));
-    return await this.pubSubProvider.sendAsyncMessageData(process.env.GOOGLE_MANAGER_TOPIC, dataBuffer);
+  async createUtmCampaign(_networkCode: unknown, _keys: unknown) {
+    // SaaS-only Google Ad Manager (UTM keys) integration. No consumer exists
+    // in the open-source distribution. Kept as an explicit no-op so future
+    // SaaS forks can override without touching call sites.
+    return { skipped: true, reason: 'GAM integration is SaaS-only' };
   }
 
   async lateCampaigns() {

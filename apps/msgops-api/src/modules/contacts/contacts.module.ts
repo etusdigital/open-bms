@@ -9,7 +9,6 @@ import { CustomFieldsEntity } from '../../entities/custom-fields.entity';
 import { CustomFieldsService } from '../custom-fields/custom-fields.service';
 import { UtilsService } from '../../utils/utils.service';
 import { ContactCustomFieldEntity } from '../../entities/contact-custom-field.entity';
-import { PubSubProvider } from '../../providers/pubsub.providers';
 import { ContactTagEntity } from 'src/entities/contact-tag.entity';
 import { ContactDeviceEntity } from 'src/entities/contact-device.entity';
 import { CustomEventModule } from '../custom-events/custom-events.module';
@@ -37,7 +36,7 @@ import { AuditService } from 'src/utils/audits/audit.service';
       AuditEntity,
     ]),
   ],
-  providers: [ContactsService, FormatterUtils, CustomFieldsService, PubSubProvider, UtilsService, AuditService],
+  providers: [ContactsService, FormatterUtils, CustomFieldsService, UtilsService, AuditService],
   exports: [ContactsService],
   controllers: [ContactsController],
 })

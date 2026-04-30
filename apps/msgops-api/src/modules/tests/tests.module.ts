@@ -14,7 +14,6 @@ import { MessageEntity } from '../../entities/message.entity';
 import { AutomationMessageAccountService } from '../automations-messages-accounts/automations-message-account.service';
 import { AutomationMessageAccountEntity } from './../../entities/automation-message-account.entity';
 import { S3StorageProvider } from '../../providers/s3-storage.provider';
-import { GoogleTasksProvider } from '../../providers/google-tasks.provider';
 import { SparkPostHandler } from '../../handlers/email/sparkpost/sparkPost.handler';
 import { AuditEntity } from '../../entities/audit.entity';
 import { AuditService } from './../../utils/audits/audit.service';
@@ -28,7 +27,6 @@ import { CampaignContactEntity } from 'src/entities/campaign-contact.entity';
 import { TwilioHandler } from 'src/handlers/twilio/twilio.handler';
 import { TagEntity } from 'src/entities/tag.entity';
 import { AccountEntity } from 'src/entities/account.entity';
-import { PubSubProvider } from 'src/providers/pubsub.providers';
 import { EmailsLabelsEntity } from '../../entities/emails-labels.entity';
 import { OpenAIProvider } from 'src/providers/openai.provider';
 import { SlackProvider } from 'src/providers/slack.provider';
@@ -66,11 +64,9 @@ import { BucketsService } from '../buckets/buckets.service';
     SendgridHandler,
     SparkPostHandler,
     S3StorageProvider,
-    GoogleTasksProvider,
     AuditService,
     TwilioHandler,
     EvolutionHandler,
-    PubSubProvider,
     OpenAIProvider,
     SlackProvider,
     BucketsService,

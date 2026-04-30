@@ -14,7 +14,7 @@ import { RedisService } from '../../providers/redis.provider';
 import { createHash, randomBytes } from 'crypto';
 import { replaceSpecialChars } from '../../utils/utils.service';
 import { S3StorageProvider } from '../../providers/s3-storage.provider';
-import { GoogleTasksProvider } from 'src/providers/google-tasks.provider';
+import { SchedulerService } from 'src/providers/queue/scheduler.service';
 import dayjs from 'dayjs';
 import { ClsService } from 'nestjs-cls';
 import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
@@ -42,7 +42,7 @@ export class AccountsService {
     private readonly roleRepository: Repository<RoleEntity>,
     private readonly redisService: RedisService,
     private readonly storage: S3StorageProvider,
-    private readonly googleTasksProvider: GoogleTasksProvider,
+    private readonly scheduler: SchedulerService,
     private readonly cls: ClsService,
     private readonly httpService: HttpService,
     private readonly evolutionHandler: EvolutionHandler,
@@ -51,7 +51,7 @@ export class AccountsService {
 
   // Sanitization of account configs happens at the HTTP serialization boundary via
   // AccountEntity.accountConfigs' @Transform (ClassSerializerInterceptor). In-process
-  // consumers (e.g. Pub/Sub publishers, internal handlers) receive the raw entity.
+  // consumers (e.g. AMQP publishers, internal handlers) receive the raw entity.
 
   async findAll(userId: number): Promise<Array<AccountEntity>> {
     try {
@@ -372,12 +372,7 @@ export class AccountsService {
         const minute = Math.floor(Math.random() * (40 - 1 + 1) + 1);
         const dateSchedule = dayjs().tz('America/Sao_Paulo').add(24, 'hour').set('minute', minute).format('YYYY-MM-DD HH:mm:ss');
         const currentDate = dayjs().tz('America/Sao_Paulo').format('YYYY-MM-DD');
-        await this.googleTasksProvider.create(
-          `${account.id}/${currentDate}`,
-          new Date(dateSchedule),
-          `${process.env.BRIUS_HOSTURL}/statistics/usage`,
-          process.env.GOOGLE_TASK_BMS_USAGE,
-        );
+        await this.scheduler.create(`${account.id}/${currentDate}`, new Date(dateSchedule), `${process.env.BRIUS_HOSTURL}/statistics/usage`, process.env.GOOGLE_TASK_BMS_USAGE);
       } catch (err) {
         console.error('Account created, but billing task scheduling failed (non-fatal):', err);
       }

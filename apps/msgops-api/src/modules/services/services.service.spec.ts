@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ServicesService } from './services.service';
-import { PubSubProvider } from '../../providers/pubsub.providers';
+import { EventPublisherService } from '../../providers/messaging/event-publisher.service';
+import { EXCHANGES } from '@bms/messaging';
 import { AccountsService } from '../accounts/accounts.service';
 import { ContactsService } from '../contacts/contacts.service';
 import { PoolsService } from '../pools/pools.service';
@@ -19,7 +20,7 @@ import { AccountCacheService } from '../accounts/account-cache.service';
 
 describe('ServicesService', () => {
   let service: ServicesService;
-  let pubSubProvider: jest.Mocked<PubSubProvider>;
+  let eventPublisher: jest.Mocked<EventPublisherService>;
   let accountService: jest.Mocked<AccountsService>;
   let contactService: jest.Mocked<ContactsService>;
   let poolService: jest.Mocked<PoolsService>;
@@ -141,8 +142,8 @@ describe('ServicesService', () => {
   };
 
   beforeEach(async () => {
-    const mockPubSubProvider = {
-      sendAsyncMessage: jest.fn().mockImplementation(() => Promise.resolve('mocked-message-id')),
+    const mockEventPublisher = {
+      publish: jest.fn().mockResolvedValue(undefined),
     };
 
     const mockAccountService = {
@@ -175,8 +176,8 @@ describe('ServicesService', () => {
       providers: [
         ServicesService,
         {
-          provide: PubSubProvider,
-          useValue: mockPubSubProvider,
+          provide: EventPublisherService,
+          useValue: mockEventPublisher,
         },
         {
           provide: AccountsService,
@@ -206,7 +207,7 @@ describe('ServicesService', () => {
     }).compile();
 
     service = module.get<ServicesService>(ServicesService);
-    pubSubProvider = module.get(PubSubProvider);
+    eventPublisher = module.get(EventPublisherService);
     accountService = module.get(AccountsService);
     contactService = module.get(ContactsService);
     poolService = module.get(PoolsService);
@@ -219,19 +220,18 @@ describe('ServicesService', () => {
     accountService.findWithCleanConfigs.mockResolvedValue(mockAccount);
     poolService.findOneByPool.mockResolvedValue(mockPool);
     poolService.findOneBySenderEmail.mockResolvedValue(mockPool);
-
-    process.env.TOPIC_NAME_SEND_EMAIL = 'test-topic';
   });
 
   describe('sendEmail', () => {
     it('should successfully send an email', async () => {
-      pubSubProvider.sendAsyncMessage.mockResolvedValue('mocked-message-id');
+      eventPublisher.publish.mockResolvedValue(undefined);
 
       const result = await service.sendEmail(mockEmailDto);
 
-      expect(result).toBe('mocked-message-id');
-      expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
-        'test-topic',
+      expect(result).toEqual({ status: 'ok' });
+      expect(eventPublisher.publish).toHaveBeenCalledWith(
+        EXCHANGES.email,
+        'email.send',
         expect.objectContaining({
           account: mockAccount,
           contact: expect.objectContaining({
@@ -314,12 +314,13 @@ describe('ServicesService', () => {
         },
       };
 
-      pubSubProvider.sendAsyncMessage.mockResolvedValue('mocked-message-id');
+      eventPublisher.publish.mockResolvedValue(undefined);
 
       await service.sendEmail(dtoWithCustomFields);
 
-      expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
-        'test-topic',
+      expect(eventPublisher.publish).toHaveBeenCalledWith(
+        EXCHANGES.email,
+        'email.send',
         expect.objectContaining({
           contact: expect.objectContaining({
             customFields: dtoWithCustomFields.contact.customFields,
@@ -337,12 +338,13 @@ describe('ServicesService', () => {
       utmCampaign: 'test-campaign',
     };
 
-    pubSubProvider.sendAsyncMessage.mockResolvedValue('mocked-message-id');
+    eventPublisher.publish.mockResolvedValue(undefined);
 
     await service.sendEmail(dtoWithUtm);
 
-    expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
-      'test-topic',
+    expect(eventPublisher.publish).toHaveBeenCalledWith(
+      EXCHANGES.email,
+      'email.send',
       expect.objectContaining({
         utmContent: dtoWithUtm.utmContent,
         utmCampaign: dtoWithUtm.utmCampaign,
@@ -357,12 +359,13 @@ describe('ServicesService', () => {
       automationName: 'test-automation',
     };
 
-    pubSubProvider.sendAsyncMessage.mockResolvedValue('mocked-message-id');
+    eventPublisher.publish.mockResolvedValue(undefined);
 
     await service.sendEmail(dtoWithAutomationName);
 
-    expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
-      'test-topic',
+    expect(eventPublisher.publish).toHaveBeenCalledWith(
+      EXCHANGES.email,
+      'email.send',
       expect.objectContaining({
         automationName: dtoWithAutomationName.automationName,
       }),
@@ -379,14 +382,15 @@ describe('ServicesService', () => {
       },
     };
 
-    pubSubProvider.sendAsyncMessage.mockResolvedValue('mocked-message-id');
+    eventPublisher.publish.mockResolvedValue(undefined);
 
     await service.sendEmail(dtoWithLoadContactFromDatabase);
 
     expect(contactService.findByProperty).toHaveBeenCalledWith({ email: dtoWithLoadContactFromDatabase.contact.email, isCompleted: true });
 
-    expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
-      'test-topic',
+    expect(eventPublisher.publish).toHaveBeenCalledWith(
+      EXCHANGES.email,
+      'email.send',
       expect.objectContaining({
         contact: expect.objectContaining({
           email: dtoWithLoadContactFromDatabase.contact.email,
@@ -405,14 +409,15 @@ describe('ServicesService', () => {
       },
     };
 
-    pubSubProvider.sendAsyncMessage.mockResolvedValue('mocked-message-id');
+    eventPublisher.publish.mockResolvedValue(undefined);
 
     await service.sendEmail(dtoWithLoadContactFromDatabase);
 
     expect(contactService.findByProperty).toHaveBeenCalledWith({ uuid: dtoWithLoadContactFromDatabase.contact.uuid, isCompleted: true });
 
-    expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
-      'test-topic',
+    expect(eventPublisher.publish).toHaveBeenCalledWith(
+      EXCHANGES.email,
+      'email.send',
       expect.objectContaining({
         contact: expect.objectContaining({
           uuid: dtoWithLoadContactFromDatabase.contact.uuid,
@@ -431,14 +436,15 @@ describe('ServicesService', () => {
       },
     };
 
-    pubSubProvider.sendAsyncMessage.mockResolvedValue('mocked-message-id');
+    eventPublisher.publish.mockResolvedValue(undefined);
 
     await service.sendEmail(dtoWithLoadContactFromDatabase);
 
     expect(contactService.findByProperty).toHaveBeenCalledWith({ id: dtoWithLoadContactFromDatabase.contact.id, isCompleted: true });
 
-    expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
-      'test-topic',
+    expect(eventPublisher.publish).toHaveBeenCalledWith(
+      EXCHANGES.email,
+      'email.send',
       expect.objectContaining({
         contact: expect.objectContaining({
           id: dtoWithLoadContactFromDatabase.contact.id,
@@ -664,8 +670,9 @@ describe('ServicesService', () => {
 
       await service.sendEmail(dtoWithMillis);
 
-      expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
-        'test-topic',
+      expect(eventPublisher.publish).toHaveBeenCalledWith(
+        EXCHANGES.email,
+        'email.send',
         expect.objectContaining({
           sendAt: expectedSecondsTimestamp,
         }),
@@ -683,8 +690,9 @@ describe('ServicesService', () => {
 
       await service.sendEmail(dtoWithSeconds);
 
-      expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
-        'test-topic',
+      expect(eventPublisher.publish).toHaveBeenCalledWith(
+        EXCHANGES.email,
+        'email.send',
         expect.objectContaining({
           sendAt: secondsTimestamp,
         }),
@@ -703,8 +711,9 @@ describe('ServicesService', () => {
 
       await service.sendEmail(dto);
 
-      expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
-        'test-topic',
+      expect(eventPublisher.publish).toHaveBeenCalledWith(
+        EXCHANGES.email,
+        'email.send',
         expect.objectContaining({
           sendAt: Math.floor(almost72Hours.getTime() / 1000),
         }),
@@ -1025,7 +1034,7 @@ describe('ServicesService', () => {
     beforeEach(() => {
       messagesService.findOneByname.mockResolvedValue(mockMessage);
       accountService.findWithCleanConfigs.mockResolvedValue(mockAccount);
-      pubSubProvider.sendAsyncMessage.mockResolvedValue('mocked-message-id');
+      eventPublisher.publish.mockResolvedValue(undefined);
     });
 
     it('should successfully process a transactional message', async () => {
@@ -1033,8 +1042,9 @@ describe('ServicesService', () => {
 
       expect(messagesService.findOneByname).toHaveBeenCalledWith('test-transactional-message');
       expect(accountService.findWithCleanConfigs).toHaveBeenCalled();
-      expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
-        process.env.TOPIC_NAME_SEND_EMAIL,
+      expect(eventPublisher.publish).toHaveBeenCalledWith(
+        EXCHANGES.email,
+        'email.send',
         expect.objectContaining({
           account: mockAccount,
           contact: expect.objectContaining({
@@ -1058,7 +1068,7 @@ describe('ServicesService', () => {
           priority: 'transactional',
         }),
       );
-      expect(result).toBe('mocked-message-id');
+      expect(result).toEqual({ status: 'ok' });
     });
 
     it('should throw error when message name is not provided', async () => {
@@ -1122,8 +1132,9 @@ describe('ServicesService', () => {
 
       await service.processTransactional(payloadWithCustomFields);
 
-      expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
-        process.env.TOPIC_NAME_SEND_EMAIL,
+      expect(eventPublisher.publish).toHaveBeenCalledWith(
+        EXCHANGES.email,
+        'email.send',
         expect.objectContaining({
           contact: expect.objectContaining({
             customFields: payloadWithCustomFields.contact.customFields,
@@ -1145,8 +1156,9 @@ describe('ServicesService', () => {
 
       await service.processTransactional(minimalPayload);
 
-      expect(pubSubProvider.sendAsyncMessage).toHaveBeenCalledWith(
-        process.env.TOPIC_NAME_SEND_EMAIL,
+      expect(eventPublisher.publish).toHaveBeenCalledWith(
+        EXCHANGES.email,
+        'email.send',
         expect.objectContaining({
           contact: expect.objectContaining({
             email: minimalPayload.contact.email,

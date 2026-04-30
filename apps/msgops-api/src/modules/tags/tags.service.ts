@@ -9,7 +9,7 @@ import { ContactTagEntity } from '../../entities/contact-tag.entity';
 import { TagsPageDto } from './dto/tagsPage.dto';
 import { UtilsService } from '../../utils/utils.service';
 import { SegmentDto } from './dto/segments.dto';
-import { GoogleTasksProvider } from '../../providers/google-tasks.provider';
+import { SchedulerService } from '../../providers/queue/scheduler.service';
 import { AutomationsService } from '../automations/automations.service';
 import { CampaignsService } from '../campaigns/campaigns.service';
 import { RedisService } from '../../providers/redis.provider';
@@ -20,8 +20,8 @@ import { AccountCacheService } from '../accounts/account-cache.service';
 
 @Injectable()
 export class TagsService {
-  private googleTaskName: string;
-  private googleTaskEndpoint: string;
+  private schedulerQueueName: string;
+  private schedulerEndpoint: string;
 
   constructor(
     @InjectRepository(TagEntity)
@@ -34,13 +34,13 @@ export class TagsService {
     private readonly automationsServices: AutomationsService,
     private readonly campaignsServices: CampaignsService,
     private readonly accountService: AccountsService,
-    private readonly googleTasksProvider: GoogleTasksProvider,
+    private readonly scheduler: SchedulerService,
     private readonly redisService: RedisService,
     private readonly cls: ClsService,
     private readonly accountCacheService: AccountCacheService,
   ) {
-    this.googleTaskName = process.env.GOOGLE_TASK_SEGMENT;
-    this.googleTaskEndpoint = process.env.TAG_PROCESS_ENDPOINT;
+    this.schedulerQueueName = process.env.GOOGLE_TASK_SEGMENT;
+    this.schedulerEndpoint = process.env.TAG_PROCESS_ENDPOINT;
   }
 
   async findAll(params): Promise<Array<TagEntity>> {
@@ -220,7 +220,7 @@ export class TagsService {
         currentTime = new Date(currentTime.getTime() + 10 * 60000);
       }
 
-      const response = await this.googleTasksProvider.create(tag.id, currentTime, this.googleTaskEndpoint, this.googleTaskName);
+      const response = await this.scheduler.create(tag.id, currentTime, this.schedulerEndpoint, this.schedulerQueueName);
 
       const updatedTag = await this.update(tag.id, {
         name: segmentDto.name,
@@ -262,13 +262,13 @@ export class TagsService {
       }
 
       try {
-        await this.googleTasksProvider.delete(tag.scheduleCloudTaskId, this.googleTaskName);
+        await this.scheduler.delete(tag.scheduleCloudTaskId, this.schedulerQueueName);
       } catch (error) {
         console.log('Error to delete task', error);
       }
 
       const currentTime = new Date(new Date().getTime() + 5000);
-      const response = await this.googleTasksProvider.create(tag.id, currentTime, this.googleTaskEndpoint, this.googleTaskName);
+      const response = await this.scheduler.create(tag.id, currentTime, this.schedulerEndpoint, this.schedulerQueueName);
       segmentDto.scheduleCloudTaskId = response[0].name;
 
       const updatedTag = await this.update(tag.id, {
@@ -369,7 +369,7 @@ export class TagsService {
         if (tag.isRealTimeSegment) {
           await this.realtimeUpdate(tag, 'remove');
         }
-        await this.googleTasksProvider.delete(tag.scheduleCloudTaskId, this.googleTaskName);
+        await this.scheduler.delete(tag.scheduleCloudTaskId, this.schedulerQueueName);
       }
       const deleteCacheKeys = [`tag:${tag.name}:${tag.accountId}`, `automations_tag:${tag.accountId}:${tag.id}`];
       const deletedTag = await this.tagsRepository.delete(id);
@@ -414,7 +414,7 @@ export class TagsService {
 
     try {
       const segment = await this.tagsRepository.findOneOrFail({ where: { id, accountId: this.cls.get('accountId') } });
-      return await this.googleTasksProvider.callRunTask(segment.scheduleCloudTaskId, this.googleTaskName);
+      return await this.scheduler.callRunTask(segment.scheduleCloudTaskId, this.schedulerQueueName);
     } catch (e) {
       console.error(e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);

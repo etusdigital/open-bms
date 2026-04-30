@@ -16,7 +16,6 @@ import { AuditEntity } from '../../entities/audit.entity';
 import { AuditService } from './../../utils/audits/audit.service';
 import { UtilsModule } from '../../utils/utils.module';
 import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
-import { GoogleTasksProvider } from 'src/providers/google-tasks.provider';
 import { AccountsModule } from '../accounts/accounts.module';
 import { FormatterUtils } from 'src/utils/pubSub/formatter.utils';
 import { ActiveCampaignProvider } from 'src/providers/active-campaign.provider';
@@ -51,7 +50,6 @@ import { BucketsService } from '../buckets/buckets.service';
     AuditService,
     TwilioHandler,
     EvolutionHandler,
-    GoogleTasksProvider,
     FormatterUtils,
     ActiveCampaignProvider,
     OpenAIProvider,

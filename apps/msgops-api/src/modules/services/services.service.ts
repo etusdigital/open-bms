@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, InternalServerErrorException } from '@nestjs/common';
 import { Injectable } from '@nestjs/common';
-import { PubSubProvider } from '../../providers/pubsub.providers';
+import { EventPublisherService } from '../../providers/messaging/event-publisher.service';
+import { EXCHANGES } from '@bms/messaging';
 import { EmailPriority, SendEmailMessage, SendEmailMessageDto, TransactionalMessage } from './services.dto';
 import { AccountsService } from '../accounts/accounts.service';
 import { ContactsService } from '../contacts/contacts.service';
@@ -15,7 +16,7 @@ import { PoolsDto } from '../pools/pools.dto';
 @Injectable()
 export class ServicesService {
   constructor(
-    private readonly pubSubProvider: PubSubProvider,
+    private readonly eventPublisher: EventPublisherService,
     private readonly accountService: AccountsService,
     private readonly contactService: ContactsService,
     private readonly messagesService: MessagesService,
@@ -82,7 +83,7 @@ export class ServicesService {
 
     const currentDate = new Date();
 
-    const pubSubMessage = {
+    const amqpMessage = {
       messageId: currentDate.getTime(),
       utmContent: sendEmailMessage.utmContent || 'teste',
       utmCampaign: sendEmailMessage.utmCampaign || 'msgops_front_teste',
@@ -113,10 +114,10 @@ export class ServicesService {
     } as SendEmailMessage;
 
     try {
-      const response = await this.pubSubProvider.sendAsyncMessage(process.env.TOPIC_NAME_SEND_EMAIL, pubSubMessage, {
+      await this.eventPublisher.publish(EXCHANGES.email, 'email.send', amqpMessage, {
         priority: EmailPriority.TRANSACTIONAL,
       });
-      return response;
+      return { status: 'ok' };
     } catch (e) {
       console.error(e);
       throw new InternalServerErrorException(`error to create send email.`);
@@ -140,7 +141,7 @@ export class ServicesService {
         return acc;
       });
       account.customFields = account.customFields.map((customField) => customField.name);
-      const pubSubMessage = {
+      const amqpMessage = {
         messageId: currentDate.getTime(),
         utmContent: 'teste',
         utmCampaign: 'msgops_front_teste',
@@ -155,7 +156,8 @@ export class ServicesService {
         },
         next: {},
       };
-      return await this.pubSubProvider.sendAsyncMessage(process.env.TOPIC_NAME_SEND_PUSH, pubSubMessage, { type: 'single' });
+      await this.eventPublisher.publish(EXCHANGES.push, 'push.send', amqpMessage, { type: 'single' });
+      return { status: 'ok' };
     } catch (e) {
       console.error(e);
       throw new InternalServerErrorException(`error to create send push.`);
@@ -209,9 +211,10 @@ export class ServicesService {
 
     try {
       const payload = parseMessageToSendEmail(message, account, transactionalMessage.contact);
-      return await this.pubSubProvider.sendAsyncMessage(process.env.TOPIC_NAME_SEND_EMAIL, payload, {
+      await this.eventPublisher.publish(EXCHANGES.email, 'email.send', payload, {
         priority: 'transactional',
       });
+      return { status: 'ok' };
     } catch (error) {
       throw `[transactional] Error parseLeadStateMessage: ${error.message}`;
     }

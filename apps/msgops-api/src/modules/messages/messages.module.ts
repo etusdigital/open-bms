@@ -11,7 +11,6 @@ import { AuditEntity } from '../../entities/audit.entity';
 import { AuditService } from '../../utils/audits/audit.service';
 import { RedisModule } from '../../providers/redis.provider';
 import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
-import { GoogleTasksProvider } from 'src/providers/google-tasks.provider';
 import { AccountsModule } from '../accounts/accounts.module';
 import { CampaignModule } from '../campaigns/campaigns.module';
 import { TwilioHandler } from 'src/handlers/twilio/twilio.handler';
@@ -35,7 +34,7 @@ import { BucketsService } from '../buckets/buckets.service';
       password: process.env.REDIS_PASSWORD,
     }),
   ],
-  providers: [MessagesService, S3StorageProvider, BucketsService, AuditService, TwilioHandler, EvolutionHandler, GoogleTasksProvider, ValidLinksService, OpenAIProvider],
+  providers: [MessagesService, S3StorageProvider, BucketsService, AuditService, TwilioHandler, EvolutionHandler, ValidLinksService, OpenAIProvider],
   controllers: [MessagesController],
   exports: [MessagesService],
 })
