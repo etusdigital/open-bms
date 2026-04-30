@@ -2,8 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CampaignService } from './campaign.service';
 import { MsgopsService } from '../msgops/msgops.service';
-import { GoogleTasksService } from '../providers/google-tasks.service';
-import { PubSubProvider } from '../providers/pubsub.provider';
+import { QueuePublisher } from '../providers/queue/queue.publisher';
 import { RedisService } from '../providers/redis/redis.service';
 import { FormatterUtils } from '../utils/formatter.utils';
 import { CampaignMessageType, CampaignType } from '../interfaces';
@@ -42,14 +41,14 @@ describe('CampaignService', () => {
     warmupContactsRandon: jest.fn(),
   };
 
-  const mockPubSubProvider = {
-    publishMessage: jest.fn().mockResolvedValue('mock-message-id'),
-    publishMessagePagesOnTopic: jest.fn().mockResolvedValue('mock-page-id'),
-  };
-
-  const mockGoogleTasksService = {
-    post: jest.fn().mockResolvedValue([{ name: 'projects/p/queues/q/tasks/task-123' }, {}, {}]),
-    getMillisecondDiff: jest.fn().mockResolvedValue(60000),
+  const mockQueuePublisher = {
+    addCampaignPacker: jest.fn().mockResolvedValue('mock-job-id'),
+    addCampaignPackerWarmup: jest.fn().mockResolvedValue('mock-job-id'),
+    addSchedulePage: jest.fn().mockResolvedValue('mock-job-id'),
+    addCampaignTrigger: jest.fn().mockResolvedValue('mock-job-id'),
+    addSendMessage: jest.fn().mockResolvedValue('mock-job-id'),
+    addEventsTracker: jest.fn().mockResolvedValue('mock-job-id'),
+    addWarmupTracker: jest.fn().mockResolvedValue('mock-job-id'),
   };
 
   const mockFormatterUtils = {
@@ -59,18 +58,8 @@ describe('CampaignService', () => {
 
   beforeAll(() => {
     process.env.NODE_ENV = 'test';
-    process.env.TOPIC_MSGOPS_CAMPAIGN_PACKER = 'test-packer-topic';
-    process.env.TOPIC_MSGOPS_CAMPAIGN_PACKER_WARMUP = 'test-warmup-topic';
-    process.env.TOPIC_MSGOPS_CAMPAIGN_SCHEDULE_PAGE = 'test-schedule-page-topic';
-    process.env.TOPIC_MSGOPS_CAMPAIGN_SEND_MESSAGE = 'test-send-message-topic';
-    process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER = 'test-tracker-topic';
-    process.env.TOPIC_MSGOPS_WARMUP_TRACKER = 'test-warmup-tracker-topic';
     process.env.LIMIT_CONTACT_BATCH = '1000';
     process.env.DEFAULT_WARMUP_MESSAGES = '1,2,3,4,5,6';
-    process.env.GOOGLE_TASK_QUEUE_NAME = 'test-queue';
-    process.env.GOOGLE_TASK_CALLBACK_URL = 'https://callback.url';
-    process.env.GOOGLE_TASK_QUEUE_CAMPAIGN_NAME = 'test-campaign-queue';
-    process.env.GOOGLE_TASK_CAMPAIGN_URL = 'https://campaign.url';
   });
 
   beforeEach(async () => {
@@ -83,8 +72,7 @@ describe('CampaignService', () => {
       providers: [
         CampaignService,
         { provide: MsgopsService, useValue: mockMsgopsService },
-        { provide: GoogleTasksService, useValue: mockGoogleTasksService },
-        { provide: PubSubProvider, useValue: mockPubSubProvider },
+        { provide: QueuePublisher, useValue: mockQueuePublisher },
         { provide: RedisService, useValue: mockRedisService },
         { provide: FormatterUtils, useValue: mockFormatterUtils },
       ],
@@ -298,7 +286,7 @@ describe('CampaignService', () => {
       mockMsgopsService.findFirstWarmup.mockResolvedValue(null);
       await service.createContactsSend(1);
       expect(mockMsgopsService.createContactsSend).toHaveBeenCalled();
-      expect(mockPubSubProvider.publishMessage).toHaveBeenCalled();
+      expect(mockQueuePublisher.addCampaignPacker).toHaveBeenCalled();
     });
 
     it('should process TESTAB campaign', async () => {
@@ -314,7 +302,7 @@ describe('CampaignService', () => {
       mockMsgopsService.getCampaign.mockResolvedValue(makeCampaign({ messageType: CampaignMessageType.SMS }));
       mockMsgopsService.createContactsSend.mockResolvedValue([{ contact_id: 1 }]);
       await service.createContactsSend(1);
-      expect(mockPubSubProvider.publishMessage).toHaveBeenCalledWith(process.env.TOPIC_MSGOPS_CAMPAIGN_PACKER, expect.anything());
+      expect(mockQueuePublisher.addCampaignPacker).toHaveBeenCalled();
     });
 
     it('should apply ippool override for account 60 with tag 6358', async () => {
@@ -348,7 +336,7 @@ describe('CampaignService', () => {
       mockMsgopsService.findFirstWarmup.mockResolvedValue(firstWarmup);
       mockRedisClient.exists.mockResolvedValue(0);
       await service.createContactsSend(1);
-      expect(mockPubSubProvider.publishMessage).toHaveBeenCalledWith(process.env.TOPIC_MSGOPS_CAMPAIGN_PACKER_WARMUP, expect.objectContaining({ warmups: [1] }));
+      expect(mockQueuePublisher.addCampaignPackerWarmup).toHaveBeenCalledWith(expect.objectContaining({ warmups: [1] }));
       jest.useRealTimers();
     });
 
@@ -387,7 +375,7 @@ describe('CampaignService', () => {
       ]);
       mockRedisClient.exists.mockResolvedValue(0);
       await service.createContactsSend(1);
-      expect(mockPubSubProvider.publishMessage).toHaveBeenCalledWith(process.env.TOPIC_MSGOPS_CAMPAIGN_PACKER_WARMUP, expect.objectContaining({ warmups: [1] }));
+      expect(mockQueuePublisher.addCampaignPackerWarmup).toHaveBeenCalledWith(expect.objectContaining({ warmups: [1] }));
       jest.useRealTimers();
     });
 
@@ -401,7 +389,7 @@ describe('CampaignService', () => {
       mockRedisClient.exists.mockResolvedValue(1);
       await service.createContactsSend(1);
       // No warmup published, goes directly to packer
-      expect(mockPubSubProvider.publishMessage).toHaveBeenCalledWith(process.env.TOPIC_MSGOPS_CAMPAIGN_PACKER, expect.anything());
+      expect(mockQueuePublisher.addCampaignPacker).toHaveBeenCalled();
       jest.useRealTimers();
     });
 
@@ -452,7 +440,7 @@ describe('CampaignService', () => {
       const campaign = makeCampaign();
       mockMsgopsService.countByTags.mockResolvedValue([{ order_number: 100 }]);
       const result = await service.createBatches(campaign);
-      expect(mockPubSubProvider.publishMessagePagesOnTopic).toHaveBeenCalledTimes(1);
+      expect(mockQueuePublisher.addSchedulePage).toHaveBeenCalledTimes(1);
       expect(result).toContain('Processed 1 pages');
     });
 
@@ -530,7 +518,7 @@ describe('CampaignService', () => {
       });
       mockMsgopsService.countByTags.mockResolvedValue([{ order_number: 100 }]);
       await service.createBatches(campaign);
-      expect(mockPubSubProvider.publishMessagePagesOnTopic).toHaveBeenCalledTimes(1);
+      expect(mockQueuePublisher.addSchedulePage).toHaveBeenCalledTimes(1);
     });
 
     it('should handle multi-page testab mode', async () => {
@@ -544,7 +532,7 @@ describe('CampaignService', () => {
       mockMsgopsService.countByTags.mockResolvedValue([{ order_number: 300 }, { order_number: 200 }, { order_number: 100 }]);
       await service.createBatches(campaign);
       // In testabMode, last page is NOT sent separately
-      expect(mockPubSubProvider.publishMessagePagesOnTopic).toHaveBeenCalled();
+      expect(mockQueuePublisher.addSchedulePage).toHaveBeenCalled();
     });
 
     it('should handle Redis set error gracefully', async () => {
@@ -563,16 +551,7 @@ describe('CampaignService', () => {
       });
       mockMsgopsService.countByTags.mockResolvedValue([{ order_number: 300 }, { order_number: 200 }, { order_number: 100 }]);
       await service.createBatches(campaign);
-      expect(mockPubSubProvider.publishMessagePagesOnTopic).toHaveBeenCalled();
-    });
-  });
-
-  describe('schedulePage', () => {
-    it('should call googleTasksService.post and return task ID', async () => {
-      const request = { payload: '{}', waitFor: 0, page: 1 };
-      const result = await service.schedulePage(request);
-      expect(result).toBe('task-123');
-      expect(mockGoogleTasksService.post).toHaveBeenCalled();
+      expect(mockQueuePublisher.addSchedulePage).toHaveBeenCalled();
     });
   });
 
@@ -595,7 +574,7 @@ describe('CampaignService', () => {
       const result = await service.processPage(batch);
       expect(result).toHaveProperty('contacts');
       expect(result).toHaveProperty('packages');
-      expect(mockPubSubProvider.publishMessage).toHaveBeenCalled();
+      expect(mockQueuePublisher.addSendMessage).toHaveBeenCalled();
     });
 
     it('should handle warmup contacts when isWarmup=true and warmupTarget<=2360', async () => {
@@ -616,7 +595,7 @@ describe('CampaignService', () => {
       const batch = { campaign, page: 1, totalPages: 1, currentContactId: 1, finalContactId: 100 };
       const result = await service.processPage(batch);
       expect(result).toHaveProperty('contacts');
-      expect(mockPubSubProvider.publishMessage).toHaveBeenCalled();
+      expect(mockQueuePublisher.addSendMessage).toHaveBeenCalled();
     });
 
     it('should use cached warmup contacts from Redis', async () => {
@@ -674,7 +653,7 @@ describe('CampaignService', () => {
       const batch = { campaign, page: 1, totalPages: 1, currentContactId: 1, finalContactId: 100 };
       await service.processPage(batch);
       // Should publish 2 messages to send topic (warmup + original swap)
-      expect(mockPubSubProvider.publishMessage).toHaveBeenCalled();
+      expect(mockQueuePublisher.addSendMessage).toHaveBeenCalled();
     });
 
     it('should deduplicate contacts by id', async () => {
@@ -738,7 +717,7 @@ describe('CampaignService', () => {
       expect(mockMsgopsService.updateCampaign).toHaveBeenCalledWith(1, { status: 5 });
     });
 
-    it('should create Cloud Task when testabSentAfterTest is true', async () => {
+    it('should create BullMQ trigger job when testabSentAfterTest is true', async () => {
       const campaign = makeCampaign({
         type: CampaignType.TESTAB,
         testabCriteria: 'open',
@@ -750,20 +729,20 @@ describe('CampaignService', () => {
       mockRedisClient.hgetall.mockResolvedValue({ open: '5' });
 
       await service.processResult(1);
-      expect(mockGoogleTasksService.post).toHaveBeenCalled();
+      expect(mockQueuePublisher.addCampaignTrigger).toHaveBeenCalled();
       expect(mockMsgopsService.updateCampaign).not.toHaveBeenCalledWith(1, { status: 5 });
     });
   });
 
   describe('sendTracker', () => {
-    it('should call publishMessage with tracker topic', async () => {
+    it('should call addEventsTracker with tracker payload', async () => {
       const result = await (service as any).sendTracker(1, 10, 1, 'TEST_EVENT');
-      expect(mockPubSubProvider.publishMessage).toHaveBeenCalledWith(process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER, expect.any(Object));
-      expect(result).toBe('mock-message-id');
+      expect(mockQueuePublisher.addEventsTracker).toHaveBeenCalledWith(expect.any(Object));
+      expect(result).toBe('mock-job-id');
     });
 
-    it('should not throw when publishMessage fails', async () => {
-      mockPubSubProvider.publishMessage.mockRejectedValueOnce(new Error('fail'));
+    it('should not throw when addEventsTracker fails', async () => {
+      mockQueuePublisher.addEventsTracker.mockRejectedValueOnce(new Error('fail'));
       const result = await (service as any).sendTracker(1, 10, 1, 'TEST_EVENT');
       expect(result).toBeUndefined();
     });
@@ -791,7 +770,7 @@ describe('CampaignService', () => {
       await service.warmupStart(campaign, [1]);
       expect(mockMsgopsService.processWarmup).not.toHaveBeenCalled();
       // Should still publish original campaign
-      expect(mockPubSubProvider.publishMessage).toHaveBeenCalledWith(process.env.TOPIC_MSGOPS_CAMPAIGN_PACKER, expect.anything());
+      expect(mockQueuePublisher.addCampaignPacker).toHaveBeenCalled();
     });
 
     it('should process warmup when Redis key matches campaign id', async () => {
@@ -814,7 +793,7 @@ describe('CampaignService', () => {
 
       await service.warmupStart(campaign, [1]);
       expect(mockMsgopsService.processWarmup).toHaveBeenCalled();
-      expect(mockPubSubProvider.publishMessage).toHaveBeenCalledTimes(2); // warmup + original
+      expect(mockQueuePublisher.addCampaignPacker).toHaveBeenCalledTimes(2); // warmup + original
     });
 
     it('should use default messages for warmup stage 0', async () => {
@@ -1056,7 +1035,7 @@ describe('CampaignService', () => {
 
       await service.createTest(1);
       // sendTracker should be called with testabMode=false for SPLIT
-      expect(mockPubSubProvider.publishMessage).toHaveBeenCalledWith(process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER, expect.objectContaining({ testabMode: false }));
+      expect(mockQueuePublisher.addEventsTracker).toHaveBeenCalledWith(expect.objectContaining({ testabMode: false }));
     });
 
     it('should cap spreadSending when test window is shorter', async () => {
@@ -1080,7 +1059,7 @@ describe('CampaignService', () => {
   });
 
   describe('processResult additional branches', () => {
-    it('should use waitFor=0 when millisecondDiff is negative', async () => {
+    it('should use delay=0 when scheduleTo is in the past', async () => {
       const campaign = makeCampaign({
         type: CampaignType.TESTAB,
         testabCriteria: 'click',
@@ -1090,10 +1069,9 @@ describe('CampaignService', () => {
       });
       mockMsgopsService.getCampaign.mockResolvedValue(campaign);
       mockRedisClient.hgetall.mockResolvedValue({ click: '5' });
-      mockGoogleTasksService.getMillisecondDiff.mockResolvedValue(-5000);
 
       await service.processResult(1);
-      expect(mockGoogleTasksService.post).toHaveBeenCalledWith(expect.objectContaining({ waitFor: 0 }), '', expect.any(String), expect.any(String));
+      expect(mockQueuePublisher.addCampaignTrigger).toHaveBeenCalled();
     });
 
     it('should select winner by click criterion', async () => {
@@ -1116,11 +1094,11 @@ describe('CampaignService', () => {
     });
   });
 
-  describe('sendPageToPubSub', () => {
-    it('should call publishMessagePagesOnTopic with correct payload', async () => {
+  describe('addPageToQueue', () => {
+    it('should call addSchedulePage with correct payload', async () => {
       const campaign = makeCampaign();
-      await (service as any).sendPageToPubSub(campaign, 1, 3, 20000, 1, 100);
-      expect(mockPubSubProvider.publishMessagePagesOnTopic).toHaveBeenCalledWith(expect.objectContaining({ page: 1, waitFor: 20000 }), { type: 'schedule-pages' });
+      await (service as any).addPageToQueue(campaign, 1, 3, 20000, 1, 100);
+      expect(mockQueuePublisher.addSchedulePage).toHaveBeenCalledWith(expect.objectContaining({ page: 1 }), 20000);
     });
   });
 

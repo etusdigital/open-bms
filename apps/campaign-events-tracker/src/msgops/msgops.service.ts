@@ -4,8 +4,7 @@ import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CampaignRecurrenceFrequency, CampaignsType, StatusCampaignEnum } from '../app.interfaces';
 import { CampaignContactEntity } from './entities/campaign-contact.entity';
-import { env } from 'process';
-import { GoogleTasksProvider } from '../providers/google-tasks.provider';
+import { QueuePublisher } from '../providers/queue/queue.publisher';
 import dayjs from 'dayjs';
 
 @Injectable()
@@ -15,7 +14,7 @@ export class MsgopsService {
     private readonly campaignRepository: Repository<CampaignEntity>,
     @InjectRepository(CampaignContactEntity)
     private readonly campaignContactRepository: Repository<CampaignContactEntity>,
-    private readonly googleTasksProvider: GoogleTasksProvider,
+    private readonly queuePublisher: QueuePublisher,
   ) {}
 
   async updateStatus(campaignId: number, campaignDto) {
@@ -84,13 +83,9 @@ export class MsgopsService {
       campaign.scheduleTo = newEventDate;
       campaign.status = StatusCampaignEnum.SCHEDULED;
 
-      const response = await this.googleTasksProvider.create(
-        campaign.id,
-        campaign.scheduleTo,
-        env.CAMPAIGN_TRIGGER_ENDPOINT as string,
-        env.GOOGLE_TASK_QUEUE as string,
-      );
-      campaign.scheduleToCloudTaskId = response[0].name || '';
+      const diffMs = new Date(campaign.scheduleTo).getTime() - Date.now();
+      const jobId = await this.queuePublisher.addCampaignTrigger(campaign.id, diffMs);
+      campaign.scheduleToCloudTaskId = jobId || '';
     } else {
       campaign.scheduleTo = recurrenceSettings.lastSentDate;
       campaign.status = StatusCampaignEnum.COMPLETED;

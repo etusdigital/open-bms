@@ -21,7 +21,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
-    "@google-cloud/tasks": "^6.2.1",
+    "@nestjs/bullmq": "^10.2.3",
     "@nestjs/common": "^11.1.16",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.1.16",
@@ -30,6 +30,7 @@
     "dayjs": "^1.11.19",
     "dayjs-plugin-utc": "^0.1.2",
     "dotenv": "^17.3.1",
+    "bullmq": "^5.56.0",
     "ioredis": "^5.10.0",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",

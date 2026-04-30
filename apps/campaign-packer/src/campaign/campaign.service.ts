@@ -2,11 +2,8 @@ import { BadRequestException, Injectable, InternalServerErrorException, NotFound
 import { Campaign, CampaignBatch, CampaignMessageType, CampaignStatus, CampaignType } from '../interfaces';
 import { MsgopsService } from '../msgops/msgops.service';
 import { ContactEntity } from '../msgops/entities/contact.entity';
-import { GoogleTasksService } from '../providers/google-tasks.service';
-import { PubSubProvider } from '../providers/pubsub.provider';
-import { protos } from '@google-cloud/tasks';
+import { QueuePublisher } from '../providers/queue/queue.publisher';
 import { RedisService } from '../providers/redis/redis.service';
-import { env } from 'process';
 import { CampaignMessageEntity } from 'src/msgops/entities/campaign-message.entity';
 import * as dayjs from 'dayjs';
 import * as utc from 'dayjs/plugin/utc';
@@ -24,8 +21,7 @@ export class CampaignService {
   private contactsLength: number;
   constructor(
     private readonly msgopsService: MsgopsService,
-    private readonly googleTasksService: GoogleTasksService,
-    private readonly pubSubProvider: PubSubProvider,
+    private readonly queuePublisher: QueuePublisher,
     private readonly redisService: RedisService,
     private readonly formatterUtils: FormatterUtils,
   ) {
@@ -102,12 +98,12 @@ export class CampaignService {
         }
 
         if (warmupsIds.length) {
-          return this.pubSubProvider.publishMessage(process.env.TOPIC_MSGOPS_CAMPAIGN_PACKER_WARMUP, { warmups: warmupsIds, campaign });
+          return this.queuePublisher.addCampaignPackerWarmup({ warmups: warmupsIds, campaign });
         }
       }
     }
 
-    return this.pubSubProvider.publishMessage(process.env.TOPIC_MSGOPS_CAMPAIGN_PACKER, campaign);
+    return this.queuePublisher.addCampaignPacker(campaign);
   }
 
   definedMaxContactsWarmup(warmup: WarmupEntity, quantityContacts) {
@@ -197,13 +193,13 @@ export class CampaignService {
           ...(warmup.stage === 0 && quantitySend == 6 ? { stage: null, currentSend: 160 } : {}),
         });
 
-        await this.pubSubProvider.publishMessage(process.env.TOPIC_MSGOPS_CAMPAIGN_PACKER, warmupCampaign);
+        await this.queuePublisher.addCampaignPacker(warmupCampaign);
         const redisExpireKey = warmupCampaign?.spreadSending ? warmupCampaign.spreadSending * 60 : 28800;
         await redisClient.set(`warmup:${warmup.id}`, 0, 'EX', redisExpireKey);
       }
     }
 
-    await this.pubSubProvider.publishMessage(process.env.TOPIC_MSGOPS_CAMPAIGN_PACKER, originalCampaign);
+    await this.queuePublisher.addCampaignPacker(originalCampaign);
   }
 
   async createBatches(campaign: Campaign): Promise<string> {
@@ -255,7 +251,7 @@ export class CampaignService {
       idFirstPage = campaign?.testabLastId || 0;
     }
 
-    await this.sendPageToPubSub(campaign, 1, totalPages, distribute, idFirstPage, totalContacts[0].order_number);
+    await this.addPageToQueue(campaign, 1, totalPages, distribute, idFirstPage, totalContacts[0].order_number);
     totalContacts.shift();
 
     if (totalPages > 1) {
@@ -289,14 +285,14 @@ export class CampaignService {
           delay += delayIncrement;
 
           return new Promise((resolve) => setTimeout(resolve, delay)).then(async () => {
-            await this.sendPageToPubSub(campaign, currentPage, totalPages, waitFor, currentContactId, finalContactId);
+            await this.addPageToQueue(campaign, currentPage, totalPages, waitFor, currentContactId, finalContactId);
           });
         }),
       );
 
       if (!testabMode) {
         const lastContactId = campaign.testabLastId ? campaign.testabLastId + 1 : 0;
-        await this.sendPageToPubSub(campaign, totalPages, totalPages, Math.ceil((countPages + 1) * distribute + 600000), lastContactId, finalPageFinalId);
+        await this.addPageToQueue(campaign, totalPages, totalPages, Math.ceil((countPages + 1) * distribute + 600000), lastContactId, finalPageFinalId);
       }
     }
 
@@ -314,26 +310,11 @@ export class CampaignService {
     return `Processed ${totalPages} pages`;
   }
 
-  async sendPageToPubSub(campaign: Campaign, page: number, totalPages: number, waitFor: number, currentContactId: number, finalContactId: number) {
-    const request = {
-      payload: JSON.stringify({ campaign, page, totalPages, currentContactId, finalContactId }),
-      waitFor: waitFor,
-      page: page,
-    };
-
-    const messageId = await this.pubSubProvider.publishMessagePagesOnTopic(request, { type: 'schedule-pages' });
-    this.formatterUtils.logInfo(`Sent page to pub/sub: ${messageId}`);
-  }
-
-  async schedulePage(request: { payload: string; waitFor: number; page: number }) {
-    const response = await this.googleTasksService.post(request, '', env.GOOGLE_TASK_QUEUE_NAME, env.GOOGLE_TASK_CALLBACK_URL);
-
-    const [taskResponse] = response as [protos.google.cloud.tasks.v2.ITask, protos.google.cloud.tasks.v2.ICreateTaskRequest, Record<string, unknown>];
-
-    const taskId = taskResponse?.name?.split('/').pop();
-
-    this.formatterUtils.logInfo(`Page ${request.page} scheduled with task id ${taskId}`);
-    return taskId;
+  async addPageToQueue(campaign: Campaign, page: number, totalPages: number, delayMs: number, currentContactId: number, finalContactId: number) {
+    const data: CampaignBatch = { campaign, page, totalPages, currentContactId, finalContactId };
+    const jobId = await this.queuePublisher.addSchedulePage(data, delayMs);
+    this.formatterUtils.logInfo(`Page ${page} queued with job id ${jobId}`);
+    return jobId;
   }
 
   async processPage(campaignBatch: CampaignBatch): Promise<{ [K: string]: any }> {
@@ -413,7 +394,7 @@ export class CampaignService {
         contactsInternal.recipients.push({ name: contact.firstName, email: contact.email });
       });
       if (contactsInternal.recipients.length) {
-        await this.pubSubProvider.publishMessage(process.env.TOPIC_MSGOPS_WARMUP_TRACKER, contactsInternal, {});
+        await this.queuePublisher.addWarmupTracker(contactsInternal);
       }
     }
 
@@ -441,10 +422,7 @@ export class CampaignService {
       finalContactId: campaignBatch.finalContactId,
     };
     await redisClient.set(pubSubMessage.campaignKey, JSON.stringify(currentpackage), 'EX', 43200);
-    const messageId = await this.pubSubProvider.publishMessage(process.env.TOPIC_MSGOPS_CAMPAIGN_SEND_MESSAGE, pubSubMessage, {
-      'message-type': campaignBatch.campaign.messageType || CampaignMessageType.EMAIL,
-      type: campaignBatch.campaign.type,
-    });
+    const messageId = await this.queuePublisher.addSendMessage(pubSubMessage);
     this.formatterUtils.logInfo(`Message ${messageId} published.`);
 
     await this.sendTracker(1, this.contactsLength, campaignBatch.campaign.id, 'CAMPAIGN_PACKAGED');
@@ -468,10 +446,7 @@ export class CampaignService {
         finalContactId: campaignBatch.finalContactId,
       };
       await redisClient.set(pubSubMessageWarmup.campaignKey, JSON.stringify(currentpackage), 'EX', 43200);
-      await this.pubSubProvider.publishMessage(process.env.TOPIC_MSGOPS_CAMPAIGN_SEND_MESSAGE, pubSubMessageWarmup, {
-        'message-type': campaignBatch.campaign.messageType || CampaignMessageType.EMAIL,
-        type: campaignBatch.campaign.type,
-      });
+      await this.queuePublisher.addSendMessage(pubSubMessageWarmup);
     }
 
     return true;
@@ -542,15 +517,10 @@ export class CampaignService {
       return `Process result campaign ${campaign.id}.`;
     }
 
-    const millisecondDiff = await this.googleTasksService.getMillisecondDiff(campaign.scheduleTo.toString());
-    const request = { payload: JSON.stringify({ campaign }), waitFor: millisecondDiff > 0 ? millisecondDiff : 0 };
-    const callbackUrl = env.GOOGLE_TASK_CAMPAIGN_URL + `/${campaign.id}`;
-    const response = await this.googleTasksService.post(request, '', env.GOOGLE_TASK_QUEUE_CAMPAIGN_NAME, callbackUrl);
-    const [taskResponse] = response as [protos.google.cloud.tasks.v2.ITask, protos.google.cloud.tasks.v2.ICreateTaskRequest, Record<string, unknown>];
+    const diffMs = dayjs(campaign.scheduleTo.toString()).tz('America/Sao_Paulo').diff(dayjs().tz('America/Sao_Paulo'), 'millisecond');
+    const jobId = await this.queuePublisher.addCampaignTrigger(campaign.id, diffMs);
 
-    const taskId = taskResponse?.name?.split('/').pop();
-
-    return `Process result campaign ${campaign.id}. Create task: ${taskId}`;
+    return `Process result campaign ${campaign.id}. Trigger job: ${jobId}`;
   }
 
   validateCampaign(campaign: Campaign) {
@@ -595,9 +565,9 @@ export class CampaignService {
         testabMode,
       };
 
-      const messageId = await this.pubSubProvider.publishMessage(process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER, tracker);
+      const messageId = await this.queuePublisher.addEventsTracker(tracker);
 
-      const response = `topic-${process.env.TOPIC_MSGOPS_CAMPAIGN_EVENTS_TRACKER}-messageid-${messageId}`;
+      const response = `queue-campaign-events-tracker-jobid-${messageId}`;
       console.info(response);
 
       return messageId;

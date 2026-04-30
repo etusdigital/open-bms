@@ -3,7 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { MsgopsService } from './msgops.service';
 import { CampaignEntity } from './entities/campaign.entity';
 import { CampaignContactEntity } from './entities/campaign-contact.entity';
-import { GoogleTasksProvider } from '../providers/google-tasks.provider';
+import { QueuePublisher } from '../providers/queue/queue.publisher';
 import { CampaignRecurrenceFrequency, CampaignsType, StatusCampaignEnum } from '../app.interfaces';
 
 describe('MsgopsService', () => {
@@ -27,8 +27,8 @@ describe('MsgopsService', () => {
     }),
   };
 
-  const mockGoogleTasksProvider = {
-    create: jest.fn().mockResolvedValue([{ name: 'task-123' }]),
+  const mockQueuePublisher = {
+    addCampaignTrigger: jest.fn().mockResolvedValue('mock-job-id'),
   };
 
   beforeEach(async () => {
@@ -37,7 +37,7 @@ describe('MsgopsService', () => {
         MsgopsService,
         { provide: getRepositoryToken(CampaignEntity), useValue: mockCampaignRepo },
         { provide: getRepositoryToken(CampaignContactEntity), useValue: mockCampaignContactRepo },
-        { provide: GoogleTasksProvider, useValue: mockGoogleTasksProvider },
+        { provide: QueuePublisher, useValue: mockQueuePublisher },
       ],
     }).compile();
 
@@ -215,10 +215,10 @@ describe('MsgopsService', () => {
 
       const result = await service.setRecurringCampaign(campaign);
       expect(result.status).toBe(StatusCampaignEnum.COMPLETED);
-      expect(mockGoogleTasksProvider.create).not.toHaveBeenCalled();
+      expect(mockQueuePublisher.addCampaignTrigger).not.toHaveBeenCalled();
     });
 
-    it('should set daily recurrence', async () => {
+    it('should set daily recurrence and enqueue trigger job', async () => {
       const campaign = {
         id: 1,
         status: StatusCampaignEnum.COMPLETED,
@@ -238,7 +238,7 @@ describe('MsgopsService', () => {
 
       const result = await service.setRecurringCampaign(campaign);
       expect(result.status).toBe(StatusCampaignEnum.SCHEDULED);
-      expect(mockGoogleTasksProvider.create).toHaveBeenCalled();
+      expect(mockQueuePublisher.addCampaignTrigger).toHaveBeenCalled();
     });
 
     it('should set monthly recurrence', async () => {
@@ -264,7 +264,7 @@ describe('MsgopsService', () => {
       expect(result.scheduleTo.getMonth()).toBe(3); // April (0-indexed)
     });
 
-    it('should set weekly recurrence', async () => {
+    it('should set weekly recurrence and enqueue trigger job', async () => {
       const campaign = {
         id: 1,
         status: StatusCampaignEnum.COMPLETED,
@@ -284,7 +284,7 @@ describe('MsgopsService', () => {
 
       const result = await service.setRecurringCampaign(campaign);
       expect(result.status).toBe(StatusCampaignEnum.SCHEDULED);
-      expect(mockGoogleTasksProvider.create).toHaveBeenCalled();
+      expect(mockQueuePublisher.addCampaignTrigger).toHaveBeenCalled();
     });
 
     it('should mark as COMPLETED when next date exceeds untilDate', async () => {
@@ -310,7 +310,7 @@ describe('MsgopsService', () => {
       expect(result.status).toBe(StatusCampaignEnum.COMPLETED);
     });
 
-    it('should set scheduleToCloudTaskId from google tasks response', async () => {
+    it('should set scheduleToCloudTaskId from queue job id', async () => {
       const campaign = {
         id: 1,
         status: StatusCampaignEnum.COMPLETED,
@@ -329,11 +329,11 @@ describe('MsgopsService', () => {
       } as CampaignEntity;
 
       const result = await service.setRecurringCampaign(campaign);
-      expect(result.scheduleToCloudTaskId).toBe('task-123');
+      expect(result.scheduleToCloudTaskId).toBe('mock-job-id');
     });
 
-    it('should use empty string when google tasks response has no name', async () => {
-      mockGoogleTasksProvider.create.mockResolvedValueOnce([{ name: '' }]);
+    it('should use empty string when addCampaignTrigger returns falsy', async () => {
+      mockQueuePublisher.addCampaignTrigger.mockResolvedValueOnce('');
 
       const campaign = {
         id: 1,
@@ -359,7 +359,6 @@ describe('MsgopsService', () => {
 
   describe('nextOccurrence', () => {
     it('should find next occurrence for weekly recurrence', () => {
-      // Sunday March 15, 2026
       const currentScheduleTo = new Date('2026-03-15T10:00:00Z');
       const weekDays = [1, 3, 5]; // Mon, Wed, Fri
       const interval = 1;
@@ -376,11 +375,10 @@ describe('MsgopsService', () => {
 
       const result = service.nextOccurrence(currentScheduleTo, weekDays, interval);
       expect(result).toBeDefined();
-      expect(result.getDay()).toBe(1); // Monday
+      expect(result.getDay()).toBe(1);
     });
 
     it('should find next occurrence when current day index is found', () => {
-      // Wednesday March 11, 2026
       const currentScheduleTo = new Date('2026-03-11T10:00:00Z');
       const weekDays = [3, 5]; // Wed, Fri
       const interval = 1;
@@ -390,7 +388,6 @@ describe('MsgopsService', () => {
     });
 
     it('should wrap around to next week when no more days this week', () => {
-      // Friday March 13, 2026
       const currentScheduleTo = new Date('2026-03-13T10:00:00Z');
       const weekDays = [1, 3]; // Mon, Wed
       const interval = 1;

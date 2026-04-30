@@ -6,15 +6,16 @@ import { CampaignEntity } from './entities/campaign.entity';
 import { CampaignContactEntity } from './entities/campaign-contact.entity';
 import { ContactEntity } from './entities/contact.entity';
 import { RedisModule } from '../providers/redis/redis.module';
-import { GoogleTasksProvider } from '../providers/google-tasks.provider';
+import { QueueModule } from '../providers/queue/queue.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
     TypeOrmModule.forFeature([CampaignEntity, CampaignContactEntity, ContactEntity]),
     RedisModule,
+    QueueModule,
   ],
   exports: [MsgopsService],
-  providers: [MsgopsService, GoogleTasksProvider],
+  providers: [MsgopsService],
 })
 export class MsgopsModule {}

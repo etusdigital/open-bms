@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Post, Body } from '@nestjs/common';
 import { AppService } from './app.service';
-import { Campaign, CampaignBatch, PageMessage, SubscriptionMessage, Warmup } from './interfaces';
+import { Campaign, CampaignBatch, Warmup } from './interfaces';
 import { CampaignService } from './campaign/campaign.service';
 import { FormatterUtils } from './utils/formatter.utils';
 
@@ -23,28 +23,20 @@ export class AppController {
   }
 
   @Post('/create-batches')
-  async createBatches(@Body() data: Campaign | SubscriptionMessage) {
-    const campaign = 'subscription' in (data as SubscriptionMessage) ? this.formatterUtils.parseBatch(data as SubscriptionMessage) : (data as Campaign);
-
+  async createBatches(@Body() campaign: Campaign) {
     this.formatterUtils.logInfo(`[Create Batches] Campaign: ${JSON.stringify(campaign)}`);
-
     return await this.campaignService.createBatches(campaign);
   }
 
-  @Post('/schedule-pages')
-  async schedulePages(@Body() data: PageMessage | SubscriptionMessage) {
-    const pageToSchedule = 'subscription' in (data as SubscriptionMessage) ? this.formatterUtils.parseBatch(data as SubscriptionMessage) : (data as PageMessage);
-
-    return await this.campaignService.schedulePage(pageToSchedule);
+  @Post('/process-page')
+  async processPage(@Body() data: CampaignBatch) {
+    this.formatterUtils.logInfo(`[Process Page] Campaign: ${JSON.stringify(data)}`);
+    return await this.campaignService.processPage(data);
   }
 
-  @Post('/process-page')
-  async processPage(@Body() data: CampaignBatch | SubscriptionMessage) {
-    const campaign = 'subscription' in (data as SubscriptionMessage) ? this.formatterUtils.parseBatch(data as SubscriptionMessage) : (data as CampaignBatch);
-
-    this.formatterUtils.logInfo(`[Process Page] Campaign: ${JSON.stringify(campaign)}`);
-
-    return await this.campaignService.processPage(campaign);
+  @Post('/warmup-start')
+  async warmupStart(@Body() data: Warmup) {
+    return await this.campaignService.warmupStart(data.campaign, data.warmups);
   }
 
   @Post('/create-test/:id')
@@ -55,11 +47,5 @@ export class AppController {
   @Post('/result-test/:id')
   async resultTest(@Param('id') id: number) {
     return await this.campaignService.processResult(id);
-  }
-
-  @Post('/warmup-start')
-  async warmupStart(@Body() data: Warmup | SubscriptionMessage) {
-    const warmup = 'subscription' in (data as SubscriptionMessage) ? this.formatterUtils.parseBatch(data as SubscriptionMessage) : (data as Warmup);
-    return await this.campaignService.warmupStart(warmup.campaign, warmup.warmups);
   }
 }

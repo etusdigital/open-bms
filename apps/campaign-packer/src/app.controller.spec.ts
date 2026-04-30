@@ -10,7 +10,6 @@ describe('AppController', () => {
   const mockCampaignService = {
     createContactsSend: jest.fn().mockResolvedValue('ok'),
     createBatches: jest.fn().mockResolvedValue('Processed 5 pages'),
-    schedulePage: jest.fn().mockResolvedValue('task-abc'),
     processPage: jest.fn().mockResolvedValue({ contacts: 10, packages: 1 }),
     createTest: jest.fn().mockResolvedValue('test created'),
     processResult: jest.fn().mockResolvedValue('result processed'),
@@ -46,28 +45,13 @@ describe('AppController', () => {
     expect(mockCampaignService.createContactsSend).toHaveBeenCalledWith(42);
   });
 
-  it('POST /create-batches passes direct Campaign object', async () => {
+  it('POST /create-batches passes Campaign object to service', async () => {
     const campaign = { id: 1, title: 'Test' };
     await controller.createBatches(campaign as any);
     expect(mockCampaignService.createBatches).toHaveBeenCalledWith(campaign);
   });
 
-  it('POST /create-batches parses Pub/Sub envelope', async () => {
-    const parsed = { id: 1, title: 'Test' };
-    mockFormatterUtils.parseBatch.mockReturnValue(parsed);
-    const data = { subscription: 'sub', message: { data: 'abc', messageId: '1', message_id: '1', publishTime: '', publish_time: '', attributes: { key: '' } } };
-    await controller.createBatches(data as any);
-    expect(mockFormatterUtils.parseBatch).toHaveBeenCalled();
-    expect(mockCampaignService.createBatches).toHaveBeenCalledWith(parsed);
-  });
-
-  it('POST /schedule-pages passes direct PageMessage', async () => {
-    const page = { payload: '{}', waitFor: 0, page: 1 };
-    await controller.schedulePages(page as any);
-    expect(mockCampaignService.schedulePage).toHaveBeenCalledWith(page);
-  });
-
-  it('POST /process-page passes direct CampaignBatch', async () => {
+  it('POST /process-page passes CampaignBatch to service', async () => {
     const batch = { campaign: { id: 1 }, page: 1, totalPages: 1, currentContactId: 1, finalContactId: 10 };
     await controller.processPage(batch as any);
     expect(mockCampaignService.processPage).toHaveBeenCalledWith(batch);
@@ -83,18 +67,9 @@ describe('AppController', () => {
     expect(mockCampaignService.processResult).toHaveBeenCalledWith(5);
   });
 
-  it('POST /warmup-start parses warmup object directly', async () => {
+  it('POST /warmup-start passes campaign and warmups to service', async () => {
     const warmup = { campaign: { id: 1 }, warmups: [1, 2] };
     await controller.warmupStart(warmup as any);
-    expect(mockCampaignService.warmupStart).toHaveBeenCalledWith({ id: 1 }, [1, 2]);
-  });
-
-  it('POST /warmup-start parses Pub/Sub envelope', async () => {
-    const parsed = { campaign: { id: 1 }, warmups: [1, 2] };
-    mockFormatterUtils.parseBatch.mockReturnValue(parsed);
-    const data = { subscription: 'sub', message: { data: 'abc', messageId: '1', message_id: '1', publishTime: '', publish_time: '', attributes: { key: '' } } };
-    await controller.warmupStart(data as any);
-    expect(mockFormatterUtils.parseBatch).toHaveBeenCalled();
     expect(mockCampaignService.warmupStart).toHaveBeenCalledWith({ id: 1 }, [1, 2]);
   });
 });

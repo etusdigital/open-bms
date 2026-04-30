@@ -23,9 +23,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
-    "@google-cloud/pubsub": "^5.3.0",
-    "@google-cloud/tasks": "^6.2.1",
     "@nestjs/axios": "^4.0.1",
+    "@nestjs/bullmq": "^10.2.3",
     "@nestjs/common": "^11.1.16",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.1.16",
@@ -34,6 +33,7 @@
     "dayjs": "^1.11.20",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "bullmq": "^5.56.0",
     "ioredis": "^5.10.0",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",

@@ -275,7 +275,7 @@ export interface AccountConfig {
   accountId: number;
   name: string;
   value: string;
-  description: string;
+  description?: string;
 }
 
 export interface CustomFields {
