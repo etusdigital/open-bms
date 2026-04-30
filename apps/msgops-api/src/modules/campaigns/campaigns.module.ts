@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { GoogleCloudStorageProvider } from '../../providers/google-cloud-storage.provider';
+import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import { GoogleTasksProvider } from '../../providers/google-tasks.provider';
 import { CampaignsController } from './campaigns.controller';
 import { CampaignsService } from './campaigns.service';
@@ -33,6 +33,6 @@ import { LabelsIntegrationModule } from '../labels/labels-integration.module';
   ],
   controllers: [CampaignsController],
   exports: [CampaignsService],
-  providers: [CampaignsService, UtilsService, GoogleCloudStorageProvider, GoogleTasksProvider, PubSubProvider, SlackProvider],
+  providers: [CampaignsService, UtilsService, S3StorageProvider, GoogleTasksProvider, PubSubProvider, SlackProvider],
 })
 export class CampaignModule {}

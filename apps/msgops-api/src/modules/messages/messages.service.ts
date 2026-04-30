@@ -1,7 +1,7 @@
 import { ForbiddenException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
-import { GoogleCloudStorageProvider } from '../../providers/google-cloud-storage.provider';
+import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import { Repository, Not, QueryRunner } from 'typeorm';
 import { PaginationDto } from '../../dtos/pagination.dto';
 import { MessageEntity } from '../../entities/message.entity';
@@ -33,7 +33,7 @@ import { hasUnlayerUrls, extractUnlayerUrlsFromHtml, replaceUrlsInHtml, replaceU
 export class MessagesService {
   private messagesProcess = {};
   constructor(
-    private readonly googleCloudStorageProvider: GoogleCloudStorageProvider,
+    private readonly storage: S3StorageProvider,
     @InjectRepository(MessageEntity)
     private readonly automationMessageRepository: Repository<MessageEntity>,
     @InjectRepository(AutomationEntity)
@@ -137,7 +137,7 @@ export class MessagesService {
       throw new ForbiddenException('Emoji in Sender Name field');
     }
 
-    // Migrate Unlayer images to GCS
+    // Migrate Unlayer images to our storage
     messageDto = await this.migrateUnlayerImages(messageDto);
 
     const message = await this.findOneById(id);
@@ -182,10 +182,10 @@ export class MessagesService {
     delete message.automationMessageAccount;
 
     if (message.type === 'email') {
-      const { fileURLPath, bucketName, fullFilePath } = await this.googleCloudStorageProvider.writeContentIntoBucketFile(message.id, message.content);
+      const { fileURLPath, bucketName, fullFilePath } = await this.storage.writeContentIntoBucketFile(message.id, message.content);
 
       if (!fileURLPath || !bucketName || !fullFilePath) {
-        throw new Error("Didn't save the message on google storage");
+        throw new Error("Didn't save the message on storage");
       }
 
       if (fileURLPath) message.templateUrl = fileURLPath;
@@ -461,7 +461,7 @@ export class MessagesService {
       throw new ForbiddenException('Emoji in Sender Name field');
     }
 
-    // Migrate Unlayer images to GCS
+    // Migrate Unlayer images to our storage
     messageDto = await this.migrateUnlayerImages(messageDto);
 
     if (['2FA-whatsapp', 'whatsapp'].includes(messageDto.type) && messageDto.status == MessageStatus.SENDAPPROVAL) {
@@ -494,10 +494,10 @@ export class MessagesService {
       savedMessage = await queryRunner.manager.save(message);
 
       if (savedMessage && savedMessage.type === 'email') {
-        const { fileURLPath, bucketName, fullFilePath } = await this.googleCloudStorageProvider.writeContentIntoBucketFile(savedMessage.id, savedMessage.content);
+        const { fileURLPath, bucketName, fullFilePath } = await this.storage.writeContentIntoBucketFile(savedMessage.id, savedMessage.content);
 
         if (!fileURLPath || !bucketName || !fullFilePath) {
-          throw new Error("Didn't save the message on google storage");
+          throw new Error("Didn't save the message on storage");
         }
 
         await queryRunner.manager
@@ -1030,8 +1030,8 @@ export class MessagesService {
     // Download and upload all images in parallel (typical case: 1-10 images)
     const results = await Promise.all(
       urls.map(async (url) => {
-        const gcsUrl = await this.downloadAndUploadImage(url);
-        return { original: url, migrated: gcsUrl };
+        const migratedUrl = await this.downloadAndUploadImage(url);
+        return { original: url, migrated: migratedUrl };
       }),
     );
 
@@ -1064,7 +1064,7 @@ export class MessagesService {
       // 3. Convert to base64 (BucketsService format)
       const base64 = `data:${contentType};base64,${buffer.toString('base64')}`;
 
-      // 4. Upload to GCS
+      // 4. Upload to storage
       const fileUpload = {
         name: filename,
         data: base64,
@@ -1073,10 +1073,10 @@ export class MessagesService {
         pathExternal: 'templates/messages/unlayer-migrated',
       };
 
-      const [result] = await this.bucketsService.uploadFilesToGCS([fileUpload]);
+      const [result] = await this.bucketsService.uploadFiles([fileUpload]);
 
       if (!result?.link) {
-        throw new Error('GCS upload failed - no URL returned');
+        throw new Error('Storage upload failed - no URL returned');
       }
 
       return result.link;

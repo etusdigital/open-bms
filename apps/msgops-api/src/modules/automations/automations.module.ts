@@ -11,7 +11,7 @@ import { AutomationEntity } from './../../entities/automation.entity';
 import { MessagesService } from '../messages/messages.service';
 import { AutomationsController } from './automations.controller';
 import { AutomationsService } from './automations.service';
-import { GoogleCloudStorageProvider } from '../../providers/google-cloud-storage.provider';
+import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import { AuditEntity } from '../../entities/audit.entity';
 import { AuditService } from './../../utils/audits/audit.service';
 import { UtilsModule } from '../../utils/utils.module';
@@ -47,7 +47,7 @@ import { BucketsService } from '../buckets/buckets.service';
     AccountConfigsProvider,
     AutomationsService,
     MessagesService,
-    GoogleCloudStorageProvider,
+    S3StorageProvider,
     AuditService,
     TwilioHandler,
     EvolutionHandler,
@@ -57,7 +57,7 @@ import { BucketsService } from '../buckets/buckets.service';
     OpenAIProvider,
     BucketsService,
   ],
-  exports: [AutomationsService, MessagesService, GoogleCloudStorageProvider, AuditService],
+  exports: [AutomationsService, MessagesService, S3StorageProvider, AuditService],
   controllers: [AutomationsController],
 })
 export class AutomationsModule {}

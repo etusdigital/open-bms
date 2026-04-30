@@ -19,8 +19,8 @@ export class BucketsController {
   @Post()
   @ApiBody({ type: [FileUploadDto] })
   @RequirePermission('messages:create')
-  async uploadFilesToGCS(@Body() filesUpload: Array<FileUploadDto>): Promise<Array<FileResponseDto>> {
-    const files = await this.bucketsService.uploadFilesToGCS(filesUpload);
+  async uploadFiles(@Body() filesUpload: Array<FileUploadDto>): Promise<Array<FileResponseDto>> {
+    const files = await this.bucketsService.uploadFiles(filesUpload);
     return files;
   }
 

@@ -13,7 +13,7 @@ import { PageDto } from '../../dtos/filters/page.dto';
 import { RedisService } from '../../providers/redis.provider';
 import { createHash, randomBytes } from 'crypto';
 import { replaceSpecialChars } from '../../utils/utils.service';
-import { GoogleCloudStorageProvider } from '../../providers/google-cloud-storage.provider';
+import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import { GoogleTasksProvider } from 'src/providers/google-tasks.provider';
 import dayjs from 'dayjs';
 import { ClsService } from 'nestjs-cls';
@@ -41,7 +41,7 @@ export class AccountsService {
     @InjectRepository(RoleEntity)
     private readonly roleRepository: Repository<RoleEntity>,
     private readonly redisService: RedisService,
-    private readonly gcsProvider: GoogleCloudStorageProvider,
+    private readonly storage: S3StorageProvider,
     private readonly googleTasksProvider: GoogleTasksProvider,
     private readonly cls: ClsService,
     private readonly httpService: HttpService,
@@ -417,7 +417,7 @@ export class AccountsService {
       cacheControl: 'no-store',
     };
 
-    await this.gcsProvider.genericUpload(fileDTO, fileName, 'bms/push', process.env.BMS_ASSETS_URL);
+    await this.storage.genericUpload(fileDTO, fileName, 'bms/push', process.env.S3_BUCKET, true);
 
     return this.clearCloudFlareCache(`https://${process.env.BMS_ASSETS_URL}/bms/push/${fileName}`);
   }

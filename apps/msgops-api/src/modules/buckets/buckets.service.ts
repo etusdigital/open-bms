@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { GoogleCloudStorageProvider } from '../../providers/google-cloud-storage.provider';
+import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import { FileResponseDto } from './file-response.dto';
 import { FileUploadDto } from './file-upload.dto';
 import { replaceSpecialChars } from '../../utils/utils.service';
@@ -8,12 +8,12 @@ import sharp from 'sharp';
 
 @Injectable()
 export class BucketsService {
-  constructor(private readonly gcsProvider: GoogleCloudStorageProvider) {}
+  constructor(private readonly storage: S3StorageProvider) {}
 
-  async uploadFilesToGCS(filesUpload: Array<FileUploadDto>): Promise<Array<FileResponseDto>> {
+  async uploadFiles(filesUpload: Array<FileUploadDto>): Promise<Array<FileResponseDto>> {
     const processedFiles: FileResponseDto[] = await Promise.all(
       filesUpload.map(async (file) => {
-        const { messageId, isAutomatedMessage, name, data } = file;
+        const { messageId, name, data } = file;
 
         const extension = name.substring(name.lastIndexOf('.'));
         const cleanName = replaceSpecialChars(name.split(extension).shift()) + extension;
@@ -27,7 +27,7 @@ export class BucketsService {
           path: 'tmp/msgops',
         };
 
-        return await this.gcsProvider.upload(isAutomatedMessage, messageId, fileDTO, file.pathExternal);
+        return await this.storage.upload(messageId, fileDTO, file.pathExternal);
       }),
     );
 
@@ -75,6 +75,6 @@ export class BucketsService {
       path: 'tmp/msgops',
     };
 
-    return await this.gcsProvider.genericUpload(fileDTO, cleanName, pathFolderName, process.env.BUCKET_NAME, isPublic);
+    return await this.storage.genericUpload(fileDTO, cleanName, pathFolderName, process.env.S3_BUCKET, isPublic);
   }
 }

@@ -13,7 +13,7 @@ import { AutomationEntity } from '../../entities/automation.entity';
 import { MessageEntity } from '../../entities/message.entity';
 import { AutomationMessageAccountService } from '../automations-messages-accounts/automations-message-account.service';
 import { AutomationMessageAccountEntity } from './../../entities/automation-message-account.entity';
-import { GoogleCloudStorageProvider } from '../../providers/google-cloud-storage.provider';
+import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import { GoogleTasksProvider } from '../../providers/google-tasks.provider';
 import { SparkPostHandler } from '../../handlers/email/sparkpost/sparkPost.handler';
 import { AuditEntity } from '../../entities/audit.entity';
@@ -65,7 +65,7 @@ import { BucketsService } from '../buckets/buckets.service';
     AutomationMessageAccountService,
     SendgridHandler,
     SparkPostHandler,
-    GoogleCloudStorageProvider,
+    S3StorageProvider,
     GoogleTasksProvider,
     AuditService,
     TwilioHandler,

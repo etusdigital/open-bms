@@ -10,7 +10,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { of, throwError } from 'rxjs';
 import { MessageDto } from './messages.dto';
 import { ClsService } from 'nestjs-cls';
-import { GoogleCloudStorageProvider } from '../../providers/google-cloud-storage.provider';
+import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import { TestsService } from '../tests/tests.service';
 import { RedisService } from '../../providers/redis.provider';
 import { TwilioHandler } from '../../handlers/twilio/twilio.handler';
@@ -65,7 +65,7 @@ describe('MessagesService - Unlayer Migration', () => {
   };
 
   const mockBucketsService = {
-    uploadFilesToGCS: jest.fn(),
+    uploadFiles: jest.fn(),
   };
 
   const mockClsService = {
@@ -76,7 +76,7 @@ describe('MessagesService - Unlayer Migration', () => {
     }),
   };
 
-  const mockGcsProvider = {
+  const mockStorageProvider = {
     writeContentIntoBucketFile: jest.fn(),
   };
 
@@ -109,7 +109,7 @@ describe('MessagesService - Unlayer Migration', () => {
         { provide: HttpService, useValue: mockHttpService },
         { provide: BucketsService, useValue: mockBucketsService },
         { provide: ClsService, useValue: mockClsService },
-        { provide: GoogleCloudStorageProvider, useValue: mockGcsProvider },
+        { provide: S3StorageProvider, useValue: mockStorageProvider },
         { provide: TestsService, useValue: mockTestsService },
         { provide: RedisService, useValue: mockRedisService },
         { provide: TwilioHandler, useValue: mockTwilioHandler },
@@ -146,8 +146,8 @@ describe('MessagesService - Unlayer Migration', () => {
         }),
       );
 
-      // Mock GCS upload
-      mockBucketsService.uploadFilesToGCS.mockResolvedValue([{ link: 'https://storage.googleapis.com/bucket/new-image.png' }]);
+      // Mock storage upload
+      mockBucketsService.uploadFiles.mockResolvedValue([{ link: 'https://storage.googleapis.com/bucket/new-image.png' }]);
 
       const result = await (service as any).downloadAndUploadImage('https://cdn.tools.unlayer.com/old-image.png');
 
@@ -159,7 +159,7 @@ describe('MessagesService - Unlayer Migration', () => {
           timeout: 10000,
         }),
       );
-      expect(mockBucketsService.uploadFilesToGCS).toHaveBeenCalled();
+      expect(mockBucketsService.uploadFiles).toHaveBeenCalled();
     });
 
     it('should handle 404 download errors', async () => {
@@ -182,7 +182,7 @@ describe('MessagesService - Unlayer Migration', () => {
       await expect((service as any).downloadAndUploadImage('https://cdn.tools.unlayer.com/slow.png')).rejects.toThrow('Download timeout');
     });
 
-    it('should handle GCS upload failure', async () => {
+    it('should handle storage upload failure', async () => {
       const imageBuffer = Buffer.from('fake-image-data');
 
       mockHttpService.get.mockReturnValue(
@@ -193,9 +193,9 @@ describe('MessagesService - Unlayer Migration', () => {
       );
 
       // Mock upload failure (no URL returned)
-      mockBucketsService.uploadFilesToGCS.mockResolvedValue([{}]);
+      mockBucketsService.uploadFiles.mockResolvedValue([{}]);
 
-      await expect((service as any).downloadAndUploadImage('https://cdn.tools.unlayer.com/image.png')).rejects.toThrow('GCS upload failed - no URL returned');
+      await expect((service as any).downloadAndUploadImage('https://cdn.tools.unlayer.com/image.png')).rejects.toThrow('Storage upload failed - no URL returned');
     });
 
     it('should replace URLs in all three fields', () => {
@@ -269,14 +269,14 @@ describe('MessagesService - Unlayer Migration', () => {
         }),
       );
 
-      mockBucketsService.uploadFilesToGCS.mockResolvedValue([{ link: 'https://storage.googleapis.com/bucket/new.png' }]);
+      mockBucketsService.uploadFiles.mockResolvedValue([{ link: 'https://storage.googleapis.com/bucket/new.png' }]);
 
       const result = await (service as any).migrateUnlayerImages(messageDto);
 
       expect(result.content).toContain('https://storage.googleapis.com/bucket/new.png');
       expect(result.content).not.toContain('https://cdn.tools.unlayer.com/old.png');
       expect(mockHttpService.get).toHaveBeenCalled();
-      expect(mockBucketsService.uploadFilesToGCS).toHaveBeenCalled();
+      expect(mockBucketsService.uploadFiles).toHaveBeenCalled();
     });
 
     it('should throw error when migration fails', async () => {

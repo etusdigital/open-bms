@@ -6,7 +6,7 @@ import { EmailsTemplatesDto } from './emails-templates.dto';
 import { NewEmailsTemplatesDto } from './new-emails-templates.dto';
 import { EmailTemplatePageDto } from './email-template-page.dto';
 import { PaginationDto } from '../../dtos/pagination.dto';
-import { GoogleCloudStorageProvider } from '../../providers/google-cloud-storage.provider';
+import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import * as crypto from 'crypto';
 import { PostgresErrorCode } from 'src/shared.interfaces';
 import { ClsService } from 'nestjs-cls';
@@ -19,7 +19,7 @@ export class EmailsTemplatesService {
     @InjectRepository(EmailsTemplatesEntity)
     private readonly emailTemplateRepository: Repository<EmailsTemplatesEntity>,
 
-    private readonly gcsProvider: GoogleCloudStorageProvider,
+    private readonly storage: S3StorageProvider,
     private readonly cls: ClsService,
   ) {}
 
@@ -174,6 +174,6 @@ export class EmailsTemplatesService {
       path: 'tmp/msgops',
     };
 
-    return await this.gcsProvider.upload(false, 0, fileDTO, 'templates/emails');
+    return await this.storage.upload(0, fileDTO, 'templates/emails');
   }
 }

@@ -3,7 +3,6 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { EmailsTemplatesDto } from './emails-templates.dto';
 import { EmailsTemplatesService } from './emails-templates.service';
 import { NewEmailsTemplatesDto } from './new-emails-templates.dto';
-import { GoogleCloudStorageProvider } from '../../providers/google-cloud-storage.provider';
 import { EmailTemplatePageDto } from './email-template-page.dto';
 import { RequirePermission } from '../authz/require-permission.decorator';
 
@@ -11,10 +10,7 @@ import { RequirePermission } from '../authz/require-permission.decorator';
 @ApiBearerAuth()
 @ApiTags('CRUD')
 export class EmailsTemplatesController {
-  constructor(
-    private readonly emailTemplateService: EmailsTemplatesService,
-    private readonly googleCloudStorageProvider: GoogleCloudStorageProvider,
-  ) {}
+  constructor(private readonly emailTemplateService: EmailsTemplatesService) {}
 
   @ApiOperation({ summary: 'Get all templates' })
   @UseInterceptors(ClassSerializerInterceptor)

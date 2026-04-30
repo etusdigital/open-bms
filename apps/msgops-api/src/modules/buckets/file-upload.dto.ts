@@ -14,9 +14,9 @@ export class FileUploadDto {
   @JoiSchema(Joi.string().required())
   name: string;
 
-  @ApiProperty()
-  @JoiSchema(Joi.boolean().required())
-  isAutomatedMessage: boolean;
+  @ApiProperty({ required: false, deprecated: true })
+  @JoiSchema(Joi.boolean().optional())
+  isAutomatedMessage?: boolean;
 
   @ApiProperty()
   @JoiSchema(Joi.string().required())

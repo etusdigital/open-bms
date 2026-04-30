@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { GoogleCloudStorageProvider } from '../../providers/google-cloud-storage.provider';
+import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import { MessageEntity } from '../../entities/message.entity';
 import { AutomationEntity } from '../../entities/automation.entity';
 import { TestsModule } from '../tests/tests.module';
@@ -35,7 +35,7 @@ import { BucketsService } from '../buckets/buckets.service';
       password: process.env.REDIS_PASSWORD,
     }),
   ],
-  providers: [MessagesService, GoogleCloudStorageProvider, BucketsService, AuditService, TwilioHandler, EvolutionHandler, GoogleTasksProvider, ValidLinksService, OpenAIProvider],
+  providers: [MessagesService, S3StorageProvider, BucketsService, AuditService, TwilioHandler, EvolutionHandler, GoogleTasksProvider, ValidLinksService, OpenAIProvider],
   controllers: [MessagesController],
   exports: [MessagesService],
 })

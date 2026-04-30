@@ -12,7 +12,7 @@ import { AccountApiKeyEntity } from '../../../entities/account-api-key.entity';
 import { RoleEntity } from '../../../entities/role.entity';
 import { RedisService } from '../../../providers/redis.provider';
 import { SendgridHandler } from '../../../handlers/email/sendgrid/sendgrid.handler';
-import { GoogleCloudStorageProvider } from '../../../providers/google-cloud-storage.provider';
+import { S3StorageProvider } from '../../../providers/s3-storage.provider';
 import { GoogleTasksProvider } from 'src/providers/google-tasks.provider';
 import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
 import { AccountCacheService } from '../account-cache.service';
@@ -40,7 +40,7 @@ describe('AccountsService — findWithCleanConfigs', () => {
         { provide: getRepositoryToken(RoleEntity), useValue: {} },
         { provide: RedisService, useValue: {} },
         { provide: SendgridHandler, useValue: {} },
-        { provide: GoogleCloudStorageProvider, useValue: {} },
+        { provide: S3StorageProvider, useValue: {} },
         { provide: GoogleTasksProvider, useValue: {} },
         { provide: ClsService, useValue: { get: jest.fn() } },
         { provide: HttpService, useValue: {} },
