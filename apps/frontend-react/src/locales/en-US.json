@@ -1855,7 +1855,10 @@
       "suspendConfirmMessage": "This will disable all access for users in \"{{name}}\". Continue?",
       "reactivateConfirmTitle": "Reactivate account",
       "reactivateConfirmMessage": "This will restore access for users in \"{{name}}\". Continue?",
-      "deleteConfirmMessage": "Deleting \"{{name}}\" is permanent and cannot be undone."
+      "deleteConfirmMessage": "Deleting \"{{name}}\" is permanent and cannot be undone.",
+      "cannotDeleteCurrent": "You cannot delete the account you are currently using",
+      "bulkDeleteSuccess": "{{count}} account(s) deleted",
+      "bulkDeleteConfirmDescription": "{{count}} account(s) will be deleted. This action cannot be undone."
     },
     "users": {
       "pageTitle": "Users",
@@ -1880,6 +1883,7 @@
       "passwordResetSent": "Password reset email sent!",
       "passwordResetError": "Failed to send password reset email.",
       "cannotDeleteSelf": "You cannot delete your own user",
+      "deletedAccountFallback": "Account #{{id}} (deleted)",
       "bulkDeleteSuccess": "{{count}} user(s) deleted",
       "bulkDeleteConfirmDescription": "{{count}} user(s) will be deleted. Continue?",
       "errors": {

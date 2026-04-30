@@ -303,7 +303,9 @@ function EditForm({ userId, defaultValues, memberships, onSubmit, isPending }: U
             {memberships.map((m) => (
               <div key={m.accountId} className="flex items-center justify-between rounded-lg border p-3">
                 <div>
-                  <p className="text-sm font-medium">{m.account.name}</p>
+                  <p className="text-sm font-medium">
+                    {m.account?.name ?? t('superAdmin.users.deletedAccountFallback', { id: m.accountId })}
+                  </p>
                   {m.roleOverride && (
                     <p className="text-muted-foreground text-xs">{m.roleOverride}</p>
                   )}

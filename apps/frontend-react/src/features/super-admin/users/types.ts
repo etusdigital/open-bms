@@ -16,6 +16,7 @@ export interface SuperAdminUser {
   globalRole?: { id: number; code: string; name: string };
   globalRoleId?: number;
   userAccount?: SuperAdminUserAccount[];
+  accountsCount?: number;
   createdAt: string;
   updatedAt?: string;
 }

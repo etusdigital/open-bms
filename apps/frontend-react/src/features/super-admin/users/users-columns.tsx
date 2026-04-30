@@ -77,7 +77,7 @@ export function useSuperAdminUsersColumns({
       {
         id: 'accounts',
         header: t('superAdmin.users.accounts'),
-        cell: ({ row }) => row.original.userAccount?.length ?? 0,
+        cell: ({ row }) => row.original.accountsCount ?? row.original.userAccount?.length ?? 0,
       },
       {
         accessorKey: 'status',

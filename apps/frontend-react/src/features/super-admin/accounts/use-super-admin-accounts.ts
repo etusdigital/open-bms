@@ -67,8 +67,8 @@ export function useUpdateSuperAdminAccount(id: number) {
       return data;
     },
     onSuccess: () => {
+      queryClient.removeQueries({ queryKey: queryKeys.superAdmin.accounts.detail(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.superAdmin.accounts.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.superAdmin.accounts.detail(id) });
       toast.success(i18n.t('common.updateSuccess', { entity: i18n.t('superAdmin.accounts.entityName') }));
     },
     onError: (error) => {
@@ -109,6 +109,32 @@ export function useDeleteSuperAdminAccount() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.superAdmin.accounts.all });
       toast.success(i18n.t('common.deleteSuccess', { entity: i18n.t('superAdmin.accounts.entityName') }));
+    },
+    onError: (error) => {
+      toast.error(
+        extractApiErrorMessage(error) ??
+          i18n.t('common.deleteError', { entity: i18n.t('superAdmin.accounts.entityName') }),
+      );
+    },
+  });
+}
+
+export function useBulkDeleteSuperAdminAccounts() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: number[]) => {
+      const results = await Promise.allSettled(ids.map((id) => apiClient.delete(`/accounts/${id}`)));
+      const failures = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+      if (failures.length) {
+        const reason = (failures[0].reason as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        throw new Error(reason ?? `${failures.length} delete(s) failed`);
+      }
+      return { deleted: ids.length };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.superAdmin.accounts.all });
+      toast.success(i18n.t('superAdmin.accounts.bulkDeleteSuccess', { count: result.deleted }));
     },
     onError: (error) => {
       toast.error(

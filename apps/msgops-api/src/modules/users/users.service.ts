@@ -163,6 +163,7 @@ export class UsersService {
         .createQueryBuilder('user')
         .select(['user.id', 'user.name', 'user.email', 'user.providerId', 'user.profile', 'user.status', 'user.createdAt', 'user.updatedAt'])
         .leftJoinAndSelect('user.globalRole', 'globalRole')
+        .loadRelationCountAndMap('user.accountsCount', 'user.userAccount', 'ua', (subQb) => subQb.innerJoin('ua.account', 'a', 'a.deleted_at IS NULL'))
         .orderBy(sortBy, order as 'ASC' | 'DESC')
         .skip((params.page - 1) * params.itemsPerPage)
         .take(params.itemsPerPage);

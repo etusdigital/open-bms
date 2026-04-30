@@ -1855,7 +1855,10 @@
       "suspendConfirmMessage": "Isso vai desabilitar o acesso de todos os usuários em \"{{name}}\". Continuar?",
       "reactivateConfirmTitle": "Reativar conta",
       "reactivateConfirmMessage": "Isso vai restaurar o acesso dos usuários em \"{{name}}\". Continuar?",
-      "deleteConfirmMessage": "Excluir \"{{name}}\" é permanente e não pode ser desfeito."
+      "deleteConfirmMessage": "Excluir \"{{name}}\" é permanente e não pode ser desfeito.",
+      "cannotDeleteCurrent": "Você não pode apagar a conta que está usando",
+      "bulkDeleteSuccess": "{{count}} conta(s) apagada(s)",
+      "bulkDeleteConfirmDescription": "{{count}} conta(s) serão apagadas. Esta ação não pode ser desfeita."
     },
     "users": {
       "pageTitle": "Usuários",
@@ -1880,6 +1883,7 @@
       "passwordResetSent": "E-mail de redefinição de senha enviado!",
       "passwordResetError": "Falha ao enviar o e-mail de redefinição.",
       "cannotDeleteSelf": "Você não pode apagar seu próprio usuário",
+      "deletedAccountFallback": "Conta #{{id}} (apagada)",
       "bulkDeleteSuccess": "{{count}} usuário(s) apagado(s)",
       "bulkDeleteConfirmDescription": "{{count}} usuário(s) serão apagados. Continuar?",
       "errors": {
