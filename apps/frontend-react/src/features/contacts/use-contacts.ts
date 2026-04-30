@@ -88,10 +88,7 @@ export function useUpdateContact(uuid: string) {
 
   return useMutation({
     mutationFn: async (data: ContactEditValues) => {
-      const { data: result } = await apiClient.put<Contact>('/contact', {
-        ...data,
-        uuid,
-      });
+      const { data: result } = await apiClient.put<Contact>(`/contacts/${uuid}`, data);
       return result;
     },
     onSuccess: () => {

@@ -1,4 +1,4 @@
-import { Controller, Body, Get, Post, ClassSerializerInterceptor, UseInterceptors, Query, Param, Res, HttpStatus, Headers, Put } from '@nestjs/common';
+import { Controller, Body, Get, Post, ClassSerializerInterceptor, UseInterceptors, Query, Param, Res, HttpStatus, Headers, Put, NotFoundException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ContactsService } from './contacts.service';
 import { ContactDto } from './contacts.dto';
@@ -150,6 +150,19 @@ export class ContactsController {
   @Get('/history/:id')
   async getContactHistory(@Param('id') id: number, @Query() params: ContactsPageDto): Promise<any> {
     return this.contactsService.findContactHistory(id, params);
+  }
+
+  @ApiOperation({ summary: 'Update an existing contact' })
+  @RequirePermission('audience:contacts_edit')
+  @Put('/:id')
+  async updateContact(@Param('id') id: string, @Body() data: ContactDto): Promise<ContactDto> {
+    // Frontend may pass either numeric id or uuid for the same param.
+    const isNumeric = /^\d+$/.test(id);
+    const contact = await this.contactsService.findByProperty(isNumeric ? { id: Number(id) } : { uuid: id });
+    if (!contact) {
+      throw new NotFoundException('Contact not found');
+    }
+    return this.contactsService.update(data, contact);
   }
 
   @ApiOperation({ summary: 'Create or edit a new contact' })

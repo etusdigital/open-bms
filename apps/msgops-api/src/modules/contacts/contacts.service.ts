@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ContactEntity } from './../../entities/contact.entity';
 import { Repository, In, UpdateQueryBuilder, SelectQueryBuilder } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -29,6 +29,8 @@ const CsvParser = require('json2csv').Parser;
 
 @Injectable()
 export class ContactsService {
+  private readonly logger = new Logger(ContactsService.name);
+
   constructor(
     @InjectRepository(ContactEntity)
     private readonly contactRepository: Repository<ContactEntity>,
@@ -552,13 +554,13 @@ export class ContactsService {
         ),
         contactsTags as (
           SELECT
-          contact_id,
-          array_agg((tg.name)) AS contact_tag
-        FROM contacts_tags ctg
-        LEFT JOIN tags tg ON tg.id = ctg.tag_id
-        where ctg.contact_id = ${subQueryCondition} and ctg.account_id = $2
-        GROUP BY
-          contact_id
+            contact_id,
+            jsonb_agg(DISTINCT jsonb_build_object('id', tg.id, 'name', tg.name)) AS contact_tag
+          FROM contacts_tags ctg
+          LEFT JOIN tags tg ON tg.id = ctg.tag_id
+          where ctg.contact_id = ${subQueryCondition} and ctg.account_id = $2
+          GROUP BY
+            contact_id
         ),
         contactsCustomFields as (
             SELECT
@@ -635,11 +637,16 @@ export class ContactsService {
 
   async update(contactDto: ContactDto, contactRepository: ContactEntity): Promise<ContactDto> {
     try {
-      this.contactRepository.merge(contactRepository, contactDto);
-      await this.contactRepository.update(contactRepository.id, contactRepository);
-      return contactRepository;
+      // Build a plain patch from the dto so TypeORM's UPDATE doesn't trip on
+      // non-column fields (fullName/maskedEmail set in @AfterLoad) or eager
+      // relations (contactTag, customFields, contactAutomation, contactDevices)
+      // that ContactEntity carries when loaded.
+      const { id: _id, ...patch } = contactDto;
+      await this.contactRepository.update(contactRepository.id, patch as Partial<ContactEntity>);
+      return { ...contactRepository, ...patch };
     } catch (e) {
-      console.error(e);
+      this.logger.error('Failed to update contact', e?.stack || e);
+      if (e instanceof HttpException) throw e;
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -880,24 +887,48 @@ export class ContactsService {
     return { imported };
   }
 
-  async updateTag(params: any) {
-    const values: ContactEntity = params.contacts.flatMap((contact: number) => {
-      return params.tags.map((tag: number) => {
-        return {
-          contactId: contact,
-          tagId: tag,
-          accountId: this.cls.get('accountId'),
-        };
-      });
-    });
+  async updateTag(params: { contacts: number[]; tags: number[]; action: 'add' | 'remove' }) {
+    const accountId = this.cls.get<number>('accountId');
+    const contactIds: number[] = params.contacts ?? [];
+    const tagIds: number[] = params.tags ?? [];
+    if (!contactIds.length || !tagIds.length) {
+      return { affected: 0 };
+    }
 
     if (params.action === 'add') {
-      return this.contactTagRepository.createQueryBuilder('contacts_tags').insert().values(values).orIgnore().execute();
+      // contacts_tags has no unique constraint on (account_id, contact_id, tag_id),
+      // so .orIgnore() is a no-op — filter existing pairs in-memory before insert
+      // to keep the relation idempotent.
+      const existing = await this.contactTagRepository
+        .createQueryBuilder('ct')
+        .select(['ct.contactId', 'ct.tagId'])
+        .where('ct.account_id = :accountId AND ct.contact_id IN (:...contactIds) AND ct.tag_id IN (:...tagIds)', {
+          accountId,
+          contactIds,
+          tagIds,
+        })
+        .getMany();
+      const existingPairs = new Set(existing.map((row) => `${row.contactId}:${row.tagId}`));
+
+      const values = contactIds.flatMap((contactId) => tagIds.filter((tagId) => !existingPairs.has(`${contactId}:${tagId}`)).map((tagId) => ({ contactId, tagId, accountId })));
+      if (!values.length) {
+        return { affected: 0 };
+      }
+      return this.contactTagRepository.createQueryBuilder().insert().into('contacts_tags').values(values).execute();
     }
 
     if (params.action === 'remove') {
       // TODO: Remove tag should stop running automation
-      return this.contactTagRepository.createQueryBuilder('contacts_tags').delete().from('contacts_tags').where(values).execute();
+      return this.contactTagRepository
+        .createQueryBuilder()
+        .delete()
+        .from('contacts_tags')
+        .where('account_id = :accountId AND contact_id IN (:...contactIds) AND tag_id IN (:...tagIds)', {
+          accountId,
+          contactIds,
+          tagIds,
+        })
+        .execute();
     }
   }
 
@@ -1284,7 +1315,15 @@ export class ContactsService {
           });
         }
 
-        events = await eventsQuery.getRawMany();
+        try {
+          events = await eventsQuery.getRawMany();
+        } catch (e) {
+          // events_logs lives in ClickHouse (events_logs_v2), not Postgres. Until the
+          // cross-DB hydration is wired up, degrade to automations-only instead of 500ing
+          // the contact edit page.
+          this.logger.warn(`Contact event history unavailable: ${e?.message ?? e}`);
+          events = [];
+        }
       }
 
       const combinedData = [...automations, ...events];
