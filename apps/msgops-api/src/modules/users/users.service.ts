@@ -163,6 +163,7 @@ export class UsersService {
         .createQueryBuilder('user')
         .select(['user.id', 'user.name', 'user.email', 'user.providerId', 'user.profile', 'user.status', 'user.createdAt', 'user.updatedAt'])
         .leftJoinAndSelect('user.globalRole', 'globalRole')
+        .loadRelationCountAndMap('user.accountsCount', 'user.userAccount', 'ua', (subQb) => subQb.innerJoin('ua.account', 'a', 'a.deleted_at IS NULL'))
         .orderBy(sortBy, order as 'ASC' | 'DESC')
         .skip((params.page - 1) * params.itemsPerPage)
         .take(params.itemsPerPage);
@@ -244,6 +245,39 @@ export class UsersService {
 
   async create(userDto: CreateUserDto) {
     try {
+      // If a soft-deleted user exists with this email, restore it instead of
+      // failing on the email uniqueness constraint. The auth provider already
+      // has the user provisioned, so we just clear deleted_at, update the
+      // mutable fields, and re-issue the password.
+      const existingDeleted = await this.userRepository.findOne({
+        where: { email: userDto.email! },
+        withDeleted: true,
+      });
+      if (existingDeleted?.deletedAt) {
+        const globalRole = await this.findRoleByCode(userDto.globalRoleCode, ROLE_CODES.EDITOR);
+        await this.userRepository.restore(existingDeleted.id);
+        await this.userRepository.update(existingDeleted.id, {
+          name: userDto.name ?? existingDeleted.name,
+          profile: userDto.profile ?? existingDeleted.profile ?? '',
+          settings: userDto.settings ?? existingDeleted.settings ?? { language: 'pt-BR' },
+          globalRoleId: globalRole.id,
+          status: 'pending_invite',
+        });
+        if (userDto.password && this.authProvider.supportsCredentialLogin()) {
+          await this.authProvider.updatePassword(existingDeleted.providerId, userDto.password);
+        }
+        // users_account has no soft-delete column, so memberships from the prior
+        // life of this user are still in the table. Clear them before applying
+        // the new account selection so the admin's choice is authoritative
+        // instead of a union with whatever access the user had pre-deletion.
+        await this.userAccountRepository.delete({ userId: existingDeleted.id });
+        if (userDto.accounts && userDto.accounts.length) {
+          await this.permissionsAccounts({ userId: existingDeleted.id, accounts: userDto.accounts });
+        }
+        await this.invalidateCacheForUser(existingDeleted.id);
+        return this.findOneById(existingDeleted.id);
+      }
+
       const { providerId } = await this.authProvider.createUser({
         email: userDto.email!,
         name: userDto.name!,
@@ -436,6 +470,28 @@ export class UsersService {
 
     await this.invalidateCacheForUser(userId);
     return { removed: true };
+  }
+
+  async softDeleteUser(targetUserId: number, actingUserId: number | undefined): Promise<{ deleted: true }> {
+    if (actingUserId !== undefined && Number(targetUserId) === Number(actingUserId)) {
+      throw new ForbiddenException('You cannot delete your own user');
+    }
+    const user = await this.userRepository.findOne({ where: { id: targetUserId } });
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+    await this.userRepository.softDelete(targetUserId);
+    // Revoke active refresh tokens so a deleted user can't keep rotating sessions
+    // until natural expiry. Access JWTs themselves are still valid until their TTL,
+    // but without a refresh token they expire on their own within minutes.
+    await this.userRepository.manager
+      .createQueryBuilder()
+      .update('user_refresh_tokens')
+      .set({ revoked_at: () => 'NOW()' })
+      .where('user_id = :id AND revoked_at IS NULL', { id: targetUserId })
+      .execute();
+    await this.invalidateCacheForUser(targetUserId);
+    return { deleted: true };
   }
 
   async updateMyPassword(providerId: string, password: string): Promise<UserEntity> {

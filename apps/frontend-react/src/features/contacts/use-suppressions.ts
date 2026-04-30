@@ -67,3 +67,24 @@ export function useBulkSuppress() {
     },
   });
 }
+
+export function useBulkResubscribe() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: BulkSuppressPayload) => {
+      const { data } = await apiClient.post('/contacts/bulk-resubscribe', {
+        emails: payload.emails,
+        block: payload.block,
+      });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts', 'suppressed'] });
+      toast.success(i18n.t('contacts.resubscribeSuccess'));
+    },
+    onError: (error) => {
+      toast.error(extractApiErrorMessage(error) ?? i18n.t('contacts.resubscribeError'));
+    },
+  });
+}

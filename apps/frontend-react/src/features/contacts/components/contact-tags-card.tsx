@@ -1,13 +1,12 @@
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, X, Check } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 import { useBulkAddTags, useBulkRemoveTags, useTagOptions } from '../use-contact-tags';
 import type { ContactTag } from '../types';
 
@@ -39,7 +38,11 @@ export const ContactTagsCard = memo(function ContactTagsCard({ contactId, tags }
     removeTag.mutate({ contactIds: [contactId], tagIds: [tagId] });
   };
 
-  const currentTagIds = new Set(tags.map((t) => t.id));
+  const currentTagIds = useMemo(() => new Set(tags.map((t) => t.id)), [tags]);
+  const availableTags = useMemo(
+    () => (tagsQuery.data ?? []).filter((option) => !currentTagIds.has(Number(option.value))),
+    [tagsQuery.data, currentTagIds],
+  );
 
   return (
     <Card>
@@ -68,22 +71,16 @@ export const ContactTagsCard = memo(function ContactTagsCard({ contactId, tags }
                       {t('common.noResults', 'Nenhum resultado')}
                     </CommandEmpty>
                     <CommandGroup>
-                      {(tagsQuery.data ?? []).map((option) => {
-                        const id = Number(option.value);
-                        const alreadyAdded = currentTagIds.has(id);
-                        return (
-                          <CommandItem
-                            key={option.value}
-                            value={option.label}
-                            onSelect={() => !alreadyAdded && handleAdd(id)}
-                            className="text-xs"
-                            disabled={alreadyAdded}
-                          >
-                            <Check className={cn('mr-2 h-3 w-3', alreadyAdded ? 'opacity-100' : 'opacity-0')} />
-                            {option.label}
-                          </CommandItem>
-                        );
-                      })}
+                      {availableTags.map((option) => (
+                        <CommandItem
+                          key={option.value}
+                          value={option.label}
+                          onSelect={() => handleAdd(Number(option.value))}
+                          className="text-xs"
+                        >
+                          {option.label}
+                        </CommandItem>
+                      ))}
                     </CommandGroup>
                   </>
                 )}

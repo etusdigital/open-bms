@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { SuperAdminAccount } from './types';
 
@@ -16,16 +17,40 @@ function formatDate(dateStr?: string): string {
 interface UseAccountsColumnsOptions {
   onSuspend: (account: SuperAdminAccount) => void;
   onDelete: (account: SuperAdminAccount) => void;
+  currentAccountId?: number;
+  deleteDisabled?: boolean;
 }
 
 export function useSuperAdminAccountsColumns({
   onSuspend,
   onDelete,
+  currentAccountId,
+  deleteDisabled = false,
 }: UseAccountsColumnsOptions): ColumnDef<SuperAdminAccount, unknown>[] {
   const { t } = useTranslation();
 
   return useMemo(
     () => [
+      {
+        id: 'select',
+        header: ({ table }) => (
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && 'indeterminate')}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+            disabled={row.original.id === currentAccountId}
+          />
+        ),
+        enableSorting: false,
+        enableHiding: false,
+      },
       {
         accessorKey: 'name',
         header: t('superAdmin.accounts.name'),
@@ -68,9 +93,11 @@ export function useSuperAdminAccountsColumns({
         id: 'actions',
         cell: ({ row }) => {
           const account = row.original;
+          const isCurrent = account.id === currentAccountId;
           const suspendLabel = account.isActive
             ? t('superAdmin.accounts.suspend')
             : t('superAdmin.accounts.reactivate');
+          const deleteLabel = isCurrent ? t('superAdmin.accounts.cannotDeleteCurrent') : t('common.delete');
 
           return (
             <div className="flex justify-end gap-1">
@@ -111,12 +138,13 @@ export function useSuperAdminAccountsColumns({
                       size="icon-xs"
                       className="text-destructive hover:text-destructive"
                       onClick={() => onDelete(account)}
+                      disabled={deleteDisabled || isCurrent}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      <span className="sr-only">{t('common.delete')}</span>
+                      <span className="sr-only">{deleteLabel}</span>
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{t('common.delete')}</TooltipContent>
+                  <TooltipContent>{deleteLabel}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>
@@ -124,6 +152,6 @@ export function useSuperAdminAccountsColumns({
         },
       },
     ],
-    [t, onSuspend, onDelete],
+    [t, onSuspend, onDelete, currentAccountId, deleteDisabled],
   );
 }

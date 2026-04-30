@@ -129,6 +129,8 @@
     "noResults": "No results found",
     "noResultsMessage": "No {{entity}} match your search.",
     "clearSearch": "Clear search",
+    "bulkActionsSelected": "{{count}} selected",
+    "clearSelection": "Clear",
     "emptyState": "No {{entity}} found",
     "emptyStateMessage": "Create your first {{entity}} to get started.",
     "deleteConfirmTitle": "Delete {{entity}}",
@@ -326,6 +328,12 @@
     "suppressionError": "Failed to process emails.",
     "suppressionBulkDescription": "Enter the emails, one per line or separated by comma.",
     "suppressionBulkPlaceholder": "email1@example.com\nemail2@example.com",
+    "resubscribeAction": "Remove from list",
+    "resubscribeConfirmTitle": "Remove from list?",
+    "resubscribeConfirmDescription": "{{email}} will start receiving messages again. Continue?",
+    "resubscribeBulkConfirmDescription": "{{count}} email(s) will start receiving messages again. Continue?",
+    "resubscribeSuccess": "Email removed from list.",
+    "resubscribeError": "Failed to remove from list.",
     "filterTags": "Tags",
     "filterSegments": "Segments",
     "filterStatusAll": "All statuses",
@@ -1849,7 +1857,11 @@
       "suspendConfirmMessage": "This will disable all access for users in \"{{name}}\". Continue?",
       "reactivateConfirmTitle": "Reactivate account",
       "reactivateConfirmMessage": "This will restore access for users in \"{{name}}\". Continue?",
-      "deleteConfirmMessage": "Deleting \"{{name}}\" is permanent and cannot be undone."
+      "deleteConfirmMessage": "Deleting \"{{name}}\" is permanent and cannot be undone.",
+      "cannotDeleteCurrent": "You cannot delete the account you are currently using",
+      "bulkDeleteSuccess": "{{count}} account(s) deleted",
+      "bulkDeleteConfirmDescription": "{{count}} account(s) will be deleted. This action cannot be undone.",
+      "bulkDeletePartial": "{{succeeded}} of {{total}} account(s) deleted. {{reason}}"
     },
     "users": {
       "pageTitle": "Users",
@@ -1873,6 +1885,11 @@
       "sendPasswordReset": "Send password reset email",
       "passwordResetSent": "Password reset email sent!",
       "passwordResetError": "Failed to send password reset email.",
+      "cannotDeleteSelf": "You cannot delete your own user",
+      "deletedAccountFallback": "Account #{{id}} (deleted)",
+      "bulkDeleteSuccess": "{{count}} user(s) deleted",
+      "bulkDeleteConfirmDescription": "{{count}} user(s) will be deleted. Continue?",
+      "bulkDeletePartial": "{{succeeded}} of {{total}} user(s) deleted. {{reason}}",
       "errors": {
         "selectAccount": "Select an account",
         "atLeastOneAccount": "At least one account is required"

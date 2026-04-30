@@ -1,4 +1,4 @@
-import { ForbiddenException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { TagEntity } from '../../entities/tag.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -20,6 +20,7 @@ import { AccountCacheService } from '../accounts/account-cache.service';
 
 @Injectable()
 export class TagsService {
+  private readonly logger = new Logger(TagsService.name);
   private schedulerQueueName: string;
   private schedulerEndpoint: string;
 
@@ -185,9 +186,13 @@ export class TagsService {
   }
 
   async create(tagsDto: TagDto | SegmentDto, accountId?: number): Promise<TagEntity> {
-    try {
-      tagsDto.accountId = accountId ? accountId : this.cls.get('accountId');
+    const resolvedAccountId = accountId ?? this.cls.get<number | undefined>('accountId');
+    if (!resolvedAccountId) {
+      throw new BadRequestException('Account context is required. Send the Account-Id header.');
+    }
+    tagsDto.accountId = resolvedAccountId;
 
+    try {
       const tag = this.tagsRepository.create(tagsDto);
       const savedTag = await this.tagsRepository.save(tag);
 
@@ -197,9 +202,11 @@ export class TagsService {
       return savedTag;
     } catch (error) {
       if (error?.code === PostgresErrorCode.UniqueViolation) {
-        throw new ForbiddenException('Tag with that name already exists');
+        throw new ConflictException('A tag or segment with that name already exists in this account');
       }
+      if (error instanceof HttpException) throw error;
 
+      this.logger.error('Failed to create tag', error?.stack || error);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -233,9 +240,11 @@ export class TagsService {
       return updatedTag;
     } catch (error) {
       if (error?.code === PostgresErrorCode.UniqueViolation) {
-        throw new ForbiddenException('Segment with that name already exists');
+        throw new ConflictException('A tag or segment with that name already exists in this account');
       }
+      if (error instanceof HttpException) throw error;
 
+      this.logger.error('Failed to create segment', error?.stack || error);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -282,9 +291,11 @@ export class TagsService {
       return updatedTag;
     } catch (error) {
       if (error?.code === PostgresErrorCode.UniqueViolation) {
-        throw new ForbiddenException('Segment with that name already exists');
+        throw new ConflictException('A tag or segment with that name already exists in this account');
       }
+      if (error instanceof HttpException) throw error;
 
+      this.logger.error('Failed to update segment', error?.stack || error);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -337,11 +348,12 @@ export class TagsService {
 
       return tag;
     } catch (error) {
-      console.error(error);
       if (error?.code === PostgresErrorCode.UniqueViolation) {
-        throw new ForbiddenException('Tag with that name already exists');
+        throw new ConflictException('A tag or segment with that name already exists in this account');
       }
+      if (error instanceof HttpException) throw error;
 
+      this.logger.error('Failed to update tag', error?.stack || error);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

@@ -88,13 +88,11 @@ export function useUpdateContact(uuid: string) {
 
   return useMutation({
     mutationFn: async (data: ContactEditValues) => {
-      const { data: result } = await apiClient.put<Contact>('/contact', {
-        ...data,
-        uuid,
-      });
+      const { data: result } = await apiClient.put<Contact>(`/contacts/${uuid}`, data);
       return result;
     },
     onSuccess: () => {
+      queryClient.removeQueries({ queryKey: [...queryKeys.contacts.all, 'detail'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.contacts.all });
       toast.success(i18n.t('common.updateSuccess', { entity: i18n.t('contacts.entityName') }));
     },

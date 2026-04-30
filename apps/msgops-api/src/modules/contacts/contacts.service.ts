@@ -1,4 +1,5 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { PostgresErrorCode } from 'src/shared.interfaces';
 import { ContactEntity } from './../../entities/contact.entity';
 import { Repository, In, UpdateQueryBuilder, SelectQueryBuilder } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -29,6 +30,8 @@ const CsvParser = require('json2csv').Parser;
 
 @Injectable()
 export class ContactsService {
+  private readonly logger = new Logger(ContactsService.name);
+
   constructor(
     @InjectRepository(ContactEntity)
     private readonly contactRepository: Repository<ContactEntity>,
@@ -140,15 +143,12 @@ export class ContactsService {
         .limit(params.itemsPerPage)
         .getRawMany();
 
-      // Mask emails in raw results
-      const maskedResults = results.map((suppression) => ({
-        ...suppression,
-        email: maskEmail(suppression.email),
-      }));
-
+      // Operator-facing list: emails are intentionally returned in clear so the
+      // operator can identify whom to remove. They're already inside an
+      // authenticated, permission-gated route.
       return new PaginationDto<SuppressionEntity>({
-        results: maskedResults,
-        total: maskedResults.length,
+        results,
+        total: results.length,
         page: params.page,
         itemsPerPage: params.itemsPerPage,
       });
@@ -552,13 +552,13 @@ export class ContactsService {
         ),
         contactsTags as (
           SELECT
-          contact_id,
-          array_agg((tg.name)) AS contact_tag
-        FROM contacts_tags ctg
-        LEFT JOIN tags tg ON tg.id = ctg.tag_id
-        where ctg.contact_id = ${subQueryCondition} and ctg.account_id = $2
-        GROUP BY
-          contact_id
+            contact_id,
+            jsonb_agg(DISTINCT jsonb_build_object('id', tg.id, 'name', tg.name)) AS contact_tag
+          FROM contacts_tags ctg
+          LEFT JOIN tags tg ON tg.id = ctg.tag_id
+          where ctg.contact_id = ${subQueryCondition} and ctg.account_id = $2
+          GROUP BY
+            contact_id
         ),
         contactsCustomFields as (
             SELECT
@@ -635,11 +635,19 @@ export class ContactsService {
 
   async update(contactDto: ContactDto, contactRepository: ContactEntity): Promise<ContactDto> {
     try {
-      this.contactRepository.merge(contactRepository, contactDto);
-      await this.contactRepository.update(contactRepository.id, contactRepository);
-      return contactRepository;
+      // Build a plain patch from the dto so TypeORM's UPDATE doesn't trip on
+      // non-column fields (fullName/maskedEmail set in @AfterLoad) or eager
+      // relations (contactTag, customFields, contactAutomation, contactDevices)
+      // that ContactEntity carries when loaded.
+      const { id: _id, ...patch } = contactDto;
+      await this.contactRepository.update(contactRepository.id, patch as Partial<ContactEntity>);
+      return { ...contactRepository, ...patch };
     } catch (e) {
-      console.error(e);
+      if (e?.code === PostgresErrorCode.UniqueViolation) {
+        throw new ConflictException('A contact with that email already exists in this account');
+      }
+      if (e instanceof HttpException) throw e;
+      this.logger.error('Failed to update contact', e?.stack || e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -880,94 +888,178 @@ export class ContactsService {
     return { imported };
   }
 
-  async updateTag(params: any) {
-    const values: ContactEntity = params.contacts.flatMap((contact: number) => {
-      return params.tags.map((tag: number) => {
-        return {
-          contactId: contact,
-          tagId: tag,
-          accountId: this.cls.get('accountId'),
-        };
-      });
-    });
+  async updateTag(params: { contacts: number[]; tags: number[]; action: 'add' | 'remove' }) {
+    const accountId = this.cls.get<number>('accountId');
+    const contactIds: number[] = params.contacts ?? [];
+    const tagIds: number[] = params.tags ?? [];
+    if (!contactIds.length || !tagIds.length) {
+      return { affected: 0 };
+    }
 
     if (params.action === 'add') {
-      return this.contactTagRepository.createQueryBuilder('contacts_tags').insert().values(values).orIgnore().execute();
+      // contacts_tags has no unique constraint on (account_id, contact_id, tag_id),
+      // so .orIgnore() is a no-op — filter existing pairs in-memory before insert
+      // to keep the relation idempotent.
+      const existing = await this.contactTagRepository
+        .createQueryBuilder('ct')
+        .select(['ct.contactId', 'ct.tagId'])
+        .where('ct.account_id = :accountId AND ct.contact_id IN (:...contactIds) AND ct.tag_id IN (:...tagIds)', {
+          accountId,
+          contactIds,
+          tagIds,
+        })
+        .getMany();
+      const existingPairs = new Set(existing.map((row) => `${row.contactId}:${row.tagId}`));
+
+      const values = contactIds.flatMap((contactId) => tagIds.filter((tagId) => !existingPairs.has(`${contactId}:${tagId}`)).map((tagId) => ({ contactId, tagId, accountId })));
+      if (!values.length) {
+        return { affected: 0 };
+      }
+      return this.contactTagRepository.createQueryBuilder().insert().into('contacts_tags').values(values).execute();
     }
 
     if (params.action === 'remove') {
       // TODO: Remove tag should stop running automation
-      return this.contactTagRepository.createQueryBuilder('contacts_tags').delete().from('contacts_tags').where(values).execute();
+      return this.contactTagRepository
+        .createQueryBuilder()
+        .delete()
+        .from('contacts_tags')
+        .where('account_id = :accountId AND contact_id IN (:...contactIds) AND tag_id IN (:...tagIds)', {
+          accountId,
+          contactIds,
+          tagIds,
+        })
+        .execute();
     }
   }
 
   async bulkUnsubscribe(params: { emails: string[]; allAccounts?: boolean; block?: boolean }) {
     const emails = [...params.emails];
     const date = new Date();
-    if (emails.length && date) {
-      const queryRunner = this.contactRepository.manager.connection.createQueryRunner();
-      await queryRunner.startTransaction();
+    if (!emails.length) {
+      return;
+    }
 
-      try {
-        const block = params.block;
-        const groupId = 1;
-        let accountsIds = [this.cls.get('accountId')];
+    // The `allAccounts` and `is_internal` flags were a SaaS multi-tenant concept
+    // where suppression cascaded across all customer accounts managed by the
+    // operator. In OSS each deployment owns its own data, so we always scope
+    // both the contact update and the suppression record to the current account.
+    const accountId = this.cls.get<number>('accountId');
+    if (!accountId) {
+      throw new BadRequestException('Account context is required. Send the Account-Id header.');
+    }
 
-        if (params.allAccounts) {
-          const accounts = await this.accountRepository.createQueryBuilder('accounts').select('id').where('accounts.is_internal = true').getRawMany();
-          accountsIds = accounts.map((account) => account.id);
-        }
+    const queryRunner = this.contactRepository.manager.connection.createQueryRunner();
+    await queryRunner.startTransaction();
 
-        if (!accountsIds.length) {
-          throw new HttpException('Account not defined', HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    try {
+      const block = params.block;
+      const groupId = 1;
 
-        const query = queryRunner.manager.createQueryBuilder().update('contacts');
-        if (block) {
-          query.set({ isBlocked: true, blockedAt: new Date() });
-        } else {
-          query.set({ isUnsubscribed: true, unsubscribedAt: new Date() });
-        }
-        query.where('email IN (:...emails) AND account_id IN (:...accounts)', {
-          emails,
-          accounts: accountsIds,
-        });
-
-        await query.execute();
-
-        const accountUsub = await this.accountRepository.findOne({ where: { id: this.cls.get('accountId') } });
-        if (accountUsub && accountUsub.isInternal) {
-          let contacts = emails.map((email: string) => ({
-            groupId,
-            email,
-            ...(block ? { isBlocked: true, blockedAt: date, isUnsubscribed: false, unsubscribedAt: null } : { isUnsubscribed: true, unsubscribedAt: date }),
-          }));
-
-          contacts = [...new Map(contacts.map((obj) => [obj.email, obj])).values()];
-
-          await queryRunner.manager.upsert(SuppressionEntity, contacts, ['email', 'groupId']);
-        }
-
-        await queryRunner.commitTransaction();
-
-        const redisClient = this.redisService.getClient();
-        const redisExpiration = 60 * 60 * 168;
-        for (const accountId of accountsIds) {
-          for (const email of emails) {
-            if (block) {
-              await redisClient.set(`${accountId}:blocked:${email}`, 'true');
-            } else {
-              await redisClient.set(`${accountId}:unsubscribed:${email}`, 'true', 'EX', redisExpiration);
-            }
-          }
-        }
-      } catch (err) {
-        await queryRunner.rollbackTransaction();
-        console.error(err);
-        throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
-      } finally {
-        await queryRunner.release();
+      const query = queryRunner.manager.createQueryBuilder().update('contacts');
+      if (block) {
+        query.set({ isBlocked: true, blockedAt: date });
+      } else {
+        query.set({ isUnsubscribed: true, unsubscribedAt: date });
       }
+      query.where('email IN (:...emails) AND account_id = :accountId', { emails, accountId });
+
+      await query.execute();
+
+      const contacts = [
+        ...new Map(
+          emails.map((email: string) => [
+            email,
+            {
+              groupId,
+              email,
+              ...(block ? { isBlocked: true, blockedAt: date, isUnsubscribed: false, unsubscribedAt: null } : { isUnsubscribed: true, unsubscribedAt: date }),
+            },
+          ]),
+        ).values(),
+      ];
+
+      await queryRunner.manager.upsert(SuppressionEntity, contacts, ['email', 'groupId']);
+
+      await queryRunner.commitTransaction();
+
+      const redisClient = this.redisService.getClient();
+      const redisExpiration = 60 * 60 * 168;
+      // Pipeline so a 1k-email bulk doesn't pay 1k network round-trips. Each
+      // command is independent — no need for a Redis MULTI transaction here.
+      const pipeline = redisClient.pipeline();
+      for (const email of emails) {
+        if (block) {
+          pipeline.set(`${accountId}:blocked:${email}`, 'true');
+        } else {
+          pipeline.set(`${accountId}:unsubscribed:${email}`, 'true', 'EX', redisExpiration);
+        }
+      }
+      await pipeline.exec();
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      if (err instanceof HttpException) throw err;
+      this.logger.error('Failed to bulk unsubscribe', err?.stack || err);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async bulkResubscribe(params: { emails: string[]; block?: boolean }) {
+    const emails = [...(params.emails ?? [])];
+    if (!emails.length) {
+      return;
+    }
+
+    const accountId = this.cls.get<number>('accountId');
+    if (!accountId) {
+      throw new BadRequestException('Account context is required. Send the Account-Id header.');
+    }
+
+    const block = !!params.block;
+    const groupId = 1;
+
+    const queryRunner = this.contactRepository.manager.connection.createQueryRunner();
+    await queryRunner.startTransaction();
+
+    try {
+      // Clear the matching flag on the contact rows in this account.
+      const contactPatch = block ? { isBlocked: false, blockedAt: null } : { isUnsubscribed: false, unsubscribedAt: null };
+      await queryRunner.manager
+        .createQueryBuilder()
+        .update('contacts')
+        .set(contactPatch)
+        .where('email IN (:...emails) AND account_id = :accountId', { emails, accountId })
+        .execute();
+
+      // Drop suppression rows that match the type. bulkUnsubscribe only ever
+      // sets one flag at a time, so a row in the requested type can be deleted
+      // outright. If a future caller stores a row with both flags set, we'd
+      // need to clear the flag and delete only when both are false instead.
+      const suppressionDelete = queryRunner.manager.createQueryBuilder().delete().from('suppressions').where('group_id = :groupId AND email IN (:...emails)', { groupId, emails });
+      if (block) {
+        suppressionDelete.andWhere('is_blocked = TRUE');
+      } else {
+        suppressionDelete.andWhere('is_unsubscribed = TRUE');
+      }
+      await suppressionDelete.execute();
+
+      await queryRunner.commitTransaction();
+
+      const redisClient = this.redisService.getClient();
+      const redisKeyPrefix = block ? 'blocked' : 'unsubscribed';
+      const redisKeys = emails.map((email) => `${accountId}:${redisKeyPrefix}:${email}`);
+      if (redisKeys.length) {
+        await redisClient.del(...redisKeys);
+      }
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      if (err instanceof HttpException) throw err;
+      this.logger.error('Failed to bulk resubscribe', err?.stack || err);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    } finally {
+      await queryRunner.release();
     }
   }
 
@@ -1284,7 +1376,15 @@ export class ContactsService {
           });
         }
 
-        events = await eventsQuery.getRawMany();
+        try {
+          events = await eventsQuery.getRawMany();
+        } catch (e) {
+          // events_logs lives in ClickHouse (events_logs_v2), not Postgres. Until the
+          // cross-DB hydration is wired up, degrade to automations-only instead of 500ing
+          // the contact edit page.
+          this.logger.warn(`Contact event history unavailable: ${e?.message ?? e}`);
+          events = [];
+        }
       }
 
       const combinedData = [...automations, ...events];

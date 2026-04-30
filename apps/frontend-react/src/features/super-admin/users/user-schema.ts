@@ -10,7 +10,10 @@ export const superAdminCreateUserSchema = z
     globalRoleCode: z.enum(ROLE_CODES).default('editor'),
     accounts: z.array(
       z.object({
-        accountId: z.number().int().positive({ message: 'superAdmin.users.errors.selectAccount' }),
+        accountId: z
+          .number({ message: 'superAdmin.users.errors.selectAccount' })
+          .int({ message: 'superAdmin.users.errors.selectAccount' })
+          .positive({ message: 'superAdmin.users.errors.selectAccount' }),
         isMasterUser: z.boolean().default(false),
       }),
     ),

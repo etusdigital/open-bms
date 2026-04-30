@@ -187,4 +187,11 @@ export class UsersController {
   removeAccountMembership(@Param('id') id: number, @Param('accountId') accountId: number) {
     return this.userService.removeAccountMembership(Number(id), Number(accountId));
   }
+
+  @Delete(':id')
+  async deleteUser(@Param('id') id: number, @Req() req: any) {
+    this.requireSuperAdmin(req);
+    const actingUserId = req?.authzContext?.userId;
+    return this.userService.softDeleteUser(Number(id), actingUserId);
+  }
 }

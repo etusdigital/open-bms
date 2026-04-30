@@ -148,7 +148,7 @@ describe('useUpdateContact', () => {
     authenticateStore();
   });
 
-  it('calls PUT /contact with form data', async () => {
+  it('calls PUT /contacts/:uuid with form data', async () => {
     const { result } = renderHook(() => useUpdateContact('abc-uuid-123'), {
       wrapper: createQueryWrapper(),
     });
@@ -167,9 +167,8 @@ describe('useUpdateContact', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(mockPut).toHaveBeenCalledWith(
-      '/contact',
+      '/contacts/abc-uuid-123',
       expect.objectContaining({
-        uuid: 'abc-uuid-123',
         firstName: 'John',
       }),
     );

@@ -100,6 +100,7 @@ export function useUpdateCustomField(id: number) {
       return result;
     },
     onSuccess: () => {
+      queryClient.removeQueries({ queryKey: [...queryKeys.customFields.all, 'detail'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.customFields.all });
       toast.success(i18n.t('common.updateSuccess', { entity: i18n.t('customFields.entityName') }));
     },

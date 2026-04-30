@@ -79,6 +79,7 @@ export function useUpdateLabel(id: number) {
       return result;
     },
     onSuccess: () => {
+      queryClient.removeQueries({ queryKey: [...queryKeys.labels.all, 'detail'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.labels.all });
       toast.success(i18n.t('common.updateSuccess', { entity: i18n.t('labels.entityName') }));
     },

@@ -129,6 +129,8 @@
     "noResults": "Nenhum resultado encontrado",
     "noResultsMessage": "Nenhum {{entity}} corresponde à sua busca.",
     "clearSearch": "Limpar busca",
+    "bulkActionsSelected": "{{count}} selecionado(s)",
+    "clearSelection": "Limpar",
     "emptyState": "Nenhum {{entity}} encontrado",
     "emptyStateMessage": "Crie seu primeiro {{entity}} para começar.",
     "deleteConfirmTitle": "Excluir {{entity}}",
@@ -326,6 +328,12 @@
     "suppressionError": "Erro ao processar emails.",
     "suppressionBulkDescription": "Insira os emails, um por linha ou separados por vírgula.",
     "suppressionBulkPlaceholder": "email1@example.com\nemail2@example.com",
+    "resubscribeAction": "Remover da lista",
+    "resubscribeConfirmTitle": "Remover da lista?",
+    "resubscribeConfirmDescription": "{{email}} voltará a receber mensagens. Continuar?",
+    "resubscribeBulkConfirmDescription": "{{count}} email(s) voltarão a receber mensagens. Continuar?",
+    "resubscribeSuccess": "Email removido da lista.",
+    "resubscribeError": "Erro ao remover da lista.",
     "filterTags": "Tags",
     "filterSegments": "Segmentos",
     "filterStatusAll": "Todos os status",
@@ -1849,7 +1857,11 @@
       "suspendConfirmMessage": "Isso vai desabilitar o acesso de todos os usuários em \"{{name}}\". Continuar?",
       "reactivateConfirmTitle": "Reativar conta",
       "reactivateConfirmMessage": "Isso vai restaurar o acesso dos usuários em \"{{name}}\". Continuar?",
-      "deleteConfirmMessage": "Excluir \"{{name}}\" é permanente e não pode ser desfeito."
+      "deleteConfirmMessage": "Excluir \"{{name}}\" é permanente e não pode ser desfeito.",
+      "cannotDeleteCurrent": "Você não pode apagar a conta que está usando",
+      "bulkDeleteSuccess": "{{count}} conta(s) apagada(s)",
+      "bulkDeleteConfirmDescription": "{{count}} conta(s) serão apagadas. Esta ação não pode ser desfeita.",
+      "bulkDeletePartial": "{{succeeded}} de {{total}} conta(s) apagada(s). {{reason}}"
     },
     "users": {
       "pageTitle": "Usuários",
@@ -1873,6 +1885,11 @@
       "sendPasswordReset": "Enviar e-mail de redefinição",
       "passwordResetSent": "E-mail de redefinição de senha enviado!",
       "passwordResetError": "Falha ao enviar o e-mail de redefinição.",
+      "cannotDeleteSelf": "Você não pode apagar seu próprio usuário",
+      "deletedAccountFallback": "Conta #{{id}} (apagada)",
+      "bulkDeleteSuccess": "{{count}} usuário(s) apagado(s)",
+      "bulkDeleteConfirmDescription": "{{count}} usuário(s) serão apagados. Continuar?",
+      "bulkDeletePartial": "{{succeeded}} de {{total}} usuário(s) apagado(s). {{reason}}",
       "errors": {
         "selectAccount": "Selecione uma conta",
         "atLeastOneAccount": "Pelo menos uma conta é necessária"
