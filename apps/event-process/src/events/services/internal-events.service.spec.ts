@@ -5,7 +5,7 @@ import { FormatterUtils } from '../../utils/formatter.utils';
 import { MsgopsService } from '../../msgops/msgops.service';
 import { EventPublisherService } from '../../event-publisher.service';
 import { CacheService } from '../../msgops/cache.service';
-import { GeolocationService } from '../../utils/geolocation/geolocation.service';
+import { GEO_PROVIDER_TOKEN } from '@bms/geo';
 import { AnalyticsPublisherProvider } from '../../providers/analytics-publisher.provider';
 import { InternalRequest } from '../interfaces/events.interfaces';
 
@@ -49,15 +49,20 @@ describe('InternalEventsService', () => {
   };
 
   const mockGeolocationService = {
-    getLocation: jest.fn(),
+    lookup: jest.fn(),
   };
 
   const mockAnalyticsPublisherProvider = {
     publish: jest.fn(),
   };
 
+  afterEach(() => {
+    delete process.env.GEO_ENRICHMENT_ENABLED;
+  });
+
   beforeEach(async () => {
     jest.clearAllMocks();
+    process.env.GEO_ENRICHMENT_ENABLED = 'true';
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -67,7 +72,7 @@ describe('InternalEventsService', () => {
         { provide: MsgopsService, useValue: mockMsgopsService },
         { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: CacheService, useValue: mockCacheService },
-        { provide: GeolocationService, useValue: mockGeolocationService },
+        { provide: GEO_PROVIDER_TOKEN, useValue: mockGeolocationService },
         { provide: AnalyticsPublisherProvider, useValue: mockAnalyticsPublisherProvider },
       ],
     }).compile();
@@ -325,7 +330,7 @@ describe('InternalEventsService', () => {
       });
 
       it('should fetch geolocation data when IP is provided', async () => {
-        mockGeolocationService.getLocation.mockResolvedValue({
+        mockGeolocationService.lookup.mockResolvedValue({
           country: 'Brazil',
           region: 'SP',
           city: 'Sao Paulo',
@@ -335,7 +340,7 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        expect(mockGeolocationService.getLocation).toHaveBeenCalledWith('192.168.1.1');
+        expect(mockGeolocationService.lookup).toHaveBeenCalledWith('192.168.1.1');
         expect(mockAnalyticsPublisherProvider.publish).toHaveBeenCalledWith(
           expect.objectContaining({
             country: 'Brazil',
@@ -350,7 +355,7 @@ describe('InternalEventsService', () => {
 
         await service.internalEventsProcess(request);
 
-        expect(mockGeolocationService.getLocation).not.toHaveBeenCalled();
+        expect(mockGeolocationService.lookup).not.toHaveBeenCalled();
       });
     });
 
@@ -681,7 +686,7 @@ describe('InternalEventsService', () => {
       });
 
       it('stamps is_datacenter=true, is_bot=false, bot_classification="datacenter" for a GCP hosting IP', async () => {
-        mockGeolocationService.getLocation.mockResolvedValueOnce({
+        mockGeolocationService.lookup.mockResolvedValueOnce({
           country: 'US',
           region: 'CA',
           city: 'Mountain View',
@@ -713,7 +718,7 @@ describe('InternalEventsService', () => {
       });
 
       it('UA denylist upgrades a hosting tracker-redirect with curl UA to is_bot=true (script_ua)', async () => {
-        mockGeolocationService.getLocation.mockResolvedValueOnce({
+        mockGeolocationService.lookup.mockResolvedValueOnce({
           country: 'US',
           traits: {
             asn: 16509,
@@ -739,7 +744,7 @@ describe('InternalEventsService', () => {
       });
 
       it('stamps residential traits clean for a real user click', async () => {
-        mockGeolocationService.getLocation.mockResolvedValueOnce({
+        mockGeolocationService.lookup.mockResolvedValueOnce({
           country: 'BR',
           region: 'SP',
           city: 'São Paulo',
@@ -772,7 +777,7 @@ describe('InternalEventsService', () => {
         const request = createRequest([noIpEvent]);
         await service.internalEventsProcess(request);
 
-        expect(mockGeolocationService.getLocation).not.toHaveBeenCalled();
+        expect(mockGeolocationService.lookup).not.toHaveBeenCalled();
         const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
         expect(JSON.parse(payload.properties)).toMatchObject({
           is_bot: false,

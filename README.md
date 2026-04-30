@@ -196,3 +196,10 @@ curl -X POST https://YOUR_BACKEND_URL/internal/cron/detect-anomalies \
 curl -X POST https://YOUR_BACKEND_URL/internal/cron/refresh-ip-usage \
   -H "x-cron-secret: YOUR_CRON_SECRET"
 ```
+
+## Attributions
+
+IP geolocation data provided by [DB-IP.com](https://db-ip.com) under the
+[Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).
+The DB-IP Lite City MMDB is downloaded by `scripts/download-geodb.sh` and refreshed
+monthly by the `geolocation-refresh` sidecar in `docker-compose.yml`.

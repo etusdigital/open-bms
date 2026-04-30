@@ -1,9 +1,5 @@
 import { Observable } from 'rxjs';
 
-export interface IpRequest {
-  ip: string;
-}
-
 export interface Traits {
   asn: number;
   asnOrg: string;
@@ -12,6 +8,17 @@ export interface Traits {
   userType: string;
   connectionType: string;
   isAnycast: boolean;
+}
+
+export interface GeoData {
+  country?: string;
+  region?: string;
+  city?: string;
+  traits?: Traits;
+}
+
+export interface GeoProvider {
+  lookup(ip: string): Promise<GeoData | null>;
 }
 
 export interface LocationResponse {
@@ -27,6 +34,10 @@ export interface LocationResponse {
   traits?: Traits;
 }
 
-export interface GeolocationServiceClient {
+export interface IpRequest {
+  ip: string;
+}
+
+export interface GeoIpServiceClient {
   getLocation(data: IpRequest): Observable<LocationResponse>;
 }

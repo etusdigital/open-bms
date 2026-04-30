@@ -7,7 +7,7 @@ import { MsgopsService } from '../../msgops/msgops.service';
 import { EXCHANGES } from '@bms/messaging';
 import { EventPublisherService } from '../../event-publisher.service';
 import { CacheService } from '../../msgops/cache.service';
-import { GeolocationService } from '../../utils/geolocation/geolocation.service';
+import { GEO_PROVIDER_TOKEN } from '@bms/geo';
 import { AnalyticsPublisherProvider } from '../../providers/analytics-publisher.provider';
 import { PlatformType } from '../interfaces/push.interfaces';
 
@@ -94,8 +94,8 @@ describe('EventsService', () => {
     set: jest.fn(),
   };
 
-  const mockGeolocationService = {
-    getLocation: jest.fn(),
+  const mockGeoProvider = {
+    lookup: jest.fn(),
   };
 
   const mockAnalyticsPublisherProvider = {
@@ -114,7 +114,7 @@ describe('EventsService', () => {
         { provide: MsgopsService, useValue: mockMsgopsService },
         { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: CacheService, useValue: mockCacheService },
-        { provide: GeolocationService, useValue: mockGeolocationService },
+        { provide: GEO_PROVIDER_TOKEN, useValue: mockGeoProvider },
         { provide: AnalyticsPublisherProvider, useValue: mockAnalyticsPublisherProvider },
       ],
     }).compile();
@@ -278,29 +278,49 @@ describe('EventsService', () => {
   });
 
   describe('getGeoIpInfo', () => {
+    const originalEnv = process.env.GEO_ENRICHMENT_ENABLED;
+
+    afterEach(() => {
+      process.env.GEO_ENRICHMENT_ENABLED = originalEnv;
+    });
+
     it('should return empty object when ip is empty', async () => {
+      process.env.GEO_ENRICHMENT_ENABLED = 'true';
       const result = await service.testGetGeoIpInfo('');
       expect(result).toEqual({});
     });
 
     it('should return empty object when ip is undefined', async () => {
+      process.env.GEO_ENRICHMENT_ENABLED = 'true';
       const result = await service.testGetGeoIpInfo(undefined);
       expect(result).toEqual({});
     });
 
-    it('should return location data from geolocationService', async () => {
-      mockGeolocationService.getLocation.mockResolvedValueOnce({
-        country: 'US',
-        region: 'CA',
-        city: 'San Francisco',
-      });
+    it('should return empty object when GEO_ENRICHMENT_ENABLED is false', async () => {
+      process.env.GEO_ENRICHMENT_ENABLED = 'false';
+      const result = await service.testGetGeoIpInfo('8.8.8.8');
+      expect(result).toEqual({});
+      expect(mockGeoProvider.lookup).not.toHaveBeenCalled();
+    });
+
+    it('should return empty object when GEO_ENRICHMENT_ENABLED is not set', async () => {
+      delete process.env.GEO_ENRICHMENT_ENABLED;
+      const result = await service.testGetGeoIpInfo('8.8.8.8');
+      expect(result).toEqual({});
+      expect(mockGeoProvider.lookup).not.toHaveBeenCalled();
+    });
+
+    it('should return location data from geo provider', async () => {
+      process.env.GEO_ENRICHMENT_ENABLED = 'true';
+      mockGeoProvider.lookup.mockResolvedValueOnce({ country: 'US', region: 'CA', city: 'San Francisco' });
 
       const result = await service.testGetGeoIpInfo('1.2.3.4');
       expect(result).toEqual({ country: 'US', region: 'CA', city: 'San Francisco', traits: undefined });
     });
 
-    it('should pass traits through from the geolocation service', async () => {
-      mockGeolocationService.getLocation.mockResolvedValueOnce({
+    it('should pass traits through from the geo provider', async () => {
+      process.env.GEO_ENRICHMENT_ENABLED = 'true';
+      mockGeoProvider.lookup.mockResolvedValueOnce({
         country: 'US',
         region: 'CA',
         city: 'Mountain View',
@@ -319,8 +339,17 @@ describe('EventsService', () => {
       expect(result.traits).toEqual(expect.objectContaining({ asn: 15169, userType: 'hosting', asnOrg: 'Google LLC' }));
     });
 
-    it('should return empty object and log when geolocationService throws', async () => {
-      mockGeolocationService.getLocation.mockRejectedValueOnce(new Error('gRPC fail'));
+    it('should return empty object when provider returns null', async () => {
+      process.env.GEO_ENRICHMENT_ENABLED = 'true';
+      mockGeoProvider.lookup.mockResolvedValueOnce(null);
+
+      const result = await service.testGetGeoIpInfo('127.0.0.1');
+      expect(result).toEqual({});
+    });
+
+    it('should return empty object and log when geo provider throws', async () => {
+      process.env.GEO_ENRICHMENT_ENABLED = 'true';
+      mockGeoProvider.lookup.mockRejectedValueOnce(new Error('gRPC fail'));
 
       const result = await service.testGetGeoIpInfo('1.2.3.4');
       expect(result).toEqual({});

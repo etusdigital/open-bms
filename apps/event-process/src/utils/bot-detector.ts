@@ -1,4 +1,4 @@
-import type { Traits } from './geolocation/geolocation.interface';
+import type { Traits } from '@bms/geo';
 
 export type BotClassification =
   | 'gmail_prefetch'

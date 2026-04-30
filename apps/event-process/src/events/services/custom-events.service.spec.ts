@@ -5,7 +5,7 @@ import { FormatterUtils } from '../../utils/formatter.utils';
 import { MsgopsService } from '../../msgops/msgops.service';
 import { EventPublisherService } from '../../event-publisher.service';
 import { CacheService } from '../../msgops/cache.service';
-import { GeolocationService } from '../../utils/geolocation/geolocation.service';
+import { GEO_PROVIDER_TOKEN } from '@bms/geo';
 import { AnalyticsPublisherProvider } from '../../providers/analytics-publisher.provider';
 import { PlatformType } from '../interfaces/push.interfaces';
 
@@ -47,7 +47,7 @@ describe('CustomEventsService', () => {
   };
   const mockEventPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
   const mockCacheService = { get: jest.fn(), set: jest.fn() };
-  const mockGeolocationService = { getLocation: jest.fn().mockResolvedValue({}) };
+  const mockGeolocationService = { lookup: jest.fn().mockResolvedValue(null) };
   const mockAnalyticsPublisherProvider = { publish: jest.fn().mockResolvedValue(undefined) };
 
   const baseEvent = {
@@ -66,8 +66,13 @@ describe('CustomEventsService', () => {
     payload: events,
   });
 
+  afterEach(() => {
+    delete process.env.GEO_ENRICHMENT_ENABLED;
+  });
+
   beforeEach(async () => {
     jest.clearAllMocks();
+    process.env.GEO_ENRICHMENT_ENABLED = 'true';
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -77,7 +82,7 @@ describe('CustomEventsService', () => {
         { provide: MsgopsService, useValue: mockMsgopsService },
         { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: CacheService, useValue: mockCacheService },
-        { provide: GeolocationService, useValue: mockGeolocationService },
+        { provide: GEO_PROVIDER_TOKEN, useValue: mockGeolocationService },
         { provide: AnalyticsPublisherProvider, useValue: mockAnalyticsPublisherProvider },
       ],
     }).compile();
@@ -273,7 +278,7 @@ describe('CustomEventsService', () => {
       };
 
       it('stamps residential traits clean for a real user pageview', async () => {
-        mockGeolocationService.getLocation.mockResolvedValueOnce({
+        mockGeolocationService.lookup.mockResolvedValueOnce({
           country: 'MX',
           region: 'DIF',
           city: 'Mexico City',
@@ -304,7 +309,7 @@ describe('CustomEventsService', () => {
       });
 
       it('UA denylist flips a hosting pageview with curl UA to is_bot=true (script_ua)', async () => {
-        mockGeolocationService.getLocation.mockResolvedValueOnce({
+        mockGeolocationService.lookup.mockResolvedValueOnce({
           country: 'US',
           traits: {
             asn: 16509,
@@ -332,7 +337,7 @@ describe('CustomEventsService', () => {
         const { ip: _ip, ...noIpEvent } = pageviewEvent;
         await service.customEventsProcess(makeRequest([noIpEvent]) as any);
 
-        expect(mockGeolocationService.getLocation).not.toHaveBeenCalled();
+        expect(mockGeolocationService.lookup).not.toHaveBeenCalled();
         const [payload] = mockAnalyticsPublisherProvider.publish.mock.lastCall!;
         expect(JSON.parse(payload.properties)).toMatchObject({
           is_bot: false,

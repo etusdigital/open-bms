@@ -8,12 +8,12 @@ import { FormatterUtils } from '../utils/formatter.utils';
 import { MsgopsModule } from '../msgops/msgops.module';
 import { RedisModule } from '../providers/redis/redis.module';
 import { CacheService } from '../msgops/cache.service';
-import { GeolocationModule } from '../utils/geolocation/geolocation.module';
+import { GeoModule } from '@bms/geo';
 import { AnalyticsPublisherProvider } from '../providers/analytics-publisher.provider';
 import { InternalEventsService } from './services/internal-events.service';
 
 @Module({
-  imports: [MsgopsModule, RedisModule, GeolocationModule],
+  imports: [MsgopsModule, RedisModule, GeoModule.register()],
   providers: [
     FormatterUtils,
     EventsService,

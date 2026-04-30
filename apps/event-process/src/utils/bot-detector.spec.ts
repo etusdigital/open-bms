@@ -1,5 +1,5 @@
 import { BotDetector } from './bot-detector';
-import type { Traits } from './geolocation/geolocation.interface';
+import type { Traits } from '@bms/geo';
 
 const traitsOf = (overrides: Partial<Traits>): Traits => ({
   asn: 0,

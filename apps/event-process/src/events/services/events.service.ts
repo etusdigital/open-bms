@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Inject } from '@nestjs/common';
 import { RedisService } from '../../providers/redis/redis.service';
 import { Redis, ChainableCommander } from 'ioredis';
 import { UAParser } from 'ua-parser-js';
@@ -9,8 +9,7 @@ import { EXCHANGES } from '@bms/messaging';
 import { EventPublisherService } from '../../event-publisher.service';
 import { EventLog, InternalEvent, InternalRequest, SendgridPayload } from '../interfaces/events.interfaces';
 import { CacheService } from '../../msgops/cache.service';
-import { GeolocationService } from '../../utils/geolocation/geolocation.service';
-import type { Traits } from '../../utils/geolocation/geolocation.interface';
+import { GeoProvider, GEO_PROVIDER_TOKEN, Traits } from '@bms/geo';
 import { AnalyticsPublisherProvider } from '../../providers/analytics-publisher.provider';
 import { BotDetector } from '../../utils/bot-detector';
 import crypto from 'crypto';
@@ -31,7 +30,7 @@ export class EventsService {
     protected readonly msgOpsService: MsgopsService,
     protected readonly eventPublisher: EventPublisherService,
     private readonly cacheService: CacheService,
-    private readonly geolocationService: GeolocationService,
+    @Inject(GEO_PROVIDER_TOKEN) private readonly geoProvider: GeoProvider,
     protected readonly analyticsPublisher: AnalyticsPublisherProvider,
   ) {
     this.redisClient = this.redisService.getOrThrow();
@@ -43,15 +42,15 @@ export class EventsService {
   protected async getGeoIpInfo(
     ip: string,
   ): Promise<{ country?: string; region?: string; city?: string; traits?: Traits }> {
-    if (!ip) return {};
+    if (!ip || process.env.GEO_ENRICHMENT_ENABLED !== 'true') return {};
     try {
-      const location = await this.geolocationService.getLocation(ip);
-
+      const geoData = await this.geoProvider.lookup(ip);
+      if (!geoData) return {};
       return {
-        country: location.country,
-        region: location.region,
-        city: location.city,
-        traits: location.traits,
+        country: geoData.country,
+        region: geoData.region,
+        city: geoData.city,
+        traits: geoData.traits,
       };
     } catch (error) {
       this.formatterUtils.logInfo(`Error getting GeoIP info for ${ip}: ${error}`);

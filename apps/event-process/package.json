@@ -21,6 +21,7 @@
     "test:e2e": "DOTENV_CONFIG_PATH=./.env.test jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@bms/geo": "workspace:*",
     "@bms/messaging": "workspace:*",
     "@grpc/grpc-js": "^1.14.3",
     "@grpc/proto-loader": "^0.8.0",
@@ -96,7 +97,8 @@
       "!msgops/msgops.module.ts",
       "!utils/geolocation/geolocation.module.ts",
       "!utils/geolocation/geolocation.interface.ts",
-      "!utils/geolocation/geolocation.service.ts"
+      "!utils/geolocation/geolocation.service.ts",
+      "!messaging.module.ts"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",

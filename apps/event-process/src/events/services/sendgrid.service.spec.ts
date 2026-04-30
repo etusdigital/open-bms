@@ -5,7 +5,7 @@ import { FormatterUtils } from '../../utils/formatter.utils';
 import { MsgopsService } from '../../msgops/msgops.service';
 import { EventPublisherService } from '../../event-publisher.service';
 import { CacheService } from '../../msgops/cache.service';
-import { GeolocationService } from '../../utils/geolocation/geolocation.service';
+import { GEO_PROVIDER_TOKEN } from '@bms/geo';
 import { AnalyticsPublisherProvider } from '../../providers/analytics-publisher.provider';
 import { SendgridBounceClassification } from '../interfaces/events.interfaces';
 
@@ -91,11 +91,16 @@ describe('SendgridService', () => {
 
   const mockEventPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
   const mockCacheService = { get: jest.fn(), set: jest.fn() };
-  const mockGeolocationService = { getLocation: jest.fn().mockResolvedValue({}) };
+  const mockGeolocationService = { lookup: jest.fn().mockResolvedValue(null) };
   const mockAnalyticsPublisherProvider = { publish: jest.fn().mockResolvedValue(undefined) };
+
+  afterEach(() => {
+    delete process.env.GEO_ENRICHMENT_ENABLED;
+  });
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    process.env.GEO_ENRICHMENT_ENABLED = 'true';
     // Re-apply mock implementations after clearAllMocks (which only clears state, not implementations).
     // Tests that override these with mockReturnValue/mockImplementation will persist
     // across clearAllMocks, so we must explicitly reset them here.
@@ -115,7 +120,7 @@ describe('SendgridService', () => {
         { provide: MsgopsService, useValue: mockMsgopsService },
         { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: CacheService, useValue: mockCacheService },
-        { provide: GeolocationService, useValue: mockGeolocationService },
+        { provide: GEO_PROVIDER_TOKEN, useValue: mockGeolocationService },
         { provide: AnalyticsPublisherProvider, useValue: mockAnalyticsPublisherProvider },
       ],
     }).compile();
@@ -784,11 +789,11 @@ describe('SendgridService', () => {
     });
 
     it('should fetch geoIP for open events with IP', async () => {
-      mockGeolocationService.getLocation.mockResolvedValueOnce({ country: 'BR', region: 'SP', city: 'SP' });
+      mockGeolocationService.lookup.mockResolvedValueOnce({ country: 'BR', region: 'SP', city: 'SP' });
       const event = makeOpenEvent({ ip: '8.8.8.8' });
       await service.processSendgrid({ payload: [event], platform: 'sendgrid' as any, account: 'acct1' });
 
-      expect(mockGeolocationService.getLocation).toHaveBeenCalledWith('8.8.8.8');
+      expect(mockGeolocationService.lookup).toHaveBeenCalledWith('8.8.8.8');
     });
 
     it('should check automation target Redis key for open/click events', async () => {

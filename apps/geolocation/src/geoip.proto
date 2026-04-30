@@ -1,5 +1,9 @@
 syntax = "proto3";
 
+// NOTE: this proto is a server-side copy. The shared client copy lives in
+// `packages/geo/src/geoip.proto`. Both must stay in sync until they are
+// consolidated — see ADR docs/plans/2026-04-30-adr-geo-grpc-architecture.md.
+
 package geoip;
 
 service GeoIpService {

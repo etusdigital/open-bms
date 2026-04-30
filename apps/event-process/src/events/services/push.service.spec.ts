@@ -5,7 +5,7 @@ import { FormatterUtils } from '../../utils/formatter.utils';
 import { MsgopsService } from '../../msgops/msgops.service';
 import { EventPublisherService } from '../../event-publisher.service';
 import { CacheService } from '../../msgops/cache.service';
-import { GeolocationService } from '../../utils/geolocation/geolocation.service';
+import { GEO_PROVIDER_TOKEN } from '@bms/geo';
 import { AnalyticsPublisherProvider } from '../../providers/analytics-publisher.provider';
 import { PlatformType } from '../interfaces/push.interfaces';
 
@@ -43,11 +43,16 @@ describe('PushService', () => {
   };
   const mockEventPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
   const mockCacheService = { get: jest.fn(), set: jest.fn() };
-  const mockGeolocationService = { getLocation: jest.fn().mockResolvedValue({}) };
+  const mockGeolocationService = { lookup: jest.fn().mockResolvedValue(null) };
   const mockAnalyticsPublisherProvider = { publish: jest.fn().mockResolvedValue(undefined) };
+
+  afterEach(() => {
+    delete process.env.GEO_ENRICHMENT_ENABLED;
+  });
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    process.env.GEO_ENRICHMENT_ENABLED = 'true';
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -57,7 +62,7 @@ describe('PushService', () => {
         { provide: MsgopsService, useValue: mockMsgopsService },
         { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: CacheService, useValue: mockCacheService },
-        { provide: GeolocationService, useValue: mockGeolocationService },
+        { provide: GEO_PROVIDER_TOKEN, useValue: mockGeolocationService },
         { provide: AnalyticsPublisherProvider, useValue: mockAnalyticsPublisherProvider },
       ],
     }).compile();
@@ -208,12 +213,12 @@ describe('PushService', () => {
 
     it('should call getGeoIpInfo for delivered events when EVENT_IP is present', async () => {
       await service.saveLogsPush(makeWebhook([makeEvent({ event: 'delivered' })]) as any);
-      expect(mockGeolocationService.getLocation).toHaveBeenCalled();
+      expect(mockGeolocationService.lookup).toHaveBeenCalled();
     });
 
     it('should not call getGeoIpInfo for sent events', async () => {
       await service.saveLogsPush(makeWebhook([makeEvent({ event: 'sent' })]) as any);
-      expect(mockGeolocationService.getLocation).not.toHaveBeenCalled();
+      expect(mockGeolocationService.lookup).not.toHaveBeenCalled();
     });
   });
 });

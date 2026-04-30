@@ -248,7 +248,14 @@ services:
     environment:
       <<: *backend-env
       PORT: '3000'
-    depends_on: *infra-deps
+      GEOIP_SERVICE_URL: geolocation:50051
+      GEO_GRPC_URL: geolocation:50051
+      GEO_ENRICHMENT_ENABLED: 'true'
+      GEO_PROVIDER: local
+    depends_on:
+      <<: *infra-deps
+      geolocation:
+        condition: service_started
 
   campaign-packer:
     build:
@@ -369,11 +376,41 @@ services:
       context: .
       dockerfile: apps/geolocation/Dockerfile
     container_name: geolocation
+    ports:
+      - '50051:50051'
     <<: *restart-policy
     environment:
       <<: *backend-env
-      PORT: '3000'
+      PORT: '50051'
+      DBIP_MMDB_PATH: /data/geo/dbip-city-lite.mmdb
+    volumes:
+      - ./data/geo:/data/geo
     depends_on: *infra-deps
+
+  # Monthly MMDB refresh. DB-IP releases new builds on the 1st of each month;
+  # this sidecar re-downloads on container start, then sleeps 30 days and
+  # repeats. Restart policy ensures the loop survives host reboots. The MMDB
+  # is bind-mounted to the same ./data/geo dir the geolocation service reads
+  # from — geolocation rebuilds the in-memory MMDBReader on its own restarts,
+  # so no IPC needed here.
+  geolocation-refresh:
+    image: alpine:3.20
+    container_name: geolocation-refresh
+    <<: *restart-policy
+    volumes:
+      - ./data/geo:/data/geo
+      - ./scripts/download-geodb.sh:/usr/local/bin/download-geodb.sh:ro
+    environment:
+      GEO_DB_PATH: /data/geo/dbip-city-lite.mmdb
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        apk add --no-cache bash curl >/dev/null &&
+        while true; do
+          bash /usr/local/bin/download-geodb.sh || echo "[geolocation-refresh] download failed, retrying next cycle"
+          sleep 2592000
+        done
 
   frontend-react:
     build:
@@ -401,3 +438,4 @@ volumes:
   postgres-data:
   redis-data:
   minio-data:
+  # geo-data: bind mount ./data/geo — run scripts/download-geodb.sh before first docker-compose up
