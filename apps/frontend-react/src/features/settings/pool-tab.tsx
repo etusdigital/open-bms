@@ -34,7 +34,7 @@ function normalizeStoredIps(raw: Pool['ip']): string[] {
 
 export function PoolTab() {
   const { t } = useTranslation();
-  const accountId = useAppStore((s) => (s.auth.status === 'authenticated' ? s.auth.account.id : 0));
+  const accountId = useAppStore((s) => (s.auth.status === 'authenticated' ? s.auth.account.id.toString() : '0'));
 
   const [pool, setPool] = useState<Pool | null>(null);
   const [name, setName] = useState('');
