@@ -40,6 +40,7 @@ x-backend-env: &backend-env
   # `openssl rand -hex 32` for any real deploy.
   AUTH_PROVIDER: ${AUTH_PROVIDER:-local}
   JWT_SECRET: ${JWT_SECRET:-INSECURE_DEV_ONLY_jwt-secret-rotate-with-openssl-rand-hex-32}
+  CRON_SECRET: ${CRON_SECRET:-INSECURE_DEV_ONLY_cron-secret-rotate-with-openssl-rand-hex-32}
   JWT_AUDIENCE: ${JWT_AUDIENCE:-bms-msgops-api}
   JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-3600}
   JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-2592000}
