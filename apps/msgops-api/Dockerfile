@@ -9,16 +9,19 @@ COPY apps/msgops-api/package.json ./apps/msgops-api/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/segment-query-builder/package.json ./packages/segment-query-builder/
+COPY packages/messaging/package.json ./packages/messaging/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --filter msgops-api... --ignore-scripts
 
 FROM deps AS build
 COPY packages/typescript-config/ ./packages/typescript-config/
 COPY packages/segment-query-builder/ ./packages/segment-query-builder/
+COPY packages/messaging/ ./packages/messaging/
 COPY apps/msgops-api/ ./apps/msgops-api/
 RUN pnpm pkg delete scripts.prepare
 RUN pnpm --filter msgops-api exec pnpm pkg delete scripts.prepare
 RUN pnpm --filter @msgops/segment-query-builder build
+RUN pnpm --filter @bms/messaging build
 RUN pnpm --filter msgops-api build
 
 FROM build AS deploy
