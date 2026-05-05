@@ -395,8 +395,6 @@ export class StatisticsAggregationService {
       console.log(parameters);
     }
 
-    // TODO: Retornar com o unique constraint quando limpar a sujeira do bigquery
-    // digo mais, acho isso uma gambiarra das mais toscas mas é o que temos por enquanto
     // ON CONFLICT (account_id, date, event_type, type, event_id, message_id, automation_id, campaign_id, is_test_ab)
     // DO UPDATE SET
     //   processed = EXCLUDED.processed,

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`msgops-tracker` is a NestJS microservice within the MsgOps platform that handles contact lookups, short link redirects, and event tracking. It runs as a Google Cloud Run service and exposes HTTP endpoints for:
+`msgops-tracker` is a NestJS microservice within the MsgOps platform that handles contact lookups, short link redirects, and event tracking. It is packaged as a container (see project-level Docker setup) and exposes HTTP endpoints for:
 
 - Contact retrieval by email, UUID, or hashed email
 - Contact segment/tag queries for real-time personalization
@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Rate Limiting**: Redis-backed throttler
 - **Request Context**: nestjs-cls for request-scoped storage
 - **Package Manager**: yarn
-- **Runtime Port**: 3000 (Cloud Run), 3000 default (local)
+- **Runtime Port**: 3000 (default)
 
 ## Development Commands
 
@@ -169,21 +169,11 @@ NODE_ENV=production
 
 ## Deployment
 
-Deployed to Google Cloud Run via GitLab CI/CD (`.gitlab-ci.yml`):
-
-**Staging** (auto-deploy on push to `staging` branch):
-
-```bash
-gcloud builds submit . --tag $GCP_IMAGE-staging:$VERSION
-gcloud run deploy $GCP_RUN_SERVICE_NAME --image ... --port=3000
-```
-
-**Production** (manual trigger on `master` branch):
-
-- Deploys to two projects: main and Brius
-- Same build artifact, different GCP projects
-
-Docker image: Node.js LTS Alpine, yarn-based build
+Provider-agnostic. The service is packaged as a container via the
+repository-level Dockerfile and is intended to be operated via
+`docker-compose.yml` for local/self-hosted use, or any container
+orchestrator of choice (Kubernetes, Docker Swarm, Nomad, etc.).
+Image base: Node.js LTS Alpine.
 
 ## API Request Patterns
 
