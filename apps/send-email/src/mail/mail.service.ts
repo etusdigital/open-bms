@@ -177,6 +177,11 @@ export class MailService {
         sendgridApiKey = this.keyRegistry.getKey('unum-ca-automation');
       }
 
+      const baseUrl = process.env.SENDGRID_API_BASE_URL;
+      if (baseUrl) {
+        const client = (sendgrid as unknown as { client?: { setDefaultRequest?: (k: string, v: string) => void } }).client;
+        client?.setDefaultRequest?.('baseUrl', baseUrl.replace(/\/+$/, ''));
+      }
       sendgrid.setApiKey(sendgridApiKey);
       const response = await sendgrid.send(mail);
       return response;

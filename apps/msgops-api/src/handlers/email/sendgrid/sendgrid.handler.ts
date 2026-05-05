@@ -19,7 +19,10 @@ export class SendgridHandler {
     private readonly accountConfigsProvider: AccountConfigsProvider,
     private readonly cls: ClsService,
   ) {
-    this.uri = `https://api.sendgrid.com/v3`;
+    // SENDGRID_API_BASE_URL points at the API host (no /v3 suffix). Default is the
+    // real SendGrid; the local sendgrid-mock app sets it to its own URL for tests.
+    const base = process.env.SENDGRID_API_BASE_URL ?? 'https://api.sendgrid.com';
+    this.uri = `${base.replace(/\/+$/, '')}/v3`;
   }
 
   // Resolves the SendGrid API key to use for an outbound call: strictly
@@ -57,6 +60,17 @@ export class SendgridHandler {
 
   private writeCache(key: number, value: string): void {
     this.apiKeyCache.set(key, { value, loadedAt: Date.now() });
+  }
+
+  // The @sendgrid/mail library hits api.sendgrid.com directly; this redirects
+  // it to the same base URL the rest of the handler uses (mock or real).
+  // SENDGRID_API_BASE_URL must point at the host without /v3 — the library
+  // appends /v3/mail/send itself.
+  private applySendgridLibBaseUrl(): void {
+    const base = process.env.SENDGRID_API_BASE_URL;
+    if (!base) return;
+    const client = (sendgrid as unknown as { client?: { setDefaultRequest?: (k: string, v: string) => void } }).client;
+    client?.setDefaultRequest?.('baseUrl', base.replace(/\/+$/, ''));
   }
 
   // Drops a single account's cached key (call after AccountSettingsService
@@ -178,7 +192,7 @@ export class SendgridHandler {
       const endDate = untilDate.toISOString().slice(0, 10);
       const cats = categories.map((cat) => `categories=${cat}`).join('&');
       const result = await this.httpService
-        .get(`https://api.sendgrid.com/v3/categories/stats?start_date=${startDate}&end_date=${endDate}&${cats}`, {
+        .get(`${this.uri}/categories/stats?start_date=${startDate}&end_date=${endDate}&${cats}`, {
           headers: {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
@@ -480,6 +494,7 @@ export class SendgridHandler {
   async sendSingleCustomEmail(seedList: Array<string>, fromName: string, fromMail: string, messageSubject: string, messageHtmlContent: string, ippool: string): Promise<any> {
     try {
       const apiKey = await this.loadApiKey();
+      this.applySendgridLibBaseUrl();
       sendgrid.setApiKey(apiKey);
 
       const mail = this.createSingleCustomEmail(seedList, fromName, fromMail, messageSubject, messageHtmlContent, ippool);
@@ -495,6 +510,7 @@ export class SendgridHandler {
 
   async sendInternalEmail(to: Array<string>, fromName: string, fromMail: string, subject: string, htmlContent: string): Promise<any> {
     try {
+      this.applySendgridLibBaseUrl();
       sendgrid.setApiKey(process.env.SENDGRID_API_KEY);
 
       const mail = this.createSingleCustomEmail(to, fromName, fromMail, subject, htmlContent, '');
