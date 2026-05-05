@@ -53,6 +53,15 @@ x-backend-env: &backend-env
   # will fail cleanly at runtime if exercised without real keys.
   SPARKPOST_API_KEY: ${SPARKPOST_API_KEY:-dev-placeholder-not-a-real-key}
   OPEN_AI_KEY: ${OPEN_AI_KEY:-dev-placeholder-not-a-real-key}
+  # send-email's mail.service has hardcoded SaaS-customer key lookups (account.id
+  # === 1 hits "plusdin-campaigns") that throw when the map is empty. The seeded
+  # OSS admin account is id=1, so any test campaign trips the throw. Provide
+  # placeholders here; SDK calls land on sendgrid-mock, which accepts any key.
+  SENDGRID_API_KEY: ${SENDGRID_API_KEY:-dev-placeholder-not-a-real-key}
+  SENDGRID_KEYS_MAP: ${SENDGRID_KEYS_MAP:-{"plusdin-campaigns":"dev","plusdin-transactional":"dev","plusdin-automations":"dev","plusdin-novo-campaigns":"dev","plusdin-novo-transactional":"dev","plusdin-novo-automations":"dev","oseucartao":"dev","unum-in-automation":"dev"}}
+  # campaign-packer batches contacts in pages of this size; parseInt(undefined)
+  # → NaN ends up in the SQL math, so a default is required.
+  LIMIT_CONTACT_BATCH: ${LIMIT_CONTACT_BATCH:-1000}
 
 x-infra-deps: &infra-deps
   postgres:
@@ -299,6 +308,7 @@ services:
     environment:
       <<: *backend-env
       PORT: '3000'
+      BRIDGE_ENDPOINT: http://localhost:3000
     depends_on: *infra-deps
 
   send-email:
@@ -313,6 +323,10 @@ services:
     environment:
       <<: *backend-env
       PORT: '3000'
+      # Pin to the same PORT compose enforces — apps/send-email/.env declares
+      # 3005, which mismatches once compose overrides PORT to 3000 and breaks
+      # the AMQP→HTTP bridge fetch.
+      BRIDGE_ENDPOINT: http://localhost:3000
       SENDGRID_API_BASE_URL: ${SENDGRID_API_BASE_URL:-http://sendgrid-mock:3010}
     depends_on: *infra-deps
 

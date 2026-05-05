@@ -93,9 +93,6 @@ export class CampaignEntity {
   @Column('json', { name: 'recurrence_settings' })
   recurrenceSettings: CampaignRecurrenceSettings;
 
-  @Column('boolean', { name: 'is_warmup', default: false })
-  isWarmup: boolean;
-
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

@@ -1,15 +1,14 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { EXCHANGES } from '@bms/messaging';
 import { Campaign, CampaignBatch, CampaignMessageType, CampaignStatus, CampaignType } from '../interfaces';
 import { MsgopsService } from '../msgops/msgops.service';
 import { ContactEntity } from '../msgops/entities/contact.entity';
 import { QueuePublisher } from '../providers/queue/queue.publisher';
 import { RedisService } from '../providers/redis/redis.service';
-import { CampaignMessageEntity } from 'src/msgops/entities/campaign-message.entity';
+import { EventPublisherService } from '../providers/messaging/event-publisher.service';
 import * as dayjs from 'dayjs';
 import * as utc from 'dayjs/plugin/utc';
 import * as timezone from 'dayjs/plugin/timezone';
-import { CampaignEntity } from 'src/msgops/entities/campaign.entity';
-import { WarmupEntity } from 'src/msgops/entities/warmup.entity';
 import { FormatterUtils } from 'src/utils/formatter.utils';
 
 dayjs.extend(utc);
@@ -24,6 +23,7 @@ export class CampaignService {
     private readonly queuePublisher: QueuePublisher,
     private readonly redisService: RedisService,
     private readonly formatterUtils: FormatterUtils,
+    private readonly eventPublisher: EventPublisherService,
   ) {
     this.packagesLength = 0;
     this.contactsLength = 0;
@@ -54,68 +54,13 @@ export class CampaignService {
       }
     }
 
-    let quantityContacts = 0;
     if (campaign.type === CampaignType.SIMPLE || campaign.type === CampaignType.RECURRING) {
-      const createReturn = await this.msgopsService.createContactsSend(campaign);
-      quantityContacts = createReturn.length;
-    } else if (campaign.type === CampaignType.TESTAB) {
-      quantityContacts = await this.msgopsService.countContactsTestAb(campaign.id, campaign.testabLastId);
+      await this.msgopsService.createContactsSend(campaign);
     }
 
     await this.sendTracker(0, 0, campaign.id, 'CAMPAIGN_PROCESSING_STARTED');
-    const canWarmupType = this.canRunWarmups(campaign, quantityContacts);
-    if (canWarmupType !== 'never') {
-      const timeZone = campaign.account.configByName('time_zone') || 'UTC';
-      this.formatterUtils.logInfo(`[WARMUP-CAMPAIGN] - CAMPAIGN: ${campaign.id} - QUANTITY: ${quantityContacts}`);
-      const currentDate = dayjs().tz(timeZone).format('YYYY-MM-DD');
-      let warmups = await this.msgopsService.getWarmupsAccount(quantityContacts * 0.1, campaign.accountId, currentDate, canWarmupType);
-
-      if (warmups.length === 0) {
-        const firstWarmup = await this.msgopsService.findFirstWarmup(campaign.accountId, currentDate, canWarmupType);
-        if (firstWarmup) {
-          campaign['maxContactsWarmup'] = this.definedMaxContactsWarmup(firstWarmup, quantityContacts);
-          warmups = [firstWarmup];
-          if (firstWarmup.type === 'internal' && firstWarmup.stage === 1) {
-            await this.msgopsService.updateWarmup(firstWarmup.id, { stage: 2 });
-          }
-        }
-      }
-
-      if (warmups.length) {
-        const redisClient = this.redisService.getOrThrow();
-        const warmupsIds = [];
-        const campaignTags = this.getTagsInCampaign(campaign.steps);
-        for (const warmup of warmups) {
-          if (warmup.target_segment_id == null || (warmup.target_segment_id != null && campaignTags.includes(warmup.target_segment_id))) {
-            const expireRedisKey = warmup?.campaign?.spreadSending ? warmup.campaign.spreadSending * 60 : 28800;
-            const redisKey = `warmup:${warmup.id}`;
-            const hasWarmup = await redisClient.exists(redisKey);
-            if (!hasWarmup) {
-              await redisClient.set(redisKey, campaign.id, 'EX', expireRedisKey);
-              warmupsIds.push(warmup.id);
-            }
-          }
-        }
-
-        if (warmupsIds.length) {
-          return this.queuePublisher.addCampaignPackerWarmup({ warmups: warmupsIds, campaign });
-        }
-      }
-    }
 
     return this.queuePublisher.addCampaignPacker(campaign);
-  }
-
-  definedMaxContactsWarmup(warmup: WarmupEntity, quantityContacts) {
-    if (warmup.stage === 3 && warmup.remainingSendToday > quantityContacts) {
-      return Math.round(quantityContacts * 0.9);
-    }
-
-    if (warmup.stage === 3) {
-      return warmup.remainingSendToday;
-    }
-
-    return Math.round(quantityContacts * 0.1);
   }
 
   getTagsInCampaign(steps) {
@@ -129,77 +74,6 @@ export class CampaignService {
     }
 
     return tagsIds;
-  }
-
-  async warmupStart(campaign: Campaign, warmupsIds: Array<number>) {
-    this.formatterUtils.logInfo(`[WARMUP-CAMPAIGN] - WARMUPS: ${warmupsIds} - CAMPAIGN: ${campaign.id}`);
-    const originalCampaign = JSON.parse(JSON.stringify(campaign));
-    const originalMessage = { ...originalCampaign.campaignMessage[0].message };
-    const campaignDefault = { fromMail: originalMessage.fromMail, ippool: originalMessage.ippool, replyTo: originalMessage.replyTo, id: campaign.id, originalMessage: null };
-    const warmups = await this.msgopsService.findWarmupByIds(warmupsIds, campaign.accountId);
-    for (const warmup of warmups) {
-      this.formatterUtils.logInfo(`[START-WARMUP] - ID:${warmup.id} - POOL: ${warmup.ippool} - CAMPAIGN: ${campaign.id} - 
-      QUANTITY: ${campaign.maxContactsWarmup && campaign.maxContactsWarmup < warmup.remainingSendToday ? campaign.maxContactsWarmup : warmup.remainingSendToday}`);
-      const redisClient = this.redisService.getOrThrow();
-      const hasWarmup = await redisClient.get(`warmup:${warmup.id}`);
-      if (hasWarmup && hasWarmup == `${campaign.id}`) {
-        await this.msgopsService.processWarmup(warmup, campaign);
-        const quantitySend = Array.isArray(warmup.warmupInfo) ? warmup.warmupInfo.length : 0;
-        const { campaign: warmupCampaign } = warmup;
-        let message = { ...campaign.campaignMessage[0] };
-        if (campaign.type === CampaignType.TESTAB) {
-          const campaignMessage = campaign.campaignMessage.find((item) => item.winner == true);
-          message = campaignMessage ? { ...campaignMessage } : ({ ...campaign.campaignMessage[0] } as CampaignMessageEntity);
-        }
-
-        if (warmup.stage === 0 || warmup.stage == null) {
-          campaignDefault.originalMessage = { ...message.message };
-          const defaultMessagesIds = process.env.DEFAULT_WARMUP_MESSAGES.split(',');
-          const indexMessage = quantitySend < defaultMessagesIds.length ? quantitySend : Math.floor(Math.random() * defaultMessagesIds.length);
-          message.message = await this.msgopsService.findMessageById(defaultMessagesIds[indexMessage]);
-        }
-
-        const warmupMessage = {
-          ...message,
-          message: {
-            ...message.message,
-            fromMail: warmup.sender,
-            ippool: warmup.ippool,
-            replyTo: warmup.replyTo,
-          },
-        } as CampaignMessageEntity;
-
-        if (warmup.type === 'internal' && warmup.stage === 2) {
-          const nextSpreading = warmupCampaign.spreadSending - 60;
-          warmupCampaign.spreadSending = nextSpreading > 60 ? nextSpreading : 60;
-          await this.msgopsService.updateCampaign(warmupCampaign.id, { spreadSending: warmupCampaign.spreadSending });
-        }
-
-        warmupCampaign.campaignMessage = [warmupMessage];
-        warmupCampaign.title = campaign.title;
-        warmupCampaign.name = campaign.name;
-        warmupCampaign['campaignDefault'] = campaignDefault;
-        warmupCampaign['warmupTarget'] = warmup.currentSend;
-        warmupCampaign['warmupSegmentId'] = warmup.target_segment_id;
-        warmupCampaign['stage'] = warmup.stage;
-
-        const remainingSendToday =
-          campaign.maxContactsWarmup && campaign.maxContactsWarmup < warmup.remainingSendToday ? warmup.remainingSendToday - campaign.maxContactsWarmup : 0;
-        await this.msgopsService.updateWarmup(warmup.id, {
-          remainingSendToday,
-          status: 'running',
-          ...(warmup.stage === 3 || remainingSendToday > 0 ? {} : { lastSentAt: new Date() }),
-          ...(warmup.stage !== 3 && warmup.type === 'internal' && warmupCampaign.spreadSending <= campaign.spreadSending ? { stage: 3 } : {}),
-          ...(warmup.stage === 0 && quantitySend == 6 ? { stage: null, currentSend: 160 } : {}),
-        });
-
-        await this.queuePublisher.addCampaignPacker(warmupCampaign);
-        const redisExpireKey = warmupCampaign?.spreadSending ? warmupCampaign.spreadSending * 60 : 28800;
-        await redisClient.set(`warmup:${warmup.id}`, 0, 'EX', redisExpireKey);
-      }
-    }
-
-    await this.queuePublisher.addCampaignPacker(originalCampaign);
   }
 
   async createBatches(campaign: Campaign): Promise<string> {
@@ -351,53 +225,6 @@ export class CampaignService {
 
     const contactsUnique = [...new Map(contacts.map((contact) => [contact.id, contact])).values()];
 
-    let contactsWarmupCampaign = [];
-    if (campaignBatch.campaign.isWarmup && campaignBatch.campaign.warmupTarget <= 2360) {
-      const redisClient = this.redisService.getOrThrow();
-      const redisKey = `warmup_contacts:${campaignBatch.campaign.id}`;
-      const hasWarmupContacts = await redisClient.exists(redisKey);
-      let defaultList = [];
-      if (!hasWarmupContacts) {
-        defaultList = await this.msgopsService.warmupContactsRandon(campaignBatch.campaign.warmupTarget);
-        await redisClient.set(redisKey, JSON.stringify(defaultList), 'EX', 36000);
-      } else {
-        const warmupContacts = await redisClient.get(redisKey);
-        defaultList = JSON.parse(warmupContacts);
-      }
-
-      const contactsPage = Math.floor(defaultList.length / campaignBatch.totalPages) || 1;
-      const contactsDefault = defaultList.splice((campaignBatch.page - 1) * contactsPage, contactsPage);
-      if (contactsDefault.length) {
-        contactsWarmupCampaign = contactsUnique.splice(0, contactsPage);
-      } else if (campaignBatch.campaign.stage === 0) {
-        return true;
-      }
-      const contactsInternal = {
-        warmup: campaignBatch.campaign.id,
-        message: {
-          id: message.id,
-          subject: message.subject,
-          email: message.fromMail,
-          name: message.fromName,
-        },
-        recipients: [],
-      };
-      contactsDefault.forEach((contact, index) => {
-        contactsUnique.push({
-          ...contactsWarmupCampaign[index],
-          firstName: contact.name,
-          lastName: '',
-          fullName: contact.name,
-          email: contact.email,
-          id: 0,
-        } as ContactEntity);
-        contactsInternal.recipients.push({ name: contact.firstName, email: contact.email });
-      });
-      if (contactsInternal.recipients.length) {
-        await this.queuePublisher.addWarmupTracker(contactsInternal);
-      }
-    }
-
     const currentpackage = {
       account: campaignBatch.campaign.account || {},
       campaign: campaignBatch.campaign,
@@ -422,32 +249,10 @@ export class CampaignService {
       finalContactId: campaignBatch.finalContactId,
     };
     await redisClient.set(pubSubMessage.campaignKey, JSON.stringify(currentpackage), 'EX', 43200);
-    const messageId = await this.queuePublisher.addSendMessage(pubSubMessage);
-    this.formatterUtils.logInfo(`Message ${messageId} published.`);
+    await this.eventPublisher.publish(EXCHANGES.campaigns, 'campaign.send', pubSubMessage);
+    this.formatterUtils.logInfo(`Message ${pubSubMessage.campaignKey} published to ${EXCHANGES.campaigns}/campaign.send.`);
 
     await this.sendTracker(1, this.contactsLength, campaignBatch.campaign.id, 'CAMPAIGN_PACKAGED');
-
-    if (contactsWarmupCampaign.length) {
-      currentpackage.campaign.id = campaignBatch.campaign.campaignDefault.id;
-      currentpackage.message.fromMail = campaignBatch.campaign.campaignDefault.fromMail;
-      currentpackage.message.ippool = campaignBatch.campaign.campaignDefault.ippool;
-      currentpackage.campaign_id = campaignBatch.campaign.campaignDefault.id;
-      currentpackage.message.replyTo = campaignBatch.campaign.campaignDefault.replyTo;
-      if (campaignBatch.campaign.campaignDefault && campaignBatch.campaign.campaignDefault.originalMessage) {
-        currentpackage.message = { ...campaignBatch.campaign.campaignDefault.originalMessage };
-      }
-      currentpackage.contacts = contactsWarmupCampaign;
-      currentpackage['is_campaign_warmup_mode'] = true;
-      const pubSubMessageWarmup = {
-        campaignKey: `campaign-${currentpackage.campaign_id}-${currentpackage.page}-${Date.now()}`,
-        campaign: currentpackage.campaign_id,
-        page: currentpackage.page,
-        initialContactId: campaignBatch.currentContactId,
-        finalContactId: campaignBatch.finalContactId,
-      };
-      await redisClient.set(pubSubMessageWarmup.campaignKey, JSON.stringify(currentpackage), 'EX', 43200);
-      await this.queuePublisher.addSendMessage(pubSubMessageWarmup);
-    }
 
     return true;
   }
@@ -565,34 +370,10 @@ export class CampaignService {
         testabMode,
       };
 
-      const messageId = await this.queuePublisher.addEventsTracker(tracker);
-
-      const response = `queue-campaign-events-tracker-jobid-${messageId}`;
-      console.info(response);
-
-      return messageId;
+      await this.eventPublisher.publish(EXCHANGES.campaigns, 'campaign.tracked', tracker);
+      console.info(`amqp ${EXCHANGES.campaigns}/campaign.tracked published`);
     } catch (error) {
       this.formatterUtils.logInfo(`Error to use service tracker`, error);
     }
-  }
-
-  canRunWarmups(campaign: CampaignEntity, quantityContacts: number) {
-    if (campaign.messageType !== CampaignMessageType.EMAIL) {
-      return 'never';
-    }
-
-    if (quantityContacts <= 0) {
-      return 'never';
-    }
-
-    const timeZone = campaign.account.configByName('time_zone') || 'UTC';
-    const now = dayjs().tz(timeZone);
-
-    // only start warmups between 8am and 4:05pm
-    const startTime = now.clone().hour(7).minute(59).second(59);
-    const endTime = now.clone().hour(16).minute(5).second(0);
-
-    const betweenInterval = now.isAfter(startTime) && now.isBefore(endTime);
-    return betweenInterval ? 'general' : 'stage3';
   }
 }
