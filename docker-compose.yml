@@ -53,6 +53,15 @@ x-backend-env: &backend-env
   # will fail cleanly at runtime if exercised without real keys.
   SPARKPOST_API_KEY: ${SPARKPOST_API_KEY:-dev-placeholder-not-a-real-key}
   OPEN_AI_KEY: ${OPEN_AI_KEY:-dev-placeholder-not-a-real-key}
+  # send-email's mail.service has hardcoded SaaS-customer key lookups (account.id
+  # === 1 hits "plusdin-campaigns") that throw when the map is empty. The seeded
+  # OSS admin account is id=1, so any test campaign trips the throw. Provide
+  # placeholders here; SDK calls land on sendgrid-mock, which accepts any key.
+  SENDGRID_API_KEY: ${SENDGRID_API_KEY:-dev-placeholder-not-a-real-key}
+  SENDGRID_KEYS_MAP: ${SENDGRID_KEYS_MAP:-{"plusdin-campaigns":"dev","plusdin-transactional":"dev","plusdin-automations":"dev","plusdin-novo-campaigns":"dev","plusdin-novo-transactional":"dev","plusdin-novo-automations":"dev","oseucartao":"dev","unum-in-automation":"dev"}}
+  # campaign-packer batches contacts in pages of this size; parseInt(undefined)
+  # → NaN ends up in the SQL math, so a default is required.
+  LIMIT_CONTACT_BATCH: ${LIMIT_CONTACT_BATCH:-1000}
 
 x-infra-deps: &infra-deps
   postgres:
@@ -202,6 +211,15 @@ services:
     environment:
       <<: *backend-env
       SERVER_PORT: '5001'
+      # Routes msgops-api SendGrid calls through the local mock by default so
+      # `docker compose up` boots a fully self-contained stack. Set
+      # SENDGRID_API_BASE_URL=https://api.sendgrid.com explicitly to talk to
+      # the real SendGrid in this environment.
+      SENDGRID_API_BASE_URL: ${SENDGRID_API_BASE_URL:-http://sendgrid-mock:3010}
+      # URL the SendGrid Event Webhook will POST events to. In this stack the
+      # sendgrid-mock fires synthetic events at this URL when /v3/mail/send is
+      # called, so it must point at event-receiver inside the compose network.
+      SENDGRID_WEBHOOK_URL_BASE: ${SENDGRID_WEBHOOK_URL_BASE:-http://event-receiver:3011/bms/events?platform=sendgrid}
     depends_on: *infra-deps
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:5001/api-docs']
@@ -209,6 +227,18 @@ services:
       timeout: 5s
       retries: 12
       start_period: 30s
+
+  sendgrid-mock:
+    build:
+      context: .
+      dockerfile: apps/sendgrid-mock/Dockerfile
+    container_name: sendgrid-mock
+    <<: *restart-policy
+    ports:
+      - '3010:3010'
+    environment:
+      PORT: '3010'
+      MOCK_EVENT_DELAY_MS: ${SENDGRID_MOCK_EVENT_DELAY_MS:-500}
 
   event-receiver:
     build:
@@ -278,6 +308,7 @@ services:
     environment:
       <<: *backend-env
       PORT: '3000'
+      BRIDGE_ENDPOINT: http://localhost:3000
     depends_on: *infra-deps
 
   send-email:
@@ -292,6 +323,11 @@ services:
     environment:
       <<: *backend-env
       PORT: '3000'
+      # Pin to the same PORT compose enforces — apps/send-email/.env declares
+      # 3005, which mismatches once compose overrides PORT to 3000 and breaks
+      # the AMQP→HTTP bridge fetch.
+      BRIDGE_ENDPOINT: http://localhost:3000
+      SENDGRID_API_BASE_URL: ${SENDGRID_API_BASE_URL:-http://sendgrid-mock:3010}
     depends_on: *infra-deps
 
   send-push:

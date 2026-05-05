@@ -8,11 +8,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { typeOrmConfig } from './ormconfig';
 import { RedisModule } from './providers/redis/redis.module';
 import { QueueModule } from './providers/queue/queue.module';
-import { EventTrackerProcessor } from './providers/queue/event-tracker.processor';
+import { CampaignEventsConsumerService } from './campaign-events-consumer.service';
 
 @Module({
   imports: [MsgopsModule, TypeOrmModule.forRoot(typeOrmConfig), ConfigModule.forRoot(), RedisModule, QueueModule],
   controllers: [AppController],
-  providers: [AppService, FormatterUtils, EventTrackerProcessor],
+  providers: [AppService, FormatterUtils, CampaignEventsConsumerService],
 })
 export class AppModule {}

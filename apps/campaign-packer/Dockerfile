@@ -8,11 +8,16 @@ FROM base AS deps
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/campaign-packer/package.json ./apps/campaign-packer/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/typescript-config/package.json ./packages/typescript-config/
+COPY packages/messaging/package.json ./packages/messaging/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --filter msgops-campaign-packer
+    pnpm install --frozen-lockfile --filter msgops-campaign-packer... --ignore-scripts
 
 FROM deps AS build
+COPY packages/typescript-config/ ./packages/typescript-config/
+COPY packages/messaging/ ./packages/messaging/
 COPY apps/campaign-packer/ ./apps/campaign-packer/
+RUN pnpm --filter @bms/messaging build
 RUN pnpm --filter msgops-campaign-packer build
 
 FROM build AS deploy

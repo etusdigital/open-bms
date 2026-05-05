@@ -9,7 +9,8 @@ export interface SendgridValidationResult {
 
 export async function validateSendgridApiKey(apiKey: string): Promise<SendgridValidationResult> {
   try {
-    const res = await axios.get('https://api.sendgrid.com/v3/user/account', {
+    const base = (process.env.SENDGRID_API_BASE_URL ?? 'https://api.sendgrid.com').replace(/\/+$/, '');
+    const res = await axios.get(`${base}/v3/user/account`, {
       headers: { Authorization: `Bearer ${apiKey}` },
       timeout: 10_000,
       validateStatus: () => true,

@@ -13,7 +13,6 @@ describe('AppController', () => {
     processPage: jest.fn().mockResolvedValue({ contacts: 10, packages: 1 }),
     createTest: jest.fn().mockResolvedValue('test created'),
     processResult: jest.fn().mockResolvedValue('result processed'),
-    warmupStart: jest.fn().mockResolvedValue('warmup started'),
   };
 
   const mockFormatterUtils = {
@@ -65,11 +64,5 @@ describe('AppController', () => {
   it('POST /result-test/:id delegates to service', async () => {
     await controller.resultTest(5);
     expect(mockCampaignService.processResult).toHaveBeenCalledWith(5);
-  });
-
-  it('POST /warmup-start passes campaign and warmups to service', async () => {
-    const warmup = { campaign: { id: 1 }, warmups: [1, 2] };
-    await controller.warmupStart(warmup as any);
-    expect(mockCampaignService.warmupStart).toHaveBeenCalledWith({ id: 1 }, [1, 2]);
   });
 });

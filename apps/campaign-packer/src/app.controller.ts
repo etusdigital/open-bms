@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Post, Body } from '@nestjs/common';
 import { AppService } from './app.service';
-import { Campaign, CampaignBatch, Warmup } from './interfaces';
+import { Campaign, CampaignBatch } from './interfaces';
 import { CampaignService } from './campaign/campaign.service';
 import { FormatterUtils } from './utils/formatter.utils';
 
@@ -32,11 +32,6 @@ export class AppController {
   async processPage(@Body() data: CampaignBatch) {
     this.formatterUtils.logInfo(`[Process Page] Campaign: ${JSON.stringify(data)}`);
     return await this.campaignService.processPage(data);
-  }
-
-  @Post('/warmup-start')
-  async warmupStart(@Body() data: Warmup) {
-    return await this.campaignService.warmupStart(data.campaign, data.warmups);
   }
 
   @Post('/create-test/:id')
