@@ -492,8 +492,9 @@ export class AutomationsService {
       const category = this.utilsService.normalizeString(statisticsDto.category);
 
       const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
+      const base = (process.env.SENDGRID_API_BASE_URL ?? 'https://api.sendgrid.com').replace(/\/+$/, '');
       const result = await this.httpService
-        .get(`https://api.sendgrid.com/v3/categories/stats?start_date=${statisticsDto.startDate}&end_date=${statisticsDto.endDate}&categories=${category}`, {
+        .get(`${base}/v3/categories/stats?start_date=${statisticsDto.startDate}&end_date=${statisticsDto.endDate}&categories=${category}`, {
           headers: {
             Authorization: `Bearer ${sendgriApiKey}`,
           },

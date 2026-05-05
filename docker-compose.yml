@@ -202,6 +202,15 @@ services:
     environment:
       <<: *backend-env
       SERVER_PORT: '5001'
+      # Routes msgops-api SendGrid calls through the local mock by default so
+      # `docker compose up` boots a fully self-contained stack. Set
+      # SENDGRID_API_BASE_URL=https://api.sendgrid.com explicitly to talk to
+      # the real SendGrid in this environment.
+      SENDGRID_API_BASE_URL: ${SENDGRID_API_BASE_URL:-http://sendgrid-mock:3010}
+      # URL the SendGrid Event Webhook will POST events to. In this stack the
+      # sendgrid-mock fires synthetic events at this URL when /v3/mail/send is
+      # called, so it must point at event-receiver inside the compose network.
+      SENDGRID_WEBHOOK_URL_BASE: ${SENDGRID_WEBHOOK_URL_BASE:-http://event-receiver:3011/bms/events?platform=sendgrid}
     depends_on: *infra-deps
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:5001/api-docs']
@@ -209,6 +218,18 @@ services:
       timeout: 5s
       retries: 12
       start_period: 30s
+
+  sendgrid-mock:
+    build:
+      context: .
+      dockerfile: apps/sendgrid-mock/Dockerfile
+    container_name: sendgrid-mock
+    <<: *restart-policy
+    ports:
+      - '3010:3010'
+    environment:
+      PORT: '3010'
+      MOCK_EVENT_DELAY_MS: ${SENDGRID_MOCK_EVENT_DELAY_MS:-500}
 
   event-receiver:
     build:
@@ -292,6 +313,7 @@ services:
     environment:
       <<: *backend-env
       PORT: '3000'
+      SENDGRID_API_BASE_URL: ${SENDGRID_API_BASE_URL:-http://sendgrid-mock:3010}
     depends_on: *infra-deps
 
   send-push:
