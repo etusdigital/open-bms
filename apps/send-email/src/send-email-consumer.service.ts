@@ -11,7 +11,7 @@ interface QueueBinding {
   bridgePath: string;
 }
 
-const BINDINGS: QueueBinding[] = [
+export const BINDINGS: QueueBinding[] = [
   {
     exchange: EXCHANGES.email,
     routingKey: 'email.send',

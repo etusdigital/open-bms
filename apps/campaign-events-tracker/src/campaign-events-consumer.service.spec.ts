@@ -39,9 +39,17 @@ describe('CampaignEventsConsumerService', () => {
     expect(() => new CampaignEventsConsumerService()).toThrow(/INTERNAL_AUTH_TOKEN/);
   });
 
-  it('throws when BRIDGE_ENDPOINT is missing', () => {
+  it('start() throws when BRIDGE_ENDPOINT is missing and no fallback is passed', async () => {
     delete process.env.BRIDGE_ENDPOINT;
-    expect(() => new CampaignEventsConsumerService()).toThrow(/BRIDGE_ENDPOINT/);
+    const svc = new CampaignEventsConsumerService();
+    await expect(svc.start()).rejects.toThrow(/BRIDGE_ENDPOINT/);
+  });
+
+  it('start() accepts an explicit bridgeEndpoint argument when env is unset', async () => {
+    delete process.env.BRIDGE_ENDPOINT;
+    const svc = new CampaignEventsConsumerService();
+    await svc.start('http://localhost:3004');
+    expect(consumeMock).toHaveBeenCalledTimes(1);
   });
 
   it('binds campaigns/campaign.tracked to the campaign-events-tracker queue on start', async () => {

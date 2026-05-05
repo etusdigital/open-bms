@@ -17,9 +17,9 @@ async function bootstrap() {
     if (!process.env.BRIDGE_ENDPOINT) {
       throw new Error('[campaign-events-tracker] BRIDGE_ENDPOINT must be set explicitly in production');
     }
-  } else if (!process.env.BRIDGE_ENDPOINT) {
-    process.env.BRIDGE_ENDPOINT = `http://localhost:${port}`;
   }
+
+  const bridgeEndpoint = process.env.BRIDGE_ENDPOINT ?? `http://localhost:${port}`;
 
   const app = await NestFactory.create(AppModule);
 
@@ -58,7 +58,7 @@ async function bootstrap() {
 
   await app.listen(port);
 
-  await consumer.start();
+  await consumer.start(bridgeEndpoint);
   consumerStarted = true;
 
   console.log(`Server listening on: ${port}`);

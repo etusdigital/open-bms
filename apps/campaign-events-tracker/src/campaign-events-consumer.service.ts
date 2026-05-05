@@ -31,16 +31,16 @@ export class CampaignEventsConsumerService {
     if (!process.env.INTERNAL_AUTH_TOKEN) {
       throw new Error('INTERNAL_AUTH_TOKEN environment variable is required');
     }
-    if (!process.env.BRIDGE_ENDPOINT) {
-      throw new Error('BRIDGE_ENDPOINT environment variable is required');
-    }
     for (let i = 0; i < BINDINGS.length; i++) {
       this.consumers.push(new AmqpConsumer({ url: process.env.AMQP_URL }, SHUTDOWN_TIMEOUT_MS));
     }
   }
 
-  async start(): Promise<void> {
-    const bridgeBase = process.env.BRIDGE_ENDPOINT!;
+  async start(bridgeEndpoint?: string): Promise<void> {
+    const bridgeBase = bridgeEndpoint ?? process.env.BRIDGE_ENDPOINT;
+    if (!bridgeBase) {
+      throw new Error('BRIDGE_ENDPOINT environment variable is required');
+    }
     const token = process.env.INTERNAL_AUTH_TOKEN!;
 
     await Promise.all(
