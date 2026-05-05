@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
-import { QueuePublisher, QUEUE_CAMPAIGN_EVENTS_TRACKER, QUEUE_CAMPAIGN_TRIGGER } from './queue.publisher';
+import { QueuePublisher, QUEUE_CAMPAIGN_TRIGGER } from './queue.publisher';
 
 @Module({
   imports: [
@@ -11,7 +11,7 @@ import { QueuePublisher, QUEUE_CAMPAIGN_EVENTS_TRACKER, QUEUE_CAMPAIGN_TRIGGER }
         password: process.env.REDIS_PASSWORD || undefined,
       },
     }),
-    BullModule.registerQueue({ name: QUEUE_CAMPAIGN_EVENTS_TRACKER }, { name: QUEUE_CAMPAIGN_TRIGGER }),
+    BullModule.registerQueue({ name: QUEUE_CAMPAIGN_TRIGGER }),
   ],
   providers: [QueuePublisher],
   exports: [QueuePublisher, BullModule],

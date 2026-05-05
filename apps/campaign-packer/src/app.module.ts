@@ -8,13 +8,13 @@ import { MsgopsModule } from './msgops/msgops.module';
 import { HttpModule } from '@nestjs/axios';
 import { QueueModule } from './providers/queue/queue.module';
 import { CampaignPackerProcessor } from './providers/queue/campaign-packer.processor';
-import { WarmupStartProcessor } from './providers/queue/warmup-start.processor';
 import { SchedulePageProcessor } from './providers/queue/schedule-page.processor';
 import { CampaignTriggerProcessor } from './providers/queue/campaign-trigger.processor';
+import { MessagingModule } from './providers/messaging/messaging.module';
 
 @Module({
-  imports: [CampaignModule, MsgopsModule, ConfigModule.forRoot({ isGlobal: true }), HttpModule, QueueModule],
+  imports: [MessagingModule, CampaignModule, MsgopsModule, ConfigModule.forRoot({ isGlobal: true }), HttpModule, QueueModule],
   controllers: [AppController],
-  providers: [AppService, FormatterUtils, CampaignPackerProcessor, WarmupStartProcessor, SchedulePageProcessor, CampaignTriggerProcessor],
+  providers: [AppService, FormatterUtils, CampaignPackerProcessor, SchedulePageProcessor, CampaignTriggerProcessor],
 })
 export class AppModule {}

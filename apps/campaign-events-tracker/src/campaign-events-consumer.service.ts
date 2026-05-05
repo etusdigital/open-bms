@@ -11,29 +11,17 @@ interface QueueBinding {
   bridgePath: string;
 }
 
-export const BINDINGS: QueueBinding[] = [
-  {
-    exchange: EXCHANGES.email,
-    routingKey: 'email.send',
-    queue: 'send-email.email.send',
-    bridgePath: '/internal/email/send',
-  },
+const BINDINGS: QueueBinding[] = [
   {
     exchange: EXCHANGES.campaigns,
-    routingKey: 'campaign.send',
-    queue: 'send-email.campaign.send',
-    bridgePath: '/internal/campaigns/send',
-  },
-  {
-    exchange: EXCHANGES.triggers,
-    routingKey: 'trigger.process',
-    queue: 'send-email.trigger.process',
-    bridgePath: '/internal/automations/process',
+    routingKey: 'campaign.tracked',
+    queue: 'campaign-events-tracker.campaign.tracked',
+    bridgePath: '/',
   },
 ];
 
 @Injectable()
-export class SendEmailConsumerService {
+export class CampaignEventsConsumerService {
   private readonly consumers: AmqpConsumer[] = [];
 
   constructor() {
@@ -43,16 +31,16 @@ export class SendEmailConsumerService {
     if (!process.env.INTERNAL_AUTH_TOKEN) {
       throw new Error('INTERNAL_AUTH_TOKEN environment variable is required');
     }
-    if (!process.env.BRIDGE_ENDPOINT) {
-      throw new Error('BRIDGE_ENDPOINT environment variable is required');
-    }
     for (let i = 0; i < BINDINGS.length; i++) {
       this.consumers.push(new AmqpConsumer({ url: process.env.AMQP_URL }, SHUTDOWN_TIMEOUT_MS));
     }
   }
 
-  async start(): Promise<void> {
-    const bridgeBase = process.env.BRIDGE_ENDPOINT!;
+  async start(bridgeEndpoint?: string): Promise<void> {
+    const bridgeBase = bridgeEndpoint ?? process.env.BRIDGE_ENDPOINT;
+    if (!bridgeBase) {
+      throw new Error('BRIDGE_ENDPOINT environment variable is required');
+    }
     const token = process.env.INTERNAL_AUTH_TOKEN!;
 
     await Promise.all(
@@ -75,6 +63,10 @@ export class SendEmailConsumerService {
   }
 
   async stop(): Promise<void> {
-    await Promise.all(this.consumers.map((c) => c.shutdown().catch((err) => console.error('[send-email] consumer stop:', err))));
+    await Promise.all(
+      this.consumers.map((c) =>
+        c.shutdown().catch((err) => console.error('[campaign-events-tracker] consumer stop:', err)),
+      ),
+    );
   }
 }

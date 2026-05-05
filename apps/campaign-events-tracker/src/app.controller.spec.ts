@@ -1,8 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { UnauthorizedException } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { FormatterUtils } from './utils/formatter.utils';
 import { EventTracker, MsgopsCampaignEvent, MsgopsServices, SubscriptionMessage } from './app.interfaces';
+
+const VALID_TOKEN = 'test-internal-token';
 
 describe('AppController', () => {
   let controller: AppController;
@@ -16,6 +19,8 @@ describe('AppController', () => {
   };
 
   beforeEach(async () => {
+    process.env.INTERNAL_AUTH_TOKEN = VALID_TOKEN;
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
       providers: [
@@ -48,12 +53,24 @@ describe('AppController', () => {
       data: {},
     };
 
+    it('rejects requests with a missing token', () => {
+      expect(() => controller.addEventTracker('' as any, eventTracker, { debug: '' })).toThrow(UnauthorizedException);
+      expect(mockAppService.addEventTracker).not.toHaveBeenCalled();
+    });
+
+    it('rejects requests with a wrong token', () => {
+      expect(() => controller.addEventTracker('wrong-token', eventTracker, { debug: '' })).toThrow(
+        UnauthorizedException,
+      );
+      expect(mockAppService.addEventTracker).not.toHaveBeenCalled();
+    });
+
     it('should handle EventTracker data directly (with subscription property)', () => {
       const dataWithSubscription = { ...eventTracker, subscription: 'test-sub' } as any;
       mockFormatterUtils.parseBatch.mockReturnValue(eventTracker);
       mockAppService.addEventTracker.mockResolvedValue(eventTracker);
 
-      controller.addEventTracker(dataWithSubscription, { debug: '' });
+      controller.addEventTracker(VALID_TOKEN, dataWithSubscription, { debug: '' });
 
       expect(mockFormatterUtils.parseBatch).toHaveBeenCalledWith(dataWithSubscription);
       expect(mockAppService.addEventTracker).toHaveBeenCalledWith(eventTracker, '');
@@ -62,7 +79,7 @@ describe('AppController', () => {
     it('should handle EventTracker data directly (without subscription)', () => {
       mockAppService.addEventTracker.mockResolvedValue(eventTracker);
 
-      controller.addEventTracker(eventTracker, { debug: '' });
+      controller.addEventTracker(VALID_TOKEN, eventTracker, { debug: '' });
 
       expect(mockFormatterUtils.parseBatch).not.toHaveBeenCalled();
       expect(mockAppService.addEventTracker).toHaveBeenCalledWith(eventTracker, '');
@@ -71,7 +88,7 @@ describe('AppController', () => {
     it('should pass debug query parameter', () => {
       mockAppService.addEventTracker.mockResolvedValue(eventTracker);
 
-      controller.addEventTracker(eventTracker, { debug: 'true' });
+      controller.addEventTracker(VALID_TOKEN, eventTracker, { debug: 'true' });
 
       expect(mockAppService.addEventTracker).toHaveBeenCalledWith(eventTracker, 'true');
     });
@@ -92,7 +109,7 @@ describe('AppController', () => {
       mockFormatterUtils.parseBatch.mockReturnValue(eventTracker);
       mockAppService.addEventTracker.mockResolvedValue(eventTracker);
 
-      controller.addEventTracker(subscriptionMessage, { debug: '' });
+      controller.addEventTracker(VALID_TOKEN, subscriptionMessage, { debug: '' });
 
       expect(mockFormatterUtils.parseBatch).toHaveBeenCalledWith(subscriptionMessage);
       expect(mockAppService.addEventTracker).toHaveBeenCalledWith(eventTracker, '');

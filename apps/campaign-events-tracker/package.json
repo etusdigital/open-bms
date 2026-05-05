@@ -21,6 +21,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@bms/messaging": "workspace:*",
     "@nestjs/bullmq": "^10.2.3",
     "@nestjs/common": "^11.1.16",
     "@nestjs/config": "^4.0.3",

@@ -8,11 +8,16 @@ FROM base AS deps
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/campaign-events-tracker/package.json ./apps/campaign-events-tracker/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/typescript-config/package.json ./packages/typescript-config/
+COPY packages/messaging/package.json ./packages/messaging/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --filter msgops-campaign-events-tracker
+    pnpm install --frozen-lockfile --filter msgops-campaign-events-tracker... --ignore-scripts
 
 FROM deps AS build
+COPY packages/typescript-config/ ./packages/typescript-config/
+COPY packages/messaging/ ./packages/messaging/
 COPY apps/campaign-events-tracker/ ./apps/campaign-events-tracker/
+RUN pnpm --filter @bms/messaging build
 RUN pnpm --filter msgops-campaign-events-tracker build
 
 FROM build AS deploy

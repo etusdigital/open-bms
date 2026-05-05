@@ -2,7 +2,6 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { Queue } from 'bullmq';
 
-export const QUEUE_CAMPAIGN_EVENTS_TRACKER = 'campaign-events-tracker';
 export const QUEUE_CAMPAIGN_TRIGGER = 'campaign-trigger';
 
 const JOB_OPTS = {
