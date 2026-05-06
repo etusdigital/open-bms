@@ -348,15 +348,20 @@ export class StatisticsAggregationService {
       record.accountId,
       record.eventType,
       record.type,
-      record.messageId,
-      record.automationId,
-      record.campaignId,
+      // Schema enforces NOT NULL on these FK columns; the upstream record
+      // builder uses null to mean "this row is not for an automation/campaign
+      // /custom-event". Coerce to 0 here so a single insert path satisfies the
+      // schema without rewriting every call site, and so the unique-constraint
+      // logic (NULLS DISTINCT default) doesn't accidentally allow duplicates.
+      record.messageId ?? 0,
+      record.automationId ?? 0,
+      record.campaignId ?? 0,
       record.isTestAb || false,
-      record.eventId,
-      record.pool,
-      record.provider,
-      record.providerAccount,
-      record.utmCampaign,
+      record.eventId ?? 0,
+      record.pool ?? '',
+      record.provider ?? '',
+      record.providerAccount ?? '',
+      record.utmCampaign ?? '',
       record.data.processed,
       record.data.delivered,
       record.data.open,
