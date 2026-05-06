@@ -395,10 +395,16 @@ export class AccountsService {
   }
 
   async uploadWebPushFile(accountId: number, content = '') {
+    const assetsUrl = await this.storage.getAssetsUrl();
+    const bucket = await this.storage.getDefaultBucket();
+    if (!assetsUrl) {
+      throw new HttpException('BMS_ASSETS_URL não configurado em /super-admin/integrations/s3 — Service Worker requer host público.', HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
     const fileName = `bmspush-${createHash('sha256').update(`${accountId}`).digest('hex')}.js`;
     const fileContent = `
       var last_updated = "${Date.now()}";
-      importScripts("https://${process.env.BMS_ASSETS_URL}/bms/bms-sw.js?t=" + last_updated);
+      importScripts("https://${assetsUrl}/bms/bms-sw.js?t=" + last_updated);
       ${content}
     `;
 
@@ -412,9 +418,9 @@ export class AccountsService {
       cacheControl: 'no-store',
     };
 
-    await this.storage.genericUpload(fileDTO, fileName, 'bms/push', process.env.S3_BUCKET, true);
+    await this.storage.genericUpload(fileDTO, fileName, 'bms/push', bucket, true);
 
-    return this.clearCloudFlareCache(`https://${process.env.BMS_ASSETS_URL}/bms/push/${fileName}`);
+    return this.clearCloudFlareCache(`https://${assetsUrl}/bms/push/${fileName}`);
   }
 
   async sendPushRulesToCloudflareWorkers(accountId: number, config: any) {

@@ -1,9 +1,10 @@
 import { mkdirSync, writeFileSync } from 'fs';
-import { dirname, join } from 'path';
+import { dirname } from 'path';
 import type { GeoIpSettingsDto } from '../modules/setup/dtos/geoip-settings.dto';
+import { bmsConfigFilePath } from './bms-config-paths';
 
 export function geoIpEnvFilePath(): string {
-  return join(process.env.BMS_CONFIG_DIR ?? '/data/config', 'geoip.env');
+  return bmsConfigFilePath('geoip.env');
 }
 
 // Maps a persisted GeoIpSettingsDto to the env vars consumed by

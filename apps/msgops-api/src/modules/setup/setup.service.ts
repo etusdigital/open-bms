@@ -24,6 +24,10 @@ import { HealthCheckResult, ServiceHealthResult } from './dtos/health-check-resu
 import { TestSendgridDto } from './dtos/test-sendgrid.dto';
 import { GeoIpSettingsDto, geoIpSettingsSchema } from './dtos/geoip-settings.dto';
 import { validateSendgridApiKey } from '../../lib/sendgrid-validator';
+import { enforceTestRateLimit } from '../../lib/test-rate-limit';
+import { SystemConfigCacheProvider } from '../../providers/system-config-cache.provider';
+import { S3SystemSettings } from '../../lib/integrations-config-file';
+import { S3_KEY } from '../admin-integrations/s3/admin-s3.service';
 
 const WIZARD_KEY = 'setup_wizard_step';
 const SMTP_KEY = 'smtp_settings';
@@ -31,9 +35,6 @@ const DOMAIN_KEY = 'domain_settings';
 const GEOIP_KEY = 'geoip_settings';
 // Shared with seedAdmin (bootstrap/seed-admin.ts) so the wizard serializes against the same lock.
 const ADVISORY_LOCK_KEY = 834729;
-// Rate limit for testSmtp/testSendgrid — window in ms and max attempts per IP in that window.
-const TEST_RATE_WINDOW_MS = 60_000;
-const TEST_RATE_MAX_PER_WINDOW = 5;
 // Rate limit for health-check — more restrictive (each call opens 6 external connections).
 const HEALTH_CHECK_WINDOW_MS = 60_000;
 const HEALTH_CHECK_MAX_PER_WINDOW = 3;
@@ -64,6 +65,7 @@ export class SetupService implements OnModuleInit {
     @Inject(AUTH_PROVIDER_TOKEN) private readonly authProvider: IAuthProvider,
     private readonly redisService: RedisService,
     private readonly clickhouse: ClickhouseProvider,
+    private readonly cache: SystemConfigCacheProvider,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -158,15 +160,19 @@ export class SetupService implements OnModuleInit {
         await connPromise;
       }),
       this.probe(async () => {
-        const bucket = process.env.S3_BUCKET;
-        const accessKeyId = process.env.S3_ACCESS_KEY_ID;
-        const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
+        // DB first (post-setup); env fallback covers the setup wizard itself (pre-config).
+        const db = await this.cache.get<S3SystemSettings>(S3_KEY);
+        const bucket = db?.bucket ?? process.env.S3_BUCKET;
+        const accessKeyId = db?.accessKeyId ?? process.env.S3_ACCESS_KEY_ID;
+        const secretAccessKey = db?.secretAccessKey ?? process.env.S3_SECRET_ACCESS_KEY;
+        const endpoint = db?.endpoint ?? process.env.S3_ENDPOINT;
+        const region = db?.region ?? process.env.S3_REGION ?? 'us-east-1';
         if (!accessKeyId || !secretAccessKey || !bucket) throw new Error('S3 not configured');
         const client = new S3Client({
-          endpoint: process.env.S3_ENDPOINT,
-          region: process.env.S3_REGION ?? 'us-east-1',
+          endpoint,
+          region,
           credentials: { accessKeyId, secretAccessKey },
-          forcePathStyle: !!process.env.S3_ENDPOINT,
+          forcePathStyle: !!endpoint,
         });
         await client.send(new HeadBucketCommand({ Bucket: bucket }));
       }),
@@ -425,16 +431,8 @@ export class SetupService implements OnModuleInit {
   }
 
   private enforceTestRateLimit(provider: 'smtp' | 'sendgrid', requesterIp?: string): void {
-    const key = `${provider}:${requesterIp || 'unknown'}`;
-    const now = Date.now();
-    const windowStart = now - TEST_RATE_WINDOW_MS;
-    const hits = (this.testProviderHits.get(key) || []).filter((t: number) => t > windowStart);
-    if (hits.length >= TEST_RATE_MAX_PER_WINDOW) {
-      const label = provider === 'smtp' ? 'SMTP' : 'SendGrid';
-      throw new HttpException(`Muitas tentativas de teste ${label}. Aguarde um minuto e tente novamente.`, HttpStatus.TOO_MANY_REQUESTS);
-    }
-    hits.push(now);
-    this.testProviderHits.set(key, hits);
+    const label = provider === 'smtp' ? 'SMTP' : 'SendGrid';
+    enforceTestRateLimit(this.testProviderHits, `${provider}:${requesterIp || 'unknown'}`, label);
   }
 
   private async resolveAdminEmail(): Promise<string | null> {

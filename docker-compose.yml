@@ -346,7 +346,14 @@ services:
       # the AMQP→HTTP bridge fetch.
       BRIDGE_ENDPOINT: http://localhost:3000
       SENDGRID_API_BASE_URL: ${SENDGRID_API_BASE_URL:-http://sendgrid-mock:3010}
-    depends_on: *infra-deps
+      # Shared config dir written by msgops-api (s3.env, sendgrid.env).
+      BMS_CONFIG_DIR: /data/config
+    volumes:
+      - bms-config:/data/config:ro
+    depends_on:
+      <<: *infra-deps
+      msgops-api:
+        condition: service_healthy
 
   send-push:
     build:
@@ -360,7 +367,14 @@ services:
     environment:
       <<: *backend-env
       PORT: '3000'
-    depends_on: *infra-deps
+      # Shared config dir written by msgops-api (fcm.env).
+      BMS_CONFIG_DIR: /data/config
+    volumes:
+      - bms-config:/data/config:ro
+    depends_on:
+      <<: *infra-deps
+      msgops-api:
+        condition: service_healthy
 
   send-whatsapp:
     build:
@@ -424,7 +438,14 @@ services:
     environment:
       <<: *backend-env
       PORT: '3000'
-    depends_on: *infra-deps
+      # Shared config dir written by msgops-api (emailable.env).
+      BMS_CONFIG_DIR: /data/config
+    volumes:
+      - bms-config:/data/config:ro
+    depends_on:
+      <<: *infra-deps
+      msgops-api:
+        condition: service_healthy
 
   geolocation:
     build:
