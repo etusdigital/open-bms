@@ -742,12 +742,16 @@ export class AccountsService {
   }
 
   async getActiveAccountIds() {
+    // Move the time_zone filter into the LEFT JOIN's ON clause and COALESCE
+    // the result so accounts without an explicit time_zone config still
+    // qualify (default UTC). The previous form put the filter in WHERE,
+    // turning the LEFT JOIN into an effective INNER JOIN and silently
+    // excluding accounts from the statistics aggregation cron.
     return await this.accountRepository
       .createQueryBuilder('account')
-      .leftJoin('account.accountConfigs', 'accountConfigs')
+      .leftJoin('account.accountConfigs', 'accountConfigs', 'accountConfigs.name = :name', { name: 'time_zone' })
       .where('account.is_active = true')
-      .andWhere('accountConfigs.name = :name', { name: 'time_zone' })
-      .select(['account.id AS id', 'accountConfigs.value AS time_zone'])
+      .select(['account.id AS id', "COALESCE(accountConfigs.value, 'UTC') AS time_zone"])
       .getRawMany();
   }
 
