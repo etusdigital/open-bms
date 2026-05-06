@@ -1,10 +1,10 @@
-import { CheckerProvider } from './checker.provider';
+import { EmailableProvider } from './emailable.provider';
 import { HttpService } from '@nestjs/axios';
 import { of, throwError } from 'rxjs';
 import { AxiosResponse, AxiosHeaders } from 'axios';
 
-describe('CheckerProvider', () => {
-  let provider: CheckerProvider;
+describe('EmailableProvider', () => {
+  let provider: EmailableProvider;
   let httpService: HttpService;
 
   const makeAxiosResponse = (data: any, status = 200): AxiosResponse => ({
@@ -19,7 +19,7 @@ describe('CheckerProvider', () => {
     process.env.EMAILABLE_URL = 'https://api.emailable.com/v1/verify';
     process.env.EMAILABLE_API_KEY = 'test-key';
 
-    provider = new CheckerProvider();
+    provider = new EmailableProvider();
     httpService = (provider as any).httpService;
   });
 

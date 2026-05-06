@@ -11,8 +11,20 @@ import { EventPublisherService } from 'src/providers/messaging/event-publisher.s
 import { EXCHANGES } from '@bms/messaging';
 import { VerifyStatisticsService, VerifyStatisticType } from './verify-statistics.service';
 
+const TRUTHY_ENV_VALUES = new Set(['true', '1', 'yes']);
+
+function isEnvTruthy(value: string | undefined): boolean {
+  if (!value) return false;
+  return TRUTHY_ENV_VALUES.has(value.trim().toLowerCase());
+}
+
 @Injectable()
 export class VerifyService {
+  // Tighter than RFC 5322 but rejects `x"a"@b.com` and similar weird-quoted edge cases that the
+  // upstream email-validation regex accepted. When EMAIL_VALIDATION_ENABLED=false this is the only
+  // gate before publishing the 2FA code, so prefer rejecting odd-but-RFC-valid forms.
+  private static readonly EMAIL_FORMAT_REGEX = /^[^\s@"<>()[\]\\,;:]+@[^\s@"<>()[\]\\,;:]+\.[^\s@"<>()[\]\\,;:]{2,}$/;
+
   constructor(
     private readonly redisService: RedisService,
     private readonly cls: ClsService,
@@ -124,39 +136,47 @@ export class VerifyService {
           }
 
           // Validate email before sending verification code
-          try {
-            const emailToValidate = encodeURIComponent(requestData.to);
-            const validationUrl = `${process.env.EMAIL_VALIDATION_URL}validations?email=${emailToValidate}`;
-            const apiKey = account.configByName('api_key').value;
+          if (isEnvTruthy(process.env.EMAIL_VALIDATION_ENABLED)) {
+            try {
+              const emailToValidate = encodeURIComponent(requestData.to);
+              const validationUrl = `${process.env.EMAIL_VALIDATION_URL}validations?email=${emailToValidate}`;
+              const apiKey = account.configByName('api_key').value;
 
-            const response = await fetch(validationUrl, {
-              method: 'GET',
-              headers: {
-                Accept: 'application/json',
-                'api-key': apiKey,
-              },
-            });
+              const response = await fetch(validationUrl, {
+                method: 'GET',
+                headers: {
+                  Accept: 'application/json',
+                  'api-key': apiKey,
+                },
+              });
 
-            if (!response.ok) {
-              //Increment error request counter
-              await this.verifyStatisticsService.incrementStatistic(VerifyMethod.EMAIL, requestData.group, VerifyStatisticType.ERROR, accountTimezone);
-              throw new HttpException('Email validation service unavailable', HttpStatus.SERVICE_UNAVAILABLE);
+              if (!response.ok) {
+                //Increment error request counter
+                await this.verifyStatisticsService.incrementStatistic(VerifyMethod.EMAIL, requestData.group, VerifyStatisticType.ERROR, accountTimezone);
+                throw new HttpException('Email validation service unavailable', HttpStatus.SERVICE_UNAVAILABLE);
+              }
+
+              const validationResult = await response.json();
+
+              if (!['deliverable', 'risky'].includes(validationResult.result)) {
+                //Increment error request counter
+                await this.verifyStatisticsService.incrementStatistic(VerifyMethod.EMAIL, requestData.group, VerifyStatisticType.ERROR, accountTimezone);
+                throw new HttpException('Invalid email address', HttpStatus.UNPROCESSABLE_ENTITY);
+              }
+            } catch (error) {
+              if (error instanceof HttpException) {
+                //TODO: Need a specific error counter for non-email validation errors
+                throw error;
+              }
+              console.error('Email validation error:', error);
+              throw new HttpException('Error validating email address', HttpStatus.INTERNAL_SERVER_ERROR);
             }
-
-            const validationResult = await response.json();
-
-            if (!['deliverable', 'risky'].includes(validationResult.result)) {
-              //Increment error request counter
+          } else {
+            // External validation disabled — fall back to local format regex
+            if (!VerifyService.EMAIL_FORMAT_REGEX.test(requestData.to.toLowerCase())) {
               await this.verifyStatisticsService.incrementStatistic(VerifyMethod.EMAIL, requestData.group, VerifyStatisticType.ERROR, accountTimezone);
               throw new HttpException('Invalid email address', HttpStatus.UNPROCESSABLE_ENTITY);
             }
-          } catch (error) {
-            if (error instanceof HttpException) {
-              //TODO: Need a specific error counter for non-email validation errors
-              throw error;
-            }
-            console.error('Email validation error:', error);
-            throw new HttpException('Error validating email address', HttpStatus.INTERNAL_SERVER_ERROR);
           }
 
           const messages = settings.email[requestData.group || 'default'];

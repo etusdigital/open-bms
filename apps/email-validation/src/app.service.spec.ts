@@ -2,12 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException } from '@nestjs/common';
 import { AppService } from './app.service';
 import { MsgopsService } from './msgops/msgops.service';
-import { CheckerProvider } from './providers/checker.provider';
+import { EMAIL_VALIDATION_PROVIDER_TOKEN, IEmailValidationProvider } from './providers/email-validation.provider.interface';
 
 describe('AppService', () => {
   let service: AppService;
   let msgopsService: Partial<Record<keyof MsgopsService, jest.Mock>>;
-  let checkerProvider: Partial<Record<keyof CheckerProvider, jest.Mock>>;
+  let checker: Partial<Record<keyof IEmailValidationProvider, jest.Mock>>;
 
   beforeEach(async () => {
     msgopsService = {
@@ -17,12 +17,12 @@ describe('AppService', () => {
       createOrUpdateEmail: jest.fn(),
     };
 
-    checkerProvider = {
+    checker = {
       check: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AppService, { provide: MsgopsService, useValue: msgopsService }, { provide: CheckerProvider, useValue: checkerProvider }],
+      providers: [AppService, { provide: MsgopsService, useValue: msgopsService }, { provide: EMAIL_VALIDATION_PROVIDER_TOKEN, useValue: checker }],
     }).compile();
 
     service = module.get<AppService>(AppService);
@@ -53,7 +53,7 @@ describe('AppService', () => {
 
       it('should not call checker provider for invalid email format', async () => {
         await service.validate('invalid', '', false);
-        expect(checkerProvider.check).not.toHaveBeenCalled();
+        expect(checker.check).not.toHaveBeenCalled();
       });
 
       it('should not call findByEmail for invalid email format', async () => {
@@ -73,7 +73,7 @@ describe('AppService', () => {
       it('should call createOrUpdateAccountUsage when account is found', async () => {
         msgopsService.findAccountByApiKey.mockResolvedValue({ id: 1 });
         msgopsService.findByEmail.mockResolvedValue(null);
-        checkerProvider.check.mockResolvedValue({
+        checker.check.mockResolvedValue({
           email: 'user@example.com',
           status: 'deliverable',
           response: {},
@@ -87,7 +87,7 @@ describe('AppService', () => {
 
       it('should not validate account when shouldChargeUse is false', async () => {
         msgopsService.findByEmail.mockResolvedValue(null);
-        checkerProvider.check.mockResolvedValue({
+        checker.check.mockResolvedValue({
           email: 'user@example.com',
           status: 'deliverable',
           response: {},
@@ -115,7 +115,7 @@ describe('AppService', () => {
         const result = await service.validate('user@example.com', '', false);
 
         expect(result.result).toBe('deliverable');
-        expect(checkerProvider.check).not.toHaveBeenCalled();
+        expect(checker.check).not.toHaveBeenCalled();
       });
     });
 
@@ -140,7 +140,7 @@ describe('AppService', () => {
 
         expect(result.result).toBe('deliverable');
         expect(result.state).toBe('deliverable');
-        expect(checkerProvider.check).not.toHaveBeenCalled();
+        expect(checker.check).not.toHaveBeenCalled();
       });
 
       it('should return deliverable when lastClick is within 7 days', async () => {
@@ -155,7 +155,7 @@ describe('AppService', () => {
         const result = await service.validate('user@example.com', '', false);
 
         expect(result.result).toBe('deliverable');
-        expect(checkerProvider.check).not.toHaveBeenCalled();
+        expect(checker.check).not.toHaveBeenCalled();
       });
 
       it('should return deliverable when unsubscribedAt is within 7 days', async () => {
@@ -170,7 +170,7 @@ describe('AppService', () => {
         const result = await service.validate('user@example.com', '', false);
 
         expect(result.result).toBe('deliverable');
-        expect(checkerProvider.check).not.toHaveBeenCalled();
+        expect(checker.check).not.toHaveBeenCalled();
       });
 
       // Boundary tests
@@ -189,7 +189,7 @@ describe('AppService', () => {
         const result = await service.validate('user@example.com', '', false);
 
         expect(result.result).toBe('deliverable');
-        expect(checkerProvider.check).not.toHaveBeenCalled();
+        expect(checker.check).not.toHaveBeenCalled();
       });
 
       it('should NOT bypass for engagement 8 days ago (outside 7 day window)', async () => {
@@ -202,7 +202,7 @@ describe('AppService', () => {
           status: null,
         });
 
-        checkerProvider.check.mockResolvedValue({
+        checker.check.mockResolvedValue({
           email: 'user@example.com',
           status: 'deliverable',
           response: {},
@@ -211,7 +211,7 @@ describe('AppService', () => {
 
         await service.validate('user@example.com', '', false);
 
-        expect(checkerProvider.check).toHaveBeenCalled();
+        expect(checker.check).toHaveBeenCalled();
       });
     });
 
@@ -222,7 +222,7 @@ describe('AppService', () => {
       });
 
       it('should call checker provider when no cache hit', async () => {
-        checkerProvider.check.mockResolvedValue({
+        checker.check.mockResolvedValue({
           email: 'user@example.com',
           status: 'deliverable',
           response: { state: 'deliverable' },
@@ -231,7 +231,7 @@ describe('AppService', () => {
 
         await service.validate('user@example.com', '', false);
 
-        expect(checkerProvider.check).toHaveBeenCalledWith('user@example.com');
+        expect(checker.check).toHaveBeenCalledWith('user@example.com');
       });
 
       it('should save result to DB for HTTP 200', async () => {
@@ -241,7 +241,7 @@ describe('AppService', () => {
           response: { state: 'deliverable' },
           apiStatus: 200,
         };
-        checkerProvider.check.mockResolvedValue(checkResult);
+        checker.check.mockResolvedValue(checkResult);
 
         await service.validate('user@example.com', '', false);
 
@@ -249,10 +249,45 @@ describe('AppService', () => {
       });
 
       it('should return the correct result from Emailable response', async () => {
-        checkerProvider.check.mockResolvedValue({
+        checker.check.mockResolvedValue({
           email: 'user@example.com',
           status: 'deliverable',
           response: { state: 'deliverable', reason: 'accepted_email' },
+          apiStatus: 200,
+        });
+
+        const result = await service.validate('user@example.com', '', false);
+
+        expect(result.result).toBe('deliverable');
+      });
+    });
+
+    // Noop provider — must not persist to cache (F1)
+    describe('noop provider — cache bypass', () => {
+      beforeEach(() => {
+        msgopsService.findByEmail.mockResolvedValue(null);
+      });
+
+      it('should NOT save to DB when reason is "noop"', async () => {
+        checker.check.mockResolvedValue({
+          email: 'user@example.com',
+          status: 'deliverable',
+          reason: 'noop',
+          response: { state: 'deliverable', reason: 'noop' },
+          apiStatus: 200,
+        });
+
+        await service.validate('user@example.com', '', false);
+
+        expect(msgopsService.createOrUpdateEmail).not.toHaveBeenCalled();
+      });
+
+      it('should still return deliverable for noop response', async () => {
+        checker.check.mockResolvedValue({
+          email: 'user@example.com',
+          status: 'deliverable',
+          reason: 'noop',
+          response: { state: 'deliverable', reason: 'noop' },
           apiStatus: 200,
         });
 
@@ -269,7 +304,7 @@ describe('AppService', () => {
       });
 
       it('should NOT save to DB when apiStatus is 249', async () => {
-        checkerProvider.check.mockResolvedValue({
+        checker.check.mockResolvedValue({
           email: 'user@example.com',
           status: 'deferred',
           response: { message: 'Still processing' },
@@ -282,7 +317,7 @@ describe('AppService', () => {
       });
 
       it('should return deferred status for HTTP 249', async () => {
-        checkerProvider.check.mockResolvedValue({
+        checker.check.mockResolvedValue({
           email: 'user@example.com',
           status: 'deferred',
           response: { message: 'Still processing' },
@@ -295,7 +330,7 @@ describe('AppService', () => {
       });
 
       it('should NOT save for Yahoo email with HTTP 249', async () => {
-        checkerProvider.check.mockResolvedValue({
+        checker.check.mockResolvedValue({
           email: 'user@yahoo.com',
           status: 'deferred',
           response: { message: 'Still processing' },

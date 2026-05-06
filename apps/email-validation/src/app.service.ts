@@ -1,12 +1,12 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { MsgopsService } from './msgops/msgops.service';
-import { CheckerProvider } from './providers/checker.provider';
+import { EMAIL_VALIDATION_PROVIDER_TOKEN, IEmailValidationProvider } from './providers/email-validation.provider.interface';
 
 @Injectable()
 export class AppService {
   constructor(
     private readonly msgOpsService: MsgopsService,
-    private readonly checkerProvider: CheckerProvider,
+    @Inject(EMAIL_VALIDATION_PROVIDER_TOKEN) private readonly checker: IEmailValidationProvider,
   ) {}
 
   async validate(email: string, apiKey: string, shouldChargeUse = true) {
@@ -56,9 +56,11 @@ export class AppService {
       }
     }
 
-    const response = await this.checkerProvider.check(email);
+    const response = await this.checker.check(email);
 
-    if (response.apiStatus !== 249) {
+    // Skip cache write for: deferred (249) and noop provider (synthetic result, no real validation occurred).
+    // Persisting noop would let stale 'deliverable' entries serve cache hits forever after migrating to emailable.
+    if (response.apiStatus !== 249 && response.reason !== 'noop') {
       await this.msgOpsService.createOrUpdateEmail(response);
     }
     return { ...response.response, result: response.status };
