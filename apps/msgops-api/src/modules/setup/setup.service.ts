@@ -1,4 +1,6 @@
-import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { existsSync } from 'fs';
+import { geoIpEnvFilePath, writeGeoIpEnvFile } from '../../lib/geoip-config-file';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import * as nodemailer from 'nodemailer';
@@ -20,11 +22,13 @@ import { AdvanceStepDto, STEP_SCHEMAS, Step1Data, Step2Data, Step3Data, Step4Dat
 import { TestSmtpDto } from './dtos/test-smtp.dto';
 import { HealthCheckResult, ServiceHealthResult } from './dtos/health-check-result.dto';
 import { TestSendgridDto } from './dtos/test-sendgrid.dto';
+import { GeoIpSettingsDto, geoIpSettingsSchema } from './dtos/geoip-settings.dto';
 import { validateSendgridApiKey } from '../../lib/sendgrid-validator';
 
 const WIZARD_KEY = 'setup_wizard_step';
 const SMTP_KEY = 'smtp_settings';
 const DOMAIN_KEY = 'domain_settings';
+const GEOIP_KEY = 'geoip_settings';
 // Shared with seedAdmin (bootstrap/seed-admin.ts) so the wizard serializes against the same lock.
 const ADVISORY_LOCK_KEY = 834729;
 // Rate limit for testSmtp/testSendgrid — window in ms and max attempts per IP in that window.
@@ -44,7 +48,7 @@ type SmtpSettings = Omit<Step2Data, never>;
 type DomainSettings = Step3Data;
 
 @Injectable()
-export class SetupService {
+export class SetupService implements OnModuleInit {
   private readonly logger = new Logger(SetupService.name);
   private readonly testProviderHits = new Map<string, number[]>();
   private readonly healthCheckHits = new Map<string, number[]>();
@@ -61,6 +65,22 @@ export class SetupService {
     private readonly redisService: RedisService,
     private readonly clickhouse: ClickhouseProvider,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    // Bootstrap: if the wizard already ran but the config file is missing (e.g.
+    // first boot after adding this feature, or volume was wiped), regenerate it
+    // from the persisted system_config so the sidecar and geolocation service
+    // pick up the correct tier without requiring a re-run of the wizard.
+    if (existsSync(geoIpEnvFilePath())) return;
+    const settings = await this.getGeoIpSettings();
+    if (!settings) return;
+    try {
+      writeGeoIpEnvFile(settings);
+      this.logger.log(`[GeoIP] bootstrapped ${geoIpEnvFilePath()} from system_config`);
+    } catch (err: any) {
+      this.logger.warn(`[GeoIP] could not write ${geoIpEnvFilePath()}: ${err?.message} — sidecar will fall back to env vars`);
+    }
+  }
 
   async getStatus(): Promise<{ configured: boolean; currentStep: number; baseUrl?: string }> {
     const state = await this.readWizard();
@@ -317,6 +337,34 @@ export class SetupService {
       return this.completeWizard(data.skipReason);
     }
     return this.completeWizard();
+  }
+
+  async saveGeoIpSettings(dto: GeoIpSettingsDto): Promise<void> {
+    await this.ensureNotConfigured();
+
+    const { value, error } = geoIpSettingsSchema.validate(dto, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+    if (error) {
+      throw new BadRequestException(error.details.map((d) => d.message).join('; '));
+    }
+
+    await this.systemConfigRepo.save(this.systemConfigRepo.create({ key: GEOIP_KEY, value: value as Record<string, unknown> }));
+
+    // Write the config file so the geolocation sidecar and service pick up
+    // the wizard choice immediately — no manual .env editing required.
+    try {
+      writeGeoIpEnvFile(value as GeoIpSettingsDto);
+    } catch (err: any) {
+      this.logger.warn(`[GeoIP] could not write env file: ${err?.message} — sidecar will fall back to env vars`);
+    }
+  }
+
+  async getGeoIpSettings(): Promise<GeoIpSettingsDto | null> {
+    const cfg = await this.systemConfigRepo.findOne({ where: { key: GEOIP_KEY } });
+    if (!cfg) return null;
+    return cfg.value as unknown as GeoIpSettingsDto;
   }
 
   async testSendgrid(dto: TestSendgridDto, requesterIp?: string): Promise<{ accountName: string | null }> {

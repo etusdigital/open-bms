@@ -2,9 +2,19 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AppService } from './app.service';
 import { GeoIpLookupResult } from './geoip.interface';
 
-// Mock fs
+// Mock fs. statSync feeds the size/mtime tracker; watch returns a noop
+// closer so OnModuleDestroy can call .close() without crashing the test.
+// Helpers live inside the factory because jest.mock() is hoisted above
+// const declarations — referencing top-level vars from the factory triggers
+// ReferenceError.
 jest.mock('fs', () => ({
   readFileSync: jest.fn().mockReturnValue(Buffer.from('test')),
+  statSync: jest.fn().mockReturnValue({
+    size: 125_000_000,
+    mtimeMs: 1_700_000_000_000,
+    mtime: new Date(1_700_000_000_000),
+  }),
+  watch: jest.fn().mockImplementation(() => ({ close: jest.fn() })),
 }));
 
 // Mock the mmdb-reader module
@@ -32,8 +42,10 @@ describe('AppService', () => {
   const originalEnv = process.env;
 
   beforeEach(async () => {
-    // Set environment variable for the test
-    process.env = { ...originalEnv, DBIP_MMDB_PATH: './mock-path.mmdb' };
+    // Service derives the path as `${GEO_MMDB_DIR}/<tier-filename>`. With
+    // tier=lite the filename resolves to dbip-city-lite.mmdb; the dir below
+    // is irrelevant because fs is mocked.
+    process.env = { ...originalEnv, GEO_MMDB_DIR: './mock', GEO_TIER: 'lite' };
 
     // Reset mocks before each test
     mockLookup.mockReset();
@@ -304,9 +316,22 @@ describe('AppService', () => {
   });
 
   describe('constructor', () => {
-    it('should set mmdbReader to null when DBIP_MMDB_PATH is not set', async () => {
-      process.env = { ...originalEnv };
-      delete process.env.DBIP_MMDB_PATH;
+    it('should set mmdbReader to null when GEO_MMDB_DIR is not set', async () => {
+      process.env = { ...originalEnv, GEO_TIER: 'lite' };
+      delete process.env.GEO_MMDB_DIR;
+
+      const module = await Test.createTestingModule({
+        providers: [AppService],
+      }).compile();
+
+      const svc = module.get<AppService>(AppService);
+      expect((svc as any).mmdbReader).toBeNull();
+    });
+
+    it('should set mmdbReader to null for tiers without a local MMDB (api/disabled)', async () => {
+      // api/disabled tiers run cache-only / no-op — no file to load. Setting
+      // GEO_MMDB_DIR should be inert in those modes.
+      process.env = { ...originalEnv, GEO_TIER: 'api', GEO_MMDB_DIR: './ignored' };
 
       const module = await Test.createTestingModule({
         providers: [AppService],
@@ -322,7 +347,7 @@ describe('AppService', () => {
         throw new Error('file not found');
       });
 
-      process.env = { ...originalEnv, DBIP_MMDB_PATH: './missing.mmdb' };
+      process.env = { ...originalEnv, GEO_MMDB_DIR: './missing-dir', GEO_TIER: 'lite' };
 
       const module = await Test.createTestingModule({
         providers: [AppService],
@@ -332,8 +357,8 @@ describe('AppService', () => {
       expect((svc as any).mmdbReader).toBeNull();
     });
 
-    it('should initialize mmdbReader when DBIP_MMDB_PATH is set and file exists', async () => {
-      process.env = { ...originalEnv, DBIP_MMDB_PATH: './valid.mmdb' };
+    it('should initialize mmdbReader when GEO_MMDB_DIR is set and file exists', async () => {
+      process.env = { ...originalEnv, GEO_MMDB_DIR: './valid-dir', GEO_TIER: 'lite' };
 
       const module = await Test.createTestingModule({
         providers: [AppService],
@@ -342,6 +367,40 @@ describe('AppService', () => {
       const svc = module.get<AppService>(AppService);
       expect((svc as any).mmdbReader).not.toBeNull();
       expect((svc as any).mmdbReader.lookup).toBeDefined();
+    });
+
+    it('should derive the on-disk filename from GEO_TIER (lite → dbip-city-lite.mmdb)', async () => {
+      process.env = { ...originalEnv, GEO_MMDB_DIR: '/data/geo', GEO_TIER: 'lite' };
+
+      const module = await Test.createTestingModule({
+        providers: [AppService],
+      }).compile();
+
+      const svc = module.get<AppService>(AppService);
+      expect((svc as any).mmdbPath).toContain('dbip-city-lite.mmdb');
+    });
+
+    it('should derive the on-disk filename from GEO_TIER (full → dbip-city-full.mmdb)', async () => {
+      process.env = { ...originalEnv, GEO_MMDB_DIR: '/data/geo', GEO_TIER: 'full' };
+
+      const module = await Test.createTestingModule({
+        providers: [AppService],
+      }).compile();
+
+      const svc = module.get<AppService>(AppService);
+      expect((svc as any).mmdbPath).toContain('dbip-city-full.mmdb');
+      expect((svc as any).mmdbPath).not.toContain('lite');
+    });
+
+    it('should derive the on-disk filename from GEO_TIER (maxmind → geolite2-city.mmdb)', async () => {
+      process.env = { ...originalEnv, GEO_MMDB_DIR: '/data/geo', GEO_TIER: 'maxmind' };
+
+      const module = await Test.createTestingModule({
+        providers: [AppService],
+      }).compile();
+
+      const svc = module.get<AppService>(AppService);
+      expect((svc as any).mmdbPath).toContain('geolite2-city.mmdb');
     });
   });
 });

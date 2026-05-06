@@ -28,6 +28,7 @@ import { LabelsModule } from './modules/labels/labels.module';
 import { AuthzModule } from './modules/authz/authz.module';
 import { SetupModule } from './modules/setup/setup.module';
 import { AccountSettingsModule } from './modules/account-settings/account-settings.module';
+import { AdminGeoIpModule } from './modules/admin-geoip/admin-geoip.module';
 import { MessagingModule } from './providers/messaging/messaging.module';
 import { QueueModule } from './providers/queue/queue.module';
 
@@ -67,6 +68,7 @@ import { QueueModule } from './providers/queue/queue.module';
     LabelsModule,
     SetupModule,
     AccountSettingsModule,
+    AdminGeoIpModule,
   ],
   providers: [AuditSubscriber],
 })

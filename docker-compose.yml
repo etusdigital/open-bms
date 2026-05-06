@@ -197,6 +197,17 @@ services:
       retries: 6
       start_period: 30s
 
+  # One-shot init: runs as root before msgops-api starts and sets ownership
+  # of the bms-config volume to UID 1001 (nodejs) so msgops-api can write
+  # /data/config/geoip.env. Without this, Docker initialises named volumes
+  # as root-owned and the non-root container cannot write.
+  bms-config-init:
+    image: alpine:3.20
+    volumes:
+      - bms-config:/data/config
+    entrypoint: ['/bin/sh', '-c', 'chown 1001:1001 /data/config']
+    restart: 'no'
+
   msgops-api:
     build:
       context: .
@@ -220,7 +231,14 @@ services:
       # sendgrid-mock fires synthetic events at this URL when /v3/mail/send is
       # called, so it must point at event-receiver inside the compose network.
       SENDGRID_WEBHOOK_URL_BASE: ${SENDGRID_WEBHOOK_URL_BASE:-http://event-receiver:3011/bms/events?platform=sendgrid}
-    depends_on: *infra-deps
+      # Shared config dir written by wizard, read by geolocation + sidecar.
+      BMS_CONFIG_DIR: /data/config
+    volumes:
+      - bms-config:/data/config
+    depends_on:
+      <<: *infra-deps
+      bms-config-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:5001/api-docs']
       interval: 10s
@@ -416,38 +434,75 @@ services:
     ports:
       - '50051:50051'
     <<: *restart-policy
+    # GEO_TIER, DBIP_API_KEY, MAXMIND_* live in apps/geolocation/.env so a
+    # single file drives both this service AND the geolocation-refresh sidecar
+    # below. The `environment:` block deliberately omits GEO_TIER — compose
+    # `environment:` overrides `env_file:` by precedence, so re-declaring it
+    # there would silently shadow the .env. GEO_MMDB_DIR stays here because
+    # it's infrastructure (must match the volume mount target).
+    env_file:
+      - path: apps/geolocation/.env
+        required: false
     environment:
       <<: *backend-env
       PORT: '50051'
-      DBIP_MMDB_PATH: /data/geo/dbip-city-lite.mmdb
+      GEO_MMDB_DIR: /data/geo
+      BMS_CONFIG_DIR: /data/config
     volumes:
       - ./data/geo:/data/geo
+      - bms-config:/data/config:ro
     depends_on: *infra-deps
 
   # Monthly MMDB refresh. DB-IP releases new builds on the 1st of each month;
-  # this sidecar re-downloads on container start, then sleeps 30 days and
-  # repeats. Restart policy ensures the loop survives host reboots. The MMDB
-  # is bind-mounted to the same ./data/geo dir the geolocation service reads
-  # from — geolocation rebuilds the in-memory MMDBReader on its own restarts,
-  # so no IPC needed here.
+  # this sidecar re-downloads immediately on container start, then schedules
+  # future runs via crond on "0 6 1 * *" (06:00 UTC on the 1st of each month).
+  # Using crond instead of `sleep 2592000` keeps the download aligned with the
+  # DB-IP release calendar regardless of when the container last started.
+  # The geolocation service watches ./data/geo and reloads its in-memory
+  # MMDBReader on mtime change — no restart or IPC needed.
   geolocation-refresh:
-    image: alpine:3.20
+    image: node:20-alpine
     container_name: geolocation-refresh
     <<: *restart-policy
+    working_dir: /workspace
     volumes:
       - ./data/geo:/data/geo
-      - ./scripts/download-geodb.sh:/usr/local/bin/download-geodb.sh:ro
+      - bms-config:/data/config:ro
+      - ./scripts:/workspace/scripts:ro
+      - ./package.json:/workspace/package.json:ro
+      - ./pnpm-lock.yaml:/workspace/pnpm-lock.yaml:ro
+    # Shares apps/geolocation/.env with the geolocation service above —
+    # GEO_TIER + DBIP_API_KEY + MAXMIND_* land here from a single source of
+    # truth. Compose `environment:` overrides `env_file:` by precedence, so
+    # NOTHING below may re-declare those user-toggleable vars (else .env
+    # silently stops working). Only infrastructure stays here.
+    env_file:
+      - path: apps/geolocation/.env
+        required: false
     environment:
-      GEO_DB_PATH: /data/geo/dbip-city-lite.mmdb
+      GEO_MMDB_DIR: /data/geo
+      BMS_CONFIG_DIR: /data/config
+      GEO_VALIDATE_RUNNER: tsx
+      SKIP_VALIDATION: ${GEO_REFRESH_SKIP_VALIDATION:-0}
+      NODE_PATH: /usr/local/lib/node_modules
     entrypoint:
       - /bin/sh
       - -c
       - |
-        apk add --no-cache bash curl >/dev/null &&
-        while true; do
-          bash /usr/local/bin/download-geodb.sh || echo "[geolocation-refresh] download failed, retrying next cycle"
-          sleep 2592000
-        done
+        set -e
+        apk add --no-cache bash curl >/dev/null
+        npm install -g --silent tsx mmdb-reader
+        # Download immediately on container start so the MMDB is always fresh
+        # after a recreate (e.g. tier change) without waiting for the next cron tick.
+        bash /workspace/scripts/download-geodb.sh \
+          || echo "[geolocation-refresh] initial refresh failed at $(date -Iseconds)"
+        # Run daily at 06:00 UTC. The download script compares the staged
+        # file MD5 against the current MMDB and exits early when they match,
+        # so non-release days cost only one download + compare. This also
+        # gives automatic retry if the release-day download fails (provider
+        # outage, bad file) without waiting a full extra month.
+        echo "0 6 * * * bash /workspace/scripts/download-geodb.sh >> /proc/1/fd/1 2>&1" | crontab -
+        exec crond -f -l 6
 
   frontend-react:
     build:
@@ -476,3 +531,8 @@ volumes:
   redis-data:
   minio-data:
   # geo-data: bind mount ./data/geo — run scripts/download-geodb.sh before first docker-compose up
+  # bms-config: named volume — initialised by bms-config-init (chown 1001:1001) before msgops-api starts.
+  # Contains geoip.env written by the wizard; read by geolocation + geolocation-refresh.
+  # Not a bind mount because msgops-api runs as UID 1001 (non-root) and bind mounts
+  # inherit host ownership, which would require manual chown on every new checkout.
+  bms-config:

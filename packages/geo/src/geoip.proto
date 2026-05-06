@@ -4,10 +4,23 @@ package geoip;
 
 service GeoIpService {
   rpc GetLocation (IpRequest) returns (LocationResponse) {}
+  rpc GetStatus (StatusRequest) returns (StatusResponse) {}
 }
 
 message IpRequest {
   string ip = 1; // Can be IPv4 or IPv6
+}
+
+message StatusRequest {}
+
+message StatusResponse {
+  string tier = 1;
+  string mmdb_path = 2;
+  int64 mmdb_size_bytes = 3;
+  int64 mmdb_mtime_ms = 4;
+  string last_reload_at = 5;
+  int64 lookup_count = 6;
+  bool ready = 7;
 }
 
 message Traits {

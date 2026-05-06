@@ -10,6 +10,7 @@ COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/segment-query-builder/package.json ./packages/segment-query-builder/
 COPY packages/messaging/package.json ./packages/messaging/
+COPY packages/geo/package.json ./packages/geo/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --filter msgops-api... --ignore-scripts
 
@@ -17,11 +18,15 @@ FROM deps AS build
 COPY packages/typescript-config/ ./packages/typescript-config/
 COPY packages/segment-query-builder/ ./packages/segment-query-builder/
 COPY packages/messaging/ ./packages/messaging/
+COPY packages/geo/ ./packages/geo/
 COPY apps/msgops-api/ ./apps/msgops-api/
 RUN pnpm pkg delete scripts.prepare
 RUN pnpm --filter msgops-api exec pnpm pkg delete scripts.prepare
 RUN pnpm --filter @msgops/segment-query-builder build
 RUN pnpm --filter @bms/messaging build
+# @bms/geo's build copies src/geoip.proto into dist/ — required for the
+# admin-geoip module's gRPC client to resolve the proto at runtime.
+RUN pnpm --filter @bms/geo build
 RUN pnpm --filter msgops-api build
 
 FROM build AS deploy

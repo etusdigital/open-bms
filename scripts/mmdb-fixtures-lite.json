@@ -1,0 +1,46 @@
+[
+  {
+    "ip": "8.8.8.8",
+    "note": "Google Public DNS — Lite resolves to Mountain View, California, US",
+    "expect": {
+      "country": "US",
+      "region_name_contains": "California",
+      "city_contains": "Mountain View"
+    }
+  },
+  {
+    "ip": "1.1.1.1",
+    "note": "Cloudflare DNS — anycast. DB-IP Lite geocodes the announced base to Sydney, AU (other tiers/providers may pick a US POP).",
+    "expect": {
+      "country": "AU",
+      "region_name_contains": "New South Wales",
+      "city_contains": "Sydney"
+    }
+  },
+  {
+    "ip": "208.67.222.222",
+    "note": "OpenDNS / Cisco resolver — Lite geocodes to San Jose, California, US (city string includes parenthetical neighbourhood that may drift; substring match keeps it stable).",
+    "expect": {
+      "country": "US",
+      "region_name_contains": "California",
+      "city_contains": "San Jose"
+    }
+  },
+  {
+    "ip": "200.160.0.1",
+    "note": "Brazil — Registro.br DNS / NIC.br. São Paulo state coverage check.",
+    "expect": {
+      "country": "BR",
+      "region_name_contains": "São Paulo"
+    }
+  },
+  {
+    "ip": "194.25.0.60",
+    "note": "Deutsche Telekom resolver, Germany — Hesse / Darmstadt. Non-Anglo coverage check.",
+    "expect": {
+      "country": "DE",
+      "region_name_contains": "Hesse",
+      "city_contains": "Darmstadt"
+    }
+  }
+]
