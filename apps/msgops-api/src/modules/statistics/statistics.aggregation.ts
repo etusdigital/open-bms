@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { AccountsService } from '../accounts/accounts.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, QueryRunner } from 'typeorm';
@@ -18,8 +18,11 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 @Injectable()
-export class StatisticsAggregationService {
+export class StatisticsAggregationService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(StatisticsAggregationService.name);
   private readonly redisClient: Redis;
+  private aggregationTimer: NodeJS.Timeout | null = null;
+  private aggregationRunning = false;
 
   constructor(
     private readonly accountService: AccountsService,
@@ -31,6 +34,48 @@ export class StatisticsAggregationService {
     private readonly verifyStatisticsRepository: Repository<VerifyStatisticsEntity>,
   ) {
     this.redisClient = this.redisService.getClient();
+  }
+
+  // In SaaS prod the Cloud Scheduler hits /statistics/aggregated-statistics
+  // every 15 minutes. OSS dev has no external scheduler, so the same flush
+  // can be self-driven via STATISTICS_AGGREGATION_INTERVAL_MS (defaults to
+  // 60_000 in dev, off in production unless explicitly set so it doesn't
+  // race with the external cron). Set to 0 to disable.
+  onModuleInit(): void {
+    const raw = process.env.STATISTICS_AGGREGATION_INTERVAL_MS;
+    const fallback = process.env.NODE_ENV === 'production' ? 0 : 60_000;
+    const interval = raw !== undefined ? Number(raw) : fallback;
+    if (!Number.isFinite(interval) || interval <= 0) {
+      this.logger.log('In-process aggregation scheduler disabled (STATISTICS_AGGREGATION_INTERVAL_MS=0 or unset in production)');
+      return;
+    }
+    this.logger.log(`In-process aggregation scheduler enabled — every ${interval}ms`);
+    this.aggregationTimer = setInterval(() => void this.runAggregationCycle(), interval);
+    // Don't keep the event loop alive solely for this timer — a graceful
+    // shutdown should be able to exit even if a tick is queued.
+    this.aggregationTimer.unref?.();
+  }
+
+  onModuleDestroy(): void {
+    if (this.aggregationTimer) {
+      clearInterval(this.aggregationTimer);
+      this.aggregationTimer = null;
+    }
+  }
+
+  private async runAggregationCycle(): Promise<void> {
+    if (this.aggregationRunning) {
+      // Skip overlap — a slow tick must not pile up callers writing the same rows.
+      return;
+    }
+    this.aggregationRunning = true;
+    try {
+      await Promise.all([this.transferRedisDataToPostgres(), this.transferVerifyRedisDataToPostgres()]);
+    } catch (err) {
+      this.logger.error(`Scheduled aggregation cycle failed: ${(err as Error)?.message ?? err}`);
+    } finally {
+      this.aggregationRunning = false;
+    }
   }
 
   /**
