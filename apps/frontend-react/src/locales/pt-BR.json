@@ -1737,7 +1737,7 @@
       "apiBaseUrl": "Base URL da API",
       "apiBaseUrlHelp": "Sobrescrita opcional. Em produção use https://api.sendgrid.com.",
       "webhookUrlBase": "Base URL do Event Webhook",
-      "webhookUrlBaseHelp": "URL pública para onde o SendGrid enviará eventos (sem o &account=).",
+      "webhookUrlBaseHelp": "Host público onde o event-receiver responde (ex.: https://meu-tunnel.ngrok-free.app). O resto da URL — path /bms/events e query string platform=sendgrid&account=<id> — é montado automaticamente.",
       "ipPool": "IP Pool",
       "ipPoolHelp": "Nome do IP pool padrão para envios sistema-wide.",
       "saveOk": "Configurações SendGrid salvas.",
