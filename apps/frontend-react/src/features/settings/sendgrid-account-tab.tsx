@@ -142,6 +142,15 @@ export function SendgridAccountTab() {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="max-w-lg space-y-4">
+      <div className="rounded-md border-l-4 border-blue-500 bg-blue-50 p-3 text-xs dark:bg-blue-950/30">
+        <p className="font-medium text-blue-900 dark:text-blue-200">
+          {t('settings.sendgridScopeTitle')}
+        </p>
+        <p className="mt-1 text-blue-800 dark:text-blue-300">
+          {t('settings.sendgridScopeNote')}
+        </p>
+      </div>
+
       <div className="bg-muted rounded-md p-3 text-xs">
         <p className="font-medium">{t('settings.sendgridSourceLabel')}</p>
         <p className="text-muted-foreground mt-1">{sourceLabel}</p>

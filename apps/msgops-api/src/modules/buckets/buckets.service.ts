@@ -75,6 +75,7 @@ export class BucketsService {
       path: 'tmp/msgops',
     };
 
-    return await this.storage.genericUpload(fileDTO, cleanName, pathFolderName, process.env.S3_BUCKET, isPublic);
+    const bucket = await this.storage.getDefaultBucket();
+    return await this.storage.genericUpload(fileDTO, cleanName, pathFolderName, bucket, isPublic);
   }
 }

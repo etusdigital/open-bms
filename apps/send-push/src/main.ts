@@ -1,3 +1,21 @@
+// Load credentials managed by msgops-api at /super-admin/integrations/fcm.
+// MUST come before any module that reads FIREBASE_SERVICE_ACCOUNT.
+// Inline KEY=VALUE parser to avoid pulling in dotenv as a worker dep.
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
+function loadEnvFile(path: string): void {
+  if (!existsSync(path)) return;
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq < 0) continue;
+    const key = line.slice(0, eq).trim();
+    if (!key) continue;
+    process.env[key] = line.slice(eq + 1);
+  }
+}
+loadEnvFile(join(process.env.BMS_CONFIG_DIR ?? '/data/config', 'fcm.env'));
+
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from './app.module';

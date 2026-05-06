@@ -10,7 +10,6 @@ import { useAccountConfig, useAccountId, useTimezone, useUpdateAccountConfigs } 
 import { SETTINGS_TABS, type SettingsTab } from './types';
 import { SendgridAccountTab } from './sendgrid-account-tab';
 import { PoolTab } from './pool-tab';
-import { GeoIpTab } from './geoip-tab';
 
 export default function SettingsPage() {
   const { t } = useTranslation();
@@ -18,7 +17,7 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<SettingsTab>('general');
 
   const visibleTabs = useMemo<SettingsTab[]>(
-    () => (isSuperAdmin ? [...SETTINGS_TABS, 'pool', 'geoip'] : SETTINGS_TABS),
+    () => (isSuperAdmin ? [...SETTINGS_TABS, 'pool'] : SETTINGS_TABS),
     [isSuperAdmin],
   );
 
@@ -47,7 +46,6 @@ export default function SettingsPage() {
           {tab === 'email' && <EmailTab />}
           {tab === 'sendgrid' && <SendgridAccountTab />}
           {tab === 'pool' && isSuperAdmin && <PoolTab />}
-          {tab === 'geoip' && isSuperAdmin && <GeoIpTab />}
         </div>
       </ListPage.Content>
     </ListPage.Root>

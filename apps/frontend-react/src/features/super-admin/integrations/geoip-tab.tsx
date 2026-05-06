@@ -19,7 +19,7 @@ import {
   type GeoIpAdminSettings,
   type GeoIpMode,
   type GeoIpProvider,
-} from './geoip-settings-gateway';
+} from './geoip-gateway';
 
 const API_KEY_PROVIDERS: GeoIpProvider[] = ['dbip-full', 'ip-api', 'ipinfo'];
 
@@ -57,7 +57,7 @@ export function GeoIpTab() {
         const msg =
           axios.isAxiosError(err) && err.response?.data?.message
             ? String(err.response.data.message)
-            : t('settings.geoipLoadError');
+            : t('integrations.geoipLoadError');
         toast.error(msg);
         setLoading(false);
       });
@@ -122,12 +122,12 @@ export function GeoIpTab() {
       // Clear secret fields — masked values will show on next load
       setApiKey('');
       setLicenseKey('');
-      toast.success(t('settings.geoipSaveOk'));
+      toast.success(t('integrations.geoipSaveOk'));
     } catch (err) {
       const msg =
         axios.isAxiosError(err) && err.response?.data?.message
           ? String(err.response.data.message)
-          : t('settings.geoipSaveError');
+          : t('integrations.geoipSaveError');
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -151,7 +151,7 @@ export function GeoIpTab() {
     <form onSubmit={handleSubmit} noValidate className="max-w-lg space-y-6">
       {/* Mode */}
       <div className="space-y-2">
-        <Label>{t('settings.geoipModeLabel')}</Label>
+        <Label>{t('integrations.geoipModeLabel')}</Label>
         <div className="flex gap-2">
           {(['disabled', 'lite', 'advanced'] as GeoIpMode[]).map((m) => (
             <Button
@@ -161,19 +161,19 @@ export function GeoIpTab() {
               size="sm"
               onClick={() => setMode(m)}
             >
-              {t(`settings.geoipMode${m.charAt(0).toUpperCase() + m.slice(1)}` as never)}
+              {t(`integrations.geoipMode${m.charAt(0).toUpperCase() + m.slice(1)}` as never)}
             </Button>
           ))}
         </div>
         <p className="text-muted-foreground text-xs">
-          {t(`settings.geoipMode${mode.charAt(0).toUpperCase() + mode.slice(1)}Help` as never)}
+          {t(`integrations.geoipMode${mode.charAt(0).toUpperCase() + mode.slice(1)}Help` as never)}
         </p>
       </div>
 
       {/* Provider select */}
       {mode === 'advanced' && (
         <div className="space-y-2">
-          <Label>{t('settings.geoipProviderLabel')}</Label>
+          <Label>{t('integrations.geoipProviderLabel')}</Label>
           <Select
             value={provider}
             onValueChange={(v) => handleProviderChange(v as GeoIpProvider)}
@@ -182,10 +182,10 @@ export function GeoIpTab() {
               <SelectValue placeholder={t('common.select')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="dbip-full">{t('settings.geoipProviderDbipFull')}</SelectItem>
-              <SelectItem value="maxmind">{t('settings.geoipProviderMaxmind')}</SelectItem>
-              <SelectItem value="ip-api">{t('settings.geoipProviderIpApi')}</SelectItem>
-              <SelectItem value="ipinfo">{t('settings.geoipProviderIpinfo')}</SelectItem>
+              <SelectItem value="dbip-full">{t('integrations.geoipProviderDbipFull')}</SelectItem>
+              <SelectItem value="maxmind">{t('integrations.geoipProviderMaxmind')}</SelectItem>
+              <SelectItem value="ip-api">{t('integrations.geoipProviderIpApi')}</SelectItem>
+              <SelectItem value="ipinfo">{t('integrations.geoipProviderIpinfo')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -194,10 +194,10 @@ export function GeoIpTab() {
       {/* API Key (dbip-full, ip-api, ipinfo) */}
       {usesApiKey && (
         <div className="space-y-2">
-          <Label htmlFor="geoip-apikey">{t('settings.geoipApiKey')}</Label>
+          <Label htmlFor="geoip-apikey">{t('integrations.geoipApiKey')}</Label>
           {hasExistingApiKey() && (
             <div className="bg-muted rounded-md px-3 py-2 text-xs">
-              <span className="text-muted-foreground">{t('settings.geoipApiKeyStored')}: </span>
+              <span className="text-muted-foreground">{t('integrations.geoipApiKeyStored')}: </span>
               <span className="font-mono">{settings?.apiKeyMasked}</span>
             </div>
           )}
@@ -205,7 +205,7 @@ export function GeoIpTab() {
             <Input
               id="geoip-apikey"
               type={showApiKey ? 'text' : 'password'}
-              placeholder={hasExistingApiKey() ? t('settings.geoipApiKeyReplace') : ''}
+              placeholder={hasExistingApiKey() ? t('integrations.geoipApiKeyReplace') : ''}
               autoComplete="off"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
@@ -221,7 +221,7 @@ export function GeoIpTab() {
               {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          <p className="text-muted-foreground text-xs">{t('settings.geoipApiKeyHelp')}</p>
+          <p className="text-muted-foreground text-xs">{t('integrations.geoipApiKeyHelp')}</p>
         </div>
       )}
 
@@ -229,7 +229,7 @@ export function GeoIpTab() {
       {usesMaxMind && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="geoip-accountid">{t('settings.geoipAccountId')}</Label>
+            <Label htmlFor="geoip-accountid">{t('integrations.geoipAccountId')}</Label>
             <Input
               id="geoip-accountid"
               type="text"
@@ -239,14 +239,14 @@ export function GeoIpTab() {
               onChange={(e) => setAccountId(e.target.value)}
               disabled={saving}
             />
-            <p className="text-muted-foreground text-xs">{t('settings.geoipAccountIdHelp')}</p>
+            <p className="text-muted-foreground text-xs">{t('integrations.geoipAccountIdHelp')}</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="geoip-licensekey">{t('settings.geoipLicenseKey')}</Label>
+            <Label htmlFor="geoip-licensekey">{t('integrations.geoipLicenseKey')}</Label>
             {hasExistingLicenseKey() && (
               <div className="bg-muted rounded-md px-3 py-2 text-xs">
-                <span className="text-muted-foreground">{t('settings.geoipLicenseKeyStored')}: </span>
+                <span className="text-muted-foreground">{t('integrations.geoipLicenseKeyStored')}: </span>
                 <span className="font-mono">••••••••</span>
               </div>
             )}
@@ -254,7 +254,7 @@ export function GeoIpTab() {
               <Input
                 id="geoip-licensekey"
                 type={showLicenseKey ? 'text' : 'password'}
-                placeholder={hasExistingLicenseKey() ? t('settings.geoipLicenseKeyReplace') : ''}
+                placeholder={hasExistingLicenseKey() ? t('integrations.geoipLicenseKeyReplace') : ''}
                 autoComplete="off"
                 value={licenseKey}
                 onChange={(e) => setLicenseKey(e.target.value)}
@@ -270,7 +270,7 @@ export function GeoIpTab() {
                 {showLicenseKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            <p className="text-muted-foreground text-xs">{t('settings.geoipLicenseKeyHelp')}</p>
+            <p className="text-muted-foreground text-xs">{t('integrations.geoipLicenseKeyHelp')}</p>
           </div>
         </>
       )}
