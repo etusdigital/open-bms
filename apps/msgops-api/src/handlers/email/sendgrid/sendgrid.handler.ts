@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ClsService } from 'nestjs-cls';
 import { AxiosResponse } from 'axios';
@@ -6,23 +6,35 @@ import { SingleSend } from './single-send';
 import sendgrid from '@sendgrid/mail';
 import { AccountConfigsProvider } from '../../../providers/account-configs.provider';
 import { SendgridSettingsWebhook } from '../../../interfaces/sendgrid.interface';
+import { SystemConfigCacheProvider } from '../../../providers/system-config-cache.provider';
+import type { SendgridSystemSettings } from '../../../lib/integrations-config-file';
+import { SENDGRID_KEY } from '../../../modules/admin-integrations/sendgrid/admin-sendgrid.service';
 
 const API_KEY_CACHE_TTL_MS = 60_000;
+const DEFAULT_BASE = 'https://api.sendgrid.com';
 
 @Injectable()
 export class SendgridHandler {
-  private uri: string;
   private apiKeyCache = new Map<number, { value: string; loadedAt: number }>();
 
   constructor(
     private readonly httpService: HttpService,
     private readonly accountConfigsProvider: AccountConfigsProvider,
     private readonly cls: ClsService,
-  ) {
-    // SENDGRID_API_BASE_URL points at the API host (no /v3 suffix). Default is the
-    // real SendGrid; the local sendgrid-mock app sets it to its own URL for tests.
-    const base = process.env.SENDGRID_API_BASE_URL ?? 'https://api.sendgrid.com';
-    this.uri = `${base.replace(/\/+$/, '')}/v3`;
+    private readonly systemConfigCache: SystemConfigCacheProvider,
+  ) {}
+
+  private async getSystemConfig(): Promise<SendgridSystemSettings | null> {
+    return (await this.systemConfigCache.get<SendgridSystemSettings>(SENDGRID_KEY)) ?? null;
+  }
+
+  private async getApiBaseUrl(): Promise<string> {
+    const cfg = await this.getSystemConfig();
+    return (cfg?.apiBaseUrl ?? DEFAULT_BASE).replace(/\/+$/, '');
+  }
+
+  private async getUri(): Promise<string> {
+    return `${await this.getApiBaseUrl()}/v3`;
   }
 
   // Resolves the SendGrid API key to use for an outbound call: strictly
@@ -64,10 +76,11 @@ export class SendgridHandler {
 
   // The @sendgrid/mail library hits api.sendgrid.com directly; this redirects
   // it to the same base URL the rest of the handler uses (mock or real).
-  // SENDGRID_API_BASE_URL must point at the host without /v3 — the library
-  // appends /v3/mail/send itself.
-  private applySendgridLibBaseUrl(): void {
-    const base = process.env.SENDGRID_API_BASE_URL;
+  // The base must point at the host without /v3 — the library appends
+  // /v3/mail/send itself.
+  private async applySendgridLibBaseUrl(): Promise<void> {
+    const cfg = await this.getSystemConfig();
+    const base = cfg?.apiBaseUrl;
     if (!base) return;
     const client = (sendgrid as unknown as { client?: { setDefaultRequest?: (k: string, v: string) => void } }).client;
     client?.setDefaultRequest?.('baseUrl', base.replace(/\/+$/, ''));
@@ -83,15 +96,16 @@ export class SendgridHandler {
     this.apiKeyCache.delete(accountId);
   }
 
-  // Builds the webhook URL the SendGrid event hook will POST to. Uses
-  // SENDGRID_WEBHOOK_URL_BASE (preferred); falls back to SENDGRID_WEBHOOK_URL
-  // (legacy name) for one release. Appends `&account=<id>` so the
-  // event-process gateway can route the callback to the right BMS account
-  // (the field reaches `events.account` in the SendgridEvent payload).
-  private buildWebhookUrl(accountId: number): string {
-    const base = process.env.SENDGRID_WEBHOOK_URL_BASE ?? process.env.SENDGRID_WEBHOOK_URL;
+  // Builds the webhook URL the SendGrid event hook will POST to. Reads
+  // webhookUrlBase from system_config (managed via /super-admin/integrations/sendgrid).
+  // Appends `&account=<id>` so the event-process gateway can route the callback
+  // to the right BMS account (the field reaches `events.account` in the
+  // SendgridEvent payload).
+  private async buildWebhookUrl(accountId: number): Promise<string> {
+    const cfg = await this.getSystemConfig();
+    const base = cfg?.webhookUrlBase;
     if (!base) {
-      throw new HttpException('SENDGRID_WEBHOOK_URL_BASE env var is required to register the SendGrid event webhook', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new ServiceUnavailableException('SendGrid webhookUrlBase não configurado em /super-admin/integrations/sendgrid.');
     }
     const sep = base.includes('?') ? '&' : '?';
     return `${base}${sep}account=${accountId}`;
@@ -107,7 +121,7 @@ export class SendgridHandler {
   // webhook URL that was registered so the caller can persist it for display
   // in the UI.
   public async createWebhook(options: { apiKey: string; accountId: number }): Promise<{ url: string }> {
-    const url = this.buildWebhookUrl(options.accountId);
+    const url = await this.buildWebhookUrl(options.accountId);
     const payload: SendgridSettingsWebhook = {
       enabled: true,
       url,
@@ -130,13 +144,15 @@ export class SendgridHandler {
     };
 
     try {
-      const existing = await this.httpService.get<{ webhooks?: Array<{ id: string; url: string }> }>(`${this.uri}/user/webhooks/event/settings/all`, { headers }).toPromise();
+      const existing = await this.httpService
+        .get<{ webhooks?: Array<{ id: string; url: string }> }>(`${await this.getUri()}/user/webhooks/event/settings/all`, { headers })
+        .toPromise();
       const match = existing?.data?.webhooks?.find((w) => w.url === url);
 
       if (match) {
-        await this.httpService.patch(`${this.uri}/user/webhooks/event/settings/${match.id}`, payload, { headers }).toPromise();
+        await this.httpService.patch(`${await this.getUri()}/user/webhooks/event/settings/${match.id}`, payload, { headers }).toPromise();
       } else {
-        await this.httpService.post(`${this.uri}/user/webhooks/event/settings`, payload, { headers }).toPromise();
+        await this.httpService.post(`${await this.getUri()}/user/webhooks/event/settings`, payload, { headers }).toPromise();
       }
       return { url };
     } catch (error) {
@@ -149,7 +165,7 @@ export class SendgridHandler {
     const apiKey = await this.loadApiKey();
     if (!apiKey) return [];
     const result = await this.httpService
-      .get(`${this.uri}/send_ips/pools`, {
+      .get(`${await this.getUri()}/send_ips/pools`, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
@@ -162,7 +178,7 @@ export class SendgridHandler {
   public async getIPsByAccount() {
     const apiKey = await this.loadApiKey();
     const result = await this.httpService
-      .get(`${this.uri}/ips`, {
+      .get(`${await this.getUri()}/ips`, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
@@ -175,7 +191,7 @@ export class SendgridHandler {
   public async getIPs() {
     const apiKey = await this.loadApiKey();
     const result = await this.httpService
-      .get(`${this.uri}/ips`, {
+      .get(`${await this.getUri()}/ips`, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
@@ -192,7 +208,7 @@ export class SendgridHandler {
       const endDate = untilDate.toISOString().slice(0, 10);
       const cats = categories.map((cat) => `categories=${cat}`).join('&');
       const result = await this.httpService
-        .get(`${this.uri}/categories/stats?start_date=${startDate}&end_date=${endDate}&${cats}`, {
+        .get(`${await this.getUri()}/categories/stats?start_date=${startDate}&end_date=${endDate}&${cats}`, {
           headers: {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
@@ -214,7 +230,7 @@ export class SendgridHandler {
     try {
       const apiKey = await this.loadApiKey();
       const response = await this.httpService
-        .post(`${this.uri}/marketing/singlesends`, singlesend, {
+        .post(`${await this.getUri()}/marketing/singlesends`, singlesend, {
           headers: {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
@@ -238,7 +254,7 @@ export class SendgridHandler {
 
       const result = await this.httpService
         .put(
-          `${this.uri}/marketing/singlesends/${id}/schedule`,
+          `${await this.getUri()}/marketing/singlesends/${id}/schedule`,
           { send_at: scheduleDate },
           {
             headers: {
@@ -266,7 +282,7 @@ export class SendgridHandler {
   async getCampaignById(id: any) {
     const apiKey = await this.loadApiKey();
     const result = await this.httpService
-      .get(`${this.uri}/marketing/singlesends/${id}`, {
+      .get(`${await this.getUri()}/marketing/singlesends/${id}`, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
@@ -288,7 +304,7 @@ export class SendgridHandler {
     try {
       const apiKey = await this.loadApiKey();
       const response = await this.httpService
-        .delete(`${this.uri}/marketing/singlesends/${id}/schedule`, {
+        .delete(`${await this.getUri()}/marketing/singlesends/${id}/schedule`, {
           headers: {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
@@ -314,7 +330,7 @@ export class SendgridHandler {
     try {
       const apiKey = await this.loadApiKey();
       const response = await this.httpService
-        .patch(`${this.uri}/marketing/singlesends/${singleSend.id}`, updatedSend, {
+        .patch(`${await this.getUri()}/marketing/singlesends/${singleSend.id}`, updatedSend, {
           headers: {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
@@ -428,7 +444,7 @@ export class SendgridHandler {
     try {
       const apiKey = await this.loadApiKey();
       const result = await this.httpService
-        .get(`${this.uri}/verified_senders`, {
+        .get(`${await this.getUri()}/verified_senders`, {
           headers: {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
@@ -487,17 +503,19 @@ export class SendgridHandler {
         },
       ],
       categories: ['msgops', 'test_glockapps'],
-      ipPoolName: ippool || process.env.SENDGRID_IP_POOL,
+      ipPoolName: ippool,
     };
   }
 
   async sendSingleCustomEmail(seedList: Array<string>, fromName: string, fromMail: string, messageSubject: string, messageHtmlContent: string, ippool: string): Promise<any> {
     try {
       const apiKey = await this.loadApiKey();
-      this.applySendgridLibBaseUrl();
+      const cfg = await this.getSystemConfig();
+      await this.applySendgridLibBaseUrl();
       sendgrid.setApiKey(apiKey);
 
-      const mail = this.createSingleCustomEmail(seedList, fromName, fromMail, messageSubject, messageHtmlContent, ippool);
+      const resolvedIpPool = ippool || cfg?.ipPool || '';
+      const mail = this.createSingleCustomEmail(seedList, fromName, fromMail, messageSubject, messageHtmlContent, resolvedIpPool);
       const response = await sendgrid.sendMultiple(mail);
 
       console.log(`Email sent response: ${JSON.stringify(response)}`);
@@ -510,8 +528,12 @@ export class SendgridHandler {
 
   async sendInternalEmail(to: Array<string>, fromName: string, fromMail: string, subject: string, htmlContent: string): Promise<any> {
     try {
-      this.applySendgridLibBaseUrl();
-      sendgrid.setApiKey(process.env.SENDGRID_API_KEY);
+      const cfg = await this.getSystemConfig();
+      if (!cfg?.apiKey) {
+        throw new ServiceUnavailableException('SendGrid system-level API key não configurado em /super-admin/integrations/sendgrid.');
+      }
+      await this.applySendgridLibBaseUrl();
+      sendgrid.setApiKey(cfg.apiKey);
 
       const mail = this.createSingleCustomEmail(to, fromName, fromMail, subject, htmlContent, '');
       const response = await sendgrid.sendMultiple(mail);

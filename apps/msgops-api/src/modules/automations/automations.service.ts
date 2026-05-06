@@ -23,6 +23,9 @@ import ajvErrors from 'ajv-errors';
 import { AutomationTargetEntity } from 'src/entities/automation-target.entity';
 import { LabelsService } from '../labels/labels.service';
 import { LabelsContentsEntity } from '../../entities/labels-contents.entity';
+import { SystemConfigCacheProvider } from '../../providers/system-config-cache.provider';
+import type { SendgridSystemSettings } from '../../lib/integrations-config-file';
+import { SENDGRID_KEY } from '../admin-integrations/sendgrid/admin-sendgrid.service';
 
 @Injectable()
 export class AutomationsService {
@@ -44,6 +47,7 @@ export class AutomationsService {
     private readonly scheduler: SchedulerService,
     private readonly activeCampaignProvider: ActiveCampaignProvider,
     private readonly labelsService: LabelsService,
+    private readonly systemConfigCache: SystemConfigCacheProvider,
   ) {
     this.ajv = new Ajv({ allErrors: true });
     ajvErrors(this.ajv);
@@ -492,7 +496,8 @@ export class AutomationsService {
       const category = this.utilsService.normalizeString(statisticsDto.category);
 
       const { value: sendgriApiKey } = await this.accountConfigsProvider.getAccountConfigs('sendgrid_key');
-      const base = (process.env.SENDGRID_API_BASE_URL ?? 'https://api.sendgrid.com').replace(/\/+$/, '');
+      const sysCfg = await this.systemConfigCache.get<SendgridSystemSettings>(SENDGRID_KEY);
+      const base = (sysCfg?.apiBaseUrl ?? 'https://api.sendgrid.com').replace(/\/+$/, '');
       const result = await this.httpService
         .get(`${base}/v3/categories/stats?start_date=${statisticsDto.startDate}&end_date=${statisticsDto.endDate}&categories=${category}`, {
           headers: {

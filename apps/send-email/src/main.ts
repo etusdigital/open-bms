@@ -1,3 +1,23 @@
+// Load credentials managed by msgops-api at /super-admin/integrations.
+// MUST come before any module that reads S3_*/SENDGRID_* env vars.
+// Inline KEY=VALUE parser to avoid extra runtime deps.
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
+function loadEnvFile(path: string): void {
+  if (!existsSync(path)) return;
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq < 0) continue;
+    const key = line.slice(0, eq).trim();
+    if (!key) continue;
+    process.env[key] = line.slice(eq + 1);
+  }
+}
+const BMS_CONFIG_DIR = process.env.BMS_CONFIG_DIR ?? '/data/config';
+loadEnvFile(join(BMS_CONFIG_DIR, 's3.env'));
+loadEnvFile(join(BMS_CONFIG_DIR, 'sendgrid.env'));
+
 import { NestFactory } from '@nestjs/core';
 import { json } from 'body-parser';
 import { AppModule } from './app.module';
