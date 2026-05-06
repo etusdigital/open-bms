@@ -56,7 +56,6 @@ export default function CampaignsPage({ searchParams }: CampaignsPageProps) {
   hasSendingRef.current = rawCampaigns.some(
     (c) => c.status === CampaignStatus.Sending || c.status === CampaignStatus.SendingTestAb,
   );
-  const statsMap = useCampaignListStats(rawCampaigns);
 
   // Poll progress for campaigns that are sending or sending test A/B.
   // SendingTestAb campaigns don't show a progress bar, but polling lets
@@ -69,6 +68,28 @@ export default function CampaignsPage({ searchParams }: CampaignsPageProps) {
     [rawCampaigns],
   );
   const { data: sendingStats } = useCampaignStatistics(activeSendingIds, activeSendingIds.length > 0);
+
+  // For in-progress campaigns the DB column `sent_contacts` is only filled
+  // at completion (campaign-events-tracker writes it on the final batch).
+  // Inject the live Redis-backed counter so deliveredRate = delivered/sent
+  // doesn't divide by zero while a campaign is still sending.
+  const enrichedCampaigns = useMemo(() => {
+    if (!sendingStats?.length) return rawCampaigns;
+    const liveSent = new Map<number, number>();
+    for (const entry of sendingStats) {
+      const n = Number(entry.sentContacts);
+      if (Number.isFinite(n) && n > 0) liveSent.set(Number(entry.id), n);
+    }
+    if (liveSent.size === 0) return rawCampaigns;
+    return rawCampaigns.map((c) => {
+      const live = liveSent.get(c.id);
+      return live !== undefined && (c.sentContacts == null || c.sentContacts < live)
+        ? { ...c, sentContacts: live }
+        : c;
+    });
+  }, [rawCampaigns, sendingStats]);
+
+  const statsMap = useCampaignListStats(enrichedCampaigns);
 
   const sendingProgressMap = useMemo(() => {
     const map = new Map<number, number>();
@@ -149,8 +170,8 @@ export default function CampaignsPage({ searchParams }: CampaignsPageProps) {
   });
 
   const data = useMemo<CampaignWithStats[]>(() => {
-    if (!rawCampaigns.length) return EMPTY_ARRAY;
-    return rawCampaigns.map((c) => {
+    if (!enrichedCampaigns.length) return EMPTY_ARRAY;
+    return enrichedCampaigns.map((c) => {
       const stats = statsMap.get(c.id);
       const isDoneByPolling = completedByPolling.has(c.id);
       return {
@@ -168,7 +189,7 @@ export default function CampaignsPage({ searchParams }: CampaignsPageProps) {
             (c.status === CampaignStatus.Sending ? Number(c.sentPercentage) || 0 : undefined)),
       };
     });
-  }, [rawCampaigns, statsMap, sendingProgressMap, completedByPolling]);
+  }, [enrichedCampaigns, statsMap, sendingProgressMap, completedByPolling]);
   const totalRows = query.data?.meta.total ?? 0;
   const totalPages = Math.ceil(totalRows / searchParams.pageSize);
 
