@@ -346,47 +346,101 @@ func scheduleEventBurst(webhooks []webhook, mail map[string]interface{}) {
 		log.Println("[mock] mail/send received but no webhook registered — events not fired")
 		return
 	}
-	email := extractFirstRecipient(mail)
 	categories := extractCategories(mail)
-	msgID := newID()
+	topArgs := extractCustomArgs(mail, "custom_args")
+
+	recipients := extractRecipients(mail)
+	if len(recipients) == 0 {
+		recipients = []recipient{{email: "recipient@bms.local"}}
+	}
 
 	burst := []string{"processed", "delivered", "open", "click"}
-	for i, evt := range burst {
-		evt := evt
-		i := i
-		time.AfterFunc(time.Duration(i+1)*eventDelay, func() {
-			payload := buildEvent(evt, email, categories, msgID)
-			for _, wh := range webhooks {
-				if !eventEnabled(wh, evt) {
-					continue
+	for _, rcpt := range recipients {
+		rcpt := rcpt
+		msgID := newID()
+		// Real SendGrid flattens per-recipient custom_args into top-level
+		// event fields and merges with the mail-level custom_args.
+		args := mergeArgs(topArgs, rcpt.customArgs)
+		for i, evt := range burst {
+			evt := evt
+			i := i
+			time.AfterFunc(time.Duration(i+1)*eventDelay, func() {
+				payload := buildEvent(evt, rcpt.email, categories, msgID)
+				for k, v := range args {
+					if _, exists := payload[k]; !exists {
+						payload[k] = v
+					}
 				}
-				fire(wh.URL, payload)
-			}
-		})
+				for _, wh := range webhooks {
+					if !eventEnabled(wh, evt) {
+						continue
+					}
+					fire(wh.URL, payload)
+				}
+			})
+		}
 	}
 }
 
-func extractFirstRecipient(mail map[string]interface{}) string {
+type recipient struct {
+	email      string
+	customArgs map[string]interface{}
+}
+
+// extractRecipients flattens the mail body into one recipient per personalization×to.
+// Real SendGrid emits one event burst per recipient, not per /mail/send call.
+func extractRecipients(mail map[string]interface{}) []recipient {
 	personalizations, ok := mail["personalizations"].([]interface{})
-	if !ok || len(personalizations) == 0 {
-		return "recipient@bms.local"
-	}
-	first, ok := personalizations[0].(map[string]interface{})
 	if !ok {
-		return "recipient@bms.local"
+		return nil
 	}
-	to, ok := first["to"].([]interface{})
-	if !ok || len(to) == 0 {
-		return "recipient@bms.local"
+	out := make([]recipient, 0, len(personalizations))
+	for _, p := range personalizations {
+		pmap, ok := p.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		args := extractCustomArgs(pmap, "custom_args")
+		to, ok := pmap["to"].([]interface{})
+		if !ok {
+			continue
+		}
+		for _, t := range to {
+			addr, ok := t.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			email, _ := addr["email"].(string)
+			if email == "" {
+				continue
+			}
+			out = append(out, recipient{email: email, customArgs: args})
+		}
 	}
-	addr, ok := to[0].(map[string]interface{})
+	return out
+}
+
+func extractCustomArgs(m map[string]interface{}, key string) map[string]interface{} {
+	raw, ok := m[key].(map[string]interface{})
 	if !ok {
-		return "recipient@bms.local"
+		return map[string]interface{}{}
 	}
-	if e, ok := addr["email"].(string); ok {
-		return e
+	out := make(map[string]interface{}, len(raw))
+	for k, v := range raw {
+		out[k] = v
 	}
-	return "recipient@bms.local"
+	return out
+}
+
+func mergeArgs(base, override map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{}, len(base)+len(override))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range override {
+		out[k] = v
+	}
+	return out
 }
 
 func extractCategories(mail map[string]interface{}) []string {
