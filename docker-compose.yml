@@ -434,6 +434,7 @@ services:
       context: .
       dockerfile: apps/email-validation/Dockerfile
     container_name: email-validation
+    profiles: [emailable]
     <<: *restart-policy
     environment:
       <<: *backend-env

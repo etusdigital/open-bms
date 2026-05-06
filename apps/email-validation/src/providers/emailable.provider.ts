@@ -3,16 +3,17 @@ import { Injectable } from '@nestjs/common';
 import { env } from 'process';
 import { AxiosError } from 'axios';
 import { catchError, lastValueFrom } from 'rxjs';
+import { EmailValidationResult, IEmailValidationProvider } from './email-validation.provider.interface';
 
 @Injectable()
-export class CheckerProvider {
+export class EmailableProvider implements IEmailValidationProvider {
   private httpService: HttpService;
 
   constructor() {
     this.httpService = new HttpService();
   }
 
-  async check(email: string) {
+  async check(email: string): Promise<EmailValidationResult> {
     const url = `${env.EMAILABLE_URL}?email=${encodeURIComponent(email)}&timeout=30&api_key=${env.EMAILABLE_API_KEY}`;
     const response = await lastValueFrom(
       this.httpService.get(url).pipe(
