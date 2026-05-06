@@ -1,18 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import { Logging } from '@google-cloud/logging';
+import pino, { Logger } from 'pino';
 
 @Injectable()
 export class LoggingProvider {
-  async createLogging(emailsJson: string) {
-    const projectId = process.env.GCP_PROJECT;
-    const logging = new Logging({ projectId });
-    const log = logging.log('Tag-Process');
-    const text = `[Tag-Process-Batch] - Contacts not found: ${emailsJson}`;
-    const metadata = {
-      resource: { type: 'global' },
-      severity: 'WARNING',
-    };
-    const entry = log.entry(metadata, text);
-    await log.write(entry);
+  private readonly logger: Logger;
+
+  constructor() {
+    this.logger = pino({
+      name: 'tag-process',
+      level: process.env.LOG_LEVEL?.toLowerCase() ?? 'info',
+    });
+  }
+
+  async createLogging(emailsJson: string): Promise<void> {
+    this.logger.warn({ emails: emailsJson }, '[Tag-Process-Batch] contacts not found');
   }
 }

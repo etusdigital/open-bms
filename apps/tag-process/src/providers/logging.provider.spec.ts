@@ -1,50 +1,79 @@
-const mockWrite = jest.fn().mockResolvedValue(undefined);
-const mockEntry = jest.fn().mockReturnValue({});
-const mockLog = jest.fn().mockReturnValue({ entry: mockEntry, write: mockWrite });
+const mockWarn = jest.fn();
+const mockLogger = { warn: mockWarn };
+const mockFactory = jest.fn(() => mockLogger);
 
-jest.mock('@google-cloud/logging', () => ({
-  Logging: jest.fn().mockImplementation(() => ({
-    log: mockLog,
-  })),
-}));
+jest.mock('pino', () => {
+  const fn: any = mockFactory;
+  fn.default = mockFactory;
+  fn.__esModule = true;
+  return fn;
+});
 
 import { LoggingProvider } from './logging.provider';
 
 describe('LoggingProvider', () => {
   let provider: LoggingProvider;
+  const originalLogLevel = process.env.LOG_LEVEL;
 
   beforeEach(() => {
-    process.env.GCP_PROJECT = 'test-project';
-    mockWrite.mockClear();
-    mockEntry.mockClear();
-    mockLog.mockClear();
+    delete process.env.LOG_LEVEL;
+    mockWarn.mockClear();
+    mockFactory.mockClear();
     provider = new LoggingProvider();
   });
 
+  afterAll(() => {
+    if (originalLogLevel === undefined) {
+      delete process.env.LOG_LEVEL;
+    } else {
+      process.env.LOG_LEVEL = originalLogLevel;
+    }
+  });
+
   describe('createLogging', () => {
-    it('should write a log entry', async () => {
+    it('should emit a warn-level structured log', async () => {
       await provider.createLogging('["test@test.com"]');
 
-      expect(mockLog).toHaveBeenCalledWith('Tag-Process');
-      expect(mockEntry).toHaveBeenCalledWith(
-        expect.objectContaining({ severity: 'WARNING' }),
-        expect.stringContaining('Contacts not found'),
+      expect(mockWarn).toHaveBeenCalledTimes(1);
+      expect(mockWarn).toHaveBeenCalledWith(
+        expect.objectContaining({ emails: '["test@test.com"]' }),
+        expect.stringContaining('contacts not found'),
       );
-      expect(mockWrite).toHaveBeenCalled();
     });
 
-    it('should include the emails in the log text', async () => {
+    it('should include the emails payload verbatim', async () => {
       await provider.createLogging('["a@test.com","b@test.com"]');
 
-      expect(mockEntry).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('a@test.com'));
+      expect(mockWarn).toHaveBeenCalledWith(
+        expect.objectContaining({ emails: '["a@test.com","b@test.com"]' }),
+        expect.any(String),
+      );
     });
 
-    it('should use GCP_PROJECT from env', async () => {
-      process.env.GCP_PROJECT = 'my-project';
+    it('should accept empty array payload', async () => {
       await provider.createLogging('[]');
 
-      const { Logging } = require('@google-cloud/logging');
-      expect(Logging).toHaveBeenCalledWith({ projectId: 'my-project' });
+      expect(mockWarn).toHaveBeenCalledWith(expect.objectContaining({ emails: '[]' }), expect.any(String));
+    });
+  });
+
+  describe('constructor', () => {
+    it('should default the logger level to "info" when LOG_LEVEL is unset', () => {
+      delete process.env.LOG_LEVEL;
+      mockFactory.mockClear();
+
+      new LoggingProvider();
+
+      expect(mockFactory).toHaveBeenCalledWith(expect.objectContaining({ level: 'info' }));
+    });
+
+    it('should normalize LOG_LEVEL to lowercase when present', () => {
+      process.env.LOG_LEVEL = 'DEBUG';
+      mockFactory.mockClear();
+
+      new LoggingProvider();
+
+      expect(mockFactory).toHaveBeenCalledWith(expect.objectContaining({ level: 'debug' }));
     });
   });
 });
