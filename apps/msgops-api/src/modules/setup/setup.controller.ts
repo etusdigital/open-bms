@@ -6,6 +6,7 @@ import { AdvanceStepDto } from './dtos/advance-step.dto';
 import { TestSmtpDto } from './dtos/test-smtp.dto';
 import { HealthCheckResult } from './dtos/health-check-result.dto';
 import { TestSendgridDto } from './dtos/test-sendgrid.dto';
+import { GeoIpSettingsDto } from './dtos/geoip-settings.dto';
 
 @Controller('setup')
 export class SetupController {
@@ -42,5 +43,14 @@ export class SetupController {
   @PublicRoute()
   testSendgrid(@Body() dto: TestSendgridDto, @IpAddress() ipAddress?: string) {
     return this.setupService.testSendgrid(dto, ipAddress);
+  }
+
+  // Persists the GeoIP enrichment choice (disabled / lite / advanced + creds)
+  // chosen in the setup wizard. Decoupled from advance/step ordering: it can
+  // run anywhere between Step 3 (Domain) and Step 6 (Health).
+  @Post('geoip')
+  @PublicRoute()
+  saveGeoIp(@Body() dto: GeoIpSettingsDto) {
+    return this.setupService.saveGeoIpSettings(dto);
   }
 }

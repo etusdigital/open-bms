@@ -25,6 +25,19 @@ export interface LocationResponse {
   traits?: Traits;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface StatusRequest {}
+
+export interface GeoIpStatus {
+  tier: string;
+  mmdbPath: string;
+  mmdbSizeBytes: number;
+  mmdbMtimeMs: number;
+  lastReloadAt: string;
+  lookupCount: number;
+  ready: boolean;
+}
+
 export interface GeoIpLookupResult {
   country?: { iso_code?: string };
   subdivisions?: Array<{ iso_code?: string }>;

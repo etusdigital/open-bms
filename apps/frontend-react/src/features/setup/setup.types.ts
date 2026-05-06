@@ -59,3 +59,23 @@ export type AdvanceStepInput =
   | { step: 4; data: Step4Data }
   | { step: 5; data: Step5Data }
   | { step: 6; data: Step6Data };
+
+// GeoIP wizard step lives outside the 1..6 backend numbering. It persists a
+// single system_config blob via POST /setup/geoip, decoupled from advance().
+export type GeoIpSetupMode = 'disabled' | 'lite' | 'advanced';
+export type GeoIpSetupProvider = 'dbip-full' | 'maxmind' | 'ip-api' | 'ipinfo';
+
+export type GeoIpSetupData =
+  | { mode: 'disabled' }
+  | { mode: 'lite' }
+  | {
+      mode: 'advanced';
+      provider: 'dbip-full' | 'ip-api' | 'ipinfo';
+      apiKey: string;
+    }
+  | {
+      mode: 'advanced';
+      provider: 'maxmind';
+      accountId: string;
+      licenseKey: string;
+    };

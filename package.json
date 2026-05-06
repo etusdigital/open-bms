@@ -9,7 +9,9 @@
     "test:e2e": "pnpm --filter @backoffice/api test:e2e",
     "type-check": "turbo type-check",
     "clean": "turbo clean",
-    "prepare": "lefthook install"
+    "prepare": "lefthook install",
+    "geo:refresh": "bash scripts/download-geodb.sh",
+    "geo:refresh:force": "make geo-refresh-force"
   },
   "devDependencies": {
     "@clickhouse/client-web": "^1.8.1",

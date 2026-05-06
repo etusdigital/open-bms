@@ -7,6 +7,12 @@ import { AppService } from './app.service';
 jest.mock('fs', () => ({
   readFileSync: jest.fn().mockReturnValue(Buffer.from('')),
   existsSync: jest.fn().mockReturnValue(false),
+  statSync: jest.fn().mockReturnValue({
+    size: 0,
+    mtimeMs: 0,
+    mtime: new Date(0),
+  }),
+  watch: jest.fn().mockImplementation(() => ({ close: jest.fn() })),
 }));
 jest.mock('mmdb-reader', () => {
   return function () {
@@ -16,7 +22,8 @@ jest.mock('mmdb-reader', () => {
 
 describe('AppModule', () => {
   it('should compile the real AppModule with ConfigModule', async () => {
-    process.env.DBIP_MMDB_PATH = './test.mmdb';
+    process.env.GEO_MMDB_DIR = './test';
+    process.env.GEO_TIER = 'lite';
 
     const module = await Test.createTestingModule({
       imports: [AppModule],
@@ -26,7 +33,8 @@ describe('AppModule', () => {
   });
 
   it('should provide AppController', async () => {
-    process.env.DBIP_MMDB_PATH = './test.mmdb';
+    process.env.GEO_MMDB_DIR = './test';
+    process.env.GEO_TIER = 'lite';
 
     const module = await Test.createTestingModule({
       imports: [AppModule],
@@ -37,7 +45,8 @@ describe('AppModule', () => {
   });
 
   it('should provide AppService', async () => {
-    process.env.DBIP_MMDB_PATH = './test.mmdb';
+    process.env.GEO_MMDB_DIR = './test';
+    process.env.GEO_TIER = 'lite';
 
     const module = await Test.createTestingModule({
       imports: [AppModule],

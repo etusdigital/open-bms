@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type {
   AdvanceStepInput,
+  GeoIpSetupData,
   HealthCheckResult,
   SetupStatus,
   Step1Data,
@@ -37,6 +38,10 @@ export const setupGateway = {
 
   async testSmtp(data: Step2Data): Promise<void> {
     await http.post('/setup/test-smtp', data);
+  },
+
+  async submitGeoIp(data: GeoIpSetupData): Promise<void> {
+    await http.post('/setup/geoip', data);
   },
 };
 
