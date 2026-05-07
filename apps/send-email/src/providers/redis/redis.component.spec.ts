@@ -8,6 +8,7 @@ import { TrackerService } from '../../tracker/tracker.service';
 import { EventPublisherService } from '../../event-publisher.service';
 import { SparkPostHandler } from '../../handlers/sparkpost/sparkPost.handler';
 import { AppService } from '../../app.service';
+import { EmailProviderRouter } from '../../handlers/email-provider.router';
 import { StorageService } from '../../storage/storage.service';
 import { SplitFeature } from '../../features/split/split.feature';
 import Redis from 'ioredis-mock';
@@ -94,6 +95,20 @@ describe('Redis Integration Tests', () => {
             createCampaignBatchMail: jest.fn().mockReturnValue({}),
             createAutomationBatchMail: jest.fn().mockReturnValue({}),
             sendEmail: jest.fn().mockResolvedValue([{ statusCode: 200 }]),
+            createMail: jest.fn().mockReturnValue({}),
+            getMetadata: jest.fn().mockReturnValue({ name: 'sparkpost', hasFreeTier: true, hasWebhook: true }),
+          },
+        },
+        {
+          provide: EmailProviderRouter,
+          useValue: {
+            resolveForMessage: jest.fn().mockReturnValue({
+              getMetadata: () => ({ name: 'sendgrid', hasFreeTier: true, hasWebhook: true }),
+              createMail: jest.fn().mockReturnValue({}),
+              sendEmail: jest.fn().mockResolvedValue([{ statusCode: 202 }]),
+              createCampaignBatchMail: jest.fn(),
+              createAutomationBatchMail: jest.fn(),
+            }),
           },
         },
         {
@@ -292,6 +307,18 @@ describe('Redis Integration Tests', () => {
             provide: EventPublisherService,
             useValue: {
               publish: jest.fn().mockResolvedValue(undefined),
+            },
+          },
+          {
+            provide: EmailProviderRouter,
+            useValue: {
+              resolveForMessage: jest.fn().mockReturnValue({
+                getMetadata: () => ({ name: 'sendgrid', hasFreeTier: true, hasWebhook: true }),
+                createMail: jest.fn(),
+                createCampaignBatchMail: jest.fn(),
+                createAutomationBatchMail: jest.fn(),
+                sendEmail: jest.fn().mockResolvedValue([{ statusCode: 202 }]),
+              }),
             },
           },
         ],

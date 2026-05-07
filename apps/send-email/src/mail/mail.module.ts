@@ -5,12 +5,13 @@ import { MailService } from './mail.service';
 import { MailUtils } from './mail.utils';
 import { FormatterUtils } from '../utils/formatter.utils';
 import { SparkPostHandler } from '../handlers/sparkpost/sparkPost.handler';
+import { SendGridHandler } from '../handlers/sendgrid/sendGrid.handler';
 import { TrackerModule } from '../tracker/tracker.module';
 import { SendGridKeyRegistry } from './sendgrid-key-registry';
 
 @Module({
   imports: [ConfigModule.forRoot(), StorageModule, TrackerModule],
-  exports: [MailService, MailUtils],
-  providers: [MailService, MailUtils, FormatterUtils, SendGridKeyRegistry, SparkPostHandler],
+  exports: [MailService, MailUtils, SparkPostHandler, SendGridHandler],
+  providers: [MailService, MailUtils, FormatterUtils, SendGridKeyRegistry, SparkPostHandler, SendGridHandler],
 })
 export class MailModule {}

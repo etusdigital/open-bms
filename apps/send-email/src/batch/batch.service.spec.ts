@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { BatchService } from './batch.service';
+import { EmailProviderRouter } from '../handlers/email-provider.router';
 import { MailService } from '../mail/mail.service';
 import { MailUtils } from '../mail/mail.utils';
 import { FormatterUtils } from '../utils/formatter.utils';
@@ -154,6 +155,18 @@ describe('BatchService', () => {
             publish: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: EmailProviderRouter,
+          useValue: {
+            resolveForMessage: jest.fn().mockReturnValue({
+              getMetadata: () => ({ name: 'sendgrid', hasFreeTier: true, hasWebhook: true }),
+              createMail: jest.fn(),
+              createCampaignBatchMail: jest.fn(),
+              createAutomationBatchMail: jest.fn(),
+              sendEmail: jest.fn().mockResolvedValue([{ statusCode: 202 }]),
+            }),
+          },
+        },
       ],
     }).compile();
 
@@ -180,7 +193,7 @@ describe('BatchService', () => {
       const result = await service.campaignBatch(mockBatch, null);
 
       expect(result).toEqual([{ statusCode: 202, results: { id: 'test-id' } }]);
-      expect(mailService.sendBatch).toHaveBeenCalledWith(mockBatch, null);
+      expect(mailService.sendBatch).toHaveBeenCalledWith(mockBatch, expect.any(Object), null);
     });
 
     describe('tracker behavior', () => {
@@ -841,7 +854,7 @@ describe('BatchService', () => {
         const result = await service.automationBatch(mockBatch, null);
 
         expect(result).toEqual([{ statusCode: 202, results: { id: 'test-id' } }]);
-        expect(mailService.sendBatch).toHaveBeenCalledWith(mockBatch, null);
+        expect(mailService.sendBatch).toHaveBeenCalledWith(mockBatch, expect.any(Object), null);
       });
 
       it('should apply contact cleanup filters', async () => {
