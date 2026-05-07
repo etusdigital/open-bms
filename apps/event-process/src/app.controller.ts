@@ -4,8 +4,10 @@ import {
   CustomEventRequest,
   InternalRequest,
   MailerSendRawEvent,
+  MandrillRawEvent,
   ResendRawEvent,
   SendgridEvent,
+  SnsEnvelope,
   SparkPostEnvelope,
   TwilioEvent,
 } from './events/interfaces/events.interfaces';
@@ -16,12 +18,18 @@ import { SendgridService } from './events/services/sendgrid.service';
 import { SparkpostService } from './events/services/sparkpost.service';
 import { MailerSendService } from './events/services/mailersend.service';
 import { ResendService } from './events/services/resend.service';
+import { SesService } from './events/services/ses.service';
+import { MandrillService } from './events/services/mandrill.service';
 import { PushService } from './events/services/push.service';
 import { TwilioService } from './events/services/twilio.service';
 import { CustomEventsService } from './events/services/custom-events.service';
 import { EventsService } from './events/services/events.service';
 import { InternalEventsService } from './events/services/internal-events.service';
 import { Webhook as SvixWebhook } from 'svix';
+// sns-validator is a CommonJS module without proper TS types — require() keeps
+// the surface narrow (the validator only exposes a single .validate() entry).
+
+const MessageValidator = require('sns-validator');
 
 @Controller('internal/event')
 export class AppController {
@@ -32,6 +40,8 @@ export class AppController {
     private readonly sparkpostService: SparkpostService,
     private readonly mailerSendService: MailerSendService,
     private readonly resendService: ResendService,
+    private readonly sesService: SesService,
+    private readonly mandrillService: MandrillService,
     private readonly pushService: PushService,
     private readonly twilioService: TwilioService,
     private readonly customEventsService: CustomEventsService,
@@ -104,6 +114,55 @@ export class AppController {
     }
   }
 
+  // SES events arrive wrapped in an SNS HTTP Notification. SNS signs each
+  // message with an RSA cert hosted at SigningCertURL — sns-validator
+  // downloads the cert, validates the URL is genuinely amazonaws.com, and
+  // verifies the signature. Bypass when both env vars are unset (dev mode);
+  // production MUST set AWS_SES_WEBHOOK_SNS_TOPIC_ARN to lock the source.
+  private async assertSnsEnvelopeAuth(envelope: SnsEnvelope): Promise<void> {
+    if (process.env.AWS_SES_WEBHOOK_VALIDATE !== 'false') {
+      const expectedTopicArn = process.env.AWS_SES_WEBHOOK_SNS_TOPIC_ARN;
+      if (expectedTopicArn && envelope.TopicArn !== expectedTopicArn) {
+        throw new UnauthorizedException(
+          `SNS TopicArn mismatch: expected ${expectedTopicArn}, got ${envelope.TopicArn}`,
+        );
+      }
+      const validator = new MessageValidator();
+      await new Promise<void>((resolve, reject) => {
+        validator.validate(envelope, (err: Error | null) => {
+          if (err) reject(new UnauthorizedException(`Invalid SNS signature: ${err.message}`));
+          else resolve();
+        });
+      });
+    }
+  }
+
+  // Mandrill signs each webhook with HMAC SHA-1 (base64) over the
+  // concatenation of the webhook URL + every form field's keys-and-values
+  // sorted alphabetically by key. Header: X-Mandrill-Signature.
+  // For our case the request body is `mandrill_events=<JSON>`, and we are
+  // told the canonical webhook URL via env. Bypass when env unset (dev mode).
+  private assertMandrillSignature(
+    rawJsonField: string,
+    signature: string | undefined,
+    webhookUrl: string | undefined,
+  ): void {
+    const secret = process.env.MANDRILL_WEBHOOK_KEY;
+    if (!secret) return;
+    if (!signature) throw new UnauthorizedException('Missing Mandrill signature');
+    const url = webhookUrl ?? process.env.MANDRILL_WEBHOOK_URL ?? '';
+    // Mandrill webhook field name is fixed at `mandrill_events`. We sign
+    // `<url>mandrill_events<json>` because Mandrill sorts keys alphabetically
+    // and concatenates key+value pairs without separators.
+    const payload = url + 'mandrill_events' + rawJsonField;
+    const expected = crypto.createHmac('sha1', secret).update(payload).digest('base64');
+    const a = Buffer.from(signature, 'utf8');
+    const b = Buffer.from(expected, 'utf8');
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      throw new UnauthorizedException('Invalid Mandrill signature');
+    }
+  }
+
   // Deterministic idempotency key. AMQP redelivery preserves payload content,
   // so a content hash dedupes retries the same way Pub/Sub messageId did.
   private idempotencyKey(payload: unknown): string {
@@ -167,6 +226,42 @@ export class AppController {
     if (!event) throw new BadRequestException('Body cannot be empty');
     return await this.eventsService.processWithIdempotency(this.idempotencyKey(event), () =>
       this.resendService.processResend({ payload: event, platform: PlatformType.EMAIL }),
+    );
+  }
+
+  @Post('ses')
+  async ses(@Headers('x-internal-token') token: string, @Body() envelope: SnsEnvelope): Promise<any> {
+    this.assertAuth(token);
+    if (!envelope) throw new BadRequestException('Body cannot be empty');
+    await this.assertSnsEnvelopeAuth(envelope);
+    return await this.eventsService.processWithIdempotency(this.idempotencyKey(envelope), () =>
+      this.sesService.processSes({ payload: envelope, platform: PlatformType.EMAIL }),
+    );
+  }
+
+  @Post('mandrill')
+  async mandrill(
+    @Headers('x-internal-token') token: string,
+    @Headers('x-mandrill-signature') signature: string,
+    @Headers('x-mandrill-url') webhookUrl: string,
+    @Body() body: { mandrill_events?: string } | string,
+  ): Promise<any> {
+    this.assertAuth(token);
+    // Mandrill sends application/x-www-form-urlencoded with a single field
+    // `mandrill_events=<JSON-encoded array>`. Whether NestJS parses to object
+    // or string depends on the urlencoded middleware config — handle both.
+    const rawField = typeof body === 'string' ? body : (body?.mandrill_events ?? '');
+    if (!rawField) throw new BadRequestException('Missing mandrill_events field');
+    this.assertMandrillSignature(rawField, signature, webhookUrl);
+    let events: MandrillRawEvent[];
+    try {
+      events = JSON.parse(rawField);
+    } catch {
+      throw new BadRequestException('mandrill_events is not valid JSON');
+    }
+    if (!Array.isArray(events)) throw new BadRequestException('mandrill_events must be an array');
+    return await this.eventsService.processWithIdempotency(this.idempotencyKey(events), () =>
+      this.mandrillService.processMandrill({ payload: events, platform: PlatformType.EMAIL }),
     );
   }
 

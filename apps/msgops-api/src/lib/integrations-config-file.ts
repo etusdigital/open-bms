@@ -132,3 +132,41 @@ export function writeResendEnvFile(dto: ResendSystemSettings): void {
   if (dto.webhookUrlBase) lines.push(`RESEND_WEBHOOK_URL_BASE=${dto.webhookUrlBase}`);
   writeEnvFile(resendEnvFilePath(), lines);
 }
+
+// ---------- Amazon SES ----------
+
+export interface SesSystemSettings {
+  accessKeyId: string;
+  secretAccessKey: string;
+  region: string;
+  webhookSnsTopicArn?: string;
+}
+
+export function sesEnvFilePath(): string {
+  return bmsConfigFilePath('ses.env');
+}
+
+export function writeSesEnvFile(dto: SesSystemSettings): void {
+  const lines: string[] = [`AWS_SES_ACCESS_KEY_ID=${dto.accessKeyId}`, `AWS_SES_SECRET_ACCESS_KEY=${dto.secretAccessKey}`, `AWS_SES_REGION=${dto.region}`];
+  if (dto.webhookSnsTopicArn) lines.push(`AWS_SES_WEBHOOK_SNS_TOPIC_ARN=${dto.webhookSnsTopicArn}`);
+  writeEnvFile(sesEnvFilePath(), lines);
+}
+
+// ---------- Mandrill ----------
+
+export interface MandrillSystemSettings {
+  apiKey: string;
+  webhookKey?: string;
+  webhookUrlBase?: string;
+}
+
+export function mandrillEnvFilePath(): string {
+  return bmsConfigFilePath('mandrill.env');
+}
+
+export function writeMandrillEnvFile(dto: MandrillSystemSettings): void {
+  const lines: string[] = [`MANDRILL_API_KEY=${dto.apiKey}`];
+  if (dto.webhookKey) lines.push(`MANDRILL_WEBHOOK_KEY=${dto.webhookKey}`);
+  if (dto.webhookUrlBase) lines.push(`MANDRILL_WEBHOOK_URL_BASE=${dto.webhookUrlBase}`);
+  writeEnvFile(mandrillEnvFilePath(), lines);
+}

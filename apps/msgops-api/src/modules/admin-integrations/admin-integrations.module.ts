@@ -14,13 +14,26 @@ import { AdminMailerSendController } from './mailersend/admin-mailersend.control
 import { AdminMailerSendService } from './mailersend/admin-mailersend.service';
 import { AdminResendController } from './resend/admin-resend.controller';
 import { AdminResendService } from './resend/admin-resend.service';
+import { AdminSesController } from './amazon-ses/admin-ses.controller';
+import { AdminSesService } from './amazon-ses/admin-ses.service';
+import { AdminMandrillController } from './mandrill/admin-mandrill.controller';
+import { AdminMandrillService } from './mandrill/admin-mandrill.service';
 
 // SystemConfigCacheProvider is supplied by the global SystemConfigCacheModule
 // registered at app boot — no need to re-import here.
 @Module({
   imports: [TypeOrmModule.forFeature([SystemConfigEntity])],
-  controllers: [AdminS3Controller, AdminSendgridController, AdminFcmController, AdminEmailableController, AdminMailerSendController, AdminResendController],
-  providers: [AdminS3Service, AdminSendgridService, AdminFcmService, AdminEmailableService, AdminMailerSendService, AdminResendService],
-  exports: [AdminS3Service, AdminSendgridService, AdminFcmService, AdminEmailableService, AdminMailerSendService, AdminResendService],
+  controllers: [
+    AdminS3Controller,
+    AdminSendgridController,
+    AdminFcmController,
+    AdminEmailableController,
+    AdminMailerSendController,
+    AdminResendController,
+    AdminSesController,
+    AdminMandrillController,
+  ],
+  providers: [AdminS3Service, AdminSendgridService, AdminFcmService, AdminEmailableService, AdminMailerSendService, AdminResendService, AdminSesService, AdminMandrillService],
+  exports: [AdminS3Service, AdminSendgridService, AdminFcmService, AdminEmailableService, AdminMailerSendService, AdminResendService, AdminSesService, AdminMandrillService],
 })
 export class AdminIntegrationsModule {}

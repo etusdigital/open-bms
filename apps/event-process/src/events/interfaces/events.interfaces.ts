@@ -615,3 +615,167 @@ export interface ResendEvent {
   platform: PlatformType;
   account?: string;
 }
+
+// ─────────────────────────────────────────────────────────────
+// Amazon SES (events flow through SNS HTTP/HTTPS subscription)
+// ─────────────────────────────────────────────────────────────
+
+// SNS HTTP subscription envelope. Two variants matter:
+//   - Notification: real event delivery; Message holds the SES JSON.
+//   - SubscriptionConfirmation: one-shot at subscription setup; SubscribeURL
+//     must be GETted by the receiver to confirm the topic.
+// UnsubscribeConfirmation is also possible but rarely seen and we just log it.
+export interface SnsEnvelope {
+  Type: 'Notification' | 'SubscriptionConfirmation' | 'UnsubscribeConfirmation';
+  MessageId: string;
+  TopicArn?: string;
+  Subject?: string;
+  Message: string;
+  Timestamp: string;
+  SignatureVersion: '1' | '2';
+  Signature: string;
+  SigningCertURL: string;
+  SubscribeURL?: string;
+  Token?: string;
+  UnsubscribeURL?: string;
+  [key: string]: any;
+}
+
+// Inner SES event (after JSON.parse(Message)). Documented at
+// https://docs.aws.amazon.com/ses/latest/dg/event-publishing-retrieving-sns-contents.html
+export interface SesRawEvent {
+  eventType: string;
+  mail?: {
+    timestamp?: string;
+    source?: string;
+    messageId?: string;
+    destination?: string[];
+    // Note: SES tags are { name: [values] } — multi-value per name.
+    tags?: Record<string, string[]>;
+    [key: string]: any;
+  };
+  bounce?: {
+    bounceType?: 'Permanent' | 'Transient' | 'Undetermined';
+    bounceSubType?: string;
+    bouncedRecipients?: Array<{ emailAddress?: string; status?: string; diagnosticCode?: string }>;
+    timestamp?: string;
+  };
+  complaint?: {
+    complainedRecipients?: Array<{ emailAddress?: string }>;
+    timestamp?: string;
+    complaintFeedbackType?: string;
+  };
+  delivery?: { timestamp?: string; recipients?: string[]; smtpResponse?: string };
+  open?: { ipAddress?: string; userAgent?: string; timestamp?: string };
+  click?: { ipAddress?: string; userAgent?: string; link?: string; timestamp?: string };
+  reject?: { reason?: string };
+  failure?: { errorMessage?: string; templateName?: string };
+  [key: string]: any;
+}
+
+export interface SesPayload {
+  email: string;
+  timestamp: number;
+  event: string;
+  sesType: string;
+  category: string[];
+  ses_event_id: string;
+  ses_message_id: string;
+  reason?: string;
+  ip?: string;
+  useragent?: string;
+  url?: string;
+  contactId?: string;
+  messageId?: string | number;
+  bounce_classification?: string;
+  type?: string;
+  properties?: any;
+  geoData?: { country?: string; region?: string; city?: string; traits?: Traits };
+}
+
+export enum SesEventTypes {
+  SEND = 'Send',
+  REJECT = 'Reject',
+  BOUNCE = 'Bounce',
+  COMPLAINT = 'Complaint',
+  DELIVERY = 'Delivery',
+  OPEN = 'Open',
+  CLICK = 'Click',
+  RENDERING_FAILURE = 'RenderingFailure',
+  DELIVERY_DELAY = 'DeliveryDelay',
+  SUBSCRIPTION = 'Subscription',
+}
+
+export interface SesEvent {
+  payload: SnsEnvelope;
+  platform: PlatformType;
+  account?: string;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Mandrill (MailChimp Transactional)
+// ─────────────────────────────────────────────────────────────
+
+// Mandrill posts events as form-urlencoded with a single field
+// `mandrill_events=<JSON-encoded array>`. Each array element shape:
+export interface MandrillRawEvent {
+  event: string;
+  ts?: number;
+  msg?: {
+    ts?: number;
+    _id?: string;
+    state?: string;
+    subject?: string;
+    email?: string;
+    sender?: string;
+    tags?: string[];
+    metadata?: Record<string, string>;
+    bounce_description?: string;
+    bgtools_code?: number;
+    diag?: string;
+    [key: string]: any;
+  };
+  ip?: string;
+  user_agent?: string;
+  url?: string;
+  _id?: string;
+  [key: string]: any;
+}
+
+export interface MandrillPayload {
+  email: string;
+  timestamp: number;
+  event: string;
+  mandrillType: string;
+  category: string[];
+  md_event_id: string;
+  md_message_id: string;
+  reason?: string;
+  ip?: string;
+  useragent?: string;
+  url?: string;
+  contactId?: string;
+  messageId?: string | number;
+  bounce_classification?: string;
+  type?: string;
+  properties?: any;
+  geoData?: { country?: string; region?: string; city?: string; traits?: Traits };
+}
+
+export enum MandrillEventTypes {
+  SEND = 'send',
+  DEFERRAL = 'deferral',
+  HARD_BOUNCE = 'hard_bounce',
+  SOFT_BOUNCE = 'soft_bounce',
+  OPEN = 'open',
+  CLICK = 'click',
+  SPAM = 'spam',
+  UNSUB = 'unsub',
+  REJECT = 'reject',
+}
+
+export interface MandrillEvent {
+  payload: MandrillRawEvent[];
+  platform: PlatformType;
+  account?: string;
+}

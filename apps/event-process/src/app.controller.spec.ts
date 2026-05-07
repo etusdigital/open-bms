@@ -6,6 +6,8 @@ import { SendgridService } from './events/services/sendgrid.service';
 import { SparkpostService } from './events/services/sparkpost.service';
 import { MailerSendService } from './events/services/mailersend.service';
 import { ResendService } from './events/services/resend.service';
+import { SesService } from './events/services/ses.service';
+import { MandrillService } from './events/services/mandrill.service';
 import { PushService } from './events/services/push.service';
 import { TwilioService } from './events/services/twilio.service';
 import { CustomEventsService } from './events/services/custom-events.service';
@@ -24,6 +26,8 @@ describe('AppController', () => {
   const mockSparkpostService = { processSparkPost: jest.fn().mockResolvedValue({}) };
   const mockMailerSendService = { processMailerSend: jest.fn().mockResolvedValue({}) };
   const mockResendService = { processResend: jest.fn().mockResolvedValue({}) };
+  const mockSesService = { processSes: jest.fn().mockResolvedValue({}) };
+  const mockMandrillService = { processMandrill: jest.fn().mockResolvedValue({}) };
   const mockPushService = { processPush: jest.fn().mockResolvedValue({}) };
   const mockTwilioService = { processTwilioNotification: jest.fn().mockResolvedValue({}) };
   const mockCustomEventsService = { customEventsProcess: jest.fn().mockResolvedValue({}) };
@@ -42,6 +46,8 @@ describe('AppController', () => {
         { provide: SparkpostService, useValue: mockSparkpostService },
         { provide: MailerSendService, useValue: mockMailerSendService },
         { provide: ResendService, useValue: mockResendService },
+        { provide: SesService, useValue: mockSesService },
+        { provide: MandrillService, useValue: mockMandrillService },
         { provide: PushService, useValue: mockPushService },
         { provide: TwilioService, useValue: mockTwilioService },
         { provide: CustomEventsService, useValue: mockCustomEventsService },
