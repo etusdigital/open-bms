@@ -522,8 +522,11 @@ export class SendgridHandler {
     try {
       const apiKey = await this.loadApiKey();
       const cfg = await this.getSystemConfig();
-      await this.applySendgridLibBaseUrl();
+      // Order matters: setApiKey() resets defaultRequest.baseUrl to the
+      // global region host as a side effect (@sendgrid/client client.js:46),
+      // so the override has to land AFTER. Same fix as mail.service.ts (EVO-1052).
       sendgrid.setApiKey(apiKey);
+      await this.applySendgridLibBaseUrl();
 
       const resolvedIpPool = ippool || cfg?.ipPool || '';
       const mail = this.createSingleCustomEmail(seedList, fromName, fromMail, messageSubject, messageHtmlContent, resolvedIpPool);
@@ -543,8 +546,9 @@ export class SendgridHandler {
       if (!cfg?.apiKey) {
         throw new ServiceUnavailableException('SendGrid system-level API key não configurado em /super-admin/integrations/sendgrid.');
       }
-      await this.applySendgridLibBaseUrl();
+      // Same EVO-1052 ordering: setApiKey first, override after.
       sendgrid.setApiKey(cfg.apiKey);
+      await this.applySendgridLibBaseUrl();
 
       const mail = this.createSingleCustomEmail(to, fromName, fromMail, subject, htmlContent, '');
       const response = await sendgrid.sendMultiple(mail);
