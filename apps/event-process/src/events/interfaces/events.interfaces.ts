@@ -467,3 +467,151 @@ export interface SparkPostEvent {
   platform: PlatformType;
   account?: string;
 }
+
+// ─────────────────────────────────────────────────────────────
+// MailerSend
+// ─────────────────────────────────────────────────────────────
+
+// MailerSend webhook envelope. The provider sends one event per POST
+// (Activity webhooks) with a generic shape; we accept arrays as well to
+// stay future-proof.
+export interface MailerSendRawEvent {
+  type: string;
+  // Unix epoch seconds OR ISO 8601 — the service normalizes both.
+  created_at?: string | number;
+  webhook_id?: string;
+  // The activity data — fields vary by event type. Extracted from `data` in
+  // the wire payload (MailerSend wraps event details under .data).
+  data?: {
+    object?: string;
+    id?: string;
+    type?: string;
+    created_at?: string;
+    email?: {
+      object?: string;
+      id?: string;
+      created_at?: string;
+      from?: string;
+      subject?: string;
+      tags?: string[];
+      message?: { object?: string; id?: string; created_at?: string };
+      recipient?: { object?: string; id?: string; email?: string; created_at?: string };
+    };
+    morph?: {
+      object?: string;
+      id?: string;
+      type?: string;
+      reason?: string;
+      readable_reason?: string;
+      url?: string;
+      ip?: string;
+      user_agent?: string;
+    };
+    [key: string]: any;
+  };
+  [key: string]: any;
+}
+
+// Normalized internal payload mirrors SparkPostPayload shape so the
+// pipeline can reuse statistics + analytics helpers.
+export interface MailerSendPayload {
+  email: string;
+  timestamp: number;
+  event: string; // mapped to EventsType
+  mailersendType: string;
+  // SendGrid-style category array synthesized from MailerSend `tags`.
+  category: string[];
+  ms_event_id: string; // dedup key
+  ms_message_id: string; // analytics correlation
+  reason?: string;
+  ip?: string;
+  useragent?: string;
+  url?: string;
+  contactId?: string;
+  messageId?: string | number;
+  bounce_classification?: string;
+  type?: string; // 'bounce' (HARD) | 'blocked' (SOFT)
+  properties?: any;
+  geoData?: { country?: string; region?: string; city?: string; traits?: Traits };
+}
+
+export enum MailerSendEventTypes {
+  SENT = 'activity.sent',
+  DELIVERED = 'activity.delivered',
+  SOFT_BOUNCED = 'activity.soft_bounced',
+  HARD_BOUNCED = 'activity.hard_bounced',
+  OPENED = 'activity.opened',
+  OPENED_UNIQUE = 'activity.opened_unique',
+  CLICKED = 'activity.clicked',
+  CLICKED_UNIQUE = 'activity.clicked_unique',
+  UNSUBSCRIBED = 'activity.unsubscribed',
+  SPAM_COMPLAINT = 'activity.spam_complaint',
+}
+
+export interface MailerSendEvent {
+  payload: MailerSendRawEvent | MailerSendRawEvent[];
+  platform: PlatformType;
+  account?: string;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Resend
+// ─────────────────────────────────────────────────────────────
+
+export interface ResendRawEvent {
+  type: string; // e.g. 'email.sent', 'email.delivered'
+  created_at?: string;
+  data?: {
+    email_id?: string;
+    from?: string;
+    to?: string[];
+    subject?: string;
+    created_at?: string;
+    // Reasons for bounce/complaint.
+    bounce?: { type?: string; subType?: string; message?: string };
+    complaint?: { type?: string; feedback_type?: string };
+    // Engagement events.
+    click?: { ipAddress?: string; userAgent?: string; link?: string; timestamp?: string };
+    open?: { ipAddress?: string; userAgent?: string; timestamp?: string };
+    tags?: { name: string; value: string }[];
+    [key: string]: any;
+  };
+  [key: string]: any;
+}
+
+export interface ResendPayload {
+  email: string;
+  timestamp: number;
+  event: string;
+  resendType: string;
+  category: string[];
+  re_event_id: string;
+  re_message_id: string;
+  reason?: string;
+  ip?: string;
+  useragent?: string;
+  url?: string;
+  contactId?: string;
+  messageId?: string | number;
+  bounce_classification?: string;
+  type?: string;
+  properties?: any;
+  geoData?: { country?: string; region?: string; city?: string; traits?: Traits };
+}
+
+export enum ResendEventTypes {
+  SENT = 'email.sent',
+  DELIVERED = 'email.delivered',
+  DELIVERY_DELAYED = 'email.delivery_delayed',
+  BOUNCED = 'email.bounced',
+  COMPLAINED = 'email.complained',
+  OPENED = 'email.opened',
+  CLICKED = 'email.clicked',
+  FAILED = 'email.failed',
+}
+
+export interface ResendEvent {
+  payload: ResendRawEvent;
+  platform: PlatformType;
+  account?: string;
+}

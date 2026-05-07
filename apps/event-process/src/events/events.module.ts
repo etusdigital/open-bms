@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { EventsService } from './services/events.service';
 import { SendgridService } from './services/sendgrid.service';
 import { SparkpostService } from './services/sparkpost.service';
+import { MailerSendService } from './services/mailersend.service';
+import { ResendService } from './services/resend.service';
 import { PushService } from './services/push.service';
 import { TwilioService } from './services/twilio.service';
 import { CustomEventsService } from './services/custom-events.service';
@@ -20,6 +22,8 @@ import { InternalEventsService } from './services/internal-events.service';
     EventsService,
     SendgridService,
     SparkpostService,
+    MailerSendService,
+    ResendService,
     PushService,
     TwilioService,
     CustomEventsService,
@@ -31,6 +35,8 @@ import { InternalEventsService } from './services/internal-events.service';
     EventsService,
     SendgridService,
     SparkpostService,
+    MailerSendService,
+    ResendService,
     PushService,
     TwilioService,
     CustomEventsService,

@@ -4,6 +4,8 @@ import { AppController } from './app.controller';
 import { EventsService } from './events/services/events.service';
 import { SendgridService } from './events/services/sendgrid.service';
 import { SparkpostService } from './events/services/sparkpost.service';
+import { MailerSendService } from './events/services/mailersend.service';
+import { ResendService } from './events/services/resend.service';
 import { PushService } from './events/services/push.service';
 import { TwilioService } from './events/services/twilio.service';
 import { CustomEventsService } from './events/services/custom-events.service';
@@ -20,6 +22,8 @@ describe('AppController', () => {
   const mockEventsService = { processWithIdempotency: jest.fn().mockImplementation((_id, fn) => fn()) };
   const mockSendgridService = { processSendgrid: jest.fn().mockResolvedValue({}) };
   const mockSparkpostService = { processSparkPost: jest.fn().mockResolvedValue({}) };
+  const mockMailerSendService = { processMailerSend: jest.fn().mockResolvedValue({}) };
+  const mockResendService = { processResend: jest.fn().mockResolvedValue({}) };
   const mockPushService = { processPush: jest.fn().mockResolvedValue({}) };
   const mockTwilioService = { processTwilioNotification: jest.fn().mockResolvedValue({}) };
   const mockCustomEventsService = { customEventsProcess: jest.fn().mockResolvedValue({}) };
@@ -36,6 +40,8 @@ describe('AppController', () => {
         { provide: EventsService, useValue: mockEventsService },
         { provide: SendgridService, useValue: mockSendgridService },
         { provide: SparkpostService, useValue: mockSparkpostService },
+        { provide: MailerSendService, useValue: mockMailerSendService },
+        { provide: ResendService, useValue: mockResendService },
         { provide: PushService, useValue: mockPushService },
         { provide: TwilioService, useValue: mockTwilioService },
         { provide: CustomEventsService, useValue: mockCustomEventsService },

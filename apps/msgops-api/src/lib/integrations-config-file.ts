@@ -94,3 +94,41 @@ export function emailableEnvFilePath(): string {
 export function writeEmailableEnvFile(dto: EmailableSystemSettings): void {
   writeEnvFile(emailableEnvFilePath(), [`EMAILABLE_URL=${dto.url}`, `EMAILABLE_API_KEY=${dto.apiKey}`]);
 }
+
+// ---------- MailerSend ----------
+
+export interface MailerSendSystemSettings {
+  apiKey: string;
+  webhookSigningSecret?: string;
+  webhookUrlBase?: string;
+}
+
+export function mailerSendEnvFilePath(): string {
+  return bmsConfigFilePath('mailersend.env');
+}
+
+export function writeMailerSendEnvFile(dto: MailerSendSystemSettings): void {
+  const lines: string[] = [`MAILERSEND_API_KEY=${dto.apiKey}`];
+  if (dto.webhookSigningSecret) lines.push(`MAILERSEND_WEBHOOK_SIGNING_SECRET=${dto.webhookSigningSecret}`);
+  if (dto.webhookUrlBase) lines.push(`MAILERSEND_WEBHOOK_URL_BASE=${dto.webhookUrlBase}`);
+  writeEnvFile(mailerSendEnvFilePath(), lines);
+}
+
+// ---------- Resend ----------
+
+export interface ResendSystemSettings {
+  apiKey: string;
+  webhookSigningSecret?: string;
+  webhookUrlBase?: string;
+}
+
+export function resendEnvFilePath(): string {
+  return bmsConfigFilePath('resend.env');
+}
+
+export function writeResendEnvFile(dto: ResendSystemSettings): void {
+  const lines: string[] = [`RESEND_API_KEY=${dto.apiKey}`];
+  if (dto.webhookSigningSecret) lines.push(`RESEND_WEBHOOK_SIGNING_SECRET=${dto.webhookSigningSecret}`);
+  if (dto.webhookUrlBase) lines.push(`RESEND_WEBHOOK_URL_BASE=${dto.webhookUrlBase}`);
+  writeEnvFile(resendEnvFilePath(), lines);
+}
