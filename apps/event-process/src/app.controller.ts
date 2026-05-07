@@ -1,9 +1,17 @@
 import { BadRequestException, Body, Controller, Headers, Post, UnauthorizedException } from '@nestjs/common';
 import * as crypto from 'crypto';
-import { CustomEventRequest, InternalRequest, SendgridEvent, TwilioEvent } from './events/interfaces/events.interfaces';
+import {
+  CustomEventRequest,
+  InternalRequest,
+  SendgridEvent,
+  SparkPostEnvelope,
+  TwilioEvent,
+} from './events/interfaces/events.interfaces';
 import { PushPayload, PushWebhook } from './events/interfaces/push.interfaces';
+import { PlatformType } from './events/interfaces/push.interfaces';
 import { FormatterUtils } from './utils/formatter.utils';
 import { SendgridService } from './events/services/sendgrid.service';
+import { SparkpostService } from './events/services/sparkpost.service';
 import { PushService } from './events/services/push.service';
 import { TwilioService } from './events/services/twilio.service';
 import { CustomEventsService } from './events/services/custom-events.service';
@@ -16,6 +24,7 @@ export class AppController {
     private readonly formatterUtils: FormatterUtils,
     private readonly eventsService: EventsService,
     private readonly sendgridService: SendgridService,
+    private readonly sparkpostService: SparkpostService,
     private readonly pushService: PushService,
     private readonly twilioService: TwilioService,
     private readonly customEventsService: CustomEventsService,
@@ -25,6 +34,28 @@ export class AppController {
   private assertAuth(token: string): void {
     if (token !== process.env.INTERNAL_AUTH_TOKEN) {
       throw new UnauthorizedException();
+    }
+  }
+
+  // SparkPost authenticates its outbound webhooks with HTTP Basic Auth
+  // (configured in the SparkPost console). We verify the credentials
+  // BEFORE the internal-token check so a forged x-internal-token from
+  // inside the perimeter still cannot inject SparkPost-shaped payloads.
+  private assertSparkpostBasicAuth(authHeader: string | undefined): void {
+    const user = process.env.SPARKPOST_WEBHOOK_USER;
+    const pass = process.env.SPARKPOST_WEBHOOK_PASS;
+    if (!user || !pass) {
+      // Env unset = bypass, lets dev/staging accept calls without basic auth.
+      // Production deployments MUST set both vars.
+      return;
+    }
+    if (!authHeader || !authHeader.toLowerCase().startsWith('basic ')) {
+      throw new UnauthorizedException('Missing SparkPost basic auth');
+    }
+    const decoded = Buffer.from(authHeader.slice(6).trim(), 'base64').toString('utf8');
+    const expected = `${user}:${pass}`;
+    if (decoded.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(decoded), Buffer.from(expected))) {
+      throw new UnauthorizedException('Invalid SparkPost basic auth');
     }
   }
 
@@ -44,11 +75,20 @@ export class AppController {
   }
 
   @Post('sparkpost')
-  async sparkpost(@Headers('x-internal-token') token: string, @Body() events: any): Promise<any> {
+  async sparkpost(
+    @Headers('x-internal-token') token: string,
+    @Headers('authorization') authorization: string,
+    @Body() events: SparkPostEnvelope | SparkPostEnvelope[],
+  ): Promise<any> {
+    this.assertSparkpostBasicAuth(authorization);
     this.assertAuth(token);
     if (!events) throw new BadRequestException('Body cannot be empty');
-    this.formatterUtils.logInfo(`[Sparkpost] Received event: ${JSON.stringify(events)}`);
-    return;
+    // SparkPost batches events as an array of envelopes per webhook POST,
+    // but a degenerate single-event delivery wraps the envelope directly.
+    const envelopes = Array.isArray(events) ? events : [events];
+    return await this.eventsService.processWithIdempotency(this.idempotencyKey(envelopes), () =>
+      this.sparkpostService.processSparkPost({ payload: envelopes, platform: PlatformType.EMAIL }),
+    );
   }
 
   @Post('twilio')

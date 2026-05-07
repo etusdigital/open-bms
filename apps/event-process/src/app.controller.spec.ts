@@ -3,6 +3,7 @@ import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { EventsService } from './events/services/events.service';
 import { SendgridService } from './events/services/sendgrid.service';
+import { SparkpostService } from './events/services/sparkpost.service';
 import { PushService } from './events/services/push.service';
 import { TwilioService } from './events/services/twilio.service';
 import { CustomEventsService } from './events/services/custom-events.service';
@@ -18,6 +19,7 @@ describe('AppController', () => {
   const mockFormatterUtils = { logInfo: jest.fn() };
   const mockEventsService = { processWithIdempotency: jest.fn().mockImplementation((_id, fn) => fn()) };
   const mockSendgridService = { processSendgrid: jest.fn().mockResolvedValue({}) };
+  const mockSparkpostService = { processSparkPost: jest.fn().mockResolvedValue({}) };
   const mockPushService = { processPush: jest.fn().mockResolvedValue({}) };
   const mockTwilioService = { processTwilioNotification: jest.fn().mockResolvedValue({}) };
   const mockCustomEventsService = { customEventsProcess: jest.fn().mockResolvedValue({}) };
@@ -33,6 +35,7 @@ describe('AppController', () => {
         { provide: FormatterUtils, useValue: mockFormatterUtils },
         { provide: EventsService, useValue: mockEventsService },
         { provide: SendgridService, useValue: mockSendgridService },
+        { provide: SparkpostService, useValue: mockSparkpostService },
         { provide: PushService, useValue: mockPushService },
         { provide: TwilioService, useValue: mockTwilioService },
         { provide: CustomEventsService, useValue: mockCustomEventsService },
@@ -125,12 +128,107 @@ describe('AppController', () => {
   });
 
   describe('POST /internal/event/sparkpost', () => {
-    it('logs event and returns undefined (preserves original log-only behavior)', async () => {
-      const events = { platform: PlatformType.SPARKPOST };
-      const result = await controller.sparkpost(VALID_TOKEN, events as any);
+    afterEach(() => {
+      delete process.env.SPARKPOST_WEBHOOK_USER;
+      delete process.env.SPARKPOST_WEBHOOK_PASS;
+    });
 
-      expect(mockFormatterUtils.logInfo).toHaveBeenCalledWith(expect.stringContaining('Sparkpost'));
-      expect(result).toBeUndefined();
+    it('throws when body is empty', async () => {
+      await expect(controller.sparkpost(VALID_TOKEN, undefined as any, undefined as any)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('delegates an envelope array to sparkpostService via processWithIdempotency', async () => {
+      const envelopes = [
+        { msys: { message_event: { type: 'delivery', event_id: 'e1', rcpt_to: 'a@b.com' } } },
+        { msys: { track_event: { type: 'open', event_id: 'e2', rcpt_to: 'a@b.com' } } },
+      ];
+
+      await controller.sparkpost(VALID_TOKEN, undefined as any, envelopes as any);
+
+      expect(mockEventsService.processWithIdempotency).toHaveBeenCalledWith(expect.any(String), expect.any(Function));
+      expect(mockSparkpostService.processSparkPost).toHaveBeenCalledWith(
+        expect.objectContaining({ payload: envelopes, platform: PlatformType.EMAIL }),
+      );
+    });
+
+    it('wraps a single envelope into an array before delegating', async () => {
+      const envelope = { msys: { message_event: { type: 'delivery', event_id: 'e1', rcpt_to: 'a@b.com' } } };
+
+      await controller.sparkpost(VALID_TOKEN, undefined as any, envelope as any);
+
+      expect(mockSparkpostService.processSparkPost).toHaveBeenCalledWith(
+        expect.objectContaining({ payload: [envelope], platform: PlatformType.EMAIL }),
+      );
+    });
+
+    it('rejects when SparkPost basic auth env is set and authorization header is missing', async () => {
+      process.env.SPARKPOST_WEBHOOK_USER = 'sp';
+      process.env.SPARKPOST_WEBHOOK_PASS = 'secret';
+      const envelope = { msys: { message_event: { type: 'delivery', event_id: 'e1' } } };
+
+      await expect(controller.sparkpost(VALID_TOKEN, undefined as any, envelope as any)).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('rejects when SparkPost basic auth credentials do not match', async () => {
+      process.env.SPARKPOST_WEBHOOK_USER = 'sp';
+      process.env.SPARKPOST_WEBHOOK_PASS = 'secret';
+      const wrong = 'Basic ' + Buffer.from('sp:nope').toString('base64');
+      const envelope = { msys: { message_event: { type: 'delivery', event_id: 'e1' } } };
+
+      await expect(controller.sparkpost(VALID_TOKEN, wrong, envelope as any)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('accepts valid SparkPost basic auth when env is set', async () => {
+      process.env.SPARKPOST_WEBHOOK_USER = 'sp';
+      process.env.SPARKPOST_WEBHOOK_PASS = 'secret';
+      const auth = 'Basic ' + Buffer.from('sp:secret').toString('base64');
+      const envelope = { msys: { message_event: { type: 'delivery', event_id: 'e1' } } };
+
+      await controller.sparkpost(VALID_TOKEN, auth, envelope as any);
+
+      expect(mockSparkpostService.processSparkPost).toHaveBeenCalled();
+    });
+
+    it('bypasses basic auth when SparkPost env vars are unset (dev mode)', async () => {
+      // No SPARKPOST_WEBHOOK_USER / _PASS in env → assertSparkpostBasicAuth returns early
+      const envelope = { msys: { message_event: { type: 'delivery', event_id: 'e1' } } };
+
+      await controller.sparkpost(VALID_TOKEN, undefined as any, envelope as any);
+
+      expect(mockSparkpostService.processSparkPost).toHaveBeenCalled();
+    });
+
+    it('uses content-hashed idempotency key so identical payloads dedupe', async () => {
+      const envelopeA = [{ msys: { message_event: { type: 'delivery', event_id: 'e-A' } } }];
+      const envelopeB = [{ msys: { message_event: { type: 'delivery', event_id: 'e-B' } } }];
+
+      await controller.sparkpost(VALID_TOKEN, undefined as any, envelopeA as any);
+      await controller.sparkpost(VALID_TOKEN, undefined as any, envelopeA as any);
+      await controller.sparkpost(VALID_TOKEN, undefined as any, envelopeB as any);
+
+      const calls = mockEventsService.processWithIdempotency.mock.calls.map(([key]) => key);
+      // Same payload twice → same key both times.
+      expect(calls[0]).toBe(calls[1]);
+      // Different payload → different key.
+      expect(calls[0]).not.toBe(calls[2]);
+    });
+
+    it('returns skipped result when processWithIdempotency reports duplicate', async () => {
+      // Simulate the second call seeing the processed marker already set.
+      mockEventsService.processWithIdempotency.mockResolvedValueOnce({
+        status: 'skipped',
+        message: 'Message already processed',
+      });
+      const envelope = { msys: { message_event: { type: 'delivery', event_id: 'e-dup' } } };
+
+      const result = await controller.sparkpost(VALID_TOKEN, undefined as any, envelope as any);
+
+      expect(result).toEqual(expect.objectContaining({ status: 'skipped' }));
+      expect(mockSparkpostService.processSparkPost).not.toHaveBeenCalled();
     });
   });
 });
