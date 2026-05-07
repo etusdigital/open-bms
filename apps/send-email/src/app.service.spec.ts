@@ -9,6 +9,8 @@ import { TrackerService } from './tracker/tracker.service';
 import { SplitFeature } from './features/split/split.feature';
 import { MailUtils } from './mail/mail.utils';
 import { EventPublisherService } from './event-publisher.service';
+import { EmailProviderRouter } from './handlers/email-provider.router';
+import { IEmailProvider } from './handlers/email-provider.interface';
 
 const createMockSendEmailData = (overrides = {}) => ({
   messageId: 'msg-123',
@@ -80,14 +82,43 @@ describe('AppService (Refactored)', () => {
       }),
       expire: jest.fn().mockResolvedValue(1),
     };
+    // EmailProviderRouter mock — preserves the legacy ippool-based dispatch so that
+    // assertions against sparkPostHandler.sendEmail / mailService.sendMail keep
+    // working unchanged. The sendgrid provider's sendEmail/createMail proxies into
+    // mailService.sendMail/createMail because, after Phase 1 refactor, MailService
+    // delegates to SendGridHandler — the test mocks the seam at MailService for
+    // backwards compatibility.
+    // eslint-disable-next-line prefer-const -- reassigned in module.get block below; closure semantics require late binding
+    let mailServiceMock: jest.Mocked<MailService>;
+    const sparkPostHandlerMock = {
+      sendEmail: jest.fn(),
+      createMail: jest.fn(),
+      createCampaignBatchMail: jest.fn(),
+      createAutomationBatchMail: jest.fn(),
+      getMetadata: jest.fn().mockReturnValue({ name: 'sparkpost', hasFreeTier: true, hasWebhook: true }),
+    };
+    const sendGridProviderMock: IEmailProvider = {
+      getMetadata: () => ({ name: 'sendgrid', hasFreeTier: true, hasWebhook: true }),
+      createMail: (msg: any, html: string) => mailServiceMock.createMail(msg, html),
+      createCampaignBatchMail: jest.fn(),
+      createAutomationBatchMail: jest.fn(),
+      sendEmail: (mail: any, account: any) => mailServiceMock.sendMail(mail, account),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AppService,
         {
           provide: SparkPostHandler,
+          useValue: sparkPostHandlerMock,
+        },
+        {
+          provide: EmailProviderRouter,
           useValue: {
-            sendEmail: jest.fn(),
-            createMail: jest.fn(),
+            resolveForMessage: jest.fn((_account, message) => {
+              const ippool = (message?.ippool as string) || '';
+              return ippool.includes('sparkpost') ? sparkPostHandlerMock : sendGridProviderMock;
+            }),
           },
         },
         {
@@ -158,6 +189,7 @@ describe('AppService (Refactored)', () => {
     sparkPostHandler = module.get(SparkPostHandler);
     storageService = module.get(StorageService);
     mailService = module.get(MailService);
+    mailServiceMock = mailService;
     formatterUtils = module.get(FormatterUtils);
     module.get(RedisService);
     trackerService = module.get(TrackerService);

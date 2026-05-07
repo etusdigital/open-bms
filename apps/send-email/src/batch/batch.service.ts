@@ -11,6 +11,7 @@ import * as utc from 'dayjs/plugin/utc';
 import * as timezone from 'dayjs/plugin/timezone';
 import { EXCHANGES } from '@bms/messaging';
 import { EventPublisherService } from '../event-publisher.service';
+import { EmailProviderRouter } from '../handlers/email-provider.router';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -24,6 +25,7 @@ export class BatchService {
     private readonly redisService: RedisService,
     private readonly trackerService: TrackerService,
     private readonly eventPublisher: EventPublisherService,
+    private readonly emailProviderRouter: EmailProviderRouter,
   ) {}
 
   async campaignBatch(batch: Batch, debug: string) {
@@ -72,7 +74,8 @@ export class BatchService {
     }
     this.validateCampaign(batch);
 
-    const sendResponse = await this.mailService.sendBatch(batch, debug);
+    const provider = this.emailProviderRouter.resolveForMessage(batch.account, batch.message);
+    const sendResponse = (await this.mailService.sendBatch(batch, provider, debug)) as any;
 
     if (sendResponse.results || sendResponse[0].statusCode === 202) {
       try {
@@ -106,7 +109,8 @@ export class BatchService {
       return { status: false };
     }
 
-    const sendResponse = await this.mailService.sendBatch(batch, debug);
+    const provider = this.emailProviderRouter.resolveForMessage(batch.account, batch.message);
+    const sendResponse = (await this.mailService.sendBatch(batch, provider, debug)) as any;
 
     if (sendResponse.results || sendResponse[0].statusCode === 202) {
       await this.saveBatchToRedis(batch, timeZone, 0);

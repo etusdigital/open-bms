@@ -15,6 +15,7 @@ Messaging operations platform (BMS) for multi-channel campaigns — email, SMS, 
 - **Operational DB**: PostgreSQL via TypeORM (`apps/msgops-api/src/entities/*.entity.ts`)
 - **Analytics**: ClickHouse (separate deployment, consumed by workers)
 - **Auth**: Pluggable via `IAuthProvider` — default `LocalAuthProvider` (JWT HS256 + bcrypt); `Auth0AuthProvider` opcional via `AUTH_PROVIDER=auth0`
+- **Email providers**: Pluggable via `IEmailProvider` (`apps/send-email/src/handlers/email-provider.interface.ts`). 6 providers registered: SparkPost, SendGrid, MailerSend, Resend (free tier + webhook), Amazon SES, Mandrill (paid, opt-in). Eligibility gate enforces `hasWebhook: true` no boot via `EmailProvidersModule.onModuleInit()`. Routing per-account via `account.accountConfigs.default_email_provider`. Setup completo em [`docs/email-providers.md`](docs/email-providers.md).
 
 ## Key Commands
 
@@ -63,3 +64,9 @@ packages/
 - **Data**: TypeORM entities em `apps/msgops-api/src/entities/*.entity.ts`; migrations em `src/migrations/<timestamp>-<desc>.ts`.
 - **Guards**: `PrincipalContextGuard` + `PermissionGuard` registrados globalmente; decorators `@RequirePermission('key')`, `@RequireSuperAdmin()`, `@PublicRoute()`.
 - **API docs**: Swagger em `/api-docs` (NestJS).
+- **Email Providers**:
+  - 6 providers integrados: `sparkpost`, `sendgrid`, `mailersend`, `resend` (free tier + webhook), `ses`, `mandrill` (pagos, opt-in via `hasFreeTier: false`).
+  - Send-side: `IEmailProvider` em `apps/send-email/src/handlers/<provider>/`. Resolução por mensagem via `EmailProviderRouter` (`account.accountConfigs.default_email_provider` → ippool fallback → env).
+  - Webhook-side: `apps/event-process/src/events/services/<provider>.service.ts` + `@Post('<provider>')` em `app.controller.ts`. Cada provider valida sua própria assinatura (Basic Auth/HMAC/Svix/SNS) antes de `processWithIdempotency`.
+  - Admin: `PUT/GET /admin/integrations/<provider>/settings` + `POST .../test-connection` (rate-limited 5/min). Credenciais persistem em `system_config` table; bootstrap reescreve env file no startup.
+  - Setup completo em [`docs/email-providers.md`](docs/email-providers.md).

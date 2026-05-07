@@ -7,9 +7,10 @@ import { StorageModule } from '../storage/storage.module';
 import { FormatterUtils } from '../utils/formatter.utils';
 import { TrackerModule } from '../tracker/tracker.module';
 import { RedisModule } from '../providers/redis/redis.module';
+import { EmailProvidersModule } from '../handlers/email-providers.module';
 
 @Module({
-  imports: [ConfigModule.forRoot(), MailModule, StorageModule, TrackerModule, RedisModule],
+  imports: [ConfigModule.forRoot(), MailModule, StorageModule, TrackerModule, RedisModule, EmailProvidersModule],
   controllers: [BatchController],
   providers: [BatchService, FormatterUtils],
 })

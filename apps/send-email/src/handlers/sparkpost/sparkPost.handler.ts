@@ -4,13 +4,23 @@ import { FormatterUtils } from '../../utils/formatter.utils';
 import { MailUtils } from '../../mail/mail.utils';
 import * as Sparkpost from 'sparkpost';
 import { Batch } from 'src/mail/mail.interface';
+import { EmailProviderMetadata, IEmailProvider } from '../email-provider.interface';
 
 @Injectable()
-export class SparkPostHandler {
+export class SparkPostHandler implements IEmailProvider {
   constructor(
     private readonly formatterUtils: FormatterUtils,
     private readonly mailUtils: MailUtils,
   ) {}
+
+  getMetadata(): EmailProviderMetadata {
+    return {
+      name: 'sparkpost',
+      hasFreeTier: true,
+      hasWebhook: true,
+      notes: '500 emails/mês free tier',
+    };
+  }
 
   createMail(sendEmailMessage: SendEmailMessage, html: string) {
     const replyTo = (sendEmailMessage: SendEmailMessage) => {

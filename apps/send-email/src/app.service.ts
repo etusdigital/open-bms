@@ -1,15 +1,15 @@
-import { MailDataRequired } from '@sendgrid/mail';
 import { FormatterUtils } from './utils/formatter.utils';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { RedisService } from './providers/redis/redis.service';
 import { ResultDto } from './dtos/result.dto';
 import { StorageService } from './storage/storage.service';
-import { SparkPostHandler } from './handlers/sparkpost/sparkPost.handler';
 import { Email, SendEmailMessage } from './interfaces';
 import { TrackerService } from './tracker/tracker.service';
 import { MsgopsEvent } from './tracker/tracker.interface';
 import { MailUtils } from './mail/mail.utils';
 import { MailService } from './mail/mail.service';
+import { IEmailProvider } from './handlers/email-provider.interface';
+import { EmailProviderRouter } from './handlers/email-provider.router';
 import { SplitFeature } from './features/split/split.feature';
 import * as dayjs from 'dayjs';
 import * as utc from 'dayjs/plugin/utc';
@@ -23,7 +23,7 @@ dayjs.extend(timezone);
 @Injectable()
 export class AppService {
   constructor(
-    private readonly sparkPostHandler: SparkPostHandler,
+    private readonly emailProviderRouter: EmailProviderRouter,
     private readonly storageService: StorageService,
     private readonly mailService: MailService,
     private readonly formatterUtils: FormatterUtils,
@@ -197,7 +197,8 @@ export class AppService {
       }
     }
 
-    const provider = sendEmailMessage.message.ippool.indexOf('sparkpost') != -1 ? 'sparkpost' : 'sendgrid';
+    const provider = this.emailProviderRouter.resolveForMessage(sendEmailMessage.account, sendEmailMessage.message);
+    const providerName = provider.getMetadata().name;
     const mail = await this.createEmail(sendEmailMessage, provider);
 
     this.trackerService.sendInfo(
@@ -212,31 +213,31 @@ export class AppService {
       sendEmailMessage.startedAt,
     );
 
-    let sparkPostResponse: any = [];
-    let sendGridResponse: any = [];
+    let providerResponse: any = [];
 
-    if (provider === 'sparkpost') {
-      sparkPostResponse = await this.sparkPostHandler.sendEmail(mail, sendEmailMessage.account);
+    if (providerName === 'sendgrid' && sendEmailMessage.account && sendEmailMessage.account.id == 165) {
+      // Account 165 ships single-contact emails through the SendGrid batch path
+      // — preserve verbatim from pre-refactor behavior.
+      const { location, content, id } = sendEmailMessage.message;
+      const htmlContent: string = content || (await this.getContent(id, location));
+      const mails = this.mailService.parseAutomationBatchToMailDataRequired(
+        {
+          contacts: [sendEmailMessage.contact],
+          ...sendEmailMessage,
+        },
+        htmlContent,
+      );
+      console.log(`BATCH AUTOMATION SEND: ${sendEmailMessage.contact.email} - ${sendEmailMessage.account.id} - ${sendEmailMessage.account.name}`);
+      providerResponse = await provider.sendEmail(mails, sendEmailMessage.account);
     } else {
-      if (sendEmailMessage.account && sendEmailMessage.account.id == 165) {
-        const { location, content, id } = sendEmailMessage.message;
-        const htmlContent: string = content || (await this.getContent(id, location));
-        const mails = this.mailService.parseAutomationBatchToMailDataRequired(
-          {
-            contacts: [sendEmailMessage.contact],
-            ...sendEmailMessage,
-          },
-          htmlContent,
-        );
-        console.log(`BATCH AUTOMATION SEND: ${sendEmailMessage.contact.email} - ${sendEmailMessage.account.id} - ${sendEmailMessage.account.name}`);
-        sendGridResponse = await this.mailService.sendMail(mails, sendEmailMessage.account);
-      } else {
-        sendGridResponse = await this.mailService.sendMail(mail as MailDataRequired, sendEmailMessage.account);
-      }
+      providerResponse = await provider.sendEmail(mail, sendEmailMessage.account);
     }
 
+    const sendGridResponse = providerName === 'sendgrid' ? providerResponse : [];
+    const sparkPostResponse = providerName === 'sparkpost' ? providerResponse : [];
+
     this.trackerService.sendInfo(
-      provider === 'sendgrid' ? MsgopsEvent.MSGOPS_SENDGRID_RESPONSE : MsgopsEvent.MSGOPS_SPARKPOST_RESPONSE,
+      providerName === 'sparkpost' ? MsgopsEvent.MSGOPS_SPARKPOST_RESPONSE : MsgopsEvent.MSGOPS_SENDGRID_RESPONSE,
       {
         automation_name: sendEmailMessage.automationName,
         automation_type: sendEmailMessage.automationType,
@@ -327,20 +328,16 @@ export class AppService {
     }
   }
 
-  private async createEmail(sendEmailMessage: SendEmailMessage, provider: string) {
+  private async createEmail(sendEmailMessage: SendEmailMessage, provider: IEmailProvider): Promise<unknown> {
     const { location, content, id } = sendEmailMessage.message;
     sendEmailMessage.ramdonNumber = Math.random();
 
     const contentFile: string = content || (await this.getContent(id, location));
 
     const newSendEmailMessage = this.replaceVariables(sendEmailMessage);
-    const processedEmail = await this.processEmail(contentFile, newSendEmailMessage, provider);
+    const processedEmail = await this.processEmail(contentFile, newSendEmailMessage, provider.getMetadata().name);
 
-    if (provider === 'sparkpost') {
-      return this.sparkPostHandler.createMail(newSendEmailMessage, processedEmail);
-    }
-
-    return this.mailService.createMail(newSendEmailMessage, processedEmail);
+    return provider.createMail(newSendEmailMessage, processedEmail);
   }
 
   private async getContent(messageId, location) {

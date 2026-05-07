@@ -94,3 +94,79 @@ export function emailableEnvFilePath(): string {
 export function writeEmailableEnvFile(dto: EmailableSystemSettings): void {
   writeEnvFile(emailableEnvFilePath(), [`EMAILABLE_URL=${dto.url}`, `EMAILABLE_API_KEY=${dto.apiKey}`]);
 }
+
+// ---------- MailerSend ----------
+
+export interface MailerSendSystemSettings {
+  apiKey: string;
+  webhookSigningSecret?: string;
+  webhookUrlBase?: string;
+}
+
+export function mailerSendEnvFilePath(): string {
+  return bmsConfigFilePath('mailersend.env');
+}
+
+export function writeMailerSendEnvFile(dto: MailerSendSystemSettings): void {
+  const lines: string[] = [`MAILERSEND_API_KEY=${dto.apiKey}`];
+  if (dto.webhookSigningSecret) lines.push(`MAILERSEND_WEBHOOK_SIGNING_SECRET=${dto.webhookSigningSecret}`);
+  if (dto.webhookUrlBase) lines.push(`MAILERSEND_WEBHOOK_URL_BASE=${dto.webhookUrlBase}`);
+  writeEnvFile(mailerSendEnvFilePath(), lines);
+}
+
+// ---------- Resend ----------
+
+export interface ResendSystemSettings {
+  apiKey: string;
+  webhookSigningSecret?: string;
+  webhookUrlBase?: string;
+}
+
+export function resendEnvFilePath(): string {
+  return bmsConfigFilePath('resend.env');
+}
+
+export function writeResendEnvFile(dto: ResendSystemSettings): void {
+  const lines: string[] = [`RESEND_API_KEY=${dto.apiKey}`];
+  if (dto.webhookSigningSecret) lines.push(`RESEND_WEBHOOK_SIGNING_SECRET=${dto.webhookSigningSecret}`);
+  if (dto.webhookUrlBase) lines.push(`RESEND_WEBHOOK_URL_BASE=${dto.webhookUrlBase}`);
+  writeEnvFile(resendEnvFilePath(), lines);
+}
+
+// ---------- Amazon SES ----------
+
+export interface SesSystemSettings {
+  accessKeyId: string;
+  secretAccessKey: string;
+  region: string;
+  webhookSnsTopicArn?: string;
+}
+
+export function sesEnvFilePath(): string {
+  return bmsConfigFilePath('ses.env');
+}
+
+export function writeSesEnvFile(dto: SesSystemSettings): void {
+  const lines: string[] = [`AWS_SES_ACCESS_KEY_ID=${dto.accessKeyId}`, `AWS_SES_SECRET_ACCESS_KEY=${dto.secretAccessKey}`, `AWS_SES_REGION=${dto.region}`];
+  if (dto.webhookSnsTopicArn) lines.push(`AWS_SES_WEBHOOK_SNS_TOPIC_ARN=${dto.webhookSnsTopicArn}`);
+  writeEnvFile(sesEnvFilePath(), lines);
+}
+
+// ---------- Mandrill ----------
+
+export interface MandrillSystemSettings {
+  apiKey: string;
+  webhookKey?: string;
+  webhookUrlBase?: string;
+}
+
+export function mandrillEnvFilePath(): string {
+  return bmsConfigFilePath('mandrill.env');
+}
+
+export function writeMandrillEnvFile(dto: MandrillSystemSettings): void {
+  const lines: string[] = [`MANDRILL_API_KEY=${dto.apiKey}`];
+  if (dto.webhookKey) lines.push(`MANDRILL_WEBHOOK_KEY=${dto.webhookKey}`);
+  if (dto.webhookUrlBase) lines.push(`MANDRILL_WEBHOOK_URL_BASE=${dto.webhookUrlBase}`);
+  writeEnvFile(mandrillEnvFilePath(), lines);
+}

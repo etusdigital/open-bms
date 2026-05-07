@@ -6,6 +6,7 @@ import { MailService } from './mail.service';
 import { MailUtils } from './mail.utils';
 import { TrackerService } from '../tracker/tracker.service';
 import { SparkPostHandler } from '../handlers/sparkpost/sparkPost.handler';
+import { SendGridHandler } from '../handlers/sendgrid/sendGrid.handler';
 import { HtmlToTextService } from '../html-to-text/html-to-text.service';
 import { CampaignType, CampaignMessageType, CampaignStatus } from '../interfaces';
 import * as sendgrid from '@sendgrid/mail';
@@ -139,9 +140,15 @@ describe('MailService', () => {
   let formatterUtils: FormatterUtils;
   let mailUtils: MailUtils;
   let sparkPostHandler: SparkPostHandler;
+  let sendGridHandler: SendGridHandler;
   let storageService: StorageService;
   let sendgridSendMock: jest.Mock;
   let keyRegistry: SendGridKeyRegistry;
+
+  // After Phase 1 refactor MailService.sendBatch receives a pre-resolved provider
+  // (the routing decision lives in EmailProviderRouter, exercised separately).
+  // This helper preserves the spec's original "ippool drives provider" intent.
+  const providerFor = (batch: any) => ((batch?.message?.ippool || '').includes('sparkpost') ? sparkPostHandler : sendGridHandler);
 
   beforeEach(async () => {
     sendgridSendMock = jest.fn().mockResolvedValue([{ statusCode: 202, body: {}, headers: {} }]);
@@ -213,8 +220,14 @@ describe('MailService', () => {
             createCampaignBatchMail: jest.fn().mockReturnValue({}),
             createAutomationBatchMail: jest.fn().mockReturnValue({}),
             sendEmail: jest.fn().mockResolvedValue([{ statusCode: 200, results: { id: 'spark-123' } }]),
+            getMetadata: jest.fn().mockReturnValue({ name: 'sparkpost', hasFreeTier: true, hasWebhook: true }),
+            createMail: jest.fn().mockReturnValue({}),
           },
         },
+        // Real SendGridHandler so existing assertions about SendGrid SDK calls
+        // (sendgrid.send, sendgrid.setApiKey, keyRegistry.getKey) keep working
+        // after MailService was refactored to delegate to it.
+        SendGridHandler,
         {
           provide: StorageService,
           useValue: {
@@ -238,6 +251,7 @@ describe('MailService', () => {
     formatterUtils = module.get<FormatterUtils>(FormatterUtils);
     mailUtils = module.get<MailUtils>(MailUtils);
     sparkPostHandler = module.get<SparkPostHandler>(SparkPostHandler);
+    sendGridHandler = module.get<SendGridHandler>(SendGridHandler);
     storageService = module.get<StorageService>(StorageService);
     module.get<TrackerService>(TrackerService);
 
@@ -371,7 +385,7 @@ describe('MailService', () => {
         message: { ...createMockBatch().message, ippool: 'sparkpost-pool-1' },
       });
 
-      await service.sendBatch(batch, null);
+      await service.sendBatch(batch, providerFor(batch), null);
 
       expect(sparkPostHandler.createCampaignBatchMail).toHaveBeenCalled();
       expect(sparkPostHandler.sendEmail).toHaveBeenCalled();
@@ -386,7 +400,7 @@ describe('MailService', () => {
         },
       });
 
-      await service.sendBatch(batch, null);
+      await service.sendBatch(batch, providerFor(batch), null);
 
       expect(sparkPostHandler.createAutomationBatchMail).toHaveBeenCalled();
       expect(sparkPostHandler.sendEmail).toHaveBeenCalled();
@@ -398,7 +412,7 @@ describe('MailService', () => {
         message: { ...createMockBatch().message, ippool: 'sendgrid-pool' },
       });
 
-      await service.sendBatch(batch, null);
+      await service.sendBatch(batch, providerFor(batch), null);
 
       expect(sparkPostHandler.createCampaignBatchMail).not.toHaveBeenCalled();
       expect(sendgridSendMock).toHaveBeenCalled();
@@ -414,7 +428,7 @@ describe('MailService', () => {
         },
       });
 
-      await service.sendBatch(batch, null);
+      await service.sendBatch(batch, providerFor(batch), null);
 
       expect(storageService.getHtml).not.toHaveBeenCalled();
     });
@@ -427,7 +441,7 @@ describe('MailService', () => {
         },
       });
 
-      await service.sendBatch(batch, null);
+      await service.sendBatch(batch, providerFor(batch), null);
 
       expect(storageService.getHtml).toHaveBeenCalledWith('test-bucket', 'test-file.html');
     });
@@ -440,7 +454,7 @@ describe('MailService', () => {
         },
       });
 
-      await service.sendBatch(batch, null);
+      await service.sendBatch(batch, providerFor(batch), null);
 
       expect(storageService.getHtml).toHaveBeenCalledWith('test-bucket', 'test-file.html');
     });
@@ -567,7 +581,7 @@ describe('MailService', () => {
         },
       });
 
-      await service.sendBatch(batch, null);
+      await service.sendBatch(batch, providerFor(batch), null);
 
       expect(sparkPostHandler.createCampaignBatchMail).toHaveBeenCalled();
       expect(sparkPostHandler.sendEmail).toHaveBeenCalled();
@@ -581,7 +595,7 @@ describe('MailService', () => {
         },
       });
 
-      await service.sendBatch(batch, null);
+      await service.sendBatch(batch, providerFor(batch), null);
 
       expect(sparkPostHandler.createAutomationBatchMail).toHaveBeenCalled();
       expect(sparkPostHandler.sendEmail).toHaveBeenCalled();
