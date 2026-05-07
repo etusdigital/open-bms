@@ -12,6 +12,8 @@ import {
   HttpStatus,
   Headers,
   Put,
+  Delete,
+  ParseIntPipe,
   NotFoundException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -248,5 +250,12 @@ export class ContactsController {
   @Put('/custom-fields/edit')
   updateContactCustomFieldValue(@Body() params: any) {
     return this.contactsService.updateContactCustomFieldValue(params);
+  }
+
+  @ApiOperation({ summary: 'Delete a contact by ID' })
+  @RequirePermission('audience:contacts_edit')
+  @Delete('/:id')
+  async deleteOne(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    return this.contactsService.deleteOne(id);
   }
 }
