@@ -827,9 +827,13 @@ export class CampaignsService {
     const endDate = new Date(scheduleTo);
     endDate.setHours(scheduleTo.getHours() + 1);
 
+    // Only campaigns in active states (queued, in-flight or paused) can
+    // conflict with a new schedule. Stopped/Completed campaigns are inert and
+    // must NOT block reuse of the same audience+time slot.
+    const activeStatuses = [CampaignsStatus.Scheduled, CampaignsStatus.Sending, CampaignsStatus.Paused, CampaignsStatus.SendingTestAb];
     const results = await this.campaignRepository.query(
-      "select id, title, schedule_to, tags from campaigns, jsonb_array_elements(campaigns.tags) as items where account_id = $1 AND deleted_at IS NULL AND id <> $2 AND (items->>'id')::int = ANY($3) AND schedule_to BETWEEN $4 AND $5 AND status != 0 AND message_type = $6 group by campaigns.id",
-      [this.cls.get('accountId'), campaignDto.id || 0, ids, startDate, endDate, campaignDto.messageType],
+      "select id, title, schedule_to, tags from campaigns, jsonb_array_elements(campaigns.tags) as items where account_id = $1 AND deleted_at IS NULL AND id <> $2 AND (items->>'id')::int = ANY($3) AND schedule_to BETWEEN $4 AND $5 AND status = ANY($6) AND message_type = $7 group by campaigns.id",
+      [this.cls.get('accountId'), campaignDto.id || 0, ids, startDate, endDate, activeStatuses, campaignDto.messageType],
     );
 
     if (results.length) {

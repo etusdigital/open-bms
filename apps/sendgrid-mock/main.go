@@ -77,6 +77,32 @@ var (
 	maxWebhooks = 2
 )
 
+// rates control the probability of each non-happy-path event. 0 = never,
+// 1 = always. Defaults preserve the original happy-path-only behavior:
+// every recipient gets processed → delivered → open → click and nothing
+// else. Set MOCK_<EVENT>_RATE in compose to simulate realistic mixes
+// (e.g. MOCK_BOUNCE_RATE=0.05 → 5% of recipients hard-bounce instead of
+// delivering).
+var rates = simulationRates{
+	dropped:     parseRate(os.Getenv("MOCK_DROPPED_RATE"), 0),
+	bounce:      parseRate(os.Getenv("MOCK_BOUNCE_RATE"), 0),
+	deferred:    parseRate(os.Getenv("MOCK_DEFERRED_RATE"), 0),
+	open:        parseRate(os.Getenv("MOCK_OPEN_RATE"), 1),
+	click:       parseRate(os.Getenv("MOCK_CLICK_RATE"), 1),
+	spamReport:  parseRate(os.Getenv("MOCK_SPAM_RATE"), 0),
+	unsubscribe: parseRate(os.Getenv("MOCK_UNSUBSCRIBE_RATE"), 0),
+}
+
+type simulationRates struct {
+	dropped     float64 // pre-delivery: SendGrid suppression-list drop, no delivered ever fires
+	bounce      float64 // delivery hard-fail
+	deferred    float64 // delivery temporarily failed (terminal in mock)
+	open        float64 // delivered → opened
+	click       float64 // opened → clicked
+	spamReport  float64 // delivered → marked as spam
+	unsubscribe float64 // delivered → unsubscribed
+}
+
 func parseDelay(raw string, def int) time.Duration {
 	if raw == "" {
 		return time.Duration(def) * time.Millisecond
@@ -86,6 +112,39 @@ func parseDelay(raw string, def int) time.Duration {
 		return time.Duration(def) * time.Millisecond
 	}
 	return time.Duration(n) * time.Millisecond
+}
+
+// parseRate parses a [0,1] probability from env (e.g. "0.05"). Out-of-range
+// or invalid values fall back to the supplied default so a typo can't put
+// the mock in a weird state.
+func parseRate(raw string, def float64) float64 {
+	if raw == "" {
+		return def
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil || v < 0 || v > 1 {
+		return def
+	}
+	return v
+}
+
+// rollDie returns true with probability p. p<=0 → never, p>=1 → always.
+// Uses crypto/rand (already imported for IDs) for a good-enough source.
+func rollDie(p float64) bool {
+	if p <= 0 {
+		return false
+	}
+	if p >= 1 {
+		return true
+	}
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return false
+	}
+	// Map 8 random bytes to a uniform [0,1) float.
+	n := uint64(b[0])<<56 | uint64(b[1])<<48 | uint64(b[2])<<40 | uint64(b[3])<<32 |
+		uint64(b[4])<<24 | uint64(b[5])<<16 | uint64(b[6])<<8 | uint64(b[7])
+	return float64(n)/float64(^uint64(0)) < p
 }
 
 func newID() string {
@@ -346,47 +405,134 @@ func scheduleEventBurst(webhooks []webhook, mail map[string]interface{}) {
 		log.Println("[mock] mail/send received but no webhook registered — events not fired")
 		return
 	}
-	email := extractFirstRecipient(mail)
 	categories := extractCategories(mail)
-	msgID := newID()
+	topArgs := extractCustomArgs(mail, "custom_args")
 
-	burst := []string{"processed", "delivered", "open", "click"}
-	for i, evt := range burst {
-		evt := evt
-		i := i
-		time.AfterFunc(time.Duration(i+1)*eventDelay, func() {
-			payload := buildEvent(evt, email, categories, msgID)
-			for _, wh := range webhooks {
-				if !eventEnabled(wh, evt) {
-					continue
+	recipients := extractRecipients(mail)
+	if len(recipients) == 0 {
+		recipients = []recipient{{email: "recipient@bms.local"}}
+	}
+
+	for _, rcpt := range recipients {
+		rcpt := rcpt
+		msgID := newID()
+		// Real SendGrid flattens per-recipient custom_args into top-level
+		// event fields and merges with the mail-level custom_args.
+		args := mergeArgs(topArgs, rcpt.customArgs)
+		burst := buildBurstForRecipient(rates)
+		for i, evt := range burst {
+			evt := evt
+			i := i
+			time.AfterFunc(time.Duration(i+1)*eventDelay, func() {
+				payload := buildEvent(evt, rcpt.email, categories, msgID)
+				for k, v := range args {
+					if _, exists := payload[k]; !exists {
+						payload[k] = v
+					}
 				}
-				fire(wh.URL, payload)
-			}
-		})
+				for _, wh := range webhooks {
+					if !eventEnabled(wh, evt) {
+						continue
+					}
+					fire(wh.URL, payload)
+				}
+			})
+		}
 	}
 }
 
-func extractFirstRecipient(mail map[string]interface{}) string {
+// buildBurstForRecipient picks the event sequence for one recipient based
+// on the configured rates. Mirrors real SendGrid's lifecycle: every mail
+// is processed, then the delivery either lands (delivered) or fails
+// (dropped/bounce/deferred) — never both. Post-delivery follow-ups
+// (open/click/spam/unsubscribe) only fire on the delivered branch and
+// each rolls independently.
+func buildBurstForRecipient(r simulationRates) []string {
+	burst := []string{"processed"}
+	switch {
+	case rollDie(r.dropped):
+		burst = append(burst, "dropped")
+	case rollDie(r.bounce):
+		burst = append(burst, "bounce")
+	case rollDie(r.deferred):
+		burst = append(burst, "deferred")
+	default:
+		burst = append(burst, "delivered")
+		if rollDie(r.open) {
+			burst = append(burst, "open")
+			if rollDie(r.click) {
+				burst = append(burst, "click")
+			}
+		}
+		if rollDie(r.spamReport) {
+			burst = append(burst, "spamreport")
+		}
+		if rollDie(r.unsubscribe) {
+			burst = append(burst, "unsubscribe")
+		}
+	}
+	return burst
+}
+
+type recipient struct {
+	email      string
+	customArgs map[string]interface{}
+}
+
+// extractRecipients flattens the mail body into one recipient per personalization×to.
+// Real SendGrid emits one event burst per recipient, not per /mail/send call.
+func extractRecipients(mail map[string]interface{}) []recipient {
 	personalizations, ok := mail["personalizations"].([]interface{})
-	if !ok || len(personalizations) == 0 {
-		return "recipient@bms.local"
-	}
-	first, ok := personalizations[0].(map[string]interface{})
 	if !ok {
-		return "recipient@bms.local"
+		return nil
 	}
-	to, ok := first["to"].([]interface{})
-	if !ok || len(to) == 0 {
-		return "recipient@bms.local"
+	out := make([]recipient, 0, len(personalizations))
+	for _, p := range personalizations {
+		pmap, ok := p.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		args := extractCustomArgs(pmap, "custom_args")
+		to, ok := pmap["to"].([]interface{})
+		if !ok {
+			continue
+		}
+		for _, t := range to {
+			addr, ok := t.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			email, _ := addr["email"].(string)
+			if email == "" {
+				continue
+			}
+			out = append(out, recipient{email: email, customArgs: args})
+		}
 	}
-	addr, ok := to[0].(map[string]interface{})
+	return out
+}
+
+func extractCustomArgs(m map[string]interface{}, key string) map[string]interface{} {
+	raw, ok := m[key].(map[string]interface{})
 	if !ok {
-		return "recipient@bms.local"
+		return map[string]interface{}{}
 	}
-	if e, ok := addr["email"].(string); ok {
-		return e
+	out := make(map[string]interface{}, len(raw))
+	for k, v := range raw {
+		out[k] = v
 	}
-	return "recipient@bms.local"
+	return out
+}
+
+func mergeArgs(base, override map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{}, len(base)+len(override))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range override {
+		out[k] = v
+	}
+	return out
 }
 
 func extractCategories(mail map[string]interface{}) []string {

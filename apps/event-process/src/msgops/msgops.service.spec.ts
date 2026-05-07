@@ -450,6 +450,14 @@ describe('MsgopsService', () => {
       mockPgPoolLogs.query.mockRejectedValueOnce(new Error('db error'));
       await expect(service.saveEventsLogs([{ accountId: 1 }])).rejects.toThrow('Error to save logs');
     });
+
+    it('returns empty result without throwing when events_logs table is absent (Postgres 42P01)', async () => {
+      const missingTableError = Object.assign(new Error('relation "events_logs" does not exist'), { code: '42P01' });
+      mockPgPoolLogs.query.mockRejectedValueOnce(missingTableError);
+      const result = await service.saveEventsLogs([{ accountId: 1, event: 'delivered' }]);
+      expect(result).toEqual({ rows: [] });
+      expect(mockFormatterUtils.logInfo).toHaveBeenCalledWith(expect.stringContaining('events_logs table absent'));
+    });
   });
 
   describe('findEvent', () => {
@@ -503,6 +511,43 @@ describe('MsgopsService', () => {
       mockPgPool.query.mockResolvedValueOnce({ rows: [] });
       await service.clearValidationUnsubscribed(['a@test.com']);
       expect(mockPgPool.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE email_validations'));
+    });
+  });
+
+  describe('email_validations optional-feature tolerance', () => {
+    it('updateContactsValidateByEmail returns empty without throwing when columns are absent (42703)', async () => {
+      const missingColumn = Object.assign(
+        new Error('column "last_open" of relation "email_validations" does not exist'),
+        {
+          code: '42703',
+        },
+      );
+      mockPgPool.query.mockRejectedValueOnce(missingColumn);
+      const result = await service.updateContactsValidateByEmail(['a@a.com'], { lastOpen: new Date() } as any);
+      expect(result).toEqual({ rows: [] });
+      expect(mockFormatterUtils.logInfo).toHaveBeenCalledWith(expect.stringContaining('email_validations'));
+    });
+
+    it('batchUpsertValidationBounce returns empty without throwing when table is absent (42P01)', async () => {
+      const missingTable = Object.assign(new Error('relation "email_validations" does not exist'), { code: '42P01' });
+      mockPgPool.query.mockRejectedValueOnce(missingTable);
+      const result = await service.batchUpsertValidationBounce([{ email: 'a@a.com', bouncedAt: new Date() }]);
+      expect(result).toEqual({ rows: [] });
+    });
+
+    it('clearValidationUnsubscribed returns empty without throwing when columns are absent (42703)', async () => {
+      const missingColumn = Object.assign(new Error('column "unsubscribed_at" does not exist'), { code: '42703' });
+      mockPgPool.query.mockRejectedValueOnce(missingColumn);
+      const result = await service.clearValidationUnsubscribed(['a@a.com']);
+      expect(result).toEqual({ rows: [] });
+    });
+
+    it('still throws on non-schema errors so real bugs are not masked', async () => {
+      const realError = Object.assign(new Error('connection refused'), { code: 'ECONNREFUSED' });
+      mockPgPool.query.mockRejectedValueOnce(realError);
+      await expect(service.updateContactsValidateByEmail(['a@a.com'], { lastOpen: new Date() } as any)).rejects.toThrow(
+        'Error to update email validate',
+      );
     });
   });
 

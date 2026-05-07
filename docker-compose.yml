@@ -257,6 +257,17 @@ services:
     environment:
       PORT: '3010'
       MOCK_EVENT_DELAY_MS: ${SENDGRID_MOCK_EVENT_DELAY_MS:-500}
+      # Probabilities [0,1] for each non-happy-path event. Defaults preserve
+      # the original behavior (every recipient: processed → delivered → open
+      # → click). Override to simulate realistic mixes during demos / load
+      # testing — e.g. SENDGRID_MOCK_BOUNCE_RATE=0.05 → 5% hard-bounce.
+      MOCK_DROPPED_RATE: ${SENDGRID_MOCK_DROPPED_RATE:-0}
+      MOCK_BOUNCE_RATE: ${SENDGRID_MOCK_BOUNCE_RATE:-0}
+      MOCK_DEFERRED_RATE: ${SENDGRID_MOCK_DEFERRED_RATE:-0}
+      MOCK_OPEN_RATE: ${SENDGRID_MOCK_OPEN_RATE:-1}
+      MOCK_CLICK_RATE: ${SENDGRID_MOCK_CLICK_RATE:-1}
+      MOCK_SPAM_RATE: ${SENDGRID_MOCK_SPAM_RATE:-0}
+      MOCK_UNSUBSCRIBE_RATE: ${SENDGRID_MOCK_UNSUBSCRIBE_RATE:-0}
 
   event-receiver:
     build:

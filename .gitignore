@@ -51,4 +51,4 @@ _evo-output/implementation-artifacts/
 # explicitly forbid redistribution). The .gitkeep preserves the directory
 # shape so the docker-compose bind mount has a target on a fresh clone.
 data/geo/*
-!data/geo/.gitkeep
+!data/geo/.gitkeepapps/sendgrid-mock/sendgrid-mock

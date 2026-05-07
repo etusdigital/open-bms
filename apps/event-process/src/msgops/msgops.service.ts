@@ -206,6 +206,31 @@ export class MsgopsService {
     }
   }
 
+  // Wraps a query against the optional email_validations side-effect table.
+  // When the deploy hasn't provisioned the table or columns (OSS dev ships a
+  // minimal schema) the write is best-effort: log + return empty so the parent
+  // processSendgrid pipeline keeps running. Any non-schema failure still throws.
+  private async runOptionalValidationWrite(
+    query: string,
+    contextLabel: string,
+    fallbackErrorMessage: string,
+  ): Promise<QueryResult> {
+    try {
+      return await this.pgPool.query(query);
+    } catch (error) {
+      const code = (error as { code?: string })?.code;
+      if (code === '42P01' || code === '42703') {
+        this.formatterUtils.logInfo(
+          `email_validations ${contextLabel} skipped (${code === '42P01' ? 'table' : 'column'} absent — validation feature not provisioned)`,
+        );
+        return { rows: [] } as QueryResult;
+      }
+      console.error(`Log - query: ${JSON.stringify(query)}`);
+      console.error(`Log - error: ${JSON.stringify(error)}`);
+      throw new Error(fallbackErrorMessage, { cause: error });
+    }
+  }
+
   async batchUpsertValidationBounce(entries: { email: string; bouncedAt: Date }[]): Promise<QueryResult> {
     if (!entries.length) return;
     const rows = entries.map((e) => [e.email, e.bouncedAt.toISOString()]);
@@ -218,13 +243,7 @@ export class MsgopsService {
          updated_at = NOW()`,
       rows,
     );
-    try {
-      return this.pgPool.query(query);
-    } catch (error) {
-      console.error(`Log - query: ${JSON.stringify(query)}`);
-      console.error(`Log - error: ${JSON.stringify(error)}`);
-      throw new Error('Error batch-upserting validation bounce', { cause: error });
-    }
+    return this.runOptionalValidationWrite(query, 'bounce upsert', 'Error batch-upserting validation bounce');
   }
 
   async clearValidationUnsubscribed(emails: string[]): Promise<QueryResult> {
@@ -233,13 +252,7 @@ export class MsgopsService {
       `UPDATE email_validations SET unsubscribed_at = NULL, updated_at = NOW() WHERE email IN (%L)`,
       uniqueEmails,
     );
-    try {
-      return this.pgPool.query(query);
-    } catch (error) {
-      console.error(`Log - query: ${JSON.stringify(query)}`);
-      console.error(`Log - error: ${JSON.stringify(error)}`);
-      throw new Error('Error clearing validation unsubscribed_at', { cause: error });
-    }
+    return this.runOptionalValidationWrite(query, 'unsubscribed clear', 'Error clearing validation unsubscribed_at');
   }
 
   async updateContactsValidateByEmail(
@@ -268,13 +281,7 @@ export class MsgopsService {
         changes.bouncedAt,
       ]),
     );
-    try {
-      return this.pgPool.query(query);
-    } catch (error) {
-      console.error(`Log - query: ${JSON.stringify(query)}`);
-      console.error(`Log - error: ${JSON.stringify(error)}`);
-      throw new Error('Error to update email validate', { cause: error });
-    }
+    return this.runOptionalValidationWrite(query, 'open/click upsert', 'Error to update email validate');
   }
 
   async updateContactDevices(
@@ -312,6 +319,16 @@ export class MsgopsService {
       const result = await this.pgPoolLogs.query(query);
       return result;
     } catch (error) {
+      // events_logs is a foreign table backed by a Postgres→ClickHouse FDW
+      // (apps/msgops-api/schema.sql). The OSS dev stack ships a vanilla
+      // postgres image with no FDW extension, so the table is intentionally
+      // absent and writes are best-effort. Swallow only the missing-relation
+      // case (42P01) so the rest of the pipeline (events_statistics increments,
+      // pipeline.exec) keeps running. Any other failure is still a real bug.
+      if ((error as { code?: string })?.code === '42P01') {
+        this.formatterUtils.logInfo('events_logs table absent (FDW not provisioned) — skipping raw event log write');
+        return { rows: [] } as QueryResult;
+      }
       console.error(`Log - query: ${query}`);
       console.error(`Log - error: ${JSON.stringify(error)}`);
       throw new Error('Error to save logs', { cause: error });

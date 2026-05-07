@@ -6,15 +6,14 @@ import { Batch } from '../../mail/mail.interface';
 import { FormatterUtils } from '../../utils/formatter.utils';
 import { HtmlToTextService } from '../../html-to-text/html-to-text.service';
 import { MailUtils } from '../../mail/mail.utils';
-import { SendGridKeyRegistry } from '../../mail/sendgrid-key-registry';
 import { EmailProviderMetadata, IEmailProvider } from '../email-provider.interface';
+import { getSendGridClient } from './sendgrid-client.helper';
 
 @Injectable()
 export class SendGridHandler implements IEmailProvider {
   constructor(
     private readonly formatterUtils: FormatterUtils,
     private readonly htmlToTextService: HtmlToTextService,
-    private readonly keyRegistry: SendGridKeyRegistry,
     private readonly mailUtils: MailUtils,
   ) {}
 
@@ -60,7 +59,14 @@ export class SendGridHandler implements IEmailProvider {
         { type: 'text/html', value: html },
       ],
       categories,
-      ipPoolName: this.mailUtils.getIppol(sendEmailMessage.message),
+      // SendGrid rejects ip_pool_name="" with 400. Free/Essentials plans have
+      // no dedicated pools, so the BMS pool is saved with an empty pool_name
+      // and we must omit the field entirely (sends fall back to SendGrid
+      // shared IPs). Same rationale at the two batch builders below.
+      ...(() => {
+        const pool = this.mailUtils.getIppol(sendEmailMessage.message);
+        return pool ? { ipPoolName: pool } : {};
+      })(),
       trackingSettings: {
         openTracking: {
           enable: sendEmailMessage.message.id !== 568747,
@@ -181,7 +187,7 @@ export class SendGridHandler implements IEmailProvider {
         { type: 'text/plain', value: textContent },
         { type: 'text/html', value: formatedEmailContent.template },
       ],
-      ipPoolName,
+      ...(ipPoolName ? { ipPoolName } : {}),
       categories,
       trackingSettings: {
         openTracking: {
@@ -265,7 +271,7 @@ export class SendGridHandler implements IEmailProvider {
         { type: 'text/plain', value: textContent },
         { type: 'text/html', value: formatedEmailContent.template },
       ],
-      ipPoolName,
+      ...(ipPoolName ? { ipPoolName } : {}),
       categories,
       trackingSettings: {
         openTracking: {
@@ -302,138 +308,46 @@ export class SendGridHandler implements IEmailProvider {
 
     try {
       // Resolution: per-account `sendgrid_key` first (set by tenant admin
-      // in /account-settings/sendgrid), falling back to SENDGRID_API_KEY
-      // env var which mirrors the global fallback the super-admin sets in
-      // system_config. Warmup campaigns always go through the env-var
-      // path so warmup IPs never piggyback on a tenant key.
+      // in /account-settings/sendgrid), falling back to SENDGRID_API_KEY env
+      // var which mirrors the global super-admin fallback in system_config.
+      // Warmup campaigns always go through the env-var path so warmup IPs
+      // never piggyback on a tenant key.
       const accountKey = !isWarmup && account?.accountConfigs ? this.mailUtils.getAccountConfig(account.accountConfigs, 'sendgrid_key') : null;
-      let sendgridApiKey = accountKey || process.env.SENDGRID_API_KEY;
+      const sendgridApiKey = accountKey || process.env.SENDGRID_API_KEY;
 
-      // temporary fix for replaced keys
-      if (account.id === 69) {
-        sendgridApiKey = this.keyRegistry.getKey('oseucartao');
-      }
-
-      // Unum in
-      if (account.id === 149) {
-        const randomNumber = Math.random();
-        if (sgMail.categories.includes('type_email') && randomNumber < 0.26) {
-          sendgridApiKey = this.keyRegistry.getKey('unum-in-automation');
-        }
-      }
-
-      // Plusdin
-      if (account.id === 1) {
-        if (sgMail.categories.includes('type_campaign')) {
-          sendgridApiKey = this.keyRegistry.getKey('plusdin-campaigns');
-        }
-        if (sgMail.categories.includes('type_transactional') || (sgMail.categories.includes('type_email') && this.includesInCategory(sgMail.categories, '_e1_'))) {
-          sendgridApiKey = this.keyRegistry.getKey('plusdin-transactional');
-        } else if (sgMail.categories.includes('type_email')) {
-          sendgridApiKey = this.keyRegistry.getKey('plusdin-automations');
-        }
-      }
-
-      // Plusdin - NOVO
-      if (account.id === 235) {
-        if (sgMail.categories.includes('type_campaign')) {
-          sendgridApiKey = this.keyRegistry.getKey('plusdin-novo-campaigns');
-        }
-        if (sgMail.categories.includes('type_transactional') || (sgMail.categories.includes('type_email') && this.includesInCategory(sgMail.categories, '_e1_'))) {
-          sendgridApiKey = this.keyRegistry.getKey('plusdin-novo-transactional');
-        } else if (sgMail.categories.includes('type_email')) {
-          sendgridApiKey = this.keyRegistry.getKey('plusdin-novo-automations');
-        }
-      }
-
-      // easy
-      if (account.id === 5) {
-        if (sgMail.categories.includes('type_campaign')) {
-          sendgridApiKey = this.keyRegistry.getKey('easy-campaigns');
-        } else {
-          if (this.includesInCategory(sgMail.categories, 'automation-id_2802')) {
-            sendgridApiKey = this.keyRegistry.getKey('easy-automations-1');
-          } else if (this.includesInCategory(sgMail.categories, 'automation-id_2803')) {
-            sendgridApiKey = this.keyRegistry.getKey('easy-automations-2');
-          } else if (this.includesInCategory(sgMail.categories, 'automation-id_2804')) {
-            sendgridApiKey = this.keyRegistry.getKey('easy-automations-3');
-          } else if (sgMail.categories.includes('type_transactional') || (sgMail.categories.includes('type_email') && this.includesInCategory(sgMail.categories, '_e1_'))) {
-            sendgridApiKey = this.keyRegistry.getKey('easy-transactional');
-          } else if (sgMail.categories.includes('type_email')) {
-            sendgridApiKey = this.keyRegistry.getKey('easy-automations');
-          }
-        }
-      }
-
-      // vouquitar
-      if (account.id === 16) {
-        if (sgMail.categories.includes('type_campaign')) {
-          sendgridApiKey = this.keyRegistry.getKey('vq-campaigns');
-        }
-        if (sgMail.categories.includes('type_transactional') || (sgMail.categories.includes('type_email') && this.includesInCategory(sgMail.categories, '_e1_'))) {
-          sendgridApiKey = this.keyRegistry.getKey('vq-transactional');
-        } else if (sgMail.categories.includes('type_email')) {
-          sendgridApiKey = this.keyRegistry.getKey('vq-automations');
-        }
-      }
-
-      // Peca o seu
-      if (account.id === 10) {
-        if (sgMail.categories.includes('message_210909') || sgMail.categories.includes('message_210945') || sgMail.categories.includes('message_218981')) {
-          sendgridApiKey = this.keyRegistry.getKey('peca-o-seu');
-        }
-      }
-
-      // cardfacil
-      if (account.id === 2 && sgMail.categories.includes('type_email')) {
-        sendgridApiKey = this.keyRegistry.getKey('cardfacil');
-      }
-
-      // mejoresopciones
-      if (account.id === 22) {
-        const randomNumber = Math.random();
-        if (sgMail.categories.includes('type_email') && randomNumber < 0.5) {
-          sendgridApiKey = this.keyRegistry.getKey('mejoresopciones-emp');
-        }
-      }
-
-      // gotallcards
-      if (account.id === 65 && sgMail.categories.includes('pool_gotallcards_com')) {
-        sendgridApiKey = this.keyRegistry.getKey('gotallcards-warmup');
-      }
-
-      if (account.id === 6) {
-        if (this.includesInCategory(sgMail.categories, 'automation-id_2892')) {
-          sendgridApiKey = this.keyRegistry.getKey('help-automations-1');
-        } else if (this.includesInCategory(sgMail.categories, 'automation-id_2893')) {
-          sendgridApiKey = this.keyRegistry.getKey('help-automations-2');
-        }
-      }
-
-      if (account.id === 150 && this.includesInCategory(sgMail.categories, 'automation-id_2997')) {
-        sendgridApiKey = this.keyRegistry.getKey('unum-us-automation-2');
-      }
-
-      if (account.id === 152 && this.includesInCategory(sgMail.categories, 'automation-id_3028')) {
-        sendgridApiKey = this.keyRegistry.getKey('unum-ca-automation');
-      }
-
+      sendgrid.setApiKey(sendgridApiKey);
+      // Must run AFTER setApiKey: @sendgrid/client.setApiKey() resets
+      // defaultRequest.baseUrl to the global region host, clobbering any
+      // earlier override (see @sendgrid/client client.js:46). EVO-1052.
+      //
+      // Note: this mutates the @sendgrid/mail singleton on every send. OSS
+      // ships single-tenant so there's no race between concurrent accounts
+      // with different baseUrls; SaaS multi-tenant carries the same shape
+      // (per-account key swap was already done via setApiKey on the same
+      // singleton), so this isn't a regression.
       const baseUrl = process.env.SENDGRID_API_BASE_URL;
       if (baseUrl) {
-        const client = (sendgrid as unknown as { client?: { setDefaultRequest?: (k: string, v: string) => void } }).client;
-        client?.setDefaultRequest?.('baseUrl', baseUrl.replace(/\/+$/, ''));
+        getSendGridClient()?.setDefaultRequest('baseUrl', baseUrl.replace(/\/+$/, ''));
       }
-      sendgrid.setApiKey(sendgridApiKey);
       const response = await sendgrid.send(sgMail);
       return response;
     } catch (error) {
-      console.log('Sendgrid error', JSON.stringify(error));
-      throw new BadRequestException(`Email not sent error: ${error}`, error);
+      // Redacted: SendGrid error objects routinely include the full request
+      // body (recipient emails, custom args, content). Logging the whole
+      // thing would leak PII. Surface only the actionable fields.
+      const err = error as {
+        code?: string | number;
+        message?: string;
+        response?: { statusCode?: number; body?: { errors?: unknown } };
+      };
+      console.log('Sendgrid error', {
+        code: err?.code,
+        message: err?.message,
+        statusCode: err?.response?.statusCode,
+        sendgridErrors: err?.response?.body?.errors,
+      });
+      throw new BadRequestException(`Email not sent error: ${err?.message ?? error}`, err?.message);
     }
-  }
-
-  private includesInCategory(categories: string[], value: string) {
-    return categories.find((item) => item.includes(value));
   }
 
   private akrossArgs(sendEmailMessage: SendEmailMessage) {

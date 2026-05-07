@@ -98,17 +98,28 @@ export class SendgridHandler {
 
   // Builds the webhook URL the SendGrid event hook will POST to. Reads
   // webhookUrlBase from system_config (managed via /super-admin/integrations/sendgrid).
-  // Appends `&account=<id>` so the event-process gateway can route the callback
-  // to the right BMS account (the field reaches `events.account` in the
-  // SendgridEvent payload).
+  // The field is labeled "Base URL" in the UI, so accept just the public host
+  // (e.g. `https://my-tunnel.ngrok-free.app`) and append the event-receiver's
+  // canonical path + the platform/account query that the gateway needs to
+  // route the callback. If the user pasted a fuller URL we tolerate it: an
+  // existing path is preserved, an existing `platform=` query is preserved,
+  // we always append `account=<id>` last.
   private async buildWebhookUrl(accountId: number): Promise<string> {
     const cfg = await this.getSystemConfig();
     const base = cfg?.webhookUrlBase;
     if (!base) {
       throw new ServiceUnavailableException('SendGrid webhookUrlBase não configurado em /super-admin/integrations/sendgrid.');
     }
-    const sep = base.includes('?') ? '&' : '?';
-    return `${base}${sep}account=${accountId}`;
+    const trimmed = base.replace(/\/+$/, '');
+    const url = new URL(/^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`);
+    if (url.pathname === '/' || url.pathname === '') {
+      url.pathname = '/bms/events';
+    }
+    if (!url.searchParams.has('platform')) {
+      url.searchParams.set('platform', 'sendgrid');
+    }
+    url.searchParams.set('account', String(accountId));
+    return url.toString();
   }
 
   // Registers (or updates) the SendGrid event webhook against the supplied
@@ -511,8 +522,11 @@ export class SendgridHandler {
     try {
       const apiKey = await this.loadApiKey();
       const cfg = await this.getSystemConfig();
-      await this.applySendgridLibBaseUrl();
+      // Order matters: setApiKey() resets defaultRequest.baseUrl to the
+      // global region host as a side effect (@sendgrid/client client.js:46),
+      // so the override has to land AFTER. Same fix as mail.service.ts (EVO-1052).
       sendgrid.setApiKey(apiKey);
+      await this.applySendgridLibBaseUrl();
 
       const resolvedIpPool = ippool || cfg?.ipPool || '';
       const mail = this.createSingleCustomEmail(seedList, fromName, fromMail, messageSubject, messageHtmlContent, resolvedIpPool);
@@ -532,8 +546,9 @@ export class SendgridHandler {
       if (!cfg?.apiKey) {
         throw new ServiceUnavailableException('SendGrid system-level API key não configurado em /super-admin/integrations/sendgrid.');
       }
-      await this.applySendgridLibBaseUrl();
+      // Same EVO-1052 ordering: setApiKey first, override after.
       sendgrid.setApiKey(cfg.apiKey);
+      await this.applySendgridLibBaseUrl();
 
       const mail = this.createSingleCustomEmail(to, fromName, fromMail, subject, htmlContent, '');
       const response = await sendgrid.sendMultiple(mail);
