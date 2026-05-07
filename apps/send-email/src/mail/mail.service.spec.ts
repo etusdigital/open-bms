@@ -10,7 +10,6 @@ import { SendGridHandler } from '../handlers/sendgrid/sendGrid.handler';
 import { HtmlToTextService } from '../html-to-text/html-to-text.service';
 import { CampaignType, CampaignMessageType, CampaignStatus } from '../interfaces';
 import * as sendgrid from '@sendgrid/mail';
-import { SendGridKeyRegistry } from './sendgrid-key-registry';
 
 /**
  * Factory function to create mock Batch data
@@ -143,7 +142,6 @@ describe('MailService', () => {
   let sendGridHandler: SendGridHandler;
   let storageService: StorageService;
   let sendgridSendMock: jest.Mock;
-  let keyRegistry: SendGridKeyRegistry;
 
   // After Phase 1 refactor MailService.sendBatch receives a pre-resolved provider
   // (the routing decision lives in EmailProviderRouter, exercised separately).
@@ -209,12 +207,6 @@ describe('MailService', () => {
           },
         },
         {
-          provide: SendGridKeyRegistry,
-          useValue: {
-            getKey: jest.fn((name: string) => `SG.mock-key-for-${name}`),
-          },
-        },
-        {
           provide: SparkPostHandler,
           useValue: {
             createCampaignBatchMail: jest.fn().mockReturnValue({}),
@@ -225,8 +217,8 @@ describe('MailService', () => {
           },
         },
         // Real SendGridHandler so existing assertions about SendGrid SDK calls
-        // (sendgrid.send, sendgrid.setApiKey, keyRegistry.getKey) keep working
-        // after MailService was refactored to delegate to it.
+        // (sendgrid.send, sendgrid.setApiKey) keep working after MailService
+        // was refactored to delegate to it.
         SendGridHandler,
         {
           provide: StorageService,
@@ -246,7 +238,6 @@ describe('MailService', () => {
     }).compile();
 
     module.get<HtmlToTextService>(HtmlToTextService);
-    keyRegistry = module.get<SendGridKeyRegistry>(SendGridKeyRegistry);
     service = module.get<MailService>(MailService);
     formatterUtils = module.get<FormatterUtils>(FormatterUtils);
     mailUtils = module.get<MailUtils>(MailUtils);
@@ -683,301 +674,6 @@ describe('MailService', () => {
       sendgridSendMock.mockRejectedValueOnce({ message: 'Unknown error', code: 500 });
 
       await expect(service.sendMail(mail, account, false)).rejects.toThrow();
-    });
-  });
-
-  describe('API Key Selection - Registry Rules', () => {
-    it('should use default API key when no account-specific routing matches', async () => {
-      const mail: any = {
-        personalizations: [{ to: [{ email: 'test@example.com' }] }],
-        from: { email: 'sender@test.com' },
-        subject: 'Test',
-        content: [{ type: 'text/html', value: '<p>Test</p>' }],
-        ipPoolName: 'm02_brmailsrv_com',
-        categories: [],
-      };
-      const account = { id: 999, name: 'Test', accountConfigs: null };
-
-      await service.sendMail(mail, account, false);
-
-      expect(sendgrid.setApiKey).toHaveBeenCalledWith('SG.DefaultTestKey');
-    });
-
-    // it('should handle account 64 (wheresmycard) with random API key selection', async () => {
-    //   const mail: any = {
-    //     personalizations: [{ to: [{ email: 'test@example.com' }] }],
-    //     from: { email: 'sender@test.com' },
-    //     subject: 'Test',
-    //     content: [{ type: 'text/html', value: '<p>Test</p>' }],
-    //     categories: ['type_email'],
-    //   };
-    //   const account = { id: 64, name: 'WheresMyCard', accountConfigs: [] };
-
-    //   jest.spyOn(Math, 'random').mockReturnValue(0.2);
-
-    //   await service.sendMail(mail, account, false);
-
-    //   expect(sendgrid.setApiKey).toHaveBeenCalledWith(expect.stringContaining('SG.259o8OZIRoCWnMGiXxfvLA'));
-    //   (Math.random as jest.Mock).mockRestore();
-    // });
-
-    it('should handle account 149 (Unum) with random API key selection', async () => {
-      const mail: any = {
-        personalizations: [{ to: [{ email: 'test@example.com' }] }],
-        from: { email: 'sender@test.com' },
-        subject: 'Test',
-        content: [{ type: 'text/html', value: '<p>Test</p>' }],
-        categories: ['type_email'],
-      };
-      const account = { id: 149, name: 'Unum', accountConfigs: [] };
-
-      jest.spyOn(Math, 'random').mockReturnValue(0.1);
-
-      await service.sendMail(mail, account, false);
-
-      expect(keyRegistry.getKey).toHaveBeenCalledWith('unum-in-automation');
-      expect(sendgrid.setApiKey).toHaveBeenCalledWith('SG.mock-key-for-unum-in-automation');
-      (Math.random as jest.Mock).mockRestore();
-    });
-
-    it.each([
-      { accountId: 1, categories: ['type_campaign'], expectedKeyName: 'plusdin-campaigns' },
-      { accountId: 1, categories: ['type_transactional'], expectedKeyName: 'plusdin-transactional' },
-      { accountId: 1, categories: ['type_email', 'campaign_e1_123'], expectedKeyName: 'plusdin-transactional' },
-      { accountId: 1, categories: ['type_email'], expectedKeyName: 'plusdin-automations' },
-    ])('should handle account 1 (Plusdin): categories=$categories', async ({ accountId, categories, expectedKeyName }) => {
-      const mail: any = {
-        personalizations: [{ to: [{ email: 'test@example.com' }] }],
-        from: { email: 'sender@test.com' },
-        subject: 'Test',
-        content: [{ type: 'text/html', value: '<p><a href="[unsubscribe_link]">Unsubscribe</a></p>' }],
-        categories,
-      };
-      const account = { id: accountId, name: 'Plusdin', accountConfigs: [] };
-
-      await service.sendMail(mail, account, false);
-
-      expect(keyRegistry.getKey).toHaveBeenCalledWith(expectedKeyName);
-      expect(sendgrid.setApiKey).toHaveBeenCalledWith(`SG.mock-key-for-${expectedKeyName}`);
-      expect(mail.content[0].value).toContain('<p><a href=\"[unsubscribe_link]\">Unsubscribe</a></p>');
-    });
-
-    it.each([
-      { accountId: 235, categories: ['type_campaign'], expectedKeyName: 'plusdin-novo-campaigns' },
-      { accountId: 235, categories: ['type_transactional'], expectedKeyName: 'plusdin-novo-transactional' },
-      { accountId: 235, categories: ['type_email', 'automation_e1_456'], expectedKeyName: 'plusdin-novo-transactional' },
-      { accountId: 235, categories: ['type_email'], expectedKeyName: 'plusdin-novo-automations' },
-    ])('should handle account 235 (Plusdin Novo): categories=$categories', async ({ accountId, categories, expectedKeyName }) => {
-      const mail: any = {
-        personalizations: [{ to: [{ email: 'test@example.com' }] }],
-        from: { email: 'sender@test.com' },
-        subject: 'Test',
-        content: [{ type: 'text/html', value: '<p>Test</p>' }],
-        categories,
-      };
-      const account = { id: accountId, name: 'Plusdin Novo', accountConfigs: [] };
-
-      await service.sendMail(mail, account, false);
-
-      expect(keyRegistry.getKey).toHaveBeenCalledWith(expectedKeyName);
-      expect(sendgrid.setApiKey).toHaveBeenCalledWith(`SG.mock-key-for-${expectedKeyName}`);
-    });
-
-    it.each([
-      { accountId: 5, categories: ['type_campaign'], expectedKeyName: 'easy-campaigns' },
-      { accountId: 5, categories: ['automation-id_2802'], expectedKeyName: 'easy-automations-1' },
-      { accountId: 5, categories: ['automation-id_2803'], expectedKeyName: 'easy-automations-2' },
-      { accountId: 5, categories: ['automation-id_2804'], expectedKeyName: 'easy-automations-3' },
-      { accountId: 5, categories: ['type_transactional'], expectedKeyName: 'easy-transactional' },
-      { accountId: 5, categories: ['type_email', 'campaign_e1_789'], expectedKeyName: 'easy-transactional' },
-      { accountId: 5, categories: ['type_email'], expectedKeyName: 'easy-automations' },
-    ])('should handle account 5 (Easy): categories=$categories', async ({ accountId, categories, expectedKeyName }) => {
-      const mail: any = {
-        personalizations: [{ to: [{ email: 'test@example.com' }] }],
-        from: { email: 'sender@test.com' },
-        subject: 'Test',
-        content: [{ type: 'text/html', value: '<p><a href="[unsubscribe_link]">Unsubscribe</a></p>' }],
-        categories,
-      };
-      const account = { id: accountId, name: 'Easy', accountConfigs: [] };
-
-      await service.sendMail(mail, account, false);
-
-      expect(keyRegistry.getKey).toHaveBeenCalledWith(expectedKeyName);
-      expect(sendgrid.setApiKey).toHaveBeenCalledWith(`SG.mock-key-for-${expectedKeyName}`);
-    });
-
-    it.each([
-      { accountId: 16, categories: ['type_campaign'], expectedKeyName: 'vq-campaigns' },
-      { accountId: 16, categories: ['type_transactional'], expectedKeyName: 'vq-transactional' },
-      { accountId: 16, categories: ['type_email', 'automation_e1_999'], expectedKeyName: 'vq-transactional' },
-      { accountId: 16, categories: ['type_email'], expectedKeyName: 'vq-automations' },
-    ])('should handle account 16 (VouQuitar): categories=$categories', async ({ accountId, categories, expectedKeyName }) => {
-      const mail: any = {
-        personalizations: [{ to: [{ email: 'test@example.com' }] }],
-        from: { email: 'sender@test.com' },
-        subject: 'Test',
-        content: [{ type: 'text/html', value: '<p><a href="[unsubscribe_link]">Unsubscribe</a></p>' }],
-        categories,
-      };
-      const account = { id: accountId, name: 'VouQuitar', accountConfigs: [] };
-
-      await service.sendMail(mail, account, false);
-
-      expect(keyRegistry.getKey).toHaveBeenCalledWith(expectedKeyName);
-      expect(sendgrid.setApiKey).toHaveBeenCalledWith(`SG.mock-key-for-${expectedKeyName}`);
-      expect(mail.content[0].value).toContain('<p><a href=\"[unsubscribe_link]\">Unsubscribe</a></p>');
-    });
-
-    it.each([{ messageId: 'message_210909' }, { messageId: 'message_210945' }, { messageId: 'message_218981' }])(
-      'should handle account 10 (Peca o seu) with category $messageId',
-      async ({ messageId }) => {
-        const mail: any = {
-          personalizations: [{ to: [{ email: 'test@example.com' }] }],
-          from: { email: 'sender@test.com' },
-          subject: 'Test',
-          content: [{ type: 'text/html', value: '<p>Test</p>' }],
-          categories: [messageId],
-        };
-        const account = { id: 10, name: 'Peca o seu', accountConfigs: [] };
-
-        await service.sendMail(mail, account, false);
-
-        expect(keyRegistry.getKey).toHaveBeenCalledWith('peca-o-seu');
-        expect(sendgrid.setApiKey).toHaveBeenCalledWith('SG.mock-key-for-peca-o-seu');
-      },
-    );
-
-    it('should handle account 2 (cardfacil) with type_email', async () => {
-      const mail: any = {
-        personalizations: [{ to: [{ email: 'test@example.com' }] }],
-        from: { email: 'sender@test.com' },
-        subject: 'Test',
-        content: [{ type: 'text/html', value: '<p>Test</p>' }],
-        categories: ['type_email'],
-      };
-      const account = { id: 2, name: 'cardfacil', accountConfigs: [] };
-
-      await service.sendMail(mail, account, false);
-
-      expect(keyRegistry.getKey).toHaveBeenCalledWith('cardfacil');
-      expect(sendgrid.setApiKey).toHaveBeenCalledWith('SG.mock-key-for-cardfacil');
-    });
-
-    it('should handle account 22 (mejoresopciones) with type_email and random < 0.5', async () => {
-      const mail: any = {
-        personalizations: [{ to: [{ email: 'test@example.com' }] }],
-        from: { email: 'sender@test.com' },
-        subject: 'Test',
-        content: [{ type: 'text/html', value: '<p>Test</p>' }],
-        categories: ['type_email'],
-      };
-      const account = { id: 22, name: 'mejoresopciones', accountConfigs: [] };
-
-      jest.spyOn(Math, 'random').mockReturnValue(0.3);
-
-      await service.sendMail(mail, account, false);
-
-      expect(keyRegistry.getKey).toHaveBeenCalledWith('mejoresopciones-emp');
-      expect(sendgrid.setApiKey).toHaveBeenCalledWith('SG.mock-key-for-mejoresopciones-emp');
-      (Math.random as jest.Mock).mockRestore();
-    });
-
-    it('should use default API key for account 93 (genyotech) with no specific routing', async () => {
-      const mail: any = {
-        personalizations: [{ to: [{ email: 'test@example.com' }] }],
-        from: { email: 'sender@test.com' },
-        subject: 'Test',
-        content: [{ type: 'text/html', value: '<p>Test</p>' }],
-        categories: ['type_email'],
-      };
-      const account = { id: 93, name: 'genyotech', accountConfigs: null };
-
-      await service.sendMail(mail, account, false);
-
-      expect(sendgrid.setApiKey).toHaveBeenCalledWith('SG.DefaultTestKey');
-    });
-
-    it('should handle account 65 (gotallcards) with pool_gotallcards_com', async () => {
-      const mail: any = {
-        personalizations: [{ to: [{ email: 'test@example.com' }] }],
-        from: { email: 'sender@test.com' },
-        subject: 'Test',
-        content: [{ type: 'text/html', value: '<p>Test</p>' }],
-        categories: ['pool_gotallcards_com'],
-      };
-      const account = { id: 65, name: 'gotallcards', accountConfigs: [] };
-
-      await service.sendMail(mail, account, false);
-
-      expect(keyRegistry.getKey).toHaveBeenCalledWith('gotallcards-warmup');
-      expect(sendgrid.setApiKey).toHaveBeenCalledWith('SG.mock-key-for-gotallcards-warmup');
-    });
-
-    it.each([
-      { categories: ['automation-id_2892'], expectedKeyName: 'help-automations-1' },
-      { categories: ['automation-id_2893'], expectedKeyName: 'help-automations-2' },
-    ])('should handle account 6 (help) with categories=$categories', async ({ categories, expectedKeyName }) => {
-      const mail: any = {
-        personalizations: [{ to: [{ email: 'test@example.com' }] }],
-        from: { email: 'sender@test.com' },
-        subject: 'Test',
-        content: [{ type: 'text/html', value: '<p>Test</p>' }],
-        categories,
-      };
-      const account = { id: 6, name: 'help', accountConfigs: [] };
-
-      await service.sendMail(mail, account, false);
-
-      expect(keyRegistry.getKey).toHaveBeenCalledWith(expectedKeyName);
-      expect(sendgrid.setApiKey).toHaveBeenCalledWith(`SG.mock-key-for-${expectedKeyName}`);
-    });
-
-    it('should handle account 150 with automation-id_2997', async () => {
-      const mail: any = {
-        personalizations: [{ to: [{ email: 'test@example.com' }] }],
-        from: { email: 'sender@test.com' },
-        subject: 'Test',
-        content: [{ type: 'text/html', value: '<p>Test</p>' }],
-        categories: ['automation-id_2997'],
-      };
-      const account = { id: 150, name: 'unum-us', accountConfigs: [] };
-
-      await service.sendMail(mail, account, false);
-
-      expect(keyRegistry.getKey).toHaveBeenCalledWith('unum-us-automation-2');
-      expect(sendgrid.setApiKey).toHaveBeenCalledWith('SG.mock-key-for-unum-us-automation-2');
-    });
-
-    it('should handle account 152 with automation-id_3028', async () => {
-      const mail: any = {
-        personalizations: [{ to: [{ email: 'test@example.com' }] }],
-        from: { email: 'sender@test.com' },
-        subject: 'Test',
-        content: [{ type: 'text/html', value: '<p>Test</p>' }],
-        categories: ['automation-id_3028'],
-      };
-      const account = { id: 152, name: 'unum-ca', accountConfigs: [] };
-
-      await service.sendMail(mail, account, false);
-
-      expect(keyRegistry.getKey).toHaveBeenCalledWith('unum-ca-automation');
-      expect(sendgrid.setApiKey).toHaveBeenCalledWith('SG.mock-key-for-unum-ca-automation');
-    });
-
-    it('should use default API key when no campaign-specific routing matches', async () => {
-      const mail: any = {
-        personalizations: [{ to: [{ email: 'test@example.com' }] }],
-        from: { email: 'sender@test.com' },
-        subject: 'Test',
-        content: [{ type: 'text/html', value: '<p>Test</p>' }],
-        categories: ['type_campaign', 'campaign_252398'],
-      };
-      const account = { id: 999, name: 'Test', accountConfigs: null };
-
-      await service.sendMail(mail, account, false);
-
-      expect(sendgrid.setApiKey).toHaveBeenCalledWith('SG.DefaultTestKey');
     });
   });
 
