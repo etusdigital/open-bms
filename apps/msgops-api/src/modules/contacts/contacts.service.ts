@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PostgresErrorCode } from 'src/shared.interfaces';
 import { ContactEntity } from './../../entities/contact.entity';
 import { Repository, In, UpdateQueryBuilder, SelectQueryBuilder } from 'typeorm';
@@ -648,6 +648,23 @@ export class ContactsService {
       }
       if (e instanceof HttpException) throw e;
       this.logger.error('Failed to update contact', e?.stack || e);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // Hard delete: is_active already means "deactivated" (different semantic);
+  // FKs in contacts_devices/_tags/_automations/_custom_fields are CASCADE.
+  async deleteOne(id: number): Promise<void> {
+    const accountId = this.cls.get('accountId');
+    const contact = await this.contactRepository.findOne({ where: { id, accountId } });
+    if (!contact) {
+      throw new NotFoundException('Contact not found');
+    }
+
+    try {
+      await this.contactRepository.delete({ id, accountId });
+    } catch (e) {
+      this.logger.error('Failed to delete contact', e?.stack || e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

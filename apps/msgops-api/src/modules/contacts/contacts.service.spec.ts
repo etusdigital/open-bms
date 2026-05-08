@@ -1,6 +1,46 @@
+import { NotFoundException } from '@nestjs/common';
 import { ContactsService } from './contacts.service';
 
 describe('ContactsService', () => {
+  describe('deleteOne', () => {
+    const accountId = 42;
+
+    function buildService(repoOverrides: Partial<{ findOne: jest.Mock; delete: jest.Mock }> = {}) {
+      const contactRepository = {
+        findOne: jest.fn(),
+        delete: jest.fn(),
+        ...repoOverrides,
+      };
+      const cls = { get: jest.fn().mockReturnValue(accountId) };
+      const service = Object.create(ContactsService.prototype) as ContactsService;
+      (service as any).contactRepository = contactRepository;
+      (service as any).cls = cls;
+      (service as any).logger = { error: jest.fn() };
+      return { service, contactRepository, cls };
+    }
+
+    it('hard-deletes when contact belongs to the account', async () => {
+      const { service, contactRepository } = buildService({
+        findOne: jest.fn().mockResolvedValue({ id: 7, accountId }),
+        delete: jest.fn().mockResolvedValue({ affected: 1 }),
+      });
+
+      await expect(service.deleteOne(7)).resolves.toBeUndefined();
+
+      expect(contactRepository.findOne).toHaveBeenCalledWith({ where: { id: 7, accountId } });
+      expect(contactRepository.delete).toHaveBeenCalledWith({ id: 7, accountId });
+    });
+
+    it('throws NotFoundException when contact does not exist or belongs to another account', async () => {
+      const { service, contactRepository } = buildService({
+        findOne: jest.fn().mockResolvedValue(null),
+      });
+
+      await expect(service.deleteOne(7)).rejects.toBeInstanceOf(NotFoundException);
+      expect(contactRepository.delete).not.toHaveBeenCalled();
+    });
+  });
+
   describe('isUuid', () => {
     // Access private method for testing
     const isUuid = (value: string) => (ContactsService.prototype as any).isUuid.call(null, value);
