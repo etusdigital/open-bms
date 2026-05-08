@@ -652,12 +652,10 @@ export class ContactsService {
     }
   }
 
+  // Hard delete: is_active already means "deactivated" (different semantic);
+  // FKs in contacts_devices/_tags/_automations/_custom_fields are CASCADE.
   async deleteOne(id: number): Promise<void> {
     const accountId = this.cls.get('accountId');
-    if (!accountId) {
-      throw new BadRequestException('Account context is required. Send the Account-Id header.');
-    }
-
     const contact = await this.contactRepository.findOne({ where: { id, accountId } });
     if (!contact) {
       throw new NotFoundException('Contact not found');
