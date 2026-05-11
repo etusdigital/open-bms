@@ -31,10 +31,14 @@ describe('IntegrationsPage', () => {
 
   it('shows all tabs', async () => {
     await renderWithRouter(<IntegrationsPage />);
-    expect(screen.getByRole('button', { name: 'SendGrid (plataforma)' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'S3' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Firebase Cloud Messaging' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'GeoIP' })).toBeInTheDocument();
+    const tabs = [
+      screen.getByRole('button', { name: 'SendGrid (plataforma)' }),
+      screen.getByRole('button', { name: 'S3' }),
+      screen.getByRole('button', { name: 'Firebase Cloud Messaging' }),
+      screen.getByRole('button', { name: 'GeoIP' }),
+    ];
+    tabs.forEach((tab) => expect(tab).toBeInTheDocument());
+    expect(tabs).toHaveLength(4);
   });
 
   it('starts with SendGrid platform tab active', async () => {

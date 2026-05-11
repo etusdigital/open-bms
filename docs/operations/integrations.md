@@ -56,6 +56,10 @@ Os workers declaram `depends_on: msgops-api: { condition: service_healthy }` —
 - Rate-limit nos endpoints `test-connection`: 5 requests/minuto/IP por provider.
 - Valores em `system_config.value` (JSONB) ficam **plaintext**. Acesso ao DB já é restrito por roles do Postgres. Envelope encryption (KMS) está fora do escopo de v0.1.
 
+## Comportamento degradado por design (OSS)
+
+- **`email_validations` table:** não existe no OSS (migration removida junto com o Emailable). O `event-process` tenta escrever nessa tabela em eventos de bounce/unsubscribe, mas detecta a ausência (`pg error 42P01`) e pula silenciosamente — não crasha. O tracking via `email_validations` simplesmente não ocorre, por design.
+
 ## Riscos conhecidos
 
 - Race condition de boot é mitigada pelo `depends_on: service_healthy`. Em ambientes não-compose (k8s), garanta a mesma ordem com initContainers/probes.
