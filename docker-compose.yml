@@ -62,6 +62,20 @@ x-backend-env: &backend-env
   # campaign-packer batches contacts in pages of this size; parseInt(undefined)
   # → NaN ends up in the SQL math, so a default is required.
   LIMIT_CONTACT_BATCH: ${LIMIT_CONTACT_BATCH:-1000}
+  # Scheduler endpoints — campaign-packer and tag-process internal URLs.
+  # Without these, msgops-api scheduler jobs throw "Failed to parse URL" and
+  # die silently in the dead-letter queue, leaving campaigns stuck in Sending.
+  CAMPAIGN_TRIGGER_ENDPOINT: ${CAMPAIGN_TRIGGER_ENDPOINT:-http://campaign-packer:3000/create-contacts-send}
+  CAMPAIGN_TEST_AB_ENDPOINT: ${CAMPAIGN_TEST_AB_ENDPOINT:-http://campaign-packer:3000/create-test}
+  CAMPAIGN_RESULT_TEST_AB_ENDPOINT: ${CAMPAIGN_RESULT_TEST_AB_ENDPOINT:-http://campaign-packer:3000/result-test}
+  GOOGLE_TASK_QUEUE: ${GOOGLE_TASK_QUEUE:-bms-scheduler-campaign-trigger}
+  GOOGLE_TASK_QUEUE_TEST_AB: ${GOOGLE_TASK_QUEUE_TEST_AB:-bms-scheduler-campaign-testab}
+  GOOGLE_TASK_SEGMENT: ${GOOGLE_TASK_SEGMENT:-bms-scheduler-segment}
+  GOOGLE_TASK_BMS_USAGE: ${GOOGLE_TASK_BMS_USAGE:-bms-scheduler-bms-usage}
+  GOOGLE_TASK_WHATSAPP_MESSAGE: ${GOOGLE_TASK_WHATSAPP_MESSAGE:-bms-scheduler-whatsapp-message}
+  TAG_PROCESS_ENDPOINT: ${TAG_PROCESS_ENDPOINT:-http://tag-process:3000/process-segment}
+  # campaign-packer calls tag-process directly (separate from the scheduler path above).
+  TAG_PROCESS_API: ${TAG_PROCESS_API:-http://tag-process:3000/process-segment/}
 
 x-infra-deps: &infra-deps
   postgres:

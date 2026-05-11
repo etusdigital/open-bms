@@ -32,15 +32,15 @@ describe('SchedulerService', () => {
     }).compile();
 
     service = module.get(SchedulerService);
-    process.env.GOOGLE_TASK_QUEUE_TEST_AB = 'msgops-campaign-testab';
-    process.env.GOOGLE_TASK_SEGMENT = 'segment-process';
-    process.env.GOOGLE_TASK_BMS_USAGE = 'msgops-bms-usage';
-    process.env.GOOGLE_TASK_WHATSAPP_MESSAGE = 'msgops-whatsapp-message';
+    process.env.GOOGLE_TASK_QUEUE_TEST_AB = 'bms-scheduler-campaign-testab';
+    process.env.GOOGLE_TASK_SEGMENT = 'bms-scheduler-segment';
+    process.env.GOOGLE_TASK_BMS_USAGE = 'bms-scheduler-bms-usage';
+    process.env.GOOGLE_TASK_WHATSAPP_MESSAGE = 'bms-scheduler-whatsapp-message';
   });
 
   describe('create', () => {
     it('routes to campaign-trigger queue by default', async () => {
-      await service.create(123, new Date(Date.now() + 60_000), 'http://hub/campaign', 'message-trigger-timer');
+      await service.create(123, new Date(Date.now() + 60_000), 'http://hub/campaign', 'bms-scheduler-campaign-trigger');
       expect(triggerQueue.add).toHaveBeenCalled();
       expect(testabQueue.add).not.toHaveBeenCalled();
     });
@@ -62,35 +62,35 @@ describe('SchedulerService', () => {
     });
 
     it('replaces empty-string id with anon-* segment so jobName is unique', async () => {
-      await service.create('', new Date(), 'http://hub/x', 'msgops-bms-usage');
+      await service.create('', new Date(), 'http://hub/x', 'bms-scheduler-bms-usage');
       const [jobName] = usageQueue.add.mock.calls[0];
-      expect(jobName).toMatch(/^msgops-bms-usage:anon-[0-9a-f]{8}:[0-9a-f]{12}$/);
+      expect(jobName).toMatch(/^bms-scheduler-bms-usage:anon-[0-9a-f]{8}:[0-9a-f]{12}$/);
     });
 
     it('clamps past scheduleTo to delay 0', async () => {
       const past = new Date(Date.now() - 10_000);
-      await service.create(1, past, 'http://hub/x', 'message-trigger-timer');
+      await service.create(1, past, 'http://hub/x', 'bms-scheduler-campaign-trigger');
       const [, , opts] = triggerQueue.add.mock.calls[0];
       expect(opts.delay).toBe(0);
     });
 
     it('returns the job name in the legacy [{ name }] shape', async () => {
-      const result = await service.create(42, new Date(Date.now() + 1000), 'http://hub/x', 'message-trigger-timer');
+      const result = await service.create(42, new Date(Date.now() + 1000), 'http://hub/x', 'bms-scheduler-campaign-trigger');
       expect(result).toHaveLength(1);
-      expect(result[0].name).toMatch(/^message-trigger-timer:42:[0-9a-f]{12}$/);
+      expect(result[0].name).toMatch(/^bms-scheduler-campaign-trigger:42:[0-9a-f]{12}$/);
     });
   });
 
   describe('delete', () => {
     it('returns false silently when the job is not found in any queue', async () => {
-      const result = await service.delete('missing', 'message-trigger-timer');
+      const result = await service.delete('missing', 'bms-scheduler-campaign-trigger');
       expect(result).toBe(false);
     });
 
     it('removes the job and returns true when found in the resolved queue', async () => {
       const remove = jest.fn().mockResolvedValue(undefined);
       triggerQueue.getJob.mockResolvedValue({ remove });
-      const result = await service.delete('foo', 'message-trigger-timer');
+      const result = await service.delete('foo', 'bms-scheduler-campaign-trigger');
       expect(remove).toHaveBeenCalled();
       expect(result).toBe(true);
     });
@@ -99,7 +99,7 @@ describe('SchedulerService', () => {
       const remove = jest.fn().mockResolvedValue(undefined);
       triggerQueue.getJob.mockResolvedValue(null);
       testabQueue.getJob.mockResolvedValue({ remove });
-      const result = await service.delete('foo', 'message-trigger-timer');
+      const result = await service.delete('foo', 'bms-scheduler-campaign-trigger');
       expect(remove).toHaveBeenCalled();
       expect(result).toBe(true);
     });
@@ -107,13 +107,13 @@ describe('SchedulerService', () => {
 
   describe('callRunTask', () => {
     it('throws SchedulerJobNotFoundError when the job is gone (legacy NOT_FOUND contract)', async () => {
-      await expect(service.callRunTask('gone', 'msgops-bms-usage')).rejects.toBeInstanceOf(SchedulerJobNotFoundError);
+      await expect(service.callRunTask('gone', 'bms-scheduler-bms-usage')).rejects.toBeInstanceOf(SchedulerJobNotFoundError);
     });
 
     it('promotes the job and returns true when found', async () => {
       const promote = jest.fn().mockResolvedValue(undefined);
       usageQueue.getJob.mockResolvedValue({ promote });
-      const result = await service.callRunTask('here', 'msgops-bms-usage');
+      const result = await service.callRunTask('here', 'bms-scheduler-bms-usage');
       expect(promote).toHaveBeenCalled();
       expect(result).toBe(true);
     });
