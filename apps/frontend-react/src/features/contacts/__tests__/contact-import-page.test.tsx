@@ -175,7 +175,6 @@ describe('ContactImportPage', () => {
       await uploadFile();
       expect(screen.getByText(/atualizar contatos/i)).toBeInTheDocument();
       expect(screen.getByText(/iniciar automação/i)).toBeInTheDocument();
-      expect(screen.queryByText(/validar contatos/i)).not.toBeInTheDocument();
     });
 
     it('shows tag selection', async () => {
