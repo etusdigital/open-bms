@@ -14,6 +14,7 @@ import { RoleEntity } from '../../entities/role.entity';
 import { ALL_PERMISSION_KEYS, ROLE_CODES, ROLE_PERMISSIONS } from '../authz/authz.constants';
 import { AuthzService } from '../authz/authz.service';
 import { AUTH_PROVIDER_TOKEN, IAuthProvider } from '../auth/providers/auth.provider.interface';
+import { UserRefreshTokenEntity } from '../../entities/user-refresh-token.entity';
 
 const AUTH0_PREFIX = 'auth0|';
 const LOCAL_PREFIX = 'local|';
@@ -486,9 +487,9 @@ export class UsersService {
     // but without a refresh token they expire on their own within minutes.
     await this.userRepository.manager
       .createQueryBuilder()
-      .update('user_refresh_tokens')
-      .set({ revoked_at: () => 'NOW()' })
-      .where('user_id = :id AND revoked_at IS NULL', { id: targetUserId })
+      .update(UserRefreshTokenEntity)
+      .set({ revokedAt: () => 'NOW()' })
+      .where('userId = :id AND revokedAt IS NULL', { id: targetUserId })
       .execute();
     await this.invalidateCacheForUser(targetUserId);
     return { deleted: true };
