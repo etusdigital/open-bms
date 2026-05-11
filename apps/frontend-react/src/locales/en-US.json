@@ -305,7 +305,6 @@
     "importPartiallyMapped": "{{mapped}} of {{total}} columns mapped",
     "importActions": "Actions",
     "importUpdateContacts": "Update existing contacts",
-    "importValidateContacts": "Validate contacts",
     "importStartAutomation": "Start automation",
     "importDisabledLargeFile": "Disabled for files with more than 10,000 contacts",
     "importSending": "Importing...",

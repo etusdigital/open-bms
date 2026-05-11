@@ -22,7 +22,6 @@ export interface ImportColumnMapping {
 }
 
 export interface ImportActions {
-  contactValidate: boolean;
   contactUpdate: boolean;
   startAutomation: boolean;
 }
