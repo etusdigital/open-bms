@@ -14,9 +14,6 @@ vi.mock('../s3-gateway', () => ({
 vi.mock('../fcm-gateway', () => ({
   fcmGateway: { get: vi.fn().mockResolvedValue(null), save: vi.fn(), testConnection: vi.fn() },
 }));
-vi.mock('../emailable-gateway', () => ({
-  emailableGateway: { get: vi.fn().mockResolvedValue(null), save: vi.fn(), testConnection: vi.fn() },
-}));
 vi.mock('../geoip-gateway', () => ({
   geoIpSettingsGateway: { get: vi.fn().mockResolvedValue(null), save: vi.fn() },
 }));
@@ -32,13 +29,13 @@ describe('IntegrationsPage', () => {
     expect(screen.getByText('Integrações')).toBeInTheDocument();
   });
 
-  it('shows all 5 tabs', async () => {
+  it('shows all 4 tabs', async () => {
     await renderWithRouter(<IntegrationsPage />);
     expect(screen.getByRole('button', { name: 'SendGrid (plataforma)' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'S3' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Firebase Cloud Messaging' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Emailable' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'GeoIP' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Emailable' })).not.toBeInTheDocument();
   });
 
   it('starts with SendGrid platform tab active', async () => {

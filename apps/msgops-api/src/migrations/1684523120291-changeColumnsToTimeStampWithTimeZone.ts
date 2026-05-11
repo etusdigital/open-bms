@@ -34,10 +34,6 @@ export class changeColumnsToTimeStampWithTimeZone1684523120291 implements Migrat
     ALTER COLUMN created_at TYPE TIMESTAMP WITH TIME ZONE USING created_at AT TIME ZONE 'UTC',
     ALTER COLUMN updated_at TYPE TIMESTAMP WITH TIME ZONE USING updated_at AT TIME ZONE 'UTC',
     ALTER COLUMN deleted_at TYPE TIMESTAMP WITH TIME ZONE USING deleted_at AT TIME ZONE 'UTC'`);
-
-    await queryRunner.query(`ALTER TABLE email_validations
-    ALTER COLUMN created_at TYPE TIMESTAMP WITH TIME ZONE USING created_at AT TIME ZONE 'UTC',
-    ALTER COLUMN updated_at TYPE TIMESTAMP WITH TIME ZONE USING updated_at AT TIME ZONE 'UTC'`);
   }
 
   public async down(_queryRunner: QueryRunner): Promise<void> {

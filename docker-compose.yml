@@ -454,25 +454,6 @@ services:
       PORT: '3000'
     depends_on: *infra-deps
 
-  email-validation:
-    build:
-      context: .
-      dockerfile: apps/email-validation/Dockerfile
-    container_name: email-validation
-    profiles: [emailable]
-    <<: *restart-policy
-    environment:
-      <<: *backend-env
-      PORT: '3000'
-      # Shared config dir written by msgops-api (emailable.env).
-      BMS_CONFIG_DIR: /data/config
-    volumes:
-      - bms-config:/data/config:ro
-    depends_on:
-      <<: *infra-deps
-      msgops-api:
-        condition: service_healthy
-
   geolocation:
     build:
       context: .

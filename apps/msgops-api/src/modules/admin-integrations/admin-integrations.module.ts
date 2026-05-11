@@ -8,8 +8,6 @@ import { AdminSendgridController } from './sendgrid/admin-sendgrid.controller';
 import { AdminSendgridService } from './sendgrid/admin-sendgrid.service';
 import { AdminFcmController } from './fcm/admin-fcm.controller';
 import { AdminFcmService } from './fcm/admin-fcm.service';
-import { AdminEmailableController } from './emailable/admin-emailable.controller';
-import { AdminEmailableService } from './emailable/admin-emailable.service';
 import { AdminMailerSendController } from './mailersend/admin-mailersend.controller';
 import { AdminMailerSendService } from './mailersend/admin-mailersend.service';
 import { AdminResendController } from './resend/admin-resend.controller';
@@ -23,17 +21,8 @@ import { AdminMandrillService } from './mandrill/admin-mandrill.service';
 // registered at app boot — no need to re-import here.
 @Module({
   imports: [TypeOrmModule.forFeature([SystemConfigEntity])],
-  controllers: [
-    AdminS3Controller,
-    AdminSendgridController,
-    AdminFcmController,
-    AdminEmailableController,
-    AdminMailerSendController,
-    AdminResendController,
-    AdminSesController,
-    AdminMandrillController,
-  ],
-  providers: [AdminS3Service, AdminSendgridService, AdminFcmService, AdminEmailableService, AdminMailerSendService, AdminResendService, AdminSesService, AdminMandrillService],
-  exports: [AdminS3Service, AdminSendgridService, AdminFcmService, AdminEmailableService, AdminMailerSendService, AdminResendService, AdminSesService, AdminMandrillService],
+  controllers: [AdminS3Controller, AdminSendgridController, AdminFcmController, AdminMailerSendController, AdminResendController, AdminSesController, AdminMandrillController],
+  providers: [AdminS3Service, AdminSendgridService, AdminFcmService, AdminMailerSendService, AdminResendService, AdminSesService, AdminMandrillService],
+  exports: [AdminS3Service, AdminSendgridService, AdminFcmService, AdminMailerSendService, AdminResendService, AdminSesService, AdminMandrillService],
 })
 export class AdminIntegrationsModule {}

@@ -2,13 +2,12 @@
 
 A partir de **EVO-1034**, as credenciais sistema-wide das integrações abaixo deixam de ser configuradas via `.env` e passam a ser gerenciadas exclusivamente pela UI super_admin em `/super-admin/integrations`:
 
-| Provider                 | Tab UI             | Key em `system_config`     | Arquivo gerado               | Consumidores                 |
-| ------------------------ | ------------------ | -------------------------- | ---------------------------- | ---------------------------- |
-| SendGrid (system)        | SendGrid (sistema) | `sendgrid_system_settings` | `/data/config/sendgrid.env`  | `msgops-api`, `send-email`   |
-| S3 / Cloud Storage       | S3                 | `s3_settings`              | `/data/config/s3.env`        | `msgops-api`, `send-email`   |
-| Firebase Cloud Messaging | FCM                | `fcm_settings`             | `/data/config/fcm.env`       | `send-push`                  |
-| Emailable                | Emailable          | `emailable_settings`       | `/data/config/emailable.env` | `email-validation`           |
-| GeoIP                    | GeoIP              | `geoip_settings`           | `/data/config/geoip.env`     | `geolocation` (gRPC sidecar) |
+| Provider                 | Tab UI             | Key em `system_config`     | Arquivo gerado              | Consumidores                 |
+| ------------------------ | ------------------ | -------------------------- | --------------------------- | ---------------------------- |
+| SendGrid (system)        | SendGrid (sistema) | `sendgrid_system_settings` | `/data/config/sendgrid.env` | `msgops-api`, `send-email`   |
+| S3 / Cloud Storage       | S3                 | `s3_settings`              | `/data/config/s3.env`       | `msgops-api`, `send-email`   |
+| Firebase Cloud Messaging | FCM                | `fcm_settings`             | `/data/config/fcm.env`      | `send-push`                  |
+| GeoIP                    | GeoIP              | `geoip_settings`           | `/data/config/geoip.env`    | `geolocation` (gRPC sidecar) |
 
 > **SendGrid account-scoped** (chave por conta) continua em `/settings → SendGrid` — não muda nesta entrega.
 > **GeoIP** continua usando o fluxo gRPC + cron de download; apenas a UI foi movida para a nova seção.
@@ -25,14 +24,14 @@ A partir de **EVO-1034**, as credenciais sistema-wide das integrações abaixo d
 
 - Definido em `docker-compose.yml`.
 - `bms-config-init` (alpine, root) faz `chown 1001:1001 /data/config` antes de qualquer serviço com permissão de escrita subir.
-- Mount: `rw` no `msgops-api`, `ro` em `geolocation`, `geolocation-refresh`, `send-email`, `send-push`, `email-validation`.
+- Mount: `rw` no `msgops-api`, `ro` em `geolocation`, `geolocation-refresh`, `send-email`, `send-push`.
 - Variável de ambiente em todos esses containers: `BMS_CONFIG_DIR=/data/config`.
 
 ## Sequência de boot
 
-`bms-config-init` → `msgops-api` (até `service_healthy`) → workers (`send-email`, `send-push`, `email-validation`, `geolocation`).
+`bms-config-init` → `msgops-api` (até `service_healthy`) → workers (`send-email`, `send-push`, `geolocation`).
 
-Os 4 workers declaram `depends_on: msgops-api: { condition: service_healthy }` — isso garante que `onModuleInit` rehydrate já rodou antes do boot dos workers.
+Os workers declaram `depends_on: msgops-api: { condition: service_healthy }` — isso garante que `onModuleInit` rehydrate já rodou antes do boot dos workers.
 
 ## Procedimento de migração (instâncias existentes pré-EVO-1034)
 
@@ -43,7 +42,6 @@ Os 4 workers declaram `depends_on: msgops-api: { condition: service_healthy }` �
    - SendGrid → `docker compose restart send-email msgops-api`
    - S3 → `docker compose restart send-email msgops-api`
    - FCM → `docker compose restart send-push`
-   - Emailable → `docker compose restart email-validation`
 5. Remova as variáveis legadas dos `.env` locais (`apps/<worker>/.env`) — elas serão sobrescritas pelo arquivo do volume, mas mantê-las pode confundir operadores.
 
 ## Comportamento sem configuração

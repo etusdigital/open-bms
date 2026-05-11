@@ -215,8 +215,8 @@ describe('AppService', () => {
       });
     });
 
-    // Emailable API call (Step 5)
-    describe('Emailable API call (Step 5)', () => {
+    // Validation provider API call (Step 5)
+    describe('validation provider API call (Step 5)', () => {
       beforeEach(() => {
         msgopsService.findByEmail.mockResolvedValue(null);
       });
@@ -248,7 +248,7 @@ describe('AppService', () => {
         expect(msgopsService.createOrUpdateEmail).toHaveBeenCalledWith(checkResult);
       });
 
-      it('should return the correct result from Emailable response', async () => {
+      it('should return the correct result from provider response', async () => {
         checker.check.mockResolvedValue({
           email: 'user@example.com',
           status: 'deliverable',

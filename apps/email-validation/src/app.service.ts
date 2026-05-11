@@ -58,8 +58,7 @@ export class AppService {
 
     const response = await this.checker.check(email);
 
-    // Skip cache write for: deferred (249) and noop provider (synthetic result, no real validation occurred).
-    // Persisting noop would let stale 'deliverable' entries serve cache hits forever after migrating to emailable.
+    // Skip cache write for deferred (249) and noop provider (synthetic result, no real validation occurred).
     if (response.apiStatus !== 249 && response.reason !== 'noop') {
       await this.msgOpsService.createOrUpdateEmail(response);
     }
