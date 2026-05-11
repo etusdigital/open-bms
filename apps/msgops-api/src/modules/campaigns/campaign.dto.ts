@@ -56,10 +56,9 @@ export class CampaignDto implements Labelable {
   @JoiSchema(Joi.string().allow(null).optional())
   scheduleToCloudTaskId?: string;
 
-  // `steps` and `triggers` belonged to the premium Trigger Campaigns feature
-  // (removed in remove-premium-features). Kept as optional `any` so the
-  // remaining campaigns.service code paths that branch on `isTriggerCampaign`
-  // (and never run in the OSS build) still type-check.
+  // `steps` and `triggers` belonged to the premium Trigger Campaigns feature.
+  // Kept as optional `any` so campaigns.service code paths that branch on
+  // `isTriggerCampaign` (never run in OSS) still type-check.
   @ApiPropertyOptional()
   @JoiSchema(Joi.allow(null).optional())
   steps?: any;
@@ -131,10 +130,6 @@ export class CampaignDto implements Labelable {
   @ApiPropertyOptional()
   @JoiSchema(Joi.number().allow(null).optional())
   sentPercentage?: number;
-
-  @ApiPropertyOptional()
-  @JoiSchema(Joi.boolean().allow(null).optional())
-  isWarmup?: boolean;
 
   @ApiPropertyOptional()
   @JoiSchema(Joi.date().allow(null).optional())
