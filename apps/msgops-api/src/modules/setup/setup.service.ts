@@ -33,7 +33,7 @@ const WIZARD_KEY = 'setup_wizard_step';
 const SMTP_KEY = 'smtp_settings';
 const DOMAIN_KEY = 'domain_settings';
 const GEOIP_KEY = 'geoip_settings';
-// Shared with seedAdmin (bootstrap/seed-admin.ts) so the wizard serializes against the same lock.
+// Advisory lock prevents two concurrent wizard step-1 submissions from both creating a super-admin.
 const ADVISORY_LOCK_KEY = 834729;
 // Rate limit for health-check — more restrictive (each call opens 6 external connections).
 const HEALTH_CHECK_WINDOW_MS = 60_000;
@@ -212,7 +212,7 @@ export class SetupService implements OnModuleInit {
     const email = data.email.trim().toLowerCase();
     const accountName = data.accountName.trim();
 
-    // Serialize with seedAdmin and concurrent wizard submissions — prevents two parallel
+    // Serialize concurrent wizard submissions — prevents two parallel
     // POSTs from both creating a super-admin before either has committed.
     await this.dataSource.transaction(async (em) => {
       await em.query(`SELECT pg_advisory_xact_lock($1)`, [ADVISORY_LOCK_KEY]);

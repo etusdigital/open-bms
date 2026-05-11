@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { INestApplication, Logger } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import cookieParser from 'cookie-parser';
@@ -8,7 +8,7 @@ import { AuthModule } from '../../src/modules/auth/auth.module';
 import { AuthzModule } from '../../src/modules/authz/authz.module';
 import { UsersModule } from '../../src/modules/users/users.module';
 import { RedisService } from '../../src/providers/redis.provider';
-import { seedAdmin } from '../../src/bootstrap/seed-admin';
+import { createTestAdmin } from '../helpers/create-test-admin';
 
 /**
  * AC23 — logout must invalidate the AuthzService PrincipalContext cache
@@ -24,9 +24,6 @@ describe('Auth cache invalidation on logout e2e', () => {
     process.env.AUTH_PROVIDER = 'local';
     process.env.JWT_SECRET = process.env.JWT_SECRET || 'e2e-test-secret-at-least-32-chars-long-!!';
     process.env.JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'bms-msgops-api';
-    process.env.BOOTSTRAP_ADMIN_EMAIL = TEST_EMAIL;
-    process.env.BOOTSTRAP_ADMIN_PASSWORD = TEST_PASSWORD;
-
     const moduleRef = await Test.createTestingModule({
       imports: [TypeOrmModule.forRoot(), AuthzModule, UsersModule, AuthModule],
     }).compile();
@@ -35,7 +32,7 @@ describe('Auth cache invalidation on logout e2e', () => {
     app.use(cookieParser());
     await app.init();
 
-    await seedAdmin(app.get(DataSource), { get: (k: string, dv?: string) => process.env[k] ?? dv } as any, new Logger('SeedAdmin'));
+    await createTestAdmin(app.get(DataSource), TEST_EMAIL, TEST_PASSWORD);
     redis = app.get(RedisService);
   });
 

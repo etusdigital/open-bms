@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { INestApplication, Logger } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import cookieParser from 'cookie-parser';
@@ -7,7 +7,7 @@ import request from 'supertest';
 import { AuthModule } from '../../src/modules/auth/auth.module';
 import { AuthzModule } from '../../src/modules/authz/authz.module';
 import { UsersModule } from '../../src/modules/users/users.module';
-import { seedAdmin } from '../../src/bootstrap/seed-admin';
+import { createTestAdmin } from '../helpers/create-test-admin';
 
 /**
  * End-to-end smoke for the LocalAuthProvider auth flow.
@@ -32,9 +32,6 @@ describe('Auth (local provider) e2e', () => {
     process.env.JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'bms-msgops-api';
     process.env.JWT_ACCESS_TTL = process.env.JWT_ACCESS_TTL || '3600';
     process.env.JWT_REFRESH_TTL = process.env.JWT_REFRESH_TTL || '2592000';
-    process.env.BOOTSTRAP_ADMIN_EMAIL = TEST_EMAIL;
-    process.env.BOOTSTRAP_ADMIN_PASSWORD = TEST_PASSWORD;
-
     const moduleRef = await Test.createTestingModule({
       imports: [TypeOrmModule.forRoot(), AuthzModule, UsersModule, AuthModule],
     }).compile();
@@ -43,9 +40,7 @@ describe('Auth (local provider) e2e', () => {
     app.use(cookieParser());
     await app.init();
 
-    const ds = app.get(DataSource);
-    const envConfig = { get: (key: string, dv?: string) => process.env[key] ?? dv } as any;
-    await seedAdmin(ds, envConfig, new Logger('SeedAdmin'));
+    await createTestAdmin(app.get(DataSource), TEST_EMAIL, TEST_PASSWORD);
   });
 
   afterAll(async () => {

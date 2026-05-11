@@ -2,9 +2,7 @@
 import './env-loader';
 
 import * as Sentry from '@sentry/node';
-import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
@@ -12,8 +10,6 @@ import bodyParser from 'body-parser';
 import cors from 'cors';
 import { createCorsOptions } from './cors.config';
 import { JoiPipe } from 'nestjs-joi';
-import { seedAdmin } from './bootstrap/seed-admin';
-
 // Sentinel committed in docker-compose.yml so `git clone && docker compose up`
 // boots in dev. Refuse to start in production with these values — anyone who
 // pulled the OSS repo would otherwise share the same forge-friendly secret.
@@ -78,11 +74,6 @@ async function bootstrap() {
   app.use(cors(createCorsOptions()));
 
   app.useGlobalPipes(new JoiPipe());
-
-  if ((process.env.AUTH_PROVIDER || 'local').toLowerCase() === 'local') {
-    const envConfig = { get: (key: string, defaultValue?: string) => process.env[key] ?? defaultValue } as any;
-    await seedAdmin(app.get(DataSource), envConfig, new Logger('SeedAdmin'));
-  }
 
   await app.listen(process.env.SERVER_PORT);
 }
