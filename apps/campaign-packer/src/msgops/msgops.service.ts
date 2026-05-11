@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Campaign, CampaignMessageType, CampaignType } from 'src/interfaces';
-import { Repository, In, MoreThan, EntityManager } from 'typeorm';
+import { Campaign, CampaignMessageType } from 'src/interfaces';
+import { Repository, MoreThan, EntityManager } from 'typeorm';
 import { AccountConfigEntity } from './entities/account-config.entity';
 import { AccountEntity } from './entities/account.entity';
 import { MessageEntity } from './entities/message.entity';
@@ -10,7 +10,6 @@ import { CampaignMessageEntity } from './entities/campaign-message.entity';
 import { CampaignEntity } from './entities/campaign.entity';
 import { ContactEntity } from './entities/contact.entity';
 import { CustomFieldsEntity } from './entities/custom-fields.entity';
-import { WarmupEntity } from './entities/warmup.entity';
 import { TagProcessProvider } from 'src/providers/tag-process.provider';
 import * as dayjs from 'dayjs';
 import * as utc from 'dayjs/plugin/utc';
@@ -32,8 +31,6 @@ export class MsgopsService {
     private readonly campaignRepository: Repository<CampaignEntity>,
     @InjectRepository(CampaignContactEntity)
     private readonly campaignContactRepository: Repository<CampaignContactEntity>,
-    @InjectRepository(WarmupEntity)
-    private readonly warmupRepository: Repository<WarmupEntity>,
     @InjectRepository(AccountEntity)
     private readonly accountRepository: Repository<AccountEntity>,
     @InjectRepository(CustomFieldsEntity)
@@ -151,13 +148,7 @@ export class MsgopsService {
       const segmentsPromisses = tagsJson.map((item) => this.tagProcessProvider.processSegment(item.id));
       await Promise.all(segmentsPromisses);
     }
-    let orderByRowNumber = 'ORDER BY c.id ASC';
-    if (campaign.accountId == 159) {
-      orderByRowNumber = 'ORDER BY c.last_open_date ASC NULLS FIRST';
-    }
-    if (campaign.accountId == 19) {
-      orderByRowNumber = 'ORDER BY c.last_click_date ASC NULLS FIRST, c.last_open_date ASC NULLS FIRST';
-    }
+    const orderByRowNumber = 'ORDER BY c.id ASC';
     const query = `INSERT INTO campaigns_contacts (
       SELECT ${campaign.id}, tb1.contact_id,
       row_number() OVER (${orderByRowNumber}) 
@@ -221,112 +212,6 @@ export class MsgopsService {
     return await this.entityManager.query(query);
   }
 
-  async findWarmupByIds(ids: number[], accountId: number) {
-    const warmups = await this.warmupRepository.find({
-      where: {
-        id: In(ids),
-      },
-    });
-    const account = await this.findAccount(accountId);
-    for (const warmup of warmups) {
-      warmup.campaign.account = account;
-    }
-
-    return warmups;
-  }
-
-  async processWarmup(warmup: WarmupEntity, campaign: Campaign) {
-    await this.entityManager.query('BEGIN TRANSACTION;');
-    try {
-      let limitSent = campaign.maxContactsWarmup && campaign.maxContactsWarmup < warmup.remainingSendToday ? campaign.maxContactsWarmup : warmup.remainingSendToday;
-
-      await this.entityManager.query(`DELETE FROM campaigns_contacts where campaign_id = ${warmup.campaignId};`);
-      // const queryEngagementSender = `
-      //   INSERT INTO campaigns_contacts (
-      //     select ${warmup.campaignId}, tb1.contact_id, row_number() OVER (ORDER BY tb1.contact_id DESC) from (
-      //     select DISTINCT contact_id from events_logs
-      //     where account_id = ${warmup.targetAccountId}
-      //     and event = 'open'
-      //     and time > '${last10DaysDate}'
-      //     and time < '${currentDate}'
-      //     and message_type = 'email'
-      //     and campaign_id = ${warmup.campaignId}
-      //     and contact_id is not null
-      //     LIMIT ${limitSent}
-      //     ) tb1
-      //   ) RETURNING contact_id;
-      // `;
-
-      const contactsInserted = []; //await this.entityManager.query(queryEngagementSender);
-      const increasedRowNumber = contactsInserted.length || 0;
-      if (contactsInserted.length) {
-        limitSent -= contactsInserted.length;
-      }
-
-      const querys = `
-      INSERT INTO campaigns_contacts (SELECT ${warmup.campaignId}, cc.contact_id,
-        (row_number() OVER (ORDER BY ct.last_click_date DESC NULLS LAST) + ${increasedRowNumber})
-        FROM campaigns_contacts cc
-        INNER JOIN contacts ct ON ct.id = cc.contact_id
-        WHERE cc.campaign_id = ${campaign.id}
-        AND ct.account_id = ${warmup.targetAccountId}
-        ${campaign.type === CampaignType.TESTAB && campaign.testabLastId ? `AND cc.contact_id > ${campaign.testabLastId}` : ''}
-        AND cc.contact_id NOT IN (SELECT contact_id FROM campaigns_contacts WHERE campaign_id = ${warmup.campaignId} )
-        ORDER BY ct.last_click_date DESC NULLS LAST
-        LIMIT ${limitSent}
-        );
-      
-      ${
-        warmup.stage !== 0
-          ? `DELETE FROM campaigns_contacts WHERE campaign_id = ${campaign.id} AND contact_id IN (SELECT contact_id FROM campaigns_contacts
-        WHERE campaign_id = ${warmup.campaignId});`
-          : ''
-      }
-
-      COMMIT;
-      `;
-      return await this.entityManager.query(querys);
-    } catch (error) {
-      await this.entityManager.query('ROLLBACK;');
-      console.error(error);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  async getWarmupsAccount(total, accountId, date, canWarmupType) {
-    const query = `
-    SELECT id, target_segment_id
-    FROM (
-        SELECT id, target_segment_id, remaining_send_today, SUM(remaining_send_today) OVER (ORDER BY id) AS sum_total
-        FROM warmups
-        WHERE status != 'finished' AND DATE(created_at) < CURRENT_DATE AND target_account_id = ${accountId} AND (last_sent_at < '${date}' OR last_sent_at is null)
-        ${canWarmupType === 'stage3' ? 'AND stage = 3' : ''}
-    ) subquery
-    WHERE sum_total <= ${total};
-    `;
-
-    return await this.entityManager.query(query);
-  }
-
-  async findFirstWarmup(accountId, date, canWarmupType) {
-    return await this.warmupRepository
-      .createQueryBuilder('warmups')
-      .leftJoinAndSelect('warmups.campaign', 'campaign')
-      .where(
-        `warmups.status != :status AND warmups.target_account_id = :accountId AND (warmups.last_sent_at < :date OR warmups.last_sent_at is null) ${canWarmupType === 'stage3' ? 'AND warmups.stage = 3' : ''}`,
-        {
-          accountId,
-          date,
-          status: 'finished',
-        },
-      )
-      .getOne();
-  }
-
-  async updateWarmup(id, warmup) {
-    return await this.warmupRepository.update(id, warmup);
-  }
-
   async findAccount(id) {
     const account = await this.accountRepository.findOne({ where: { id } });
     account.customFields = await this.customFieldRepository.find({ where: { accountId: id } });
@@ -345,13 +230,5 @@ export class MsgopsService {
 
   async findMessageById(messageId) {
     return await this.messageRepository.findOne({ where: { id: messageId } });
-  }
-
-  async warmupContactsRandon(limit) {
-    const query = `SELECT * FROM warmup_users
-    ORDER BY random()
-    LIMIT ${limit};`;
-
-    return await this.entityManager.query(query);
   }
 }

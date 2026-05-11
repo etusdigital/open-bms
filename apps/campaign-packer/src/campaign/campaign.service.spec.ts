@@ -234,30 +234,6 @@ describe('CampaignService', () => {
       expect(mockMsgopsService.createContactsSend).not.toHaveBeenCalled();
       expect(mockQueuePublisher.addCampaignPacker).toHaveBeenCalled();
     });
-
-    it('should apply ippool override for account 60 with tag 6358', async () => {
-      const campaign = makeCampaign({
-        accountId: 60,
-        messageType: CampaignMessageType.EMAIL,
-        steps: [[{ type: 'tag', tag_info: [{ id: 6358 }] }]],
-      });
-      mockMsgopsService.getCampaign.mockResolvedValue(campaign);
-      mockMsgopsService.createContactsSend.mockResolvedValue([{ contact_id: 1 }]);
-      await service.createContactsSend(1);
-      expect(campaign.campaignMessage[0].message.ippool).toBe('em01_tarjetasargentinas_com_warmup');
-    });
-
-    it('should not apply ippool for account 60 without tag 6358', async () => {
-      const campaign = makeCampaign({
-        accountId: 60,
-        messageType: CampaignMessageType.EMAIL,
-        steps: [[{ type: 'tag', tag_info: [{ id: 9999 }] }]],
-      });
-      mockMsgopsService.getCampaign.mockResolvedValue(campaign);
-      mockMsgopsService.createContactsSend.mockResolvedValue([{ contact_id: 1 }]);
-      await service.createContactsSend(1);
-      expect(campaign.campaignMessage[0].message.ippool).toBe('default');
-    });
   });
 
   describe('createBatches', () => {

@@ -44,16 +44,6 @@ export class CampaignService {
       return `Id ${id} campaign was not found and cannot be run.`;
     }
 
-    // TODO: WARMUP POOL TARJETASARGENTINAS
-    if (campaign.accountId == 60 && campaign.messageType == CampaignMessageType.EMAIL) {
-      const campaignTags = this.getTagsInCampaign(campaign.steps);
-      if (campaignTags.includes(6358) && campaign.campaignMessage.length) {
-        for (const messages of campaign.campaignMessage) {
-          messages.message.ippool = 'em01_tarjetasargentinas_com_warmup';
-        }
-      }
-    }
-
     if (campaign.type === CampaignType.SIMPLE || campaign.type === CampaignType.RECURRING) {
       await this.msgopsService.createContactsSend(campaign);
     }

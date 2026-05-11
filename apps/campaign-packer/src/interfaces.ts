@@ -26,11 +26,6 @@ export class Campaign {
   testabLastId?: number;
   testabinInitialPageId?: number;
   testabMode?: boolean;
-  maxContactsWarmup?: number;
-  isWarmup?: boolean;
-  warmupSegmentId?: boolean;
-  warmupTarget?: number;
-  stage?: number;
   campaignDefault?: any;
 }
 
@@ -99,11 +94,6 @@ export class CampaignBatch {
   totalPages: number;
   currentContactId: number;
   finalContactId: number;
-}
-
-export class Warmup {
-  warmups: Array<number>;
-  campaign: Campaign;
 }
 
 export enum EmailPriority {

@@ -1,9 +1,8 @@
-import { AfterLoad, Column, CreateDateColumn, DeleteDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { AfterLoad, Column, CreateDateColumn, DeleteDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { AccountEntity } from './account.entity';
 import { CampaignContactEntity } from './campaign-contact.entity';
 import { CampaignMessageEntity } from './campaign-message.entity';
 import { CampaignRecurrenceSettings, CampaignType } from 'src/interfaces';
-import { WarmupEntity } from './warmup.entity';
 @Entity('campaigns')
 export class CampaignEntity {
   @PrimaryGeneratedColumn({ type: 'int', name: 'id' })
@@ -114,9 +113,6 @@ export class CampaignEntity {
     nullable: true,
   })
   campaignMessage: Array<CampaignMessageEntity>;
-
-  @OneToOne(() => WarmupEntity, (warmup) => warmup.campaign, {})
-  warmup: Array<WarmupEntity>;
 
   @OneToMany(() => CampaignContactEntity, (campaignContact) => campaignContact.campaign, {})
   campaignContacts?: Array<CampaignContactEntity>;

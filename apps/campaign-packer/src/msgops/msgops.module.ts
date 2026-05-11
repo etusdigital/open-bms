@@ -8,7 +8,6 @@ import { ContactCustomFieldEntity } from './entities/contact-custom-field.entity
 import { CustomFieldsEntity } from './entities/custom-fields.entity';
 import { AccountConfigEntity } from './entities/account-config.entity';
 import { CampaignMessageEntity } from './entities/campaign-message.entity';
-import { WarmupEntity } from './entities/warmup.entity';
 import { AccountEntity } from './entities/account.entity';
 import { MessageEntity } from './entities/message.entity';
 import { TagProcessProvider } from 'src/providers/tag-process.provider';
@@ -27,7 +26,6 @@ import { typeOrmConfig } from '../ormconfig';
       ContactEntity,
       ContactCustomFieldEntity,
       CustomFieldsEntity,
-      WarmupEntity,
       AccountEntity,
       MessageEntity,
     ]),

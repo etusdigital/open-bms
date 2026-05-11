@@ -6,13 +6,12 @@ import { CampaignMessageEntity } from './entities/campaign-message.entity';
 import { ContactEntity } from './entities/contact.entity';
 import { CampaignEntity } from './entities/campaign.entity';
 import { CampaignContactEntity } from './entities/campaign-contact.entity';
-import { WarmupEntity } from './entities/warmup.entity';
 import { AccountEntity } from './entities/account.entity';
 import { CustomFieldsEntity } from './entities/custom-fields.entity';
 import { MessageEntity } from './entities/message.entity';
 import { TagProcessProvider } from '../providers/tag-process.provider';
 import { EntityManager } from 'typeorm';
-import { CampaignMessageType, CampaignType } from '../interfaces';
+import { CampaignMessageType } from '../interfaces';
 
 describe('MsgopsService', () => {
   let service: MsgopsService;
@@ -28,12 +27,6 @@ describe('MsgopsService', () => {
 
   const mockCampaignContactRepository = {
     count: jest.fn(),
-  };
-
-  const mockWarmupRepository = {
-    find: jest.fn(),
-    createQueryBuilder: jest.fn(),
-    update: jest.fn(),
   };
 
   const mockAccountRepository = {
@@ -80,7 +73,6 @@ describe('MsgopsService', () => {
         { provide: getRepositoryToken(ContactEntity), useValue: mockContactRepository },
         { provide: getRepositoryToken(CampaignEntity), useValue: mockCampaignRepository },
         { provide: getRepositoryToken(CampaignContactEntity), useValue: mockCampaignContactRepository },
-        { provide: getRepositoryToken(WarmupEntity), useValue: mockWarmupRepository },
         { provide: getRepositoryToken(AccountEntity), useValue: mockAccountRepository },
         { provide: getRepositoryToken(CustomFieldsEntity), useValue: mockCustomFieldRepository },
         { provide: getRepositoryToken(MessageEntity), useValue: mockMessageRepository },
@@ -190,56 +182,6 @@ describe('MsgopsService', () => {
       mockMessageRepository.findOne.mockResolvedValue(msg);
       const result = await service.findMessageById('5');
       expect(result).toEqual(msg);
-    });
-  });
-
-  describe('findWarmupByIds', () => {
-    it('should return warmups with account attached', async () => {
-      const warmup = { id: 1, campaign: {} };
-      const account = { id: 1, name: 'Test', accountConfigs: [], customFields: [] };
-      mockWarmupRepository.find.mockResolvedValue([warmup]);
-      mockAccountRepository.findOne.mockResolvedValue(account);
-      mockCustomFieldRepository.find.mockResolvedValue([]);
-      mockAccountConfigRepository.find.mockResolvedValue([]);
-
-      const result = await service.findWarmupByIds([1], 1);
-      expect(result[0].campaign.account).toBeDefined();
-    });
-  });
-
-  describe('processWarmup', () => {
-    it('should execute transaction queries', async () => {
-      mockEntityManager.query.mockResolvedValue([]);
-      const warmup = {
-        campaignId: 10,
-        targetAccountId: 1,
-        remainingSendToday: 100,
-        stage: 2,
-      } as any;
-      const campaign = { id: 1, maxContactsWarmup: 50, type: CampaignType.SIMPLE } as any;
-
-      await service.processWarmup(warmup, campaign);
-      expect(mockEntityManager.query).toHaveBeenCalledWith('BEGIN TRANSACTION;');
-    });
-
-    it('should rollback on error', async () => {
-      mockEntityManager.query
-        .mockResolvedValueOnce(undefined) // BEGIN
-        .mockResolvedValueOnce(undefined) // DELETE
-        .mockRejectedValueOnce(new Error('DB Error')); // INSERT fails
-
-      const warmup = { campaignId: 10, targetAccountId: 1, remainingSendToday: 100, stage: 2 } as any;
-      const campaign = { id: 1, maxContactsWarmup: 50, type: CampaignType.SIMPLE } as any;
-
-      await expect(service.processWarmup(warmup, campaign)).rejects.toThrow();
-      expect(mockEntityManager.query).toHaveBeenCalledWith('ROLLBACK;');
-    });
-  });
-
-  describe('updateWarmup', () => {
-    it('should delegate to repository', async () => {
-      await service.updateWarmup(1, { status: 'running' });
-      expect(mockWarmupRepository.update).toHaveBeenCalledWith(1, { status: 'running' });
     });
   });
 
@@ -362,102 +304,12 @@ describe('MsgopsService', () => {
     });
   });
 
-  describe('createContactsSend additional branches', () => {
-    it('should use last_open_date ordering for account 159', async () => {
-      const campaign = { id: 1, accountId: 159, query: 'SELECT 1', runSegment: false } as any;
-      mockEntityManager.query.mockResolvedValue([]);
-      await service.createContactsSend(campaign);
-      expect(mockEntityManager.query).toHaveBeenCalledWith(expect.stringContaining('ORDER BY c.last_open_date ASC NULLS FIRST'));
-    });
-
-    it('should use last_click_date ordering for account 19', async () => {
-      const campaign = { id: 1, accountId: 19, query: 'SELECT 1', runSegment: false } as any;
-      mockEntityManager.query.mockResolvedValue([]);
-      await service.createContactsSend(campaign);
-      expect(mockEntityManager.query).toHaveBeenCalledWith(expect.stringContaining('ORDER BY c.last_click_date ASC NULLS FIRST'));
-    });
-  });
-
-  describe('processWarmup additional branches', () => {
-    it('should skip DELETE for stage 0', async () => {
-      mockEntityManager.query.mockResolvedValue([]);
-      const warmup = { campaignId: 10, targetAccountId: 1, remainingSendToday: 100, stage: 0 } as any;
-      const campaign = { id: 1, maxContactsWarmup: 50, type: CampaignType.SIMPLE } as any;
-
-      await service.processWarmup(warmup, campaign);
-      // The query should NOT contain the DELETE statement when stage=0
-      const queryCall = mockEntityManager.query.mock.calls.find((c: any) => c[0].includes('INSERT INTO campaigns_contacts'));
-      expect(queryCall[0]).not.toContain('DELETE FROM campaigns_contacts WHERE campaign_id = 1 AND contact_id IN');
-    });
-
-    it('should include TESTAB testabLastId filter in query', async () => {
-      mockEntityManager.query.mockResolvedValue([]);
-      const warmup = { campaignId: 10, targetAccountId: 1, remainingSendToday: 100, stage: 2 } as any;
-      const campaign = { id: 1, maxContactsWarmup: 50, type: CampaignType.TESTAB, testabLastId: 500 } as any;
-
-      await service.processWarmup(warmup, campaign);
-      const queryCall = mockEntityManager.query.mock.calls.find((c: any) => c[0].includes('AND cc.contact_id > 500'));
-      expect(queryCall).toBeDefined();
-    });
-  });
-
-  describe('getWarmupsAccount', () => {
-    it('should return warmup IDs from query', async () => {
-      const rows = [{ id: 1, target_segment_id: null }];
-      mockEntityManager.query.mockResolvedValue(rows);
-      const result = await service.getWarmupsAccount(100, 1, '2024-01-01', 'general');
-      expect(result).toEqual(rows);
-    });
-
-    it('should filter by stage 3 when canWarmupType is stage3', async () => {
-      mockEntityManager.query.mockResolvedValue([]);
-      await service.getWarmupsAccount(100, 1, '2024-01-01', 'stage3');
-      expect(mockEntityManager.query).toHaveBeenCalledWith(expect.stringContaining('AND stage = 3'));
-    });
-  });
-
-  describe('findFirstWarmup', () => {
-    it('should return first warmup matching criteria', async () => {
-      const warmup = { id: 1 };
-      const mockQb = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue(warmup),
-      };
-      mockWarmupRepository.createQueryBuilder.mockReturnValue(mockQb);
-
-      const result = await service.findFirstWarmup(1, '2024-01-01', 'general');
-      expect(result).toEqual(warmup);
-    });
-
-    it('should filter by stage 3 for stage3 type', async () => {
-      const mockQb = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue(null),
-      };
-      mockWarmupRepository.createQueryBuilder.mockReturnValue(mockQb);
-
-      await service.findFirstWarmup(1, '2024-01-01', 'stage3');
-      expect(mockQb.where).toHaveBeenCalledWith(expect.stringContaining('AND warmups.stage = 3'), expect.any(Object));
-    });
-  });
-
   describe('findAccountConfig', () => {
     it('should return account config', async () => {
       const config = { accountId: 1, name: 'time_zone', value: 'UTC' };
       mockAccountConfigRepository.findOne.mockResolvedValue(config);
       const result = await service.findAccountConfig(1, 'time_zone');
       expect(result).toEqual(config);
-    });
-  });
-
-  describe('warmupContactsRandon', () => {
-    it('should return random warmup contacts', async () => {
-      const contacts = [{ name: 'Test', email: 'test@test.com' }];
-      mockEntityManager.query.mockResolvedValue(contacts);
-      const result = await service.warmupContactsRandon(10);
-      expect(result).toEqual(contacts);
     });
   });
 
