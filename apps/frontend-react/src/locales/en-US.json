@@ -305,7 +305,6 @@
     "importPartiallyMapped": "{{mapped}} of {{total}} columns mapped",
     "importActions": "Actions",
     "importUpdateContacts": "Update existing contacts",
-    "importValidateContacts": "Validate contacts",
     "importStartAutomation": "Start automation",
     "importDisabledLargeFile": "Disabled for files with more than 10,000 contacts",
     "importSending": "Importing...",
@@ -1724,7 +1723,6 @@
     "tabSendgridPlatform": "SendGrid (platform)",
     "tabS3": "S3",
     "tabFcm": "Firebase Cloud Messaging",
-    "tabEmailable": "Emailable",
     "tabGeoip": "GeoIP",
     "testConnection": "Test connection",
     "sendgridPlatform": {
@@ -1777,18 +1775,6 @@
       "loadError": "Failed to load FCM settings.",
       "testOk": "Service Account valid",
       "testError": "Failed to validate service account"
-    },
-    "emailable": {
-      "url": "API URL",
-      "urlHelp": "Emailable endpoint. Default: https://api.emailable.com/v1/verify.",
-      "apiKey": "API Key",
-      "apiKeyStored": "Current key",
-      "apiKeyReplace": "New key (leave blank to keep)",
-      "saveOk": "Emailable settings saved.",
-      "saveError": "Failed to save Emailable settings.",
-      "loadError": "Failed to load Emailable settings.",
-      "testOk": "Emailable connection OK",
-      "testError": "Failed to connect to Emailable"
     },
     "geoipModeLabel": "Operation mode",
     "geoipModeDisabled": "Disabled",

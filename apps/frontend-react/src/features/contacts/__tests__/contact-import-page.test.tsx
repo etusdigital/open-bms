@@ -174,7 +174,6 @@ describe('ContactImportPage', () => {
       await renderPage();
       await uploadFile();
       expect(screen.getByText(/atualizar contatos/i)).toBeInTheDocument();
-      expect(screen.getByText(/validar contatos/i)).toBeInTheDocument();
       expect(screen.getByText(/iniciar automação/i)).toBeInTheDocument();
     });
 

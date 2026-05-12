@@ -6,14 +6,12 @@ import { INTEGRATIONS_TABS, type IntegrationsTab } from './types';
 import { SendgridPlatformTab } from './sendgrid-platform-tab';
 import { S3Tab } from './s3-tab';
 import { FcmTab } from './fcm-tab';
-import { EmailableTab } from './emailable-tab';
 import { GeoIpTab } from './geoip-tab';
 
 const TAB_LABEL_KEY: Record<IntegrationsTab, string> = {
   sendgridPlatform: 'integrations.tabSendgridPlatform',
   s3: 'integrations.tabS3',
   fcm: 'integrations.tabFcm',
-  emailable: 'integrations.tabEmailable',
   geoip: 'integrations.tabGeoip',
 };
 
@@ -45,7 +43,6 @@ export default function IntegrationsPage() {
           {tab === 'sendgridPlatform' && <SendgridPlatformTab />}
           {tab === 's3' && <S3Tab />}
           {tab === 'fcm' && <FcmTab />}
-          {tab === 'emailable' && <EmailableTab />}
           {tab === 'geoip' && <GeoIpTab />}
         </div>
       </ListPage.Content>

@@ -38,7 +38,6 @@ const basePayload = {
   },
   tags: ['newsletter'],
   actions: {
-    contactValidate: false,
     contactUpdate: true,
     startAutomation: false,
   },

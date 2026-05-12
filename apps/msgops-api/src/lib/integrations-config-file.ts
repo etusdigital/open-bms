@@ -80,21 +80,6 @@ export function writeFcmEnvFile(dto: FcmSystemSettings): void {
   writeEnvFile(fcmEnvFilePath(), [`FIREBASE_SERVICE_ACCOUNT=${oneLine}`]);
 }
 
-// ---------- Emailable ----------
-
-export interface EmailableSystemSettings {
-  url: string;
-  apiKey: string;
-}
-
-export function emailableEnvFilePath(): string {
-  return bmsConfigFilePath('emailable.env');
-}
-
-export function writeEmailableEnvFile(dto: EmailableSystemSettings): void {
-  writeEnvFile(emailableEnvFilePath(), [`EMAILABLE_URL=${dto.url}`, `EMAILABLE_API_KEY=${dto.apiKey}`]);
-}
-
 // ---------- MailerSend ----------
 
 export interface MailerSendSystemSettings {

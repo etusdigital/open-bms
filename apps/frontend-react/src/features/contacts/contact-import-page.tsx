@@ -153,7 +153,6 @@ export function ContactImportPage() {
 
   // Actions state
   const [actions, setActions] = useState<ImportActions>({
-    contactValidate: false,
     contactUpdate: true,
     startAutomation: false,
   });
@@ -224,7 +223,7 @@ export function ContactImportPage() {
       setFile(f);
       setColumnMappings({});
       setSelectedTags([]);
-      setActions({ contactValidate: false, contactUpdate: true, startAutomation: false });
+      setActions({ contactUpdate: true, startAutomation: false });
       parseFile(f);
     },
     [parseFile, t],
@@ -574,24 +573,6 @@ export function ContactImportPage() {
                     />
                     <Label htmlFor="contactUpdate" className="text-sm">
                       {t('contacts.importUpdateContacts')}
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="contactValidate"
-                      checked={actions.contactValidate}
-                      disabled={isLargeFile}
-                      onCheckedChange={(checked) =>
-                        setActions((prev) => ({ ...prev, contactValidate: checked === true }))
-                      }
-                    />
-                    <Label htmlFor="contactValidate" className="text-sm">
-                      {t('contacts.importValidateContacts')}
-                      {isLargeFile && (
-                        <span className="text-muted-foreground ml-1 text-xs">
-                          ({t('contacts.importDisabledLargeFile')})
-                        </span>
-                      )}
                     </Label>
                   </div>
                   <div className="flex items-center gap-2">

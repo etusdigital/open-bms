@@ -1,16 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import {
-  s3EnvFilePath,
-  sendgridEnvFilePath,
-  fcmEnvFilePath,
-  emailableEnvFilePath,
-  writeS3EnvFile,
-  writeSendgridEnvFile,
-  writeFcmEnvFile,
-  writeEmailableEnvFile,
-} from './integrations-config-file';
+import { s3EnvFilePath, sendgridEnvFilePath, fcmEnvFilePath, writeS3EnvFile, writeSendgridEnvFile, writeFcmEnvFile } from './integrations-config-file';
 
 let tmp: string;
 
@@ -81,18 +72,10 @@ describe('integrations-config-file', () => {
     expect(() => writeFcmEnvFile({ serviceAccountJson: '{not json' })).toThrow();
   });
 
-  it('writeEmailableEnvFile writes both fields', () => {
-    writeEmailableEnvFile({ url: 'https://api.emailable.com/v1/verify', apiKey: 'em-test-key' });
-    const content = readFileSync(emailableEnvFilePath(), 'utf8');
-    expect(content).toContain('EMAILABLE_URL=https://api.emailable.com/v1/verify');
-    expect(content).toContain('EMAILABLE_API_KEY=em-test-key');
-  });
-
   it('all paths use BMS_CONFIG_DIR', () => {
     expect(s3EnvFilePath().startsWith(tmp)).toBe(true);
     expect(sendgridEnvFilePath().startsWith(tmp)).toBe(true);
     expect(fcmEnvFilePath().startsWith(tmp)).toBe(true);
-    expect(emailableEnvFilePath().startsWith(tmp)).toBe(true);
     expect(existsSync(tmp)).toBe(true);
   });
 });
