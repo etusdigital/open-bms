@@ -37,7 +37,6 @@ describe('editor types constants', () => {
         'addTag',
         'removeTag',
         'updateCustomField',
-        'contactValidate',
         'contactTransfer',
         'removeAutomation',
       ]) {

@@ -773,7 +773,6 @@
             "whatsapp",
             "sms",
             "testAB",
-            "contactValidate",
             "removeTag",
             "addTag",
             "updateCustomField",
@@ -971,7 +970,7 @@
                           "if": {
                             "properties": {
                               "type": {
-                                "enum": ["end", "contactValidate", "conditionalFalse"]
+                                "enum": ["end", "conditionalFalse"]
                               }
                             }
                           },

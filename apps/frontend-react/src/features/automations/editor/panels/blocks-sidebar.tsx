@@ -13,7 +13,6 @@ import {
   Tag,
   Tags,
   PenSquare,
-  ShieldCheck,
   ArrowRightLeft,
   UserMinus,
   GitBranch,
@@ -104,11 +103,6 @@ const BLOCK_CATEGORIES: BlockCategory[] = [
         type: 'updateCustomField',
         labelKey: 'automations.editor.contacts.updateCustomField',
         icon: PenSquare,
-      },
-      {
-        type: 'contactValidate',
-        labelKey: 'automations.editor.contacts.contactValidate',
-        icon: ShieldCheck,
       },
       {
         type: 'contactTransfer',
