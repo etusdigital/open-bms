@@ -40,7 +40,7 @@ export function createCorsOptions(): CorsOptions {
       if (isOriginAllowed(origin, process.env.NODE_ENV)) {
         return callback(null, true);
       }
-      callback(new Error('Not allowed by CORS'));
+      callback(null, false);
     },
   };
 }

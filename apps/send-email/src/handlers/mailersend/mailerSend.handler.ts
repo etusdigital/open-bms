@@ -10,7 +10,6 @@ interface Personalization {
 }
 import { Account, AutomationContactsBatch, SendEmailMessage } from '../../interfaces';
 import { Batch } from '../../mail/mail.interface';
-import { FormatterUtils } from '../../utils/formatter.utils';
 import { MailUtils } from '../../mail/mail.utils';
 import { EmailProviderMetadata, IEmailProvider } from '../email-provider.interface';
 
@@ -21,10 +20,7 @@ const MAILERSEND_TAG_LIMIT = 5;
 
 @Injectable()
 export class MailerSendHandler implements IEmailProvider {
-  constructor(
-    private readonly formatterUtils: FormatterUtils,
-    private readonly mailUtils: MailUtils,
-  ) {}
+  constructor(private readonly mailUtils: MailUtils) {}
 
   getMetadata(): EmailProviderMetadata {
     return {
