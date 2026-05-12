@@ -156,15 +156,20 @@ export class SendgridHandler {
 
     try {
       const base = await this.getUri();
-      const existing = await this.httpService.get<{ webhooks?: Array<{ id: string; url: string }> }>(`${base}/user/webhooks/event/settings/all`, { headers }).toPromise();
+      const existing = await this.httpService
+        .get<{ webhooks?: Array<{ id: string; url: string; friendly_name?: string }> }>(`${base}/user/webhooks/event/settings/all`, { headers })
+        .toPromise();
       const webhooks = existing?.data?.webhooks ?? [];
       const match = webhooks.find((w) => w.url === url);
 
       if (match) {
         await this.httpService.patch(`${base}/user/webhooks/event/settings/${match.id}`, payload, { headers }).toPromise();
       } else if (webhooks.length > 0) {
-        // Free/limited plans allow only one webhook — overwrite the existing one
-        await this.httpService.patch(`${base}/user/webhooks/event/settings/${webhooks[0].id}`, payload, { headers }).toPromise();
+        // Free/limited plans cap webhook count — overwrite an existing one.
+        // Prefer the slot we previously registered (by friendly_name) before falling back to the first entry.
+        const target = webhooks.find((w) => w.friendly_name === 'bms-prod') ?? webhooks[0];
+        console.warn('SendGrid free-plan: overwriting existing webhook', { targetId: target.id, targetUrl: target.url, newUrl: url });
+        await this.httpService.patch(`${base}/user/webhooks/event/settings/${target.id}`, payload, { headers }).toPromise();
       } else {
         await this.httpService.post(`${base}/user/webhooks/event/settings`, payload, { headers }).toPromise();
       }
@@ -173,12 +178,22 @@ export class SendgridHandler {
       const axiosError = error as { response?: { data?: { errors?: Array<{ message: string }> }; status?: number } };
       const sgMessage = axiosError?.response?.data?.errors?.[0]?.message;
       const sgStatus = axiosError?.response?.status;
-      console.error('Falha ao registrar webhook SendGrid', { sgStatus, sgMessage });
-      throw new HttpException(
-        sgMessage ?? 'Erro ao registrar webhook na SendGrid',
-        sgStatus && sgStatus >= 400 && sgStatus < 500 ? HttpStatus.UNPROCESSABLE_ENTITY : HttpStatus.BAD_GATEWAY,
-        { cause: error },
-      );
+      console.error('SendGrid webhook registration failed', { sgStatus, sgMessage });
+      let httpStatus: HttpStatus;
+      if (!sgStatus) {
+        httpStatus = HttpStatus.BAD_GATEWAY;
+      } else if (sgStatus === 401) {
+        httpStatus = HttpStatus.UNAUTHORIZED;
+      } else if (sgStatus === 403) {
+        httpStatus = HttpStatus.FORBIDDEN;
+      } else if (sgStatus === 429) {
+        httpStatus = HttpStatus.TOO_MANY_REQUESTS;
+      } else if (sgStatus >= 400 && sgStatus < 500) {
+        httpStatus = HttpStatus.UNPROCESSABLE_ENTITY;
+      } else {
+        httpStatus = HttpStatus.BAD_GATEWAY;
+      }
+      throw new HttpException(sgMessage ?? 'Erro ao registrar webhook na SendGrid', httpStatus, { cause: error });
     }
   }
 
