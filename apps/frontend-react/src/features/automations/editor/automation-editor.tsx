@@ -65,7 +65,6 @@ const DEFAULT_SETTINGS: Record<string, unknown> = {
   addTag: [] as unknown as Record<string, unknown>,
   removeTag: [] as unknown as Record<string, unknown>,
   updateCustomField: { customFieldValue: '', customFieldSelected: null } as unknown as Record<string, unknown>,
-  contactValidate: {},
   contactTransfer: { accountId: 0, accountName: '', tagId: 0, tagName: '', apiKey: '' },
   removeAutomation: { automations: [] },
   httpRequest: {
@@ -201,7 +200,6 @@ const AutomationEditorInner = forwardRef<AutomationEditorHandle, AutomationEdito
     if (
       node.type === 'end' ||
       node.type === 'unsupported' ||
-      node.type === 'contactValidate' ||
       SUB_NODE_TYPES.has(node.type ?? '')
     )
       return;

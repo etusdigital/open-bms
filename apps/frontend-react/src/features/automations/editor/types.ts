@@ -15,7 +15,6 @@ export type ContactStepType =
   | 'addTag'
   | 'removeTag'
   | 'updateCustomField'
-  | 'contactValidate'
   | 'contactTransfer'
   | 'removeAutomation';
 
@@ -193,7 +192,6 @@ export type RandomMobilePushStep = StepBase<'randomMobilePush', RandomMessageSet
 export type AddTagStep = StepBase<'addTag', TagStepSettings>;
 export type RemoveTagStep = StepBase<'removeTag', TagStepSettings>;
 export type UpdateCustomFieldStep = StepBase<'updateCustomField', UpdateCustomFieldSettings>;
-export type ContactValidateStep = StepBase<'contactValidate', EmptySettings>;
 export type ContactTransferStep = StepBase<'contactTransfer', ContactTransferSettings>;
 export type RemoveAutomationStep = StepBase<'removeAutomation', RemoveAutomationSettings>;
 export type SplitStep = StepBase<'split', SplitSettings>;
@@ -220,7 +218,6 @@ export type AutomationStep =
   | AddTagStep
   | RemoveTagStep
   | UpdateCustomFieldStep
-  | ContactValidateStep
   | ContactTransferStep
   | RemoveAutomationStep
   | SplitStep
@@ -438,7 +435,6 @@ export const KNOWN_STEP_TYPES = new Set<string>([
   'addTag',
   'removeTag',
   'updateCustomField',
-  'contactValidate',
   'contactTransfer',
   'removeAutomation',
   'split',

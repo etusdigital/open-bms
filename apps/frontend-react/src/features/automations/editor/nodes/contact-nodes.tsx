@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Tag, Tags, PenSquare, ShieldCheck, ArrowRightLeft, UserMinus } from 'lucide-react';
+import { Tag, Tags, PenSquare, ArrowRightLeft, UserMinus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import type {
@@ -129,32 +129,6 @@ export const UpdateCustomFieldNode = memo(function UpdateCustomFieldNode({ id, d
         </div>
       </div>
       <Handle type="source" position={Position.Bottom} className="!bg-blue-400" />
-      <NodeDeleteButton nodeId={id} />
-    </div>
-  );
-});
-
-// ---------------------------------------------------------------------------
-// Contact Validate (no config)
-// ---------------------------------------------------------------------------
-
-export const ContactValidateNode = memo(function ContactValidateNode({ id, selected }: NodeProps) {
-  const { t } = useTranslation();
-
-  return (
-    <div
-      className={`group bg-card relative min-w-[220px] rounded-lg border-2 p-3 shadow-sm transition-colors ${
-        selected ? 'border-primary ring-primary/20 ring-2' : 'border-teal-300'
-      }`}
-    >
-      <Handle type="target" position={Position.Top} className="!bg-teal-400" />
-      <div className="flex items-center gap-2">
-        <div className="rounded-md bg-teal-100 p-1.5">
-          <ShieldCheck className="h-4 w-4 text-teal-600" />
-        </div>
-        <p className="text-sm font-medium">{t('automations.editor.contacts.contactValidate')}</p>
-      </div>
-      <Handle type="source" position={Position.Bottom} className="!bg-teal-400" />
       <NodeDeleteButton nodeId={id} />
     </div>
   );

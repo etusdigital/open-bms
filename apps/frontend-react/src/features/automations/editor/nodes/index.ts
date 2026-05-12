@@ -9,7 +9,6 @@ import {
   AddTagNode,
   RemoveTagNode,
   UpdateCustomFieldNode,
-  ContactValidateNode,
   ContactTransferNode,
   RemoveAutomationNode,
 } from './contact-nodes';
@@ -133,7 +132,6 @@ export const automationNodeTypes = {
   addTag: AddTagNode,
   removeTag: RemoveTagNode,
   updateCustomField: UpdateCustomFieldNode,
-  contactValidate: ContactValidateNode,
   contactTransfer: ContactTransferNode,
   removeAutomation: RemoveAutomationNode,
   split: SplitNode,
