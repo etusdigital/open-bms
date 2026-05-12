@@ -94,7 +94,7 @@ describe('PoolsPage', () => {
     it('renders the page title', async () => {
       authenticateStore({ permissions: ['infra:view'] });
       await renderPage();
-      expect(screen.getByText(/pools/i)).toBeInTheDocument();
+      expect(screen.getByText(/senders/i)).toBeInTheDocument();
     });
 
     it('renders pools in the table', async () => {

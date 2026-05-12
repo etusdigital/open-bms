@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef, useMemo, type RefObject } from 'react';
+import { useCallback, useEffect, useState, useRef, useMemo, type RefObject } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -84,26 +84,51 @@ export function EmailContentForm({ editorRef, designJson, templateUrl }: EmailCo
     }
   };
 
+  const applyPoolDefaults = useCallback(
+    (pool: Pool, opts: { preserveUserEdits?: boolean } = {}) => {
+      const { preserveUserEdits = false } = opts;
+      const { dirtyFields } = form.formState;
+      const setOpts = preserveUserEdits ? { shouldDirty: false } : undefined;
+
+      form.setValue('ippool', pool.poolName, setOpts);
+
+      if (!preserveUserEdits || !dirtyFields.fromName) {
+        form.setValue('fromName', pool.senderName ?? '', setOpts);
+      }
+      if (!preserveUserEdits || !dirtyFields.fromMail) {
+        form.setValue('fromMail', pool.senderEmail ?? '', setOpts);
+      }
+      if (!preserveUserEdits || !dirtyFields.replyTo) {
+        form.setValue('replyTo', pool.senderReplyTo ?? '', setOpts);
+      }
+    },
+    [form],
+  );
+
   const handlePoolChange = (poolId: string) => {
     const pool = pools.find((p) => String(p.id) === poolId);
-    if (pool) {
-      form.setValue('ippool', pool.poolName);
-      form.setValue('fromName', pool.senderName ?? '');
-      form.setValue('fromMail', pool.senderEmail ?? '');
-      form.setValue('replyTo', pool.senderReplyTo ?? '');
-    }
+    if (pool) applyPoolDefaults(pool, { preserveUserEdits: false });
   };
 
   // Resolve the current pool id from the poolName stored in form
+  const ippoolValue = form.watch('ippool');
+  const fromMailValue = form.watch('fromMail');
   const currentPoolId = useMemo(() => {
-    const poolName = form.getValues('ippool');
-    const fromMail = form.getValues('fromMail');
     // Match by poolName + senderEmail to handle pools with same poolName
     const match =
-      pools.find((p) => p.poolName === poolName && p.senderEmail === fromMail) ??
-      pools.find((p) => p.poolName === poolName);
+      pools.find((p) => p.poolName === ippoolValue && p.senderEmail === fromMailValue) ??
+      pools.find((p) => p.poolName === ippoolValue);
     return match ? String(match.id) : undefined;
-  }, [pools, form]);
+  }, [pools, ippoolValue, fromMailValue]);
+
+  // Programmatic sync: when ippool is already set (edit / duplicate / deep-link)
+  // and pools resolve, fill sender fields without clobbering user edits.
+  useEffect(() => {
+    if (!currentPoolId) return;
+    const pool = pools.find((p) => String(p.id) === currentPoolId);
+    if (!pool) return;
+    applyPoolDefaults(pool, { preserveUserEdits: true });
+  }, [currentPoolId, pools, applyPoolDefaults]);
 
   const insertEmoji = (
     emoji: EmojiClickData,

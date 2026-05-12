@@ -29,14 +29,16 @@ describe('PoolForm', () => {
 
   it('renders pool configuration fields when SendGrid has dedicated pools', () => {
     render(<PoolForm {...defaultProps} sendGridPools={[{ name: 'pool-a' }]} />);
-    expect(screen.getByText(/pool name/i)).toBeInTheDocument();
+    // Both the sender-name input and the SendGrid pool selector use the "Sender Name" label after EVO-1022.
+    expect(screen.getAllByText(/sender name/i).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByLabelText(/daily limit/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/sending limit/i)).toBeInTheDocument();
   });
 
   it('replaces the pool dropdown with a Free-plan callout when SendGrid has no pools', () => {
     render(<PoolForm {...defaultProps} sendGridPools={[]} />);
-    expect(screen.queryByText(/pool name/i)).not.toBeInTheDocument();
+    // Only the sender-name input keeps the "Sender Name" label; the SendGrid-pool selector is replaced by the callout.
+    expect(screen.getAllByText(/sender name/i)).toHaveLength(1);
     expect(screen.getByText(/Free\/Essentials/i)).toBeInTheDocument();
     // limits remain editable so the user can still save the sender pool
     expect(screen.getByLabelText(/daily limit/i)).toBeInTheDocument();

@@ -241,7 +241,7 @@ export function PoolTab() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={saving}
-            placeholder="Pool Principal"
+            placeholder="Sender Principal"
           />
         </div>
         <div className="flex flex-col gap-1.5">

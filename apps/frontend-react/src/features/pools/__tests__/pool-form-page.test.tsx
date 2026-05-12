@@ -64,7 +64,7 @@ describe('PoolFormPage', () => {
   describe('create mode (no poolId)', () => {
     it('renders the create title', async () => {
       await renderFormPage();
-      expect(screen.getByText(/criar pool/i)).toBeInTheDocument();
+      expect(screen.getByText(/criar sender/i)).toBeInTheDocument();
     });
 
     it('renders an empty form', async () => {
@@ -172,7 +172,7 @@ describe('PoolFormPage', () => {
   describe('back navigation', () => {
     it('renders back link to pools list', async () => {
       await renderFormPage();
-      const backLink = screen.getByRole('link', { name: /pools/i });
+      const backLink = screen.getByRole('link', { name: /senders/i });
       expect(backLink).toBeInTheDocument();
     });
   });
