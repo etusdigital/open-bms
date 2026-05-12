@@ -10,7 +10,7 @@ import { TrackerModule } from '../tracker/tracker.module';
 
 @Module({
   imports: [ConfigModule.forRoot(), StorageModule, TrackerModule],
-  exports: [MailService, MailUtils, SparkPostHandler, SendGridHandler],
+  exports: [MailService, MailUtils, FormatterUtils, SparkPostHandler, SendGridHandler],
   providers: [MailService, MailUtils, FormatterUtils, SparkPostHandler, SendGridHandler],
 })
 export class MailModule {}

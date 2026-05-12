@@ -82,6 +82,7 @@ export function ProviderCard({
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
   const [testCooldownSeconds, setTestCooldownSeconds] = useState(0);
 
@@ -149,6 +150,7 @@ export function ProviderCard({
       return;
     }
     setSaving(true);
+    setSaveError(null);
     try {
       const next = await gateway.save(accountId, { apiKey });
       setStored(next);
@@ -156,7 +158,7 @@ export function ProviderCard({
       toast.success(t(`settings.${providerName}SaveOk` as never));
       onChange?.();
     } catch (err) {
-      toast.error(mapProviderError(err, providerLabel));
+      setSaveError(mapProviderError(err, providerLabel));
     } finally {
       setSaving(false);
     }
@@ -200,7 +202,7 @@ export function ProviderCard({
       : t(`settings.${providerName}SourceNone` as never);
 
   return (
-    <form id={id} onSubmit={handleSubmit} noValidate className="max-w-lg space-y-4" data-testid={`provider-card-${providerName}`}>
+    <form id={id} onSubmit={handleSubmit} noValidate autoComplete="off" className="max-w-lg space-y-4" data-testid={`provider-card-${providerName}`}>
       <div className="flex items-center gap-2">
         <h3 className="text-base font-medium">{providerLabel}</h3>
         {banner && (
@@ -256,7 +258,7 @@ export function ProviderCard({
               id={`account-${providerName}-apikey`}
               type={showApiKey ? 'text' : 'password'}
               placeholder={apiKeyConfig.placeholder}
-              autoComplete="off"
+              autoComplete="new-password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               disabled={busy}
@@ -297,6 +299,13 @@ export function ProviderCard({
       <Button type="submit" disabled={busy || !isApiKeyValid(apiKey)}>
         {saving ? t('common.loading') : (t(`settings.${providerName}Save` as never) as string)}
       </Button>
+
+      {saveError && (
+        <p className="text-destructive flex items-start gap-1.5 text-sm" role="alert">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          {saveError}
+        </p>
+      )}
     </form>
   );
 }

@@ -159,8 +159,9 @@ export class AccountSettingsService {
     try {
       registered = await this.sendgridHandler.createWebhook({ apiKey: dto.apiKey, accountId });
     } catch (err) {
+      if (err instanceof HttpException) throw err;
       this.logger.error(`Falha ao registrar webhook SendGrid para conta ${accountId}`, err as Error);
-      throw new HttpException('Não foi possível registrar o webhook na SendGrid. Verifique se a chave de API tem permissão para configurar webhooks.', HttpStatus.BAD_GATEWAY);
+      throw new HttpException('Erro inesperado ao registrar webhook na SendGrid.', HttpStatus.BAD_GATEWAY);
     }
 
     await this.accountConfigs.upsertByAccountId(accountId, SENDGRID_KEY_NAME, dto.apiKey);
