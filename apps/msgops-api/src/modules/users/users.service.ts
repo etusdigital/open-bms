@@ -374,11 +374,13 @@ export class UsersService {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
 
-      this.userRepository.merge(user, userDto);
+      const { providerId: _pId, createdAt: _cAt, updatedAt: _uAt, deletedAt: _dAt, ...mergeableDto } = userDto;
+      this.userRepository.merge(user, mergeableDto);
 
       if (userDto.globalRoleCode) {
         const globalRole = await this.findRoleByCode(userDto.globalRoleCode, ROLE_CODES.EDITOR);
         user.globalRoleId = globalRole.id;
+        user.globalRole = globalRole;
       }
 
       delete user['userAccount'];
