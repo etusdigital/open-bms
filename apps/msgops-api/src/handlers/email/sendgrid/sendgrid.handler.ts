@@ -155,20 +155,30 @@ export class SendgridHandler {
     };
 
     try {
-      const existing = await this.httpService
-        .get<{ webhooks?: Array<{ id: string; url: string }> }>(`${await this.getUri()}/user/webhooks/event/settings/all`, { headers })
-        .toPromise();
-      const match = existing?.data?.webhooks?.find((w) => w.url === url);
+      const base = await this.getUri();
+      const existing = await this.httpService.get<{ webhooks?: Array<{ id: string; url: string }> }>(`${base}/user/webhooks/event/settings/all`, { headers }).toPromise();
+      const webhooks = existing?.data?.webhooks ?? [];
+      const match = webhooks.find((w) => w.url === url);
 
       if (match) {
-        await this.httpService.patch(`${await this.getUri()}/user/webhooks/event/settings/${match.id}`, payload, { headers }).toPromise();
+        await this.httpService.patch(`${base}/user/webhooks/event/settings/${match.id}`, payload, { headers }).toPromise();
+      } else if (webhooks.length > 0) {
+        // Free/limited plans allow only one webhook — overwrite the existing one
+        await this.httpService.patch(`${base}/user/webhooks/event/settings/${webhooks[0].id}`, payload, { headers }).toPromise();
       } else {
-        await this.httpService.post(`${await this.getUri()}/user/webhooks/event/settings`, payload, { headers }).toPromise();
+        await this.httpService.post(`${base}/user/webhooks/event/settings`, payload, { headers }).toPromise();
       }
       return { url };
     } catch (error) {
-      console.log('Log - error to register sendgrid webhook', error);
-      throw new HttpException('error to register webhook', HttpStatus.INTERNAL_SERVER_ERROR, { cause: error });
+      const axiosError = error as { response?: { data?: { errors?: Array<{ message: string }> }; status?: number } };
+      const sgMessage = axiosError?.response?.data?.errors?.[0]?.message;
+      const sgStatus = axiosError?.response?.status;
+      console.error('Falha ao registrar webhook SendGrid', { sgStatus, sgMessage });
+      throw new HttpException(
+        sgMessage ?? 'Erro ao registrar webhook na SendGrid',
+        sgStatus && sgStatus >= 400 && sgStatus < 500 ? HttpStatus.UNPROCESSABLE_ENTITY : HttpStatus.BAD_GATEWAY,
+        { cause: error },
+      );
     }
   }
 
