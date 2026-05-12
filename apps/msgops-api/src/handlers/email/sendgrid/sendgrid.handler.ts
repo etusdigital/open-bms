@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ClsService } from 'nestjs-cls';
 import { AxiosResponse } from 'axios';
@@ -108,7 +108,7 @@ export class SendgridHandler {
     const cfg = await this.getSystemConfig();
     const base = cfg?.webhookUrlBase;
     if (!base) {
-      throw new ServiceUnavailableException('SendGrid webhookUrlBase não configurado em /super-admin/integrations/sendgrid.');
+      throw new UnprocessableEntityException('SendGrid webhookUrlBase não configurado em /super-admin/integrations/sendgrid.');
     }
     const trimmed = base.replace(/\/+$/, '');
     const url = new URL(/^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`);
@@ -569,7 +569,7 @@ export class SendgridHandler {
     try {
       const cfg = await this.getSystemConfig();
       if (!cfg?.apiKey) {
-        throw new ServiceUnavailableException('SendGrid system-level API key não configurado em /super-admin/integrations/sendgrid.');
+        throw new UnprocessableEntityException('SendGrid system-level API key não configurado em /super-admin/integrations/sendgrid.');
       }
       // Same EVO-1052 ordering: setApiKey first, override after.
       sendgrid.setApiKey(cfg.apiKey);

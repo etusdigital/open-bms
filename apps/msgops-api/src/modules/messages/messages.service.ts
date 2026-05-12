@@ -1,4 +1,4 @@
-import { ForbiddenException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { ForbiddenException, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
 import { S3StorageProvider } from '../../providers/s3-storage.provider';
@@ -31,6 +31,7 @@ import { hasUnlayerUrls, extractUnlayerUrlsFromHtml, replaceUrlsInHtml, replaceU
 
 @Injectable()
 export class MessagesService {
+  private readonly logger = new Logger(MessagesService.name);
   private messagesProcess = {};
   constructor(
     private readonly storage: S3StorageProvider,
@@ -182,15 +183,21 @@ export class MessagesService {
     delete message.automationMessageAccount;
 
     if (message.type === 'email') {
-      const { fileURLPath, bucketName, fullFilePath } = await this.storage.writeContentIntoBucketFile(message.id, message.content);
+      try {
+        const { fileURLPath, bucketName, fullFilePath } = await this.storage.writeContentIntoBucketFile(message.id, message.content);
 
-      if (!fileURLPath || !bucketName || !fullFilePath) {
-        throw new Error("Didn't save the message on storage");
+        if (!fileURLPath || !bucketName || !fullFilePath) {
+          throw new Error("Didn't save the message on storage");
+        }
+
+        if (fileURLPath) message.templateUrl = fileURLPath;
+        if (bucketName) message.bucketName = bucketName;
+        if (fullFilePath) message.fileName = fullFilePath;
+      } catch (err) {
+        if (err instanceof HttpException) throw err;
+        this.logger.error('Falha ao salvar template no S3', err as Error);
+        throw new HttpException('Erro ao salvar template da mensagem.', HttpStatus.UNPROCESSABLE_ENTITY);
       }
-
-      if (fileURLPath) message.templateUrl = fileURLPath;
-      if (bucketName) message.bucketName = bucketName;
-      if (fullFilePath) message.fileName = fullFilePath;
     }
 
     delete message.labelContent;
@@ -520,8 +527,9 @@ export class MessagesService {
       }
     } catch (err) {
       await queryRunner.rollbackTransaction();
-      console.log(err);
-      throw new HttpException(`Error to save message ${err}`, HttpStatus.UNPROCESSABLE_ENTITY);
+      if (err instanceof HttpException) throw err;
+      this.logger.error('Falha ao salvar mensagem', err as Error);
+      throw new HttpException('Erro ao salvar mensagem.', HttpStatus.UNPROCESSABLE_ENTITY);
     } finally {
       if (!connect) {
         await queryRunner.release();

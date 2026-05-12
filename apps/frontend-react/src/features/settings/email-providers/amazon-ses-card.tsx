@@ -178,7 +178,7 @@ export function AmazonSesCard({ onChange, id, isDefault, onAttemptRemoveDefault 
   const sourceLabel = stored?.source === 'account' ? t('settings.sesSourceAccount') : t('settings.sesSourceNone');
 
   return (
-    <form id={id} onSubmit={handleSubmit} noValidate className="max-w-lg space-y-4" data-testid="provider-card-ses">
+    <form id={id} onSubmit={handleSubmit} noValidate autoComplete="off" className="max-w-lg space-y-4" data-testid="provider-card-ses">
       <div className="flex items-center gap-2">
         <h3 className="text-base font-medium">Amazon SES</h3>
         <TooltipProvider>
@@ -241,7 +241,7 @@ export function AmazonSesCard({ onChange, id, isDefault, onAttemptRemoveDefault 
             id="account-ses-secret-access-key"
             type={showSecret ? 'text' : 'password'}
             placeholder="••••••••••••••••••••••••••••••••••••••••"
-            autoComplete="off"
+            autoComplete="new-password"
             value={secretAccessKey}
             onChange={(e) => setSecretAccessKey(e.target.value)}
             disabled={busy}
