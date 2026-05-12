@@ -1657,7 +1657,7 @@
     "tabGeneral": "Geral",
     "tabEmail": "Email",
     "tabEmail_providers": "Email Providers",
-    "tabPool": "Sender de envio",
+    "tabPool": "Remetente",
     "poolHelp": "Configure o sender de envio padrão da conta — remetente, reply-to, limites e IPs.",
     "poolName": "Nome do sender",
     "poolInternalName": "Identificador interno",
