@@ -581,3 +581,73 @@ Honestidade sobre limites desta entrega (EVO-1029):
 | **Notificações operacionais** (Slack alert quando provider rate-limited, quota próxima) | Parcial — só SparkPost subaccount suspension | Phase 2 review fix F4                                                                     |
 
 Pra qualquer uma dessas, abrir issue separada referenciando este doc.
+
+---
+
+## 12. V2 — UI per-account dos 4 providers restantes (EVO-1065)
+
+A V2 adiciona UI per-account para os 4 providers que ficaram fora da V1
+(EVO-1064): SparkPost, Resend, Amazon SES e Mandrill. Padrão idêntico ao
+MailerSend V1, com particularidades por provider.
+
+### 12.1 Smoke por provider (SparkPost, Resend, Mandrill)
+
+Para cada provider X ∈ {sparkpost, resend, mandrill}:
+
+1. Logar como operator de conta.
+2. Acessar `/settings` → aba **Email Providers**.
+3. Localizar o card "X" — deve mostrar "Não configurado".
+4. Colar credenciais reais no input, clicar **Testar**:
+   - SparkPost — chave de 30+ chars, sem prefixo fixo. Header `Authorization: <apiKey>` (sem `Bearer `).
+   - Resend — chave com prefixo `re_` e 20+ chars. Header `Authorization: Bearer <apiKey>`.
+   - Mandrill — chave de 16+ chars. POST `users/ping.json` com `{key}` no body, resposta esperada `"PONG!"`.
+5. Toast verde aparece → clicar **Salvar**. Card re-renderiza com chave mascarada (`mas***ult`) + botão **Remover**.
+6. Voltar à seção **Default Email Provider** — o radio do provider X agora deve estar habilitado (sem tooltip).
+7. Selecionar X como default → **Salvar default** → toast verde.
+8. **Mandrill apenas**: confirmar banner amarelo prominente no topo do card alertando descontinuação.
+9. **Recarregar a página** (Known Issue herdado V1: o Zustand store não invalida no save de configs). O default selecionado persiste após reload.
+10. Enviar email de teste via campanha 1-destinatário → confirmar nos logs que o handler do provider X foi usado.
+11. Clicar **Remover** no card → confirmar → estado volta a "Não configurado", radio do default desabilita de novo.
+
+### 12.2 Smoke Amazon SES (3 campos, banner sandbox)
+
+1. Logar como operator.
+2. Acessar `/settings` → aba **Email Providers**.
+3. Localizar o card "Amazon SES" — deve mostrar banner amarelo intrínseco no topo alertando sandbox (sempre visível, independente do estado).
+4. Preencher:
+   - **Access Key ID**: `AKIA...` ou `ASIA...` (20 chars total).
+   - **Secret Access Key**: 40+ chars.
+   - **Region**: selecionar do dropdown (default `us-east-1`).
+5. **Test connection** com conta SES em sandbox:
+   - Esperado: toast amarelo/warning com `t('settings.sesSandboxToast')` mencionando production access.
+6. **Test connection** com conta SES production-ready (`SendingEnabled=true`):
+   - Esperado: toast verde.
+7. **Test connection** com Access Key ID inválido:
+   - Esperado: toast vermelho "Credenciais inválidas."
+8. **Salvar** → card re-renderiza com `accessKeyIdMasked`, `secretAccessKeyMasked` e `region` (não mascarada).
+9. **Selecionar SES como default** na section Default Email Provider:
+   - Esperado: banner amarelo abaixo do radio com `t('settings.defaultProviderSesWarning')` (free tier exige EC2).
+10. **Remover** → 3 rows são deletadas (`ses_access_key_id`, `ses_secret_access_key`, `ses_region`). Estado volta a "Não configurado".
+
+### 12.3 Regressão MailerSend V1
+
+Após V2, MailerSend foi refatorado para consumir o `ProviderCard` genérico
+(mesma UI, mesmos toasts, mesmas chaves i18n). Re-rodar smoke V1 do
+MailerSend (§ anterior) para garantir zero regressão funcional ou visual.
+
+### 12.4 Rate-limit cross-provider
+
+Cada provider tem seu próprio `<provider>TestHits` map no service +
+bucket `<provider>:<ip>` no `enforceTestRateLimit`. Confirmar:
+
+- 5 clicks consecutivos em **Testar** → todos retornam normalmente.
+- 6º click em ≤ 60s → backend responde 429 + mensagem "Muitas tentativas de teste {ProviderLabel}. Aguarde um minuto e tente novamente." Toast vermelho exibe.
+
+### 12.5 Known Issues herdados (não corrigidos em V2)
+
+- **`useAccountConfig` Zustand stale**: após salvar `default_email_provider`, o store local não invalida automaticamente. Usuário precisa recarregar a página pra ver o valor persistido na section. Workaround: refresh manual.
+- **PUT `/accounts/config/:name` não-upsert**: bug latente no endpoint legado; V2 usa `PUT /accounts/providers/:accountId` (upsert correto). Endpoint legado segue bug — não tocar.
+- **SES sem rollback**: `saveSes` faz 3 upserts em série. Se um falhar entre eles, conta fica em estado parcial; usuário re-clica Save (idempotente). Solução transacional fica V3 (EVO-1066).
+- **SparkPost sem admin-integrations system-wide**: constantes locais ao DTO `account-settings/dtos/sparkpost.dto.ts`. Se super_admin precisar de UI system-wide para SparkPost em V3+, criar `admin-integrations/sparkpost/` espelhando outros providers.
+
+Todos esses entram no escopo de V3 (EVO-1066).

@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAppStore } from '@/stores/app-store';
 import { poolGateway, type Pool } from './pool-gateway';
 import { poolSendgridGateway, type SendgridPoolOption } from './pool-sendgrid-gateway';
-import { accountSendgridGateway, type SendgridKeySource } from './sendgrid-account-gateway';
+import { accountSendgridGateway, type SendgridKeySource } from './email-providers/sendgrid-account-gateway';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

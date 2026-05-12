@@ -8,7 +8,7 @@ import { ListPage } from '@/components/list-page';
 import { selectIsSuperAdmin, useAppStore } from '@/stores/app-store';
 import { useAccountConfig, useAccountId, useTimezone, useUpdateAccountConfigs } from './use-settings';
 import { SETTINGS_TABS, type SettingsTab } from './types';
-import { SendgridAccountTab } from './sendgrid-account-tab';
+import { EmailProvidersTab } from './email-providers';
 import { PoolTab } from './pool-tab';
 
 export default function SettingsPage() {
@@ -44,7 +44,7 @@ export default function SettingsPage() {
         <div className="p-6">
           {tab === 'general' && <GeneralTab />}
           {tab === 'email' && <EmailTab />}
-          {tab === 'sendgrid' && <SendgridAccountTab />}
+          {tab === 'email_providers' && <EmailProvidersTab />}
           {tab === 'pool' && isSuperAdmin && <PoolTab />}
         </div>
       </ListPage.Content>

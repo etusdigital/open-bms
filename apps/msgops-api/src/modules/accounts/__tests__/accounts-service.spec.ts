@@ -112,3 +112,113 @@ describe('AccountsService — findWithCleanConfigs', () => {
     expect(result.accountConfigs).toBe(loadedConfigs);
   });
 });
+
+describe('AccountsService — updateAccountConfig — default_email_provider cross-field validation', () => {
+  let service: AccountsService;
+  let accountConfigRepository: { find: jest.Mock; update: jest.Mock };
+  let clsService: { get: jest.Mock };
+
+  const ACCOUNT_ID = 42;
+
+  const buildRow = (name: string, value: string) => ({ accountId: ACCOUNT_ID, name, value }) as unknown as AccountConfigEntity;
+
+  beforeEach(async () => {
+    accountConfigRepository = {
+      find: jest.fn(),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+    clsService = { get: jest.fn().mockReturnValue(ACCOUNT_ID) };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AccountsService,
+        { provide: getRepositoryToken(AccountEntity), useValue: {} },
+        { provide: getRepositoryToken(CustomFieldsEntity), useValue: {} },
+        { provide: getRepositoryToken(CustomEventEntity), useValue: {} },
+        { provide: getRepositoryToken(AccountConfigEntity), useValue: accountConfigRepository },
+        { provide: getRepositoryToken(UserAccountEntity), useValue: {} },
+        { provide: getRepositoryToken(AccountApiKeyEntity), useValue: {} },
+        { provide: getRepositoryToken(RoleEntity), useValue: {} },
+        { provide: RedisService, useValue: {} },
+        { provide: SendgridHandler, useValue: {} },
+        { provide: S3StorageProvider, useValue: {} },
+        { provide: SchedulerService, useValue: {} },
+        { provide: ClsService, useValue: clsService },
+        { provide: HttpService, useValue: {} },
+        { provide: EvolutionHandler, useValue: {} },
+        { provide: AccountCacheService, useValue: {} },
+      ],
+    }).compile();
+
+    service = module.get<AccountsService>(AccountsService);
+  });
+
+  describe.each([
+    ['sparkpost', 'SparkPost', ['sparkpost_key']],
+    ['sendgrid', 'SendGrid', ['sendgrid_key']],
+    ['mailersend', 'MailerSend', ['mailersend_key']],
+    ['resend', 'Resend', ['resend_key']],
+    ['mandrill', 'Mandrill', ['mandrill_key']],
+  ])('provider %s', (providerName, providerLabel, keys) => {
+    it(`resolves when ${keys.join(', ')} is configured`, async () => {
+      accountConfigRepository.find.mockResolvedValue(keys.map((k) => buildRow(k, 'secret-value')));
+
+      await expect(service.updateAccountConfig('default_email_provider', { value: providerName })).resolves.toBeDefined();
+      expect(accountConfigRepository.update).toHaveBeenCalledWith({ accountId: ACCOUNT_ID, name: 'default_email_provider' }, { value: providerName });
+    });
+
+    it(`rejects with BadRequestException when credentials missing`, async () => {
+      accountConfigRepository.find.mockResolvedValue([]);
+
+      await expect(service.updateAccountConfig('default_email_provider', { value: providerName })).rejects.toMatchObject({
+        message: expect.stringMatching(/Configure as credenciais do .* antes de defini-lo como default\./),
+      });
+      await expect(service.updateAccountConfig('default_email_provider', { value: providerName })).rejects.toMatchObject({
+        message: expect.stringContaining(providerLabel),
+      });
+      expect(accountConfigRepository.update).not.toHaveBeenCalled();
+    });
+
+    it(`rejects when credential row exists but value is empty/whitespace`, async () => {
+      accountConfigRepository.find.mockResolvedValue(keys.map((k) => buildRow(k, '   ')));
+
+      await expect(service.updateAccountConfig('default_email_provider', { value: providerName })).rejects.toMatchObject({
+        message: expect.stringContaining(providerLabel),
+      });
+      expect(accountConfigRepository.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('provider ses (3 required keys)', () => {
+    const SES_KEYS = ['ses_access_key_id', 'ses_secret_access_key', 'ses_region'];
+
+    it('resolves when all 3 SES keys are configured', async () => {
+      accountConfigRepository.find.mockResolvedValue(SES_KEYS.map((k) => buildRow(k, 'value')));
+
+      await expect(service.updateAccountConfig('default_email_provider', { value: 'ses' })).resolves.toBeDefined();
+      expect(accountConfigRepository.update).toHaveBeenCalled();
+    });
+
+    it.each(SES_KEYS)('rejects when SES key %s is missing', async (missingKey) => {
+      const present = SES_KEYS.filter((k) => k !== missingKey).map((k) => buildRow(k, 'value'));
+      accountConfigRepository.find.mockResolvedValue(present);
+
+      await expect(service.updateAccountConfig('default_email_provider', { value: 'ses' })).rejects.toMatchObject({
+        message: expect.stringContaining('Amazon SES'),
+      });
+      expect(accountConfigRepository.update).not.toHaveBeenCalled();
+    });
+  });
+
+  it('does NOT invoke checkProviderCredentials for unrelated config names', async () => {
+    await service.updateAccountConfig('default_domain', { value: 'example.com' });
+    expect(accountConfigRepository.find).not.toHaveBeenCalled();
+    expect(accountConfigRepository.update).toHaveBeenCalledWith({ accountId: ACCOUNT_ID, name: 'default_domain' }, { value: 'example.com' });
+  });
+
+  it('does NOT invoke checkProviderCredentials for unknown provider values (preserves behavior)', async () => {
+    await service.updateAccountConfig('default_email_provider', { value: 'unknown_provider' });
+    expect(accountConfigRepository.find).not.toHaveBeenCalled();
+    expect(accountConfigRepository.update).toHaveBeenCalled();
+  });
+});

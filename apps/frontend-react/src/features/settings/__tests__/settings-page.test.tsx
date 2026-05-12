@@ -15,6 +15,7 @@ vi.mock('../use-settings', () => ({
       unsubscribe_redirect_url: 'https://example.com/unsub',
       default_domain: 'example.com',
       send_limit_per_user: '1000',
+      default_email_provider: 'mailersend',
     };
     return configs[name] ?? '';
   },
@@ -22,6 +23,82 @@ vi.mock('../use-settings', () => ({
   useAccountId: () => 1,
   useTimezone: () => 'America/Sao_Paulo',
   useUpdateAccountConfigs: () => ({ mutate: mockMutate, isPending: false }),
+}));
+
+vi.mock('../email-providers/use-email-providers', () => ({
+  useEmailProviders: () => ({
+    providers: [
+      { name: 'sendgrid', label: 'SendGrid', configured: false, hasFreeTier: false, hasWebhook: true },
+      { name: 'mailersend', label: 'MailerSend', configured: false, hasFreeTier: true, hasWebhook: true },
+      { name: 'sparkpost', label: 'SparkPost', configured: false, hasFreeTier: true, hasWebhook: true },
+      { name: 'resend', label: 'Resend', configured: false, hasFreeTier: true, hasWebhook: true },
+      { name: 'ses', label: 'Amazon SES', configured: false, hasFreeTier: false, hasWebhook: true },
+      { name: 'mandrill', label: 'Mandrill', configured: false, hasFreeTier: false, hasWebhook: true },
+    ],
+    configuredProviders: [],
+    hasAnyConfigured: false,
+    defaultProvider: 'mailersend',
+    isLoading: false,
+    refresh: vi.fn(),
+  }),
+}));
+
+vi.mock('../email-providers/sparkpost-legacy-migration', () => ({
+  SparkpostLegacyMigration: () => null,
+}));
+
+vi.mock('../email-providers/sendgrid-account-gateway', () => ({
+  accountSendgridGateway: {
+    get: vi.fn().mockResolvedValue({ source: 'none', apiKeyMasked: null, webhookUrl: null }),
+    save: vi.fn(),
+    remove: vi.fn(),
+    test: vi.fn(),
+  },
+}));
+
+vi.mock('../email-providers/mailersend-account-gateway', () => ({
+  accountMailersendGateway: {
+    get: vi.fn().mockResolvedValue({ source: 'none', apiKeyMasked: null }),
+    save: vi.fn(),
+    remove: vi.fn(),
+    test: vi.fn(),
+  },
+}));
+
+vi.mock('../email-providers/sparkpost-account-gateway', () => ({
+  accountSparkpostGateway: {
+    get: vi.fn().mockResolvedValue({ source: 'none', apiKeyMasked: null }),
+    save: vi.fn(),
+    remove: vi.fn(),
+    test: vi.fn(),
+  },
+}));
+
+vi.mock('../email-providers/resend-account-gateway', () => ({
+  accountResendGateway: {
+    get: vi.fn().mockResolvedValue({ source: 'none', apiKeyMasked: null }),
+    save: vi.fn(),
+    remove: vi.fn(),
+    test: vi.fn(),
+  },
+}));
+
+vi.mock('../email-providers/amazon-ses-account-gateway', () => ({
+  accountSesGateway: {
+    get: vi.fn().mockResolvedValue({ source: 'none', accessKeyIdMasked: null, secretAccessKeyMasked: null, region: null }),
+    save: vi.fn(),
+    remove: vi.fn(),
+    test: vi.fn(),
+  },
+}));
+
+vi.mock('../email-providers/mandrill-account-gateway', () => ({
+  accountMandrillGateway: {
+    get: vi.fn().mockResolvedValue({ source: 'none', apiKeyMasked: null }),
+    save: vi.fn(),
+    remove: vi.fn(),
+    test: vi.fn(),
+  },
 }));
 
 function renderPage() {
@@ -92,6 +169,34 @@ describe('SettingsPage', () => {
           accountId: 1,
           configs: [{ account_id: 1, name: 'send_limit_per_user', value: '1000' }],
         });
+      });
+    });
+  });
+
+  describe('email providers tab', () => {
+    it('shows the email providers tab button', async () => {
+      await renderPage();
+      expect(screen.getByRole('button', { name: 'Email Providers' })).toBeInTheDocument();
+    });
+
+    it('switches to email providers tab and renders the default provider section', async () => {
+      await renderPage();
+      fireEvent.click(screen.getByRole('button', { name: 'Email Providers' }));
+      await waitFor(() => {
+        expect(screen.getByText(/Default Email Provider/i)).toBeInTheDocument();
+      });
+    });
+
+    it('renders all 5 provider cards in email providers tab with their data-testid', async () => {
+      await renderPage();
+      fireEvent.click(screen.getByRole('button', { name: 'Email Providers' }));
+      await waitFor(() => {
+        // Wiring sanity: each card actually mounted (data-testid set by ProviderCard / AmazonSesCard).
+        expect(screen.getByTestId('provider-card-mailersend')).toBeInTheDocument();
+        expect(screen.getByTestId('provider-card-sparkpost')).toBeInTheDocument();
+        expect(screen.getByTestId('provider-card-resend')).toBeInTheDocument();
+        expect(screen.getByTestId('provider-card-mandrill')).toBeInTheDocument();
+        expect(screen.getByTestId('provider-card-ses')).toBeInTheDocument();
       });
     });
   });

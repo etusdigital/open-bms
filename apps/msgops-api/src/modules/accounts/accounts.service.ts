@@ -1,7 +1,7 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { AccountEntity } from '../../entities/account.entity';
 import { AccountConfigEntity } from '../../entities/account-config.entity';
 import { PaginationDto } from '../../dtos/pagination.dto';
@@ -732,7 +732,56 @@ export class AccountsService {
     });
   }
 
+  private async checkProviderCredentials(accountId: number, provider: string): Promise<boolean> {
+    const PROVIDER_CREDENTIAL_KEYS: Record<string, string[]> = {
+      sparkpost: ['sparkpost_key'],
+      sendgrid: ['sendgrid_key'],
+      mailersend: ['mailersend_key'],
+      resend: ['resend_key'],
+      ses: ['ses_access_key_id', 'ses_secret_access_key', 'ses_region'],
+      mandrill: ['mandrill_key'],
+    };
+
+    const keys = PROVIDER_CREDENTIAL_KEYS[provider];
+    if (!keys) return false;
+
+    const rows = await this.accountConfigRepository.find({ where: { accountId, name: In(keys) } });
+    return keys.every((key) => {
+      const row = rows.find((r) => r.name === key);
+      return !!row && typeof row.value === 'string' && row.value.trim().length > 0;
+    });
+  }
+
   async updateAccountConfig(name: string, accountConfig: { value: string; description?: string }) {
+    if (name === 'default_email_provider') {
+      const KNOWN_PROVIDERS = ['sparkpost', 'sendgrid', 'mailersend', 'resend', 'ses', 'mandrill'];
+      const providerLabel = (v: string): string => {
+        switch (v) {
+          case 'sparkpost':
+            return 'SparkPost';
+          case 'sendgrid':
+            return 'SendGrid';
+          case 'mailersend':
+            return 'MailerSend';
+          case 'resend':
+            return 'Resend';
+          case 'ses':
+            return 'Amazon SES';
+          case 'mandrill':
+            return 'Mandrill';
+          default:
+            return v;
+        }
+      };
+      const value = accountConfig.value;
+      if (KNOWN_PROVIDERS.includes(value)) {
+        const accountId = this.cls.get('accountId');
+        const ok = await this.checkProviderCredentials(accountId, value);
+        if (!ok) {
+          throw new BadRequestException(`Configure as credenciais do ${providerLabel(value)} antes de defini-lo como default.`);
+        }
+      }
+    }
     return await this.accountConfigRepository.update({ accountId: this.cls.get('accountId'), name }, accountConfig);
   }
 
