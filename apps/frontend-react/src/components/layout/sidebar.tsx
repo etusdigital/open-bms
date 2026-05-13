@@ -15,6 +15,7 @@ import { MENU_ITEMS, SETTINGS_ITEM } from './sidebar-config';
 import { SidebarNavLink } from './sidebar-nav-link';
 import { SidebarNavGroup } from './sidebar-nav-group';
 import { AccountSelector } from './account-selector';
+import { LanguageSwitcher } from '@/features/settings/components/language-switcher';
 import type { NavItem } from './sidebar-config';
 
 export function Sidebar() {
@@ -181,6 +182,10 @@ function SidebarUserMenu({ collapsed }: { collapsed: boolean }) {
           <ThemeIcon className="h-4 w-4" />
           {t('sidebar.theme')}: {themeLabel}
         </button>
+
+        <Separator className="my-1" />
+
+        <LanguageSwitcher />
 
         <Separator className="my-1" />
 

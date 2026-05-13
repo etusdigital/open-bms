@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
@@ -44,6 +45,7 @@ const PROVIDER_REMOVERS: Record<string, { label: string; remove: (accountId: num
 };
 
 export function EmailProvidersTab() {
+  const { t } = useTranslation();
   const accountId = useAccountId();
   const { configuredProviders, defaultProvider, hasAnyConfigured, isLoading, refresh } = useEmailProviders();
   const updateConfigs = useUpdateAccountConfigs();
@@ -121,7 +123,7 @@ export function EmailProvidersTab() {
 
     try {
       await remover.remove(accountId);
-      toast.success(`${remover.label} removido.`);
+      toast.success(t('settings.emailProviders.removeSuccess', { provider: remover.label }));
       refresh();
       setRemoveTarget(null);
     } catch (err) {
@@ -138,9 +140,7 @@ export function EmailProvidersTab() {
     <div className="space-y-6">
       {showSetupBanner && (
         <Alert variant="warning" data-testid="email-providers-setup-banner">
-          <AlertDescription>
-            Configure pelo menos um email provider para enviar campanhas a partir desta conta.
-          </AlertDescription>
+          <AlertDescription>{t('settings.emailProviders.setupBanner')}</AlertDescription>
         </Alert>
       )}
       <SparkpostLegacyMigration />

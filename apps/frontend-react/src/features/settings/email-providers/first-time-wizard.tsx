@@ -1,16 +1,24 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 
-const RECOMMENDED = [
-  { name: 'mailersend', label: 'MailerSend', blurb: '12k emails/mês grátis, sem cartão.' },
-  { name: 'sparkpost', label: 'SparkPost', blurb: '500 emails/dia grátis, ótimo para começar.' },
-  { name: 'resend', label: 'Resend', blurb: '3k emails/mês grátis, DX moderno.' },
-  { name: 'sendgrid', label: 'Já tenho conta SendGrid', blurb: 'Use sua API key existente.' },
-] as const;
+type Recommended = {
+  name: 'mailersend' | 'sparkpost' | 'resend' | 'sendgrid';
+  label?: string;
+  labelKey?: string;
+  blurbKey: string;
+};
 
-type RecommendedName = (typeof RECOMMENDED)[number]['name'];
+const RECOMMENDED: readonly Recommended[] = [
+  { name: 'mailersend', label: 'MailerSend', blurbKey: 'settings.emailProviders.wizard.mailersendBlurb' },
+  { name: 'sparkpost', label: 'SparkPost', blurbKey: 'settings.emailProviders.wizard.sparkpostBlurb' },
+  { name: 'resend', label: 'Resend', blurbKey: 'settings.emailProviders.wizard.resendBlurb' },
+  { name: 'sendgrid', labelKey: 'settings.emailProviders.wizard.sendgridLabel', blurbKey: 'settings.emailProviders.wizard.sendgridBlurb' },
+];
+
+type RecommendedName = Recommended['name'];
 
 interface FirstTimeWizardProps {
   open: boolean;
@@ -20,21 +28,21 @@ interface FirstTimeWizardProps {
 }
 
 export function FirstTimeWizard({ open, onOpenChange, onSelect, onSkip }: FirstTimeWizardProps) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState<RecommendedName>('mailersend');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="first-time-wizard">
         <DialogHeader>
-          <DialogTitle>Vamos configurar seu primeiro email provider</DialogTitle>
-          <DialogDescription>
-            Recomendamos começar por um provider com free tier — você pode mudar depois.
-          </DialogDescription>
+          <DialogTitle>{t('settings.emailProviders.wizard.title')}</DialogTitle>
+          <DialogDescription>{t('settings.emailProviders.wizard.description')}</DialogDescription>
         </DialogHeader>
 
-        <div role="radiogroup" aria-label="Email provider recomendado" className="flex flex-col gap-2">
+        <div role="radiogroup" aria-label={t('settings.emailProviders.wizard.ariaLabel')} className="flex flex-col gap-2">
           {RECOMMENDED.map((p) => {
             const isSelected = selected === p.name;
+            const label = p.labelKey ? t(p.labelKey as 'settings.emailProviders.wizard.sendgridLabel') : p.label;
             return (
               <button
                 key={p.name}
@@ -56,8 +64,8 @@ export function FirstTimeWizard({ open, onOpenChange, onSelect, onSkip }: FirstT
                   {isSelected && <span className="bg-primary h-2 w-2 rounded-full" />}
                 </span>
                 <span>
-                  <Label className="cursor-pointer">{p.label}</Label>
-                  <p className="text-muted-foreground text-xs">{p.blurb}</p>
+                  <Label className="cursor-pointer">{label}</Label>
+                  <p className="text-muted-foreground text-xs">{t(p.blurbKey as 'settings.emailProviders.wizard.mailersendBlurb')}</p>
                 </span>
               </button>
             );
@@ -66,10 +74,10 @@ export function FirstTimeWizard({ open, onOpenChange, onSelect, onSkip }: FirstT
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onSkip}>
-            Pular wizard
+            {t('settings.emailProviders.wizard.skip')}
           </Button>
           <Button type="button" onClick={() => onSelect(selected)}>
-            Próximo →
+            {t('settings.emailProviders.wizard.next')}
           </Button>
         </DialogFooter>
       </DialogContent>

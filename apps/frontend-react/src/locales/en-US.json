@@ -50,7 +50,11 @@
     "theme": "Theme",
     "themeLight": "Light",
     "themeDark": "Dark",
-    "themeSystem": "System"
+    "themeSystem": "System",
+    "language": "Language",
+    "languagePtBR": "Portuguese (Brazil)",
+    "languageEnUS": "English (US)",
+    "languageEsES": "Spanish (Spain)"
   },
   "auth": {
     "connecting": "Connecting...",
@@ -698,7 +702,7 @@
     "typeRecurringDesc": "Create a campaign with recurring sends.",
     "createCampaign": "Create campaign",
     "createCampaignBlank": "Create blank campaign",
-    "createFromRule": "New campaign",
+    "createFromRule": "Create campaign",
     "createFromRuleButton": "Create campaign from rule",
     "permittedDays": "Permitted days",
     "dateNotAllowed": "This date is not allowed for this rule.",
@@ -848,7 +852,6 @@
     "statisticsSent": "Sent",
     "winnerMessage": "Winner message",
     "progressLabel": "Progress",
-    "createFromRule": "Create campaign",
     "messageLabel": "Message {{label}}",
     "previewSubject": "Subject",
     "previewPreviewText": "Preview",
@@ -1811,7 +1814,47 @@
     "mandrillSourceAccount": "Account-owned key",
     "mandrillSourceNone": "Not configured",
     "mandrillStoredLabel": "Stored key",
-    "mandrillDiscontinuationWarning": "Experimental provider — Mandrill discontinuation has been announced multiple times; consider migrating."
+    "mandrillDiscontinuationWarning": "Experimental provider — Mandrill discontinuation has been announced multiple times; consider migrating.",
+    "emailProviders": {
+      "setupBanner": "Configure at least one email provider to send campaigns from this account.",
+      "removeSuccess": "{{provider}} removed.",
+      "errors": {
+        "rateLimited": "Too many attempts. Please wait 1 minute before trying again.",
+        "sesSandbox": "{{provider}} is in sandbox or paused. Request production access on AWS Support.",
+        "mandrillInvalidKey": "Invalid Mandrill credentials. Mandrill returns HTTP 500 for incorrect API keys.",
+        "network": "Could not connect to {{provider}}. Check your network.",
+        "unknown": "Error communicating with {{provider}}."
+      },
+      "wizard": {
+        "title": "Let’s set up your first email provider",
+        "description": "We recommend starting with a provider that has a free tier — you can switch later.",
+        "ariaLabel": "Recommended email provider",
+        "skip": "Skip wizard",
+        "next": "Next →",
+        "mailersendBlurb": "12k emails/month free, no credit card.",
+        "sparkpostBlurb": "500 emails/day free, great to get started.",
+        "resendBlurb": "3k emails/month free, modern DX.",
+        "sendgridLabel": "I already have a SendGrid account",
+        "sendgridBlurb": "Use your existing API key."
+      },
+      "legacyMigration": {
+        "title": "Migrate SparkPost to per-account configuration",
+        "description": "We detected this account is using the legacy SparkPost configuration (env variable SPARKPOST_API_KEY). Migrating now copies that key to the per-account configuration, letting you manage credentials and defaults per account.",
+        "keepAsIs": "Keep as is",
+        "migrating": "Migrating…",
+        "migrateNow": "Migrate now",
+        "success": "SparkPost migrated to per-account configuration."
+      },
+      "removeDefault": {
+        "title": "Remove {{provider}} as default?",
+        "description": "{{provider}} is the current default ({{providerName}}). Choose a replacement before removing.",
+        "ariaLabel": "New default",
+        "noAlternates": "Configure another provider before removing this one — it’s the only one available.",
+        "cancel": "Cancel",
+        "applying": "Applying…",
+        "swapAndRemove": "Swap default + Remove"
+      }
+    }
   },
   "integrations": {
     "pageTitle": "Integrations",

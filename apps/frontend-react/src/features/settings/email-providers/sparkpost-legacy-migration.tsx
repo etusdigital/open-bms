@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
@@ -33,6 +34,7 @@ function readDismissed(accountId: number): boolean {
 }
 
 export function SparkpostLegacyMigration() {
+  const { t } = useTranslation();
   const accountId = useAccountId();
   const { refresh } = useEmailProviders();
 
@@ -59,7 +61,7 @@ export function SparkpostLegacyMigration() {
       return res.data;
     },
     onSuccess: () => {
-      toast.success('SparkPost migrado para configuração per-account.');
+      toast.success(t('settings.emailProviders.legacyMigration.success'));
       refresh();
       void statusQuery.refetch();
       setOpen(false);
@@ -100,20 +102,18 @@ export function SparkpostLegacyMigration() {
     >
       <DialogContent data-testid="sparkpost-legacy-migration-dialog">
         <DialogHeader>
-          <DialogTitle>Migrar SparkPost para configuração per-account</DialogTitle>
-          <DialogDescription>
-            Detectamos que esta conta está usando a configuração SparkPost legada (variável de ambiente
-            <span className="font-mono"> SPARKPOST_API_KEY</span>). Migrar agora copia essa chave para a configuração
-            per-account, permitindo gerir credenciais e default por conta.
-          </DialogDescription>
+          <DialogTitle>{t('settings.emailProviders.legacyMigration.title')}</DialogTitle>
+          <DialogDescription>{t('settings.emailProviders.legacyMigration.description')}</DialogDescription>
         </DialogHeader>
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={handleSkip} disabled={migrate.isPending}>
-            Manter como está
+            {t('settings.emailProviders.legacyMigration.keepAsIs')}
           </Button>
           <Button type="button" onClick={() => migrate.mutate()} disabled={migrate.isPending}>
-            {migrate.isPending ? 'Migrando…' : 'Migrar agora'}
+            {migrate.isPending
+              ? t('settings.emailProviders.legacyMigration.migrating')
+              : t('settings.emailProviders.legacyMigration.migrateNow')}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import '@/lib/i18n';
 import { RemoveDefaultConfirmDialog } from '../remove-default-confirm-dialog';
 import type { ProviderState } from '../use-email-providers';
 

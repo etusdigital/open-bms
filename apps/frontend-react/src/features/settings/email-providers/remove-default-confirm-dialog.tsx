@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +34,7 @@ export function RemoveDefaultConfirmDialog({
   onCancel,
   submitting,
 }: RemoveDefaultConfirmDialogProps) {
+  const { t } = useTranslation();
   const alternates = configuredProviders.filter((p) => p.name !== providerBeingRemoved);
   const [selected, setSelected] = useState<string>(alternates[0]?.name ?? '');
 
@@ -48,15 +50,19 @@ export function RemoveDefaultConfirmDialog({
     <AlertDialog open={open} onOpenChange={(v) => !v && onCancel()}>
       <AlertDialogContent data-testid="remove-default-confirm-dialog">
         <AlertDialogHeader>
-          <AlertDialogTitle>Remover {providerBeingRemovedLabel} como default?</AlertDialogTitle>
+          <AlertDialogTitle>
+            {t('settings.emailProviders.removeDefault.title', { provider: providerBeingRemovedLabel })}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            {providerBeingRemovedLabel} é o default atual (
-            <span className="font-mono">{defaultProvider}</span>). Escolha um substituto antes de remover.
+            {t('settings.emailProviders.removeDefault.description', {
+              provider: providerBeingRemovedLabel,
+              providerName: defaultProvider ?? '',
+            })}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         {hasAlternates ? (
-          <div role="radiogroup" aria-label="Novo default" className="flex flex-col gap-2">
+          <div role="radiogroup" aria-label={t('settings.emailProviders.removeDefault.ariaLabel')} className="flex flex-col gap-2">
             {alternates.map((p) => {
               const isSelected = selected === p.name;
               return (
@@ -86,13 +92,13 @@ export function RemoveDefaultConfirmDialog({
           </div>
         ) : (
           <p className="text-muted-foreground text-sm" data-testid="remove-default-no-alternates">
-            Configure outro provider antes de remover este — ele é o único disponível.
+            {t('settings.emailProviders.removeDefault.noAlternates')}
           </p>
         )}
 
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel} disabled={submitting}>
-            Cancelar
+            {t('settings.emailProviders.removeDefault.cancel')}
           </AlertDialogCancel>
           {hasAlternates && (
             <AlertDialogAction
@@ -103,7 +109,9 @@ export function RemoveDefaultConfirmDialog({
               }}
               disabled={submitting || !selected}
             >
-              {submitting ? 'Aplicando…' : 'Trocar default + Remover'}
+              {submitting
+                ? t('settings.emailProviders.removeDefault.applying')
+                : t('settings.emailProviders.removeDefault.swapAndRemove')}
             </AlertDialogAction>
           )}
         </AlertDialogFooter>

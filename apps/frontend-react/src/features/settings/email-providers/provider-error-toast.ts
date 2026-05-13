@@ -1,4 +1,5 @@
 import { isAxiosError } from 'axios';
+import i18n from '@/lib/i18n';
 import { extractApiErrorMessage } from '@/lib/api-error';
 
 export type ProviderErrorKind =
@@ -8,24 +9,20 @@ export type ProviderErrorKind =
   | 'network'
   | 'unknown';
 
-/**
- * Translate a provider error (axios or unknown) into a single PT-BR string suitable for
- * `toast.error(...)`. Order of checks matters — more specific kinds win over generic ones.
- */
 export function mapProviderError(error: unknown, providerLabel: string): string {
   if (isRateLimited(error)) {
-    return 'Muitas tentativas. Aguarde 1 minuto antes de tentar novamente.';
+    return i18n.t('settings.emailProviders.errors.rateLimited');
   }
   if (isSesSandbox(error)) {
-    return `${providerLabel} está em sandbox ou pausado. Solicite production access no AWS Support.`;
+    return i18n.t('settings.emailProviders.errors.sesSandbox', { provider: providerLabel });
   }
   if (isMandrillInvalidKey(error, providerLabel)) {
-    return 'Credenciais Mandrill inválidas. Mandrill retorna HTTP 500 para api keys erradas.';
+    return i18n.t('settings.emailProviders.errors.mandrillInvalidKey');
   }
   if (isNetworkError(error)) {
-    return `Não foi possível conectar ao ${providerLabel}. Verifique sua rede.`;
+    return i18n.t('settings.emailProviders.errors.network', { provider: providerLabel });
   }
-  return extractApiErrorMessage(error) ?? `Erro ao comunicar com ${providerLabel}.`;
+  return extractApiErrorMessage(error) ?? i18n.t('settings.emailProviders.errors.unknown', { provider: providerLabel });
 }
 
 /** Exposed for tests / callers that need the kind without the rendered message. */
