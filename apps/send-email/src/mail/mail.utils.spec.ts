@@ -1,6 +1,5 @@
 import { FormatterUtils } from '../utils/formatter.utils';
 import { MailUtils } from './mail.utils';
-import { Request } from 'express';
 
 import { Email, EmailPriority, SendEmailMessage } from '../interfaces';
 
@@ -25,8 +24,7 @@ const mockEmail: Email = {
 
 describe('Mail Utils', () => {
   const formatterUtils = new FormatterUtils();
-  const mockRequest = {} as Request;
-  const mailUtils = new MailUtils(formatterUtils, mockRequest);
+  const mailUtils = new MailUtils(formatterUtils);
 
   describe('Function: getCategories', () => {
     it('should be return array with default values', () => {
@@ -1262,19 +1260,17 @@ describe('Mail Utils', () => {
       expect(result).toMatch(/^[a-z0-9]+$/);
     });
 
-    it('should return cached value for same length on same request', () => {
-      const reqObj = {} as Request;
-      const utilsWithReq = new MailUtils(formatterUtils, reqObj);
-      const first = utilsWithReq.generateRandomAlphanumeric(6);
-      const second = utilsWithReq.generateRandomAlphanumeric(6);
-      expect(first).toBe(second);
+    it('should return a fresh value on each call (per-recipient semantics)', () => {
+      const first = mailUtils.generateRandomAlphanumeric(6);
+      const second = mailUtils.generateRandomAlphanumeric(6);
+      expect(first).not.toBe(second);
+      expect(first).toHaveLength(6);
+      expect(second).toHaveLength(6);
     });
 
     it('should return different values for different lengths', () => {
-      const reqObj = {} as Request;
-      const utilsWithReq = new MailUtils(formatterUtils, reqObj);
-      const four = utilsWithReq.generateRandomAlphanumeric(4);
-      const twelve = utilsWithReq.generateRandomAlphanumeric(12);
+      const four = mailUtils.generateRandomAlphanumeric(4);
+      const twelve = mailUtils.generateRandomAlphanumeric(12);
       expect(four).toHaveLength(4);
       expect(twelve).toHaveLength(12);
     });

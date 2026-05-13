@@ -1,6 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { REQUEST } from '@nestjs/core';
-import { Request } from 'express';
+import { Injectable } from '@nestjs/common';
 import { load } from 'cheerio';
 import Handlebars from 'handlebars';
 import { addTrailingSlash } from '@msgops/url-utils';
@@ -10,12 +8,7 @@ import { Email as BatchEmail, MapVariables, DefaultParams } from './mail.interfa
 
 @Injectable()
 export class MailUtils {
-  private static readonly randomCodeCache = new WeakMap<Request, { [key: string]: string }>();
-
-  constructor(
-    private readonly formatterUtils: FormatterUtils,
-    @Inject(REQUEST) private readonly request: Request,
-  ) {}
+  constructor(private readonly formatterUtils: FormatterUtils) {}
 
   getVariables(customFields: CustomFields[]) {
     const variables = {
@@ -537,20 +530,7 @@ export class MailUtils {
   }
 
   generateRandomAlphanumeric(length: number) {
-    let requestCache = MailUtils.randomCodeCache.get(this.request);
-
-    if (!requestCache) {
-      requestCache = {};
-      MailUtils.randomCodeCache.set(this.request, requestCache);
-    }
-
-    if (requestCache[length]) {
-      return requestCache[length];
-    }
-
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    const code = Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    requestCache[length] = code;
-    return code;
+    return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
   }
 }
