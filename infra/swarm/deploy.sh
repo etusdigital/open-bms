@@ -11,10 +11,10 @@
 #   - `docker login` feito com credenciais que enxergam evoapicloud/bms-*
 #
 # Uso (a partir de uma checkout do repo no manager):
-#   sudo bash _evo-output/implementation-artifacts/evo-1026/swarm/deploy.sh
+#   sudo bash infra/swarm/deploy.sh
 #
 # Ou remoto, do laptop:
-#   DOCKER_HOST=ssh://evolution_manager bash _evo-output/.../swarm/deploy.sh
+#   DOCKER_HOST=ssh://evolution_manager bash infra/swarm/deploy.sh
 
 set -euo pipefail
 

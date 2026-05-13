@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build & push BMS Open Source images for staging deploy.
 #
-# Builds 9 service images, tags them as
+# Builds 13 service images, tags them as
 # evoapicloud/bms-<app>:bms-staging-<sha7>, also tags
 # bms-staging-latest, and pushes both tags to Docker Hub.
 #
@@ -9,12 +9,12 @@
 # the evoapicloud namespace.
 #
 # Usage (do repo root ou de qualquer cwd):
-#   bash _evo-output/implementation-artifacts/evo-1026/swarm/build-and-push.sh
-#   IMAGE_TAG=foo bash _evo-output/.../swarm/build-and-push.sh   # tag custom
-#   REGISTRY=other bash _evo-output/.../swarm/build-and-push.sh  # outro registry
+#   bash infra/swarm/build-and-push.sh
+#   IMAGE_TAG=foo bash infra/swarm/build-and-push.sh   # tag custom
+#   REGISTRY=other bash infra/swarm/build-and-push.sh  # outro registry
 #
 # Após terminar, deploy via:
-#   bash _evo-output/implementation-artifacts/evo-1026/swarm/deploy.sh
+#   bash infra/swarm/deploy.sh
 
 set -euo pipefail
 
