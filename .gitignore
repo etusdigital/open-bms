@@ -41,6 +41,8 @@ test-results/
 
 # Upstream reference clone — not part of this repo
 bms-reference/
+# Skill-generated implementation artifacts (not authoritative).
+# Deploy artifacts for staging live at infra/swarm/ and ARE versioned.
 _evo-output/implementation-artifacts/
 
 # Contact-import stress tool: CSV runs, generated reports, local env file
