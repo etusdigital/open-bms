@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-SWARM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../_evo-output/implementation-artifacts/evo-1026/swarm" && pwd)"
+SWARM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../infra/swarm" && pwd)"
 MANAGER="${MANAGER:-evolution_manager}"
 REGISTRY="${REGISTRY:-evoapicloud}"
 SHA="$(git rev-parse --short=7 HEAD)"
