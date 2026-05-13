@@ -5,6 +5,7 @@ import { setupGateway } from '@/features/setup/setup-gateway';
 import { Step1Admin } from '@/features/setup/steps/Step1Admin';
 import { Step3Domain } from '@/features/setup/steps/Step3Domain';
 import { Step4GeoIp } from '@/features/setup/steps/Step4GeoIp';
+import { Step5S3 } from '@/features/setup/steps/Step5S3';
 import { Step6HealthCheck } from '@/features/setup/steps/Step6HealthCheck';
 import { LoadingScreen } from '@/components/loading-screen';
 
@@ -16,14 +17,16 @@ const STEPS = [
   { num: 1, label: 'Admin' },
   { num: 2, label: 'Domínio' },
   { num: 3, label: 'GeoIP' },
-  { num: 4, label: 'Health' },
+  { num: 4, label: 'S3' },
+  { num: 5, label: 'Health' },
 ] as const;
 
 const STEP_TITLES: Record<number, string> = {
   1: 'Criar conta de administrador',
   2: 'URL base da plataforma',
   3: 'Enriquecimento de IP (GeoIP)',
-  4: 'Verificação de saúde dos serviços',
+  4: 'Armazenamento de arquivos (S3)',
+  5: 'Verificação de saúde dos serviços',
 };
 
 // The backend wizard keeps 6 internal steps (1=Admin, 2=SMTP, 3=Domain,
@@ -68,7 +71,7 @@ function SetupPage() {
   }, [navigate]);
 
   function advance() {
-    setCurrentStep((s) => Math.min(s + 1, 4));
+    setCurrentStep((s) => Math.min(s + 1, 5));
   }
 
   function back() {
@@ -103,7 +106,8 @@ function SetupPage() {
           {currentStep === 1 && <Step1Admin onComplete={advance} />}
           {currentStep === 2 && <Step3Domain onComplete={advance} onBack={back} />}
           {currentStep === 3 && <Step4GeoIp onComplete={advance} onBack={back} />}
-          {currentStep === 4 && <Step6HealthCheck onComplete={finish} onBack={back} />}
+          {currentStep === 4 && <Step5S3 onComplete={advance} onBack={back} />}
+          {currentStep === 5 && <Step6HealthCheck onComplete={finish} onBack={back} />}
         </div>
       </div>
     </div>

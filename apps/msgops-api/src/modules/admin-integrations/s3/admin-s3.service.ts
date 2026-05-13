@@ -60,13 +60,13 @@ export class AdminS3Service implements OnModuleInit {
       accessKeyId: payload.accessKeyId,
       secretAccessKey: payload.secretAccessKey ?? existing?.secretAccessKey ?? '',
       useObjectAcls: payload.useObjectAcls,
-      assetsUrl: payload.assetsUrl,
+      assetsUrl: payload.assetsUrl?.replace(/^https?:\/\//i, '').replace(/\/+$/, '') || undefined,
     };
 
     // Refuse silent reuse when the endpoint changed — operator must supply
     // fresh credentials or we'd be saving stale secret against a new endpoint.
     if (existing && existing.endpoint !== merged.endpoint && !payload.secretAccessKey) {
-      throw new BadRequestException('Trocar de endpoint exige novas credenciais (secretAccessKey).');
+      throw new BadRequestException('Changing endpoint requires new credentials (secretAccessKey).');
     }
 
     const { value, error } = s3SettingsSaveSchema.validate(merged, { abortEarly: false, stripUnknown: true });
@@ -74,7 +74,7 @@ export class AdminS3Service implements OnModuleInit {
 
     const finalValue = value as S3SystemSettings;
     if (!finalValue.secretAccessKey) {
-      throw new BadRequestException('secretAccessKey é obrigatório na primeira configuração.');
+      throw new BadRequestException('secretAccessKey is required on first configuration.');
     }
 
     await this.repo.save(this.repo.create({ key: S3_KEY, value: finalValue as unknown as Record<string, unknown> }));
@@ -118,8 +118,15 @@ export class AdminS3Service implements OnModuleInit {
       await client.send(new HeadBucketCommand({ Bucket: config.bucket }));
       return { ok: true };
     } catch (err: any) {
-      const msg: string = err?.message ?? 'erro desconhecido';
-      return { ok: false, errorMessage: msg.slice(0, 150) };
+      const sub = Array.isArray(err?.errors)
+        ? (err.errors as Error[])
+            .map((e) => e.message)
+            .filter(Boolean)
+            .join('; ')
+        : '';
+      const msg: string = sub || err?.message || String(err) || 'erro desconhecido';
+      this.logger.error('S3 test-connection failed', { msg, err });
+      return { ok: false, errorMessage: msg.slice(0, 300) };
     }
   }
 

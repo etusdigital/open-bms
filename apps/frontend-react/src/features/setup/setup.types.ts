@@ -60,6 +60,17 @@ export type AdvanceStepInput =
   | { step: 5; data: Step5Data }
   | { step: 6; data: Step6Data };
 
+// S3 wizard step — persists via POST /setup/s3, decoupled from advance().
+export interface S3SetupData {
+  endpoint?: string;
+  region?: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  useObjectAcls?: boolean;
+  assetsUrl?: string;
+}
+
 // GeoIP wizard step lives outside the 1..6 backend numbering. It persists a
 // single system_config blob via POST /setup/geoip, decoupled from advance().
 export type GeoIpSetupMode = 'disabled' | 'lite' | 'advanced';

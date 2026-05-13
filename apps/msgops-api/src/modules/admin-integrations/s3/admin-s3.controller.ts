@@ -13,6 +13,12 @@ export class AdminS3Controller {
     return this.service.getSettings();
   }
 
+  @Get('configured')
+  async isConfigured(): Promise<{ configured: boolean }> {
+    const settings = await this.service.getSettings();
+    return { configured: !!settings?.bucket };
+  }
+
   @Put('settings')
   @RequireSuperAdmin()
   saveSettings(@Body() payload: S3SettingsDto): Promise<S3AdminSettings> {

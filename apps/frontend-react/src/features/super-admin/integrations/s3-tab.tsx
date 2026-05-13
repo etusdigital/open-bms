@@ -56,7 +56,9 @@ export function S3Tab() {
   }, [t]);
 
   const hasExistingSecret = !!settings?.secretAccessKeyMasked;
-  const isValid = !!bucket && !!accessKeyId && (!!secretAccessKey || hasExistingSecret);
+  const endpointChanged = !!settings && (settings.endpoint ?? '') !== endpoint;
+  const secretRequired = !hasExistingSecret || endpointChanged;
+  const isValid = !!bucket && !!accessKeyId && (!!secretAccessKey || !secretRequired);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -75,6 +77,7 @@ export function S3Tab() {
       const updated = await s3Gateway.save(payload);
       setSettings(updated);
       setSecretAccessKey('');
+      setAssetsUrl(updated.assetsUrl ?? '');
       toast.success(t('integrations.s3.saveOk'));
     } catch (err) {
       const msg = axios.isAxiosError(err) && err.response?.data?.message
@@ -144,7 +147,7 @@ export function S3Tab() {
 
       <div className="space-y-2">
         <Label htmlFor="s3-akid">{t('integrations.s3.accessKeyId')}</Label>
-        <Input id="s3-akid" value={accessKeyId} onChange={(e) => setAccessKeyId(e.target.value)} disabled={saving} />
+        <Input id="s3-akid" autoComplete="off" value={accessKeyId} onChange={(e) => setAccessKeyId(e.target.value)} disabled={saving} />
       </div>
 
       <div className="space-y-2">
@@ -155,12 +158,15 @@ export function S3Tab() {
             <span className="font-mono">{settings?.secretAccessKeyMasked}</span>
           </div>
         )}
+        {endpointChanged && !secretAccessKey && (
+          <p className="text-destructive text-xs">{t('integrations.s3.secretRequiredOnEndpointChange')}</p>
+        )}
         <div className="relative">
           <Input
             id="s3-secret"
             type={showSecret ? 'text' : 'password'}
             placeholder={hasExistingSecret ? t('integrations.s3.secretReplace') : ''}
-            autoComplete="off"
+            autoComplete="new-password"
             value={secretAccessKey}
             onChange={(e) => setSecretAccessKey(e.target.value)}
             disabled={saving}

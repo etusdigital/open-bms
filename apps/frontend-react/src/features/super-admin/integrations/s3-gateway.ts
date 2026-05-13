@@ -38,6 +38,10 @@ export const s3Gateway = {
     const res = await apiClient.get<S3AdminSettings | null>('/admin/integrations/s3/settings');
     return res.data;
   },
+  async isConfigured(): Promise<boolean> {
+    const res = await apiClient.get<{ configured: boolean }>('/admin/integrations/s3/configured');
+    return res.data.configured;
+  },
   async save(payload: S3SavePayload): Promise<S3AdminSettings> {
     const res = await apiClient.put<S3AdminSettings>('/admin/integrations/s3/settings', payload);
     return res.data;

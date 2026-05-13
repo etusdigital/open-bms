@@ -7,10 +7,15 @@ import { TestSmtpDto } from './dtos/test-smtp.dto';
 import { HealthCheckResult } from './dtos/health-check-result.dto';
 import { TestSendgridDto } from './dtos/test-sendgrid.dto';
 import { GeoIpSettingsDto } from './dtos/geoip-settings.dto';
+import { AdminS3Service } from '../admin-integrations/s3/admin-s3.service';
+import { S3SettingsDto } from '../admin-integrations/s3/dtos/s3-settings.dto';
 
 @Controller('setup')
 export class SetupController {
-  constructor(private readonly setupService: SetupService) {}
+  constructor(
+    private readonly setupService: SetupService,
+    private readonly s3Service: AdminS3Service,
+  ) {}
 
   @Get('status')
   @PublicRoute()
@@ -52,5 +57,13 @@ export class SetupController {
   @PublicRoute()
   saveGeoIp(@Body() dto: GeoIpSettingsDto) {
     return this.setupService.saveGeoIpSettings(dto);
+  }
+
+  // Persists S3 settings from the setup wizard step. Public because the wizard
+  // runs before the operator session is guaranteed (auto-login is best-effort).
+  @Post('s3')
+  @PublicRoute()
+  saveS3(@Body() dto: S3SettingsDto) {
+    return this.s3Service.saveSettings(dto);
   }
 }

@@ -14,6 +14,7 @@ const alertVariants = cva(
         warning:
           'border-yellow-300 bg-yellow-50 text-yellow-900 dark:border-yellow-700/60 dark:bg-yellow-950/30 dark:text-yellow-200 [&>svg]:text-current',
         info: 'border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-700/60 dark:bg-blue-950/30 dark:text-blue-200 [&>svg]:text-current',
+        success: 'border-green-300 bg-green-50 text-green-900 dark:border-green-700/60 dark:bg-green-950/30 dark:text-green-200 [&>svg]:text-current',
       },
     },
     defaultVariants: {
@@ -41,7 +42,7 @@ function AlertDescription({ className, ...props }: React.ComponentProps<'div'>) 
     <div
       data-slot="alert-description"
       className={cn(
-        'text-muted-foreground col-start-2 grid justify-items-start gap-1 text-sm [&_p]:leading-relaxed',
+        'col-start-2 grid justify-items-start gap-1 text-sm opacity-90 [&_p]:leading-relaxed',
         className,
       )}
       {...props}

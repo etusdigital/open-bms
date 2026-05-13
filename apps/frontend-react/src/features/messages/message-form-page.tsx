@@ -1,12 +1,15 @@
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, Link } from '@tanstack/react-router';
 import { AlertTriangle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { FormPage } from '@/components/form-page';
 import { Button } from '@/components/ui/button';
 import MessageForm from './message-form';
 import { useMessage, useCreateMessage, useUpdateMessage, useDuplicateMessage, useLabelsAll } from './use-messages';
 import { ANY_MESSAGE_TYPE_LABELS, baseMessageType, type MessageType, type AnyMessageType } from './types';
 import type { MessageFormValues } from './message-schema';
+import { s3Gateway } from '@/features/super-admin/integrations/s3-gateway';
+import { useAppStore, selectIsSuperAdmin } from '@/stores/app-store';
 
 interface MessageFormPageProps {
   messageId?: number;
@@ -55,6 +58,16 @@ export default function MessageFormPage({ messageId, messageType, onSuccess }: M
   const isTransactional = messageType.startsWith('transactional-');
   const campaignInUse = isEditing && messageQuery.data?.campaignInUse;
 
+  const isEmail = formMessageType === 'email';
+  const s3Query = useQuery({
+    queryKey: ['s3-configured-check'],
+    queryFn: () => s3Gateway.isConfigured(),
+    enabled: isEmail,
+    staleTime: 60_000,
+  });
+  const s3Missing = isEmail && !s3Query.isLoading && !s3Query.isError && s3Query.data === false;
+  const isSuperAdmin = useAppStore(selectIsSuperAdmin);
+
   const handleTypeChange = (type: MessageType) => {
     const base = isTransactional ? '/messages/transactional' : '/messages';
     const route = `${base}/${type}/create`;
@@ -62,6 +75,7 @@ export default function MessageFormPage({ messageId, messageType, onSuccess }: M
   };
 
   const handleSubmit = (data: MessageFormValues, labelIds: number[]) => {
+    if (s3Missing) return;
     const labels = labelIds
       .map((id) => {
         const label = allLabels.find((l) => l.id === id);
@@ -133,6 +147,24 @@ export default function MessageFormPage({ messageId, messageType, onSuccess }: M
         backLabel={pageTitle}
       />
       <FormPage.Content className="w-full">
+        {s3Missing && (
+          <div
+            role="alert"
+            className="mb-4 flex items-center gap-2 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>
+              {t('messages.s3RequiredAlert')}{' '}
+              {isSuperAdmin ? (
+                <Link to="/super-admin/integrations" className="underline underline-offset-2">
+                  {t('messages.s3RequiredAlertLink')}
+                </Link>
+              ) : (
+                t('messages.s3RequiredAlertNoAccess')
+              )}
+            </span>
+          </div>
+        )}
         {campaignInUse && (
           <div
             role="alert"
@@ -153,21 +185,26 @@ export default function MessageFormPage({ messageId, messageType, onSuccess }: M
             </Button>
           </div>
         )}
-        <MessageForm
-          key={messageQuery.data?.id}
-          messageType={formMessageType}
-          messageId={messageId}
-          messageStatus={isEditing ? messageQuery.data?.status : undefined}
-          campaignInUse={!!campaignInUse}
-          defaultValues={defaultValues}
-          templateUrl={isEditing ? messageQuery.data?.templateUrl : undefined}
-          defaultLabelIds={
-            isEditing && messageQuery.data?.labels ? messageQuery.data.labels.map((l) => l.id) : undefined
-          }
-          onSubmit={handleSubmit}
-          onTypeChange={!isEditing && !is2FA ? handleTypeChange : undefined}
-          isPending={mutation.isPending}
-        />
+        <div className="relative">
+          <MessageForm
+            key={messageQuery.data?.id}
+            messageType={formMessageType}
+            messageId={messageId}
+            messageStatus={isEditing ? messageQuery.data?.status : undefined}
+            campaignInUse={!!campaignInUse}
+            defaultValues={defaultValues}
+            templateUrl={isEditing ? messageQuery.data?.templateUrl : undefined}
+            defaultLabelIds={
+              isEditing && messageQuery.data?.labels ? messageQuery.data.labels.map((l) => l.id) : undefined
+            }
+            onSubmit={handleSubmit}
+            onTypeChange={!isEditing && !is2FA ? handleTypeChange : undefined}
+            isPending={mutation.isPending}
+          />
+          {s3Missing && (
+            <div className="absolute inset-0 cursor-not-allowed rounded-lg bg-background/70" />
+          )}
+        </div>
       </FormPage.Content>
     </FormPage.Root>
   );

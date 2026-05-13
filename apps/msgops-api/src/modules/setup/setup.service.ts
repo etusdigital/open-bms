@@ -122,13 +122,9 @@ export class SetupService implements OnModuleInit {
       throw new BadRequestException(`Passo fora de ordem: esperado ${expectedStep}, recebido ${dto.step}.`);
     }
 
-    // Step 6 fans out 6 outbound probes (Postgres/Redis/ClickHouse/RabbitMQ/S3/SMTP) via
-    // checkHealth(). Without a rate limit this public pre-completion endpoint can be
-    // looped to burn external sockets — reuse the same window as GET /setup/health-check
-    // so both paths share a budget per IP.
-    if (dto.step === 6) {
-      this.enforceHealthCheckRateLimit(requesterIp);
-    }
+    // Step 6 re-runs checkHealth() internally. Rate-limiting is handled on
+    // GET /setup/health-check (the poll path); the completion action here is
+    // one-shot and must not be blocked by the poll budget.
 
     switch (dto.step) {
       case 1:
@@ -160,21 +156,15 @@ export class SetupService implements OnModuleInit {
         await connPromise;
       }),
       this.probe(async () => {
-        // DB first (post-setup); env fallback covers the setup wizard itself (pre-config).
         const db = await this.cache.get<S3SystemSettings>(S3_KEY);
-        const bucket = db?.bucket ?? process.env.S3_BUCKET;
-        const accessKeyId = db?.accessKeyId ?? process.env.S3_ACCESS_KEY_ID;
-        const secretAccessKey = db?.secretAccessKey ?? process.env.S3_SECRET_ACCESS_KEY;
-        const endpoint = db?.endpoint ?? process.env.S3_ENDPOINT;
-        const region = db?.region ?? process.env.S3_REGION ?? 'us-east-1';
-        if (!accessKeyId || !secretAccessKey || !bucket) throw new Error('S3 not configured');
+        if (!db?.accessKeyId || !db?.secretAccessKey || !db?.bucket) throw new Error('S3 not configured');
         const client = new S3Client({
-          endpoint,
-          region,
-          credentials: { accessKeyId, secretAccessKey },
-          forcePathStyle: !!endpoint,
+          endpoint: db.endpoint,
+          region: db.region ?? 'us-east-1',
+          credentials: { accessKeyId: db.accessKeyId, secretAccessKey: db.secretAccessKey },
+          forcePathStyle: !!db.endpoint,
         });
-        await client.send(new HeadBucketCommand({ Bucket: bucket }));
+        await client.send(new HeadBucketCommand({ Bucket: db.bucket }));
       }),
       this.probe(async () => {
         const smtpConfig = await this.systemConfigRepo.findOne({ where: { key: SMTP_KEY } });
@@ -193,7 +183,9 @@ export class SetupService implements OnModuleInit {
       rabbitmq,
       s3,
       smtp,
-      allOk: [postgres, redis, clickhouse, rabbitmq, s3, smtp].every((r) => r.ok),
+      // SMTP is optional — excluded from allOk so a misconfigured SMTP
+      // doesn't silently block wizard completion on the frontend.
+      allOk: [postgres, redis, clickhouse, rabbitmq, s3].every((r) => r.ok),
     };
   }
 

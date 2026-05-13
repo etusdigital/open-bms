@@ -19,7 +19,7 @@ const SERVICES = [
   { key: 'redis', label: 'Redis' },
   { key: 'clickhouse', label: 'ClickHouse' },
   { key: 'rabbitmq', label: 'RabbitMQ' },
-  { key: 's3', label: 'S3 / MinIO' },
+  { key: 's3', label: 'S3' },
 ] as const;
 
 type ServiceKey = (typeof SERVICES)[number]['key'];
