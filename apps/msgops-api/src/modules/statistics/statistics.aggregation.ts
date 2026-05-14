@@ -23,6 +23,7 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
   private readonly redisClient: Redis;
   private aggregationTimer: NodeJS.Timeout | null = null;
   private aggregationRunning = false;
+  private lastCleanupDay: string | null = null;
 
   constructor(
     private readonly accountService: AccountsService,
@@ -39,8 +40,11 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
   // Flushes Redis counters into events_statistics on a fixed interval.
   // Override via STATISTICS_AGGREGATION_INTERVAL_MS; set to 0 to disable.
   onModuleInit(): void {
+    // Treat empty string as "unset" so a blank line in .env doesn't silently
+    // disable the scheduler (Number("") === 0 would otherwise hit the off branch).
     const raw = process.env.STATISTICS_AGGREGATION_INTERVAL_MS;
-    const interval = raw !== undefined ? Number(raw) : 60_000;
+    const isProvided = raw != null && raw.trim() !== '';
+    const interval = isProvided ? Number(raw) : 60_000;
     if (!Number.isFinite(interval) || interval <= 0) {
       this.logger.log('In-process aggregation scheduler disabled (STATISTICS_AGGREGATION_INTERVAL_MS=0)');
       return;
@@ -59,18 +63,36 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
     }
   }
 
-  private async runAggregationCycle(): Promise<void> {
+  // Shared entry point for the scheduler and the /aggregated-statistics HTTP
+  // endpoint. The re-entrancy guard lives here (not just inside the timer)
+  // so an external trigger cannot race a concurrent in-process tick and
+  // double-write the same rows.
+  async runAggregationCycle(): Promise<void> {
     if (this.aggregationRunning) {
-      // Skip overlap — a slow tick must not pile up callers writing the same rows.
       return;
     }
     this.aggregationRunning = true;
     try {
       await Promise.all([this.transferRedisDataToPostgres(), this.transferVerifyRedisDataToPostgres()]);
+      await this.runDailyCleanupIfDue();
     } catch (err) {
       this.logger.error(`Scheduled aggregation cycle failed: ${(err as Error)?.message ?? err}`);
     } finally {
       this.aggregationRunning = false;
+    }
+  }
+
+  // Runs removeOldDataFromRedis once per UTC day. Previously triggered by an
+  // external Cloud Scheduler daily job; now folded into the in-process loop
+  // so OSS deploys don't need a separate scheduler.
+  private async runDailyCleanupIfDue(): Promise<void> {
+    const today = dayjs.utc().format('YYYY-MM-DD');
+    if (this.lastCleanupDay === today) return;
+    try {
+      await this.removeOldDataFromRedis();
+      this.lastCleanupDay = today;
+    } catch (err) {
+      this.logger.error(`Daily Redis cleanup failed: ${(err as Error)?.message ?? err}`);
     }
   }
 

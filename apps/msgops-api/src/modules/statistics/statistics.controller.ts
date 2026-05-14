@@ -96,7 +96,9 @@ export class StatisticsController {
   @CronRoute()
   @Get('/aggregated-statistics')
   async loadAggregatedStatistics() {
-    return await Promise.all([this.statisticsAggregationService.transferRedisDataToPostgres(), this.statisticsAggregationService.transferVerifyRedisDataToPostgres()]);
+    // Routed through the service's re-entrancy guard so an external trigger
+    // cannot race a concurrent in-process tick and double-write rows.
+    await this.statisticsAggregationService.runAggregationCycle();
   }
 
   @ApiOperation({ summary: 'Load aggregated statistics from redis to postgres' })
