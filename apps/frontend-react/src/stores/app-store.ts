@@ -53,6 +53,7 @@ interface AppState {
   setError: (error: string) => void;
   resetAuth: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  setAccountConfigs: (configs: AccountConfig[]) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -88,6 +89,12 @@ export const useAppStore = create<AppState>()(
       resetAuth: () => set({ auth: { status: 'idle' }, savedAccountId: null }),
 
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+
+      setAccountConfigs: (configs) =>
+        set((state) => {
+          if (state.auth.status !== 'authenticated') return state;
+          return { auth: { ...state.auth, accountConfigs: configs } };
+        }),
     }),
     {
       name: 'bms-app-store',

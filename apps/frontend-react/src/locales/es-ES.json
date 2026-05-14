@@ -2106,7 +2106,16 @@
       "cannotDeleteCurrent": "No puedes eliminar la cuenta que estás usando",
       "bulkDeleteSuccess": "{{count}} cuenta(s) eliminada(s)",
       "bulkDeleteConfirmDescription": "Se eliminarán {{count}} cuenta(s). Esta acción no se puede deshacer.",
-      "bulkDeletePartial": "{{succeeded}} de {{total}} cuenta(s) eliminada(s). {{reason}}"
+      "bulkDeletePartial": "{{succeeded}} de {{total}} cuenta(s) eliminada(s). {{reason}}",
+      "channels": {
+        "title": "Canales",
+        "help": "Habilita solo los canales que esta cuenta puede usar en automatizaciones y campañas.",
+        "email": "Email",
+        "sms": "SMS",
+        "webPush": "Web Push",
+        "mobilePush": "Mobile Push",
+        "whatsapp": "WhatsApp"
+      }
     },
     "users": {
       "pageTitle": "Usuarios",

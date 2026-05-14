@@ -2110,7 +2110,16 @@
       "cannotDeleteCurrent": "You cannot delete the account you are currently using",
       "bulkDeleteSuccess": "{{count}} account(s) deleted",
       "bulkDeleteConfirmDescription": "{{count}} account(s) will be deleted. This action cannot be undone.",
-      "bulkDeletePartial": "{{succeeded}} of {{total}} account(s) deleted. {{reason}}"
+      "bulkDeletePartial": "{{succeeded}} of {{total}} account(s) deleted. {{reason}}",
+      "channels": {
+        "title": "Channels",
+        "help": "Enable only the channels this account can use in automations and campaigns.",
+        "email": "Email",
+        "sms": "SMS",
+        "webPush": "Web Push",
+        "mobilePush": "Mobile Push",
+        "whatsapp": "WhatsApp"
+      }
     },
     "users": {
       "pageTitle": "Users",

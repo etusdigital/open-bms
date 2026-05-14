@@ -2110,7 +2110,16 @@
       "cannotDeleteCurrent": "Você não pode apagar a conta que está usando",
       "bulkDeleteSuccess": "{{count}} conta(s) apagada(s)",
       "bulkDeleteConfirmDescription": "{{count}} conta(s) serão apagadas. Esta ação não pode ser desfeita.",
-      "bulkDeletePartial": "{{succeeded}} de {{total}} conta(s) apagada(s). {{reason}}"
+      "bulkDeletePartial": "{{succeeded}} de {{total}} conta(s) apagada(s). {{reason}}",
+      "channels": {
+        "title": "Canais",
+        "help": "Ative apenas os canais que esta conta pode usar nas automações e campanhas.",
+        "email": "Email",
+        "sms": "SMS",
+        "webPush": "Web Push",
+        "mobilePush": "Mobile Push",
+        "whatsapp": "WhatsApp"
+      }
     },
     "users": {
       "pageTitle": "Usuários",

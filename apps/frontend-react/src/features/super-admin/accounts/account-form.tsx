@@ -13,6 +13,7 @@ import {
   type SuperAdminCreateAccountValues,
   type SuperAdminEditAccountValues,
 } from './account-schema';
+import { CHANNEL_KEYS } from './account-channels';
 
 interface AccountFormCreateProps {
   mode: 'create';
@@ -207,6 +208,36 @@ function EditForm({
               </FormItem>
             )}
           />
+
+          <section className="rounded-lg border p-4 space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold">{t('superAdmin.accounts.channels.title')}</h3>
+              <p className="text-muted-foreground text-xs">{t('superAdmin.accounts.channels.help')}</p>
+            </div>
+            <div className="space-y-2">
+              {CHANNEL_KEYS.map((key) => (
+                <FormField
+                  key={key}
+                  control={form.control}
+                  name={`channels.${key}` as const}
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between rounded-md border p-3">
+                      <FormLabel className="font-normal">
+                        {t(`superAdmin.accounts.channels.${key}`)}
+                      </FormLabel>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          aria-label={t(`superAdmin.accounts.channels.${key}`)}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              ))}
+            </div>
+          </section>
 
           {form.formState.errors.root?.serverError && (
             <div role="alert" className="bg-destructive/10 text-destructive rounded-md p-3 text-sm">
