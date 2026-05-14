@@ -670,8 +670,12 @@ export class ContactsService {
   }
 
   async create(contactDto: ContactDto): Promise<ContactDto> {
+    const accountId = this.cls.get('accountId');
+    if (!accountId) {
+      throw new HttpException('Account context is required.', HttpStatus.BAD_REQUEST);
+    }
     try {
-      return this.contactRepository.save(contactDto);
+      return this.contactRepository.save({ ...contactDto, accountId });
     } catch (e) {
       console.error(e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
