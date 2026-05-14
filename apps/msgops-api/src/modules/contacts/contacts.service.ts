@@ -25,6 +25,9 @@ import { ContactAutomationEntity } from 'src/entities/contact-automation.entity'
 import { EventsLogEntity } from 'src/entities/events-log.entity';
 import { AuditService } from './../../utils/audits/audit.service';
 import { maskEmail } from '../../utils/masking/email-masker';
+import { EventPublisherService } from '../../providers/messaging/event-publisher.service';
+import { EXCHANGES } from '@bms/messaging';
+import { TagEntity } from 'src/entities/tag.entity';
 import * as csv from 'fast-csv';
 const CsvParser = require('json2csv').Parser;
 
@@ -55,7 +58,40 @@ export class ContactsService {
     private readonly redisService: RedisService,
     private readonly auditService: AuditService,
     private readonly cls: ClsService,
+    private readonly eventPublisher: EventPublisherService,
   ) {}
+
+  // TODO(perf): N contacts × M tags becomes N×M serial publishes. Fine for the
+  // v0.1.0 OSS ceiling; revisit with bounded concurrency or a batched envelope
+  // once we see bulk-tag flows that hit it.
+  private async publishTagEvents(
+    action: 'add' | 'remove',
+    accountId: number,
+    pairs: Array<{ contact: { id: number; email?: string; uuid?: string }; tagName: string }>,
+  ): Promise<void> {
+    if (!pairs.length) return;
+    for (const { contact, tagName } of pairs) {
+      try {
+        await this.eventPublisher.publish(
+          EXCHANGES.tags,
+          'tag.process',
+          {
+            // id is the SaaS lead-id slot; OSS doesn't carry leads through here.
+            id: 0,
+            startedAt: Date.now(),
+            account: { id: accountId },
+            contact: { id: contact.id, accountId, email: contact.email, uuid: contact.uuid },
+            tagName,
+          },
+          { type: action },
+        );
+      } catch (err) {
+        // DB already committed — don't fail the API response over a queue hiccup.
+        // The contact will miss this automation trigger; surface it for ops.
+        this.logger.error(`[publishTagEvents] failed to publish ${action} for contact=${contact.id} tag="${tagName}" account=${accountId}`, (err as Error)?.stack ?? err);
+      }
+    }
+  }
 
   async findAll(): Promise<Array<ContactEntity>> {
     try {
@@ -899,8 +935,35 @@ export class ContactsService {
       }
 
       if (tagEntities.length) {
-        const tagRows = tagEntities.map((t: any) => ({ contactId: saved.id, tagId: t.id, accountId }));
-        await this.contactTagRepository.createQueryBuilder().insert().values(tagRows).orIgnore().execute();
+        // Re-imports must not re-publish add-events for tags the contact already
+        // carries: that would fire spurious add-trigger automations every run.
+        const tagIdList = tagEntities.map((t: any) => t.id);
+        const alreadyTagged = new Set(
+          (
+            await this.contactTagRepository
+              .createQueryBuilder('ct')
+              .select(['ct.tagId'])
+              .where('ct.account_id = :accountId AND ct.contact_id = :contactId AND ct.tag_id IN (:...tagIds)', {
+                accountId,
+                contactId: saved.id,
+                tagIds: tagIdList,
+              })
+              .getMany()
+          ).map((row) => row.tagId),
+        );
+        const newTags = tagEntities.filter((t: any) => !alreadyTagged.has(t.id));
+        if (newTags.length) {
+          const tagRows = newTags.map((t: any) => ({ contactId: saved.id, tagId: t.id, accountId }));
+          await this.contactTagRepository.createQueryBuilder().insert().values(tagRows).orIgnore().execute();
+          await this.publishTagEvents(
+            'add',
+            accountId,
+            newTags.map((t: any) => ({
+              contact: { id: saved.id, email: saved.email, uuid: saved.uuid },
+              tagName: t.name,
+            })),
+          );
+        }
       }
 
       imported += 1;
@@ -910,6 +973,9 @@ export class ContactsService {
   }
 
   async updateTag(params: { contacts: number[]; tags: number[]; action: 'add' | 'remove' }) {
+    if (params.action !== 'add' && params.action !== 'remove') {
+      throw new BadRequestException(`updateTag: unknown action "${params.action}"`);
+    }
     const accountId = this.cls.get<number>('accountId');
     const contactIds: number[] = params.contacts ?? [];
     const tagIds: number[] = params.tags ?? [];
@@ -917,41 +983,84 @@ export class ContactsService {
       return { affected: 0 };
     }
 
+    const existing = await this.contactTagRepository
+      .createQueryBuilder('ct')
+      .select(['ct.contactId', 'ct.tagId'])
+      .where('ct.account_id = :accountId AND ct.contact_id IN (:...contactIds) AND ct.tag_id IN (:...tagIds)', {
+        accountId,
+        contactIds,
+        tagIds,
+      })
+      .getMany();
+    const existingPairs = new Set(existing.map((row) => `${row.contactId}:${row.tagId}`));
+
     if (params.action === 'add') {
       // contacts_tags has no unique constraint on (account_id, contact_id, tag_id),
       // so .orIgnore() is a no-op — filter existing pairs in-memory before insert
       // to keep the relation idempotent.
-      const existing = await this.contactTagRepository
-        .createQueryBuilder('ct')
-        .select(['ct.contactId', 'ct.tagId'])
-        .where('ct.account_id = :accountId AND ct.contact_id IN (:...contactIds) AND ct.tag_id IN (:...tagIds)', {
-          accountId,
-          contactIds,
-          tagIds,
-        })
-        .getMany();
-      const existingPairs = new Set(existing.map((row) => `${row.contactId}:${row.tagId}`));
-
       const values = contactIds.flatMap((contactId) => tagIds.filter((tagId) => !existingPairs.has(`${contactId}:${tagId}`)).map((tagId) => ({ contactId, tagId, accountId })));
       if (!values.length) {
         return { affected: 0 };
       }
-      return this.contactTagRepository.createQueryBuilder().insert().into('contacts_tags').values(values).execute();
+      const result = await this.contactTagRepository.createQueryBuilder().insert().into('contacts_tags').values(values).execute();
+
+      const newPairs = values.map(({ contactId, tagId }) => ({ contactId, tagId }));
+      await this.publishTagEvents('add', accountId, await this.buildTagEventPairs(accountId, newPairs));
+
+      return result;
     }
 
-    if (params.action === 'remove') {
-      // TODO: Remove tag should stop running automation
-      return this.contactTagRepository
-        .createQueryBuilder()
-        .delete()
-        .from('contacts_tags')
-        .where('account_id = :accountId AND contact_id IN (:...contactIds) AND tag_id IN (:...tagIds)', {
-          accountId,
-          contactIds,
-          tagIds,
-        })
-        .execute();
+    // remove
+    const result = await this.contactTagRepository
+      .createQueryBuilder()
+      .delete()
+      .from('contacts_tags')
+      .where('account_id = :accountId AND contact_id IN (:...contactIds) AND tag_id IN (:...tagIds)', {
+        accountId,
+        contactIds,
+        tagIds,
+      })
+      .execute();
+
+    // Only publish for pairs that actually existed (and therefore were deleted) —
+    // publishing remove for a (contact, tag) the contact never had would fire
+    // false remove-trigger automations downstream.
+    const removedPairs = existing.map((row) => ({ contactId: row.contactId, tagId: row.tagId }));
+    await this.publishTagEvents('remove', accountId, await this.buildTagEventPairs(accountId, removedPairs));
+
+    return result;
+  }
+
+  private async buildTagEventPairs(
+    accountId: number,
+    pairs: Array<{ contactId: number; tagId: number }>,
+  ): Promise<Array<{ contact: { id: number; email?: string; uuid?: string }; tagName: string }>> {
+    if (!pairs.length) return [];
+    const contactIds = Array.from(new Set(pairs.map((p) => p.contactId)));
+    const tagIds = Array.from(new Set(pairs.map((p) => p.tagId)));
+
+    const contacts = await this.contactRepository.find({ where: { id: In(contactIds), accountId }, select: ['id', 'email', 'uuid'] });
+    const tags = await this.contactTagRepository.manager.getRepository(TagEntity).find({ where: { id: In(tagIds), accountId } });
+
+    const contactById = new Map(contacts.map((c) => [c.id, c]));
+    const tagById = new Map(tags.map((t) => [t.id, t]));
+
+    const result: Array<{ contact: { id: number; email?: string; uuid?: string }; tagName: string }> = [];
+    for (const { contactId, tagId } of pairs) {
+      const tag = tagById.get(tagId);
+      if (!tag?.name) {
+        // Tag disappeared between the DB write and the lookup (deletion race or
+        // bad input); skip but make it grep-able.
+        this.logger.warn(`[buildTagEventPairs] no tag name for tagId=${tagId} account=${accountId}, skipping publish`);
+        continue;
+      }
+      const contact = contactById.get(contactId);
+      result.push({
+        contact: { id: contactId, email: contact?.email, uuid: contact?.uuid },
+        tagName: tag.name,
+      });
     }
+    return result;
   }
 
   async bulkUnsubscribe(params: { emails: string[]; allAccounts?: boolean; block?: boolean }) {
