@@ -25,6 +25,9 @@ import { ContactAutomationEntity } from 'src/entities/contact-automation.entity'
 import { EventsLogEntity } from 'src/entities/events-log.entity';
 import { AuditService } from './../../utils/audits/audit.service';
 import { maskEmail } from '../../utils/masking/email-masker';
+import { EventPublisherService } from '../../providers/messaging/event-publisher.service';
+import { EXCHANGES } from '@bms/messaging';
+import { TagEntity } from 'src/entities/tag.entity';
 import * as csv from 'fast-csv';
 const CsvParser = require('json2csv').Parser;
 
@@ -55,7 +58,26 @@ export class ContactsService {
     private readonly redisService: RedisService,
     private readonly auditService: AuditService,
     private readonly cls: ClsService,
+    private readonly eventPublisher: EventPublisherService,
   ) {}
+
+  private async publishTagEvents(action: 'add' | 'remove', accountId: number, pairs: Array<{ contactId: number; tagName: string }>): Promise<void> {
+    if (!pairs.length) return;
+    for (const { contactId, tagName } of pairs) {
+      await this.eventPublisher.publish(
+        EXCHANGES.tags,
+        'tag.process',
+        {
+          id: 0,
+          startedAt: Date.now(),
+          account: { id: accountId },
+          contact: { id: contactId, accountId },
+          tagName,
+        },
+        { type: action },
+      );
+    }
+  }
 
   async findAll(): Promise<Array<ContactEntity>> {
     try {
@@ -901,6 +923,11 @@ export class ContactsService {
       if (tagEntities.length) {
         const tagRows = tagEntities.map((t: any) => ({ contactId: saved.id, tagId: t.id, accountId }));
         await this.contactTagRepository.createQueryBuilder().insert().values(tagRows).orIgnore().execute();
+        await this.publishTagEvents(
+          'add',
+          accountId,
+          tagEntities.map((t: any) => ({ contactId: saved.id, tagName: t.name })),
+        );
       }
 
       imported += 1;
@@ -936,12 +963,20 @@ export class ContactsService {
       if (!values.length) {
         return { affected: 0 };
       }
-      return this.contactTagRepository.createQueryBuilder().insert().into('contacts_tags').values(values).execute();
+      const result = await this.contactTagRepository.createQueryBuilder().insert().into('contacts_tags').values(values).execute();
+
+      const tagNameById = new Map((await this.contactTagRepository.manager.getRepository(TagEntity).find({ where: { id: In(tagIds), accountId } })).map((t) => [t.id, t.name]));
+      await this.publishTagEvents(
+        'add',
+        accountId,
+        values.map(({ contactId, tagId }) => ({ contactId, tagName: tagNameById.get(tagId) })).filter((p): p is { contactId: number; tagName: string } => !!p.tagName),
+      );
+
+      return result;
     }
 
     if (params.action === 'remove') {
-      // TODO: Remove tag should stop running automation
-      return this.contactTagRepository
+      const result = await this.contactTagRepository
         .createQueryBuilder()
         .delete()
         .from('contacts_tags')
@@ -951,6 +986,14 @@ export class ContactsService {
           tagIds,
         })
         .execute();
+
+      const tagNameById = new Map((await this.contactTagRepository.manager.getRepository(TagEntity).find({ where: { id: In(tagIds), accountId } })).map((t) => [t.id, t.name]));
+      const pairs = contactIds.flatMap((contactId) =>
+        tagIds.map((tagId) => ({ contactId, tagName: tagNameById.get(tagId) })).filter((p): p is { contactId: number; tagName: string } => !!p.tagName),
+      );
+      await this.publishTagEvents('remove', accountId, pairs);
+
+      return result;
     }
   }
 
