@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { EXCHANGES } from '@bms/messaging';
 import { CampaignService } from './campaign.service';
 import { MsgopsService } from '../msgops/msgops.service';
@@ -396,6 +396,17 @@ describe('CampaignService', () => {
       const batch = { campaign: makeCampaign(), page: 1, totalPages: 1, currentContactId: 1, finalContactId: 100 };
       await service.processPage(batch);
       expect(mockRedisClient.set).toHaveBeenCalled();
+    });
+
+    // Regression: logInfo was gated by LOG_LEVEL=INFO so this line vanished in staging — see EVO-1149.
+    it('should emit per-page lifecycle log via Nest Logger', async () => {
+      const logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+      mockMsgopsService.findByTags.mockResolvedValue([{ id: 1, email: 'a@a.com', firstName: 'A', lastName: 'B', customFields: {}, contactDevices: [] }]);
+      const batch = { campaign: makeCampaign(), page: 2, totalPages: 3, currentContactId: 1, finalContactId: 100 };
+      await service.processPage(batch);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/\[Process Page\] Campaign: 1 - Page: 2 - Contacts: 1/));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/Message campaign-1-2-\d+ published to/));
+      logSpy.mockRestore();
     });
   });
 

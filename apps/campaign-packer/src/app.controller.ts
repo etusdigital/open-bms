@@ -24,13 +24,13 @@ export class AppController {
 
   @Post('/create-batches')
   async createBatches(@Body() campaign: Campaign) {
-    this.logger.log(`[Create Batches] Campaign: ${JSON.stringify(campaign)}`);
+    this.logger.log(`[Create Batches] Campaign id=${campaign.id} title=${campaign.title}`);
     return await this.campaignService.createBatches(campaign);
   }
 
   @Post('/process-page')
   async processPage(@Body() data: CampaignBatch) {
-    this.logger.log(`[Process Page] Campaign: ${JSON.stringify(data)}`);
+    this.logger.log(`[Process Page] Campaign id=${data.campaign?.id} page=${data.page}/${data.totalPages}`);
     return await this.campaignService.processPage(data);
   }
 

@@ -1,8 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { SubscriptionMessage } from '../interfaces';
 
 @Injectable()
 export class FormatterUtils {
+  private readonly logger = new Logger(FormatterUtils.name);
+
   stripString(text: string) {
     return text.replace(/(<([^>]+)>)/gi, '');
   }
@@ -16,7 +18,7 @@ export class FormatterUtils {
       const buff = Buffer.from(data, 'base64').toString();
       const campaign = JSON.parse(buff);
 
-      console.log(`[${messageId}] Received message: ${JSON.stringify(campaign)}`);
+      this.logger.log(`[${messageId}] Received message campaign id=${campaign?.id ?? 'unknown'}`);
 
       return campaign;
     } catch {

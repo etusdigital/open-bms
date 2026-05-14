@@ -71,7 +71,7 @@ export class CampaignService {
     const campaiKey = await redisClient.get(redisKey);
     if (campaiKey) {
       const messageErrorProcess = `Duplicated Campaign: (${campaign.id}) ${campaign.title}`;
-      console.error(messageErrorProcess);
+      this.logger.warn(messageErrorProcess);
       return messageErrorProcess;
     }
 
@@ -166,7 +166,7 @@ export class CampaignService {
         await redisClient.set(redisKey, 'true', 'EX', 60 * campaign.spreadSending || 60);
       }
     } catch (error) {
-      this.logger.error(`[${campaign.id}] Unable to save in Redis.`, error instanceof Error ? error.stack : error);
+      this.logger.error(`[${campaign.id}] Unable to save in Redis.`, error?.stack ?? String(error));
       return;
     }
 
@@ -202,7 +202,7 @@ export class CampaignService {
     try {
       return await this.msgopsService.findByTags(campaign, currentContactId, finalContactId);
     } catch (err) {
-      console.error(err);
+      this.logger.error(`getContacts failed for campaign ${campaign.id}`, err?.stack ?? String(err));
       throw new InternalServerErrorException(`Exception when trying retrieve contacts`, err);
     }
   }
@@ -360,9 +360,9 @@ export class CampaignService {
       };
 
       await this.eventPublisher.publish(EXCHANGES.campaigns, 'campaign.tracked', tracker);
-      console.info(`amqp ${EXCHANGES.campaigns}/campaign.tracked published`);
+      this.logger.log(`amqp ${EXCHANGES.campaigns}/campaign.tracked published`);
     } catch (error) {
-      this.logger.error(`Error to use service tracker`, error instanceof Error ? error.stack : error);
+      this.logger.error(`Error to use service tracker`, error?.stack ?? String(error));
     }
   }
 }
