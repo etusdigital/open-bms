@@ -104,7 +104,7 @@ export class AccountEntity {
     'whatsapp_business_id',
   ];
 
-  static readonly MASKED_CONFIGS = ['api_key', 'whatsapp_access_token'];
+  static readonly MASKED_CONFIGS = ['api_key', 'api_key_tracker', 'whatsapp_access_token'];
 
   static sanitizeAccountConfigs(configs: AccountConfigEntity[]): AccountConfigEntity[] {
     if (!configs) {

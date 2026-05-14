@@ -40,6 +40,7 @@ export const ALL_PERMISSIONS = [
   'account:roles_view',
   'account:api_keys_view',
   'account:api_keys_create',
+  'account:api_keys_revoke',
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];

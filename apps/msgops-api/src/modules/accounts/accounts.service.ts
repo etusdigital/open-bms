@@ -224,11 +224,6 @@ export class AccountsService {
       }
 
       accountDto.accountConfigs.push({
-        name: 'api_key',
-        value: createHash('md5').update(`bms-${account.id}-api_key`).digest('hex'),
-      });
-
-      accountDto.accountConfigs.push({
         name: 'api_key_tracker',
         value: createHash('md5').update(`bms-${account.id}-api_key_tracker`).digest('hex'),
       });
@@ -936,6 +931,11 @@ export class AccountsService {
     apiKey.status = 'revoked';
     apiKey.revokedAt = new Date();
     await this.accountApiKeyRepository.save(apiKey);
+
+    // Invalidate the authz cache so the key stops working immediately
+    const cacheKey = `authz:apikey:${apiKey.keyHash}`;
+    await this.redisService.getClient().del(cacheKey);
+
     return { revoked: true };
   }
 }

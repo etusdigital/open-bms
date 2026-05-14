@@ -275,12 +275,6 @@ export class SetupService implements OnModuleInit {
         await accountConfigRepo.save([
           accountConfigRepo.create({
             accountId: savedAccount.id,
-            name: 'api_key',
-            value: createHash('md5').update(`bms-${savedAccount.id}-api_key`).digest('hex'),
-            isLoadConfig: true,
-          }),
-          accountConfigRepo.create({
-            accountId: savedAccount.id,
             name: 'api_key_tracker',
             value: createHash('md5').update(`bms-${savedAccount.id}-api_key_tracker`).digest('hex'),
             isLoadConfig: true,

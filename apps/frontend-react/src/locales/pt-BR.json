@@ -1854,7 +1854,31 @@
         "applying": "Aplicando…",
         "swapAndRemove": "Trocar default + Remover"
       }
-    }
+    },
+    "apiKeyCopy": "Copiar",
+    "apiKeyCopied": "Copiado!",
+    "generalSectionApiKey": "Chave de API",
+    "generalSectionSettings": "Configurações",
+    "generalTimezoneSelect": "Selecione um fuso horário",
+    "tabApi_keys": "API Keys",
+    "apiKeysEmpty": "Nenhuma API key criada ainda.",
+    "apiKeysCreate": "Nova chave",
+    "apiKeysCreateTitle": "Criar API Key",
+    "apiKeysNameLabel": "Nome",
+    "apiKeysNamePlaceholder": "Ex: integração webhook",
+    "apiKeysCreateBtn": "Criar",
+    "apiKeysCreatedTitle": "Chave criada — copie agora",
+    "apiKeysCreatedWarning": "Esta chave não será exibida novamente.",
+    "apiKeysRevokeConfirm": "Revogar esta chave?",
+    "apiKeysRevokeDesc": "A chave será desativada imediatamente e não poderá ser usada.",
+    "apiKeysRevokeBtn": "Revogar",
+    "apiKeysRevokeOk": "Chave revogada.",
+    "apiKeysRevokeError": "Erro ao revogar chave.",
+    "apiKeysCreateError": "Erro ao criar chave.",
+    "apiKeysCreatedAt": "Criada em",
+    "apiKeysStatus": "Status",
+    "apiKeysLastUsed": "Último uso",
+    "apiKeysRevokedBadge": "Revogada"
   },
   "integrations": {
     "pageTitle": "Integrações",

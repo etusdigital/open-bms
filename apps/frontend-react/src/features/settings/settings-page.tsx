@@ -3,23 +3,32 @@ import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription } from '@/components/ui/form';
+import { Form, FormField, FormItem, FormLabel, FormControl } from '@/components/ui/form';
 import { ListPage } from '@/components/list-page';
 import { selectIsSuperAdmin, useAppStore } from '@/stores/app-store';
 import { useAccountConfig, useAccountId, useTimezone, useUpdateAccountConfigs } from './use-settings';
 import { SETTINGS_TABS, type SettingsTab } from './types';
 import { EmailProvidersTab } from './email-providers';
 import { PoolTab } from './pool-tab';
+import { ApiKeysTab } from './api-keys-tab';
+import { usePermissions } from '@/hooks/use-permissions';
+import { TimezoneCombobox } from '@/components/timezone-combobox';
 
 export default function SettingsPage() {
   const { t } = useTranslation();
   const isSuperAdmin = useAppStore(selectIsSuperAdmin);
+  const { can } = usePermissions();
   const [tab, setTab] = useState<SettingsTab>('general');
 
-  const visibleTabs = useMemo<SettingsTab[]>(
-    () => (isSuperAdmin ? [...SETTINGS_TABS, 'pool'] : SETTINGS_TABS),
-    [isSuperAdmin],
-  );
+  const visibleTabs = useMemo<SettingsTab[]>(() => {
+    const tabs: SettingsTab[] = [...SETTINGS_TABS];
+    if (!can('account:api_keys_view')) {
+      const idx = tabs.indexOf('api_keys');
+      if (idx !== -1) tabs.splice(idx, 1);
+    }
+    if (isSuperAdmin) tabs.push('pool');
+    return tabs;
+  }, [isSuperAdmin, can]);
 
   return (
     <ListPage.Root>
@@ -45,6 +54,7 @@ export default function SettingsPage() {
           {tab === 'general' && <GeneralTab />}
           {tab === 'email' && <EmailTab />}
           {tab === 'email_providers' && <EmailProvidersTab />}
+          {tab === 'api_keys' && <ApiKeysTab />}
           {tab === 'pool' && isSuperAdmin && <PoolTab />}
         </div>
       </ListPage.Content>
@@ -54,28 +64,81 @@ export default function SettingsPage() {
 
 function GeneralTab() {
   const { t } = useTranslation();
-  const apiKey = useAccountConfig('api_key');
-  const apiKeyTracker = useAccountConfig('api_key_tracker');
   const timezone = useTimezone();
   const unsubscribeUrl = useAccountConfig('unsubscribe_redirect_url');
   const defaultDomain = useAccountConfig('default_domain');
+  const accountId = useAccountId();
+  const updateConfigs = useUpdateAccountConfigs();
 
-  const fields = [
-    { label: t('settings.apiKey'), value: apiKey },
-    { label: t('settings.apiKeyTracker'), value: apiKeyTracker },
-    { label: t('settings.timezone'), value: timezone },
-    { label: t('settings.unsubscribeUrl'), value: unsubscribeUrl },
-    { label: t('settings.defaultDomain'), value: defaultDomain },
-  ];
+  const form = useForm({
+    values: {
+      timezone: timezone || '',
+      unsubscribeUrl: unsubscribeUrl || '',
+      defaultDomain: defaultDomain || '',
+    },
+  });
+
+  const handleSubmit = useCallback(
+    (data: { timezone: string; unsubscribeUrl: string; defaultDomain: string }) => {
+      const configs = [
+        { account_id: accountId, name: 'timezone', value: data.timezone },
+        { account_id: accountId, name: 'unsubscribe_redirect_url', value: data.unsubscribeUrl },
+        { account_id: accountId, name: 'default_domain', value: data.defaultDomain },
+      ];
+      updateConfigs.mutate({ accountId, configs });
+    },
+    [accountId, updateConfigs],
+  );
 
   return (
     <div className="max-w-lg space-y-4">
-      {fields.map((field) => (
-        <div key={field.label}>
-          <label className="text-muted-foreground text-sm font-medium">{field.label}</label>
-          <Input value={field.value || '—'} disabled className="mt-1" />
-        </div>
-      ))}
+      <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="timezone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('settings.timezone')}</FormLabel>
+                  <FormControl>
+                    <TimezoneCombobox
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder={t('settings.generalTimezoneSelect')}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="unsubscribeUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('settings.unsubscribeUrl')}</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="https://" />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="defaultDomain"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('settings.defaultDomain')}</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="exemplo.com" />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <Button type="submit" disabled={updateConfigs.isPending || !form.formState.isDirty}>
+              {updateConfigs.isPending ? t('common.loading') : t('common.save')}
+            </Button>
+          </form>
+        </Form>
     </div>
   );
 }
