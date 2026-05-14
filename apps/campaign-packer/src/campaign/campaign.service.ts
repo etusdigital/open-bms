@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { EXCHANGES } from '@bms/messaging';
 import { Campaign, CampaignBatch, CampaignMessageType, CampaignStatus, CampaignType } from '../interfaces';
 import { MsgopsService } from '../msgops/msgops.service';
@@ -9,20 +9,19 @@ import { EventPublisherService } from '../providers/messaging/event-publisher.se
 import * as dayjs from 'dayjs';
 import * as utc from 'dayjs/plugin/utc';
 import * as timezone from 'dayjs/plugin/timezone';
-import { FormatterUtils } from 'src/utils/formatter.utils';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
 @Injectable()
 export class CampaignService {
+  private readonly logger = new Logger(CampaignService.name);
   private packagesLength: number;
   private contactsLength: number;
   constructor(
     private readonly msgopsService: MsgopsService,
     private readonly queuePublisher: QueuePublisher,
     private readonly redisService: RedisService,
-    private readonly formatterUtils: FormatterUtils,
     private readonly eventPublisher: EventPublisherService,
   ) {
     this.packagesLength = 0;
@@ -30,11 +29,11 @@ export class CampaignService {
   }
 
   async createContactsSend(id: number) {
-    this.formatterUtils.logInfo(`Campaign processed: ${id}.`);
+    this.logger.log(`Campaign processed: ${id}.`);
     const redisClient = this.redisService.getOrThrow();
     const stopCampaign = await redisClient.get(`stop_campaign_${id}`);
     if (stopCampaign) {
-      this.formatterUtils.logInfo(`[Process Campaign] Stop processing campaign: ${id}`);
+      this.logger.log(`[Process Campaign] Stop processing campaign: ${id}`);
       return;
     }
 
@@ -91,7 +90,7 @@ export class CampaignService {
 
     const totalContacts = await this.msgopsService.countByTags(campaign, campaign?.testabLastId || 0, campaign?.testabinInitialPageId || 0);
     if (totalContacts.length < 1) {
-      this.formatterUtils.logInfo(`Contacts not found for campaign ${campaign.title}`);
+      this.logger.warn(`Contacts not found for campaign ${campaign.title}`);
       throw new NotFoundException(`Contacts not found for tags ${campaign.title}`);
     }
 
@@ -160,14 +159,14 @@ export class CampaignService {
       }
     }
 
-    this.formatterUtils.logInfo(`Generated ${totalPages} pages to be processed.`);
+    this.logger.log(`Generated ${totalPages} pages to be processed.`);
 
     try {
       if (!testabMode) {
         await redisClient.set(redisKey, 'true', 'EX', 60 * campaign.spreadSending || 60);
       }
     } catch (error) {
-      this.formatterUtils.logInfo(`[${campaign.id}] Unable to save in Redis.`, error);
+      this.logger.error(`[${campaign.id}] Unable to save in Redis.`, error instanceof Error ? error.stack : error);
       return;
     }
 
@@ -177,7 +176,7 @@ export class CampaignService {
   async addPageToQueue(campaign: Campaign, page: number, totalPages: number, delayMs: number, currentContactId: number, finalContactId: number) {
     const data: CampaignBatch = { campaign, page, totalPages, currentContactId, finalContactId };
     const jobId = await this.queuePublisher.addSchedulePage(data, delayMs);
-    this.formatterUtils.logInfo(`Page ${page} queued with job id ${jobId}`);
+    this.logger.log(`Page ${page} queued with job id ${jobId}`);
     return jobId;
   }
 
@@ -185,7 +184,7 @@ export class CampaignService {
     const redisClient = this.redisService.getOrThrow();
     const stopCampaign = await redisClient.get(`stop_campaign_${campaignBatch.campaign.id}`);
     if (stopCampaign) {
-      this.formatterUtils.logInfo(`[Process Page] Stop processing campaign: ${campaignBatch.campaign.id}`);
+      this.logger.log(`[Process Page] Stop processing campaign: ${campaignBatch.campaign.id}`);
       return {};
     }
     this.validateData(campaignBatch);
@@ -227,7 +226,7 @@ export class CampaignService {
       message,
     };
 
-    this.formatterUtils.logInfo(
+    this.logger.log(
       `[Process Page] Campaign: ${campaignBatch.campaign.id} - Page: ${campaignBatch.page} - Contacts: ${contactsUnique.length} - First ID: ${campaignBatch.currentContactId} - Last ID: ${campaignBatch.finalContactId}`,
     );
     const redisClient = this.redisService.getOrThrow();
@@ -240,7 +239,7 @@ export class CampaignService {
     };
     await redisClient.set(pubSubMessage.campaignKey, JSON.stringify(currentpackage), 'EX', 43200);
     await this.eventPublisher.publish(EXCHANGES.campaigns, 'campaign.send', pubSubMessage);
-    this.formatterUtils.logInfo(`Message ${pubSubMessage.campaignKey} published to ${EXCHANGES.campaigns}/campaign.send.`);
+    this.logger.log(`Message ${pubSubMessage.campaignKey} published to ${EXCHANGES.campaigns}/campaign.send.`);
 
     await this.sendTracker(1, this.contactsLength, campaignBatch.campaign.id, 'CAMPAIGN_PACKAGED');
 
@@ -363,7 +362,7 @@ export class CampaignService {
       await this.eventPublisher.publish(EXCHANGES.campaigns, 'campaign.tracked', tracker);
       console.info(`amqp ${EXCHANGES.campaigns}/campaign.tracked published`);
     } catch (error) {
-      this.formatterUtils.logInfo(`Error to use service tracker`, error);
+      this.logger.error(`Error to use service tracker`, error instanceof Error ? error.stack : error);
     }
   }
 }

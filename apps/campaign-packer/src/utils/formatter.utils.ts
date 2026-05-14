@@ -23,9 +23,4 @@ export class FormatterUtils {
       throw new BadRequestException(`Unable to parse data to Batch. messageId: ${JSON.stringify(subscriptionMessage)} `);
     }
   }
-
-  logInfo(message: string, args?: any) {
-    if (process.env.LOG_LEVEL === 'INFO' || process.env.LOG_LEVEL === 'DEBUG') console.log(message, args || '');
-    else return;
-  }
 }

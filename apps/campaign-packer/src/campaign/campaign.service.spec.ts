@@ -6,7 +6,6 @@ import { MsgopsService } from '../msgops/msgops.service';
 import { QueuePublisher } from '../providers/queue/queue.publisher';
 import { RedisService } from '../providers/redis/redis.service';
 import { EventPublisherService } from '../providers/messaging/event-publisher.service';
-import { FormatterUtils } from '../utils/formatter.utils';
 import { CampaignMessageType, CampaignType } from '../interfaces';
 
 describe('CampaignService', () => {
@@ -45,11 +44,6 @@ describe('CampaignService', () => {
     publish: jest.fn().mockResolvedValue(undefined),
   };
 
-  const mockFormatterUtils = {
-    logInfo: jest.fn(),
-    parseBatch: jest.fn(),
-  };
-
   beforeAll(() => {
     process.env.NODE_ENV = 'test';
     process.env.LIMIT_CONTACT_BATCH = '1000';
@@ -67,7 +61,6 @@ describe('CampaignService', () => {
         { provide: MsgopsService, useValue: mockMsgopsService },
         { provide: QueuePublisher, useValue: mockQueuePublisher },
         { provide: RedisService, useValue: mockRedisService },
-        { provide: FormatterUtils, useValue: mockFormatterUtils },
         { provide: EventPublisherService, useValue: mockEventPublisher },
       ],
     }).compile();
