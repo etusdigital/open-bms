@@ -1,5 +1,6 @@
 import { Injectable, InternalServerErrorException, HttpException, HttpStatus, ForbiddenException } from '@nestjs/common';
 import { SchedulerService } from '../../providers/queue/scheduler.service';
+import { QUEUE_CAMPAIGN_TRIGGER, QUEUE_CAMPAIGN_TESTAB } from '../../providers/queue/queue.constants';
 import { CampaignDto } from './campaign.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Not, QueryRunner, Repository } from 'typeorm';
@@ -547,15 +548,15 @@ export class CampaignsService {
       case CampaignsType.SPLIT:
       case CampaignsType.RECURRING:
         if (campaign.scheduleToCloudTaskId) {
-          await this.scheduler.delete(campaign.scheduleToCloudTaskId, env.GOOGLE_TASK_QUEUE);
+          await this.scheduler.delete(campaign.scheduleToCloudTaskId, QUEUE_CAMPAIGN_TRIGGER);
         }
         break;
       case CampaignsType.TESTAB:
         if (campaign.testabScheduleToCloudTaskId) {
-          await this.scheduler.delete(campaign.testabScheduleToCloudTaskId, env.GOOGLE_TASK_QUEUE_TEST_AB);
+          await this.scheduler.delete(campaign.testabScheduleToCloudTaskId, QUEUE_CAMPAIGN_TESTAB);
         }
         if (campaign.testabScheduleEndCloudTaskId) {
-          await this.scheduler.delete(campaign.testabScheduleEndCloudTaskId, env.GOOGLE_TASK_QUEUE_TEST_AB);
+          await this.scheduler.delete(campaign.testabScheduleEndCloudTaskId, QUEUE_CAMPAIGN_TESTAB);
         }
         break;
     }
@@ -567,7 +568,7 @@ export class CampaignsService {
       case CampaignsType.SPLIT:
       case CampaignsType.RECURRING: {
         const endpointTask = campaignDto.type === CampaignsType.SPLIT ? env.CAMPAIGN_TEST_AB_ENDPOINT : env.CAMPAIGN_TRIGGER_ENDPOINT;
-        const taskName = campaignDto.type === CampaignsType.SPLIT ? env.GOOGLE_TASK_QUEUE_TEST_AB : env.GOOGLE_TASK_QUEUE;
+        const taskName = campaignDto.type === CampaignsType.SPLIT ? QUEUE_CAMPAIGN_TESTAB : QUEUE_CAMPAIGN_TRIGGER;
         const response = await this.scheduler.create(campaign.id, campaignDto.scheduleTo, endpointTask, taskName);
         campaign.scheduleToCloudTaskId = response[0].name;
         break;
@@ -575,9 +576,9 @@ export class CampaignsService {
       case CampaignsType.TESTAB: {
         const finalEndpoint = env.CAMPAIGN_TEST_AB_ENDPOINT;
         const finalResultEndpoint = env.CAMPAIGN_RESULT_TEST_AB_ENDPOINT;
-        const testab = await this.scheduler.create(campaign.id, campaignDto.testabScheduleTo, finalEndpoint, env.GOOGLE_TASK_QUEUE_TEST_AB);
+        const testab = await this.scheduler.create(campaign.id, campaignDto.testabScheduleTo, finalEndpoint, QUEUE_CAMPAIGN_TESTAB);
         campaign.testabScheduleToCloudTaskId = testab[0].name;
-        const result = await this.scheduler.create(campaign.id, campaignDto.scheduleTo, finalResultEndpoint, env.GOOGLE_TASK_QUEUE_TEST_AB);
+        const result = await this.scheduler.create(campaign.id, campaignDto.scheduleTo, finalResultEndpoint, QUEUE_CAMPAIGN_TESTAB);
         campaign.testabScheduleEndCloudTaskId = result[0].name;
         break;
       }
@@ -610,12 +611,12 @@ export class CampaignsService {
         await redisClient.del([`events_trigger:${this.cls.get('accountId')}:${eventType}:${triggerId}:campaigns`]);
       } else {
         if (campaign.testabScheduleToCloudTaskId && campaign.testabScheduleEndCloudTaskId) {
-          await this.scheduler.delete(campaign.testabScheduleToCloudTaskId, env.GOOGLE_TASK_QUEUE_TEST_AB);
-          await this.scheduler.delete(campaign.testabScheduleEndCloudTaskId, env.GOOGLE_TASK_QUEUE_TEST_AB);
+          await this.scheduler.delete(campaign.testabScheduleToCloudTaskId, QUEUE_CAMPAIGN_TESTAB);
+          await this.scheduler.delete(campaign.testabScheduleEndCloudTaskId, QUEUE_CAMPAIGN_TESTAB);
         }
 
         if (campaign.scheduleToCloudTaskId) {
-          await this.scheduler.delete(campaign.scheduleToCloudTaskId, env.GOOGLE_TASK_QUEUE);
+          await this.scheduler.delete(campaign.scheduleToCloudTaskId, QUEUE_CAMPAIGN_TRIGGER);
         }
       }
       delete campaign.campaignMessage;

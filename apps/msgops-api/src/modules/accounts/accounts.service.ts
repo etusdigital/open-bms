@@ -15,6 +15,7 @@ import { createHash, randomBytes } from 'crypto';
 import { replaceSpecialChars } from '../../utils/utils.service';
 import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import { SchedulerService } from 'src/providers/queue/scheduler.service';
+import { QUEUE_BMS_USAGE } from 'src/providers/queue/queue.constants';
 import dayjs from 'dayjs';
 import { ClsService } from 'nestjs-cls';
 import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
@@ -367,7 +368,7 @@ export class AccountsService {
         const minute = Math.floor(Math.random() * (40 - 1 + 1) + 1);
         const dateSchedule = dayjs().tz('America/Sao_Paulo').add(24, 'hour').set('minute', minute).format('YYYY-MM-DD HH:mm:ss');
         const currentDate = dayjs().tz('America/Sao_Paulo').format('YYYY-MM-DD');
-        await this.scheduler.create(`${account.id}/${currentDate}`, new Date(dateSchedule), `${process.env.BRIUS_HOSTURL}/statistics/usage`, process.env.GOOGLE_TASK_BMS_USAGE);
+        await this.scheduler.create(`${account.id}/${currentDate}`, new Date(dateSchedule), `${process.env.BRIUS_HOSTURL}/statistics/usage`, QUEUE_BMS_USAGE);
       } catch (err) {
         console.error('Account created, but billing task scheduling failed (non-fatal):', err);
       }

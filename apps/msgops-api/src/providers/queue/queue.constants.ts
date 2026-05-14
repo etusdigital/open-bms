@@ -25,15 +25,12 @@ export interface SchedulerJobPayload {
   taskQueue: string;
 }
 
-// Maps the legacy GOOGLE_TASK_* env-var values (still passed by call sites
-// for backward compatibility) onto the new BullMQ queue names. Anything not
-// in the map falls back to QUEUE_CAMPAIGN_TRIGGER so misconfigured env vars
-// don't drop jobs silently.
+// Maps a queue name string to a known SchedulerQueueName constant.
+// Falls back to QUEUE_CAMPAIGN_TRIGGER for unknown values so misconfigured
+// call sites don't drop jobs silently.
 export function resolveQueueName(taskQueue: string | undefined): SchedulerQueueName {
-  if (!taskQueue) return QUEUE_CAMPAIGN_TRIGGER;
-  if (taskQueue === process.env.GOOGLE_TASK_QUEUE_TEST_AB) return QUEUE_CAMPAIGN_TESTAB;
-  if (taskQueue === process.env.GOOGLE_TASK_SEGMENT) return QUEUE_SEGMENT;
-  if (taskQueue === process.env.GOOGLE_TASK_BMS_USAGE) return QUEUE_BMS_USAGE;
-  if (taskQueue === process.env.GOOGLE_TASK_WHATSAPP_MESSAGE) return QUEUE_WHATSAPP_MESSAGE;
+  if (SCHEDULER_QUEUE_NAMES.includes(taskQueue as SchedulerQueueName)) {
+    return taskQueue as SchedulerQueueName;
+  }
   return QUEUE_CAMPAIGN_TRIGGER;
 }
