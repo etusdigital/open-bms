@@ -274,7 +274,6 @@ describe('AppService', () => {
 
     beforeEach(() => {
       process.env.TAG_PROCESS_ENDPOINT = 'https://example.com/segment';
-      process.env.GOOGLE_TASK_SEGMENT = 'segment-queue';
     });
 
     it('should return segment not found when tag does not exist', async () => {

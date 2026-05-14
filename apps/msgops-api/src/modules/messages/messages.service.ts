@@ -17,6 +17,7 @@ import { TwilioHandler } from 'src/handlers/twilio/twilio.handler';
 import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
 import dayjs from 'dayjs';
 import { SchedulerService } from 'src/providers/queue/scheduler.service';
+import { QUEUE_WHATSAPP_MESSAGE } from 'src/providers/queue/queue.constants';
 import { ClsService } from 'nestjs-cls';
 import { CampaignsService } from '../campaigns/campaigns.service';
 import { env } from 'process';
@@ -399,12 +400,7 @@ export class MessagesService {
 
   async createWhatsappTask(messageId, accountId) {
     const date = dayjs().tz('America/Sao_Paulo').add(30, 'second').format('YYYY-MM-DD HH:mm:ss');
-    await this.scheduler.create(
-      `${messageId}/${accountId}`,
-      new Date(date),
-      `${process.env.BRIUS_HOSTURL}/messages/monitor-whatsapp-message`,
-      process.env.GOOGLE_TASK_WHATSAPP_MESSAGE,
-    );
+    await this.scheduler.create(`${messageId}/${accountId}`, new Date(date), `${process.env.BRIUS_HOSTURL}/messages/monitor-whatsapp-message`, QUEUE_WHATSAPP_MESSAGE);
   }
 
   async monitorWhatsappMessage(messageId: string, accountId: number) {

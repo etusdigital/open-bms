@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { DashboardStatisticsDto, StatisticsDto } from './dto/statistics.dto';
 import { SchedulerService } from 'src/providers/queue/scheduler.service';
+import { QUEUE_BMS_USAGE } from 'src/providers/queue/queue.constants';
 import dayjs, { Dayjs } from 'dayjs';
 import { AccountsService } from '../accounts/accounts.service';
 import { AccountUsageEntity } from 'src/entities/account-usage.entity';
@@ -613,7 +614,7 @@ export class StatisticsService {
     const minute = Math.floor(Math.random() * (40 - 1 + 1) + 1);
     const dateSchedule = dayjs().tz('America/Sao_Paulo').add(24, 'hour').set('minute', minute).format('YYYY-MM-DD HH:mm:ss');
     const currentDate = dayjs().tz('America/Sao_Paulo').format('YYYY-MM-DD');
-    await this.scheduler.create(`${accountId}/${currentDate}`, new Date(dateSchedule), `${process.env.BRIUS_HOSTURL}/statistics/usage`, process.env.GOOGLE_TASK_BMS_USAGE);
+    await this.scheduler.create(`${accountId}/${currentDate}`, new Date(dateSchedule), `${process.env.BRIUS_HOSTURL}/statistics/usage`, QUEUE_BMS_USAGE);
     return;
   }
 

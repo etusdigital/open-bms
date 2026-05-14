@@ -15,6 +15,7 @@ import { AccountConfigsProvider } from '../../providers/account-configs.provider
 import { PostgresErrorCode } from 'src/shared.interfaces';
 import { ClsService } from 'nestjs-cls';
 import { SchedulerService } from 'src/providers/queue/scheduler.service';
+import { QUEUE_BMS_USAGE } from 'src/providers/queue/queue.constants';
 import dayjs from 'dayjs';
 import { ActiveCampaignProvider } from 'src/providers/active-campaign.provider';
 import schema from './schema/automation-schema.json';
@@ -572,13 +573,7 @@ export class AutomationsService {
     const endDate = dayjs().tz('America/Sao_Paulo').add(step.settings.duration, 'hour').format('YYYY-MM-DD HH:mm:ss');
     const updateStep = { status: 'running', startDate, endDate };
     step.settings = { ...step.settings, ...updateStep };
-    const task = await this.scheduler.create(
-      ``,
-      new Date(endDate),
-      `${process.env.BRIUS_HOSTURL}/automations/finish-testab`,
-      process.env.GOOGLE_TASK_BMS_USAGE,
-      JSON.stringify(step),
-    );
+    const task = await this.scheduler.create(``, new Date(endDate), `${process.env.BRIUS_HOSTURL}/automations/finish-testab`, QUEUE_BMS_USAGE, JSON.stringify(step));
     updateStep['taskId'] = task[0].name;
     const newSteps = this.updateStepSettings(step.id, updateStep, automation.steps[0]);
     await this.automationRepository
@@ -617,7 +612,7 @@ export class AutomationsService {
 
   async stopTestAb(step) {
     try {
-      return await this.scheduler.callRunTask(step.settings.taskId, process.env.GOOGLE_TASK_BMS_USAGE);
+      return await this.scheduler.callRunTask(step.settings.taskId, QUEUE_BMS_USAGE);
     } catch {
       return await this.finishTestabStep(step);
     }

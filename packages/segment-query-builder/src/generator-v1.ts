@@ -88,7 +88,8 @@ export function generateSegmentQueryV1(tag: TagLike, segmentDto: SegmentDtoLike,
               eventFilter = `ctd.type = '${step.event_type}' AND ctd.${step.event}`;
             }
             let timeFilter = step.conditional_interation == 'yes' ? 'is not null' : 'is null';
-            if (step.time != 'all') {
+            const hasValidTime = step.time != null && step.time !== '' && step.time !== 'all';
+            if (hasValidTime) {
               timeFilter =
                 step.conditional_interation == 'yes'
                   ? `> (CURRENT_DATE AT TIME ZONE '${timeZoneValue}' - interval '${step.time} day')`
