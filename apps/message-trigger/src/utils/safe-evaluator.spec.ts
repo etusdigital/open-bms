@@ -1,4 +1,4 @@
-import { applyComparison, assertAllowedClickhouseOperator, assertIsoDate, evaluateAtoms, hasSafeOwnProp, safeGetPath, safeOwnProp } from './safe-evaluator';
+import { applyComparison, assertAllowedClickhouseOperator, assertIsoDate, assertSafeKey, evaluateAtoms, hasSafeOwnProp, safeGetPath, safeOwnProp } from './safe-evaluator';
 
 describe('evaluateAtoms', () => {
   it('returns true for empty atom list', () => {
@@ -111,10 +111,33 @@ describe('assertIsoDate', () => {
     expect(assertIsoDate('2026-05-15', 'd')).toBe('2026-05-15');
   });
 
+  it('accepts ISO-8601 datetime variants used by legacy producers', () => {
+    expect(assertIsoDate('2026-05-15T00:00:00Z', 'd')).toBe('2026-05-15T00:00:00Z');
+    expect(assertIsoDate('2026-05-15 23:59:59', 'd')).toBe('2026-05-15 23:59:59');
+    expect(assertIsoDate('2026-05-15T12:34:56.789', 'd')).toBe('2026-05-15T12:34:56.789');
+    expect(assertIsoDate('2026-05-15T12:00:00+03:00', 'd')).toBe('2026-05-15T12:00:00+03:00');
+  });
+
   it('rejects malformed dates and injection attempts', () => {
     expect(() => assertIsoDate("2026-05-15'; DROP TABLE users --", 'd')).toThrow(/Invalid date/);
     expect(() => assertIsoDate('2026/05/15', 'd')).toThrow(/Invalid date/);
     expect(() => assertIsoDate('', 'd')).toThrow(/Invalid date/);
     expect(() => assertIsoDate(undefined, 'd')).toThrow(/Invalid date/);
+    expect(() => assertIsoDate("2026-05-15' OR 1=1 --", 'd')).toThrow(/Invalid date/);
+  });
+});
+
+describe('assertSafeKey', () => {
+  it('accepts non-prototype keys', () => {
+    expect(assertSafeKey('plan', 'f')).toBe('plan');
+    expect(assertSafeKey('user_id', 'f')).toBe('user_id');
+  });
+
+  it('rejects prototype-poison keys and empties', () => {
+    expect(() => assertSafeKey('__proto__', 'f')).toThrow(/Unsafe key/);
+    expect(() => assertSafeKey('constructor', 'f')).toThrow(/Unsafe key/);
+    expect(() => assertSafeKey('prototype', 'f')).toThrow(/Unsafe key/);
+    expect(() => assertSafeKey('', 'f')).toThrow(/Unsafe key/);
+    expect(() => assertSafeKey(undefined, 'f')).toThrow(/Unsafe key/);
   });
 });

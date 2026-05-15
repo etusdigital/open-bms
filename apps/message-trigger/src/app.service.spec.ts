@@ -2788,6 +2788,12 @@ describe('AppService', () => {
       ],
     });
 
+    beforeEach(() => {
+      // Tracker-event assertions here must see only calls produced by the current test.
+      mocks.mockTrackerService.send.mockClear();
+      mocks.mockMsgopsService.queryEventsLogs.mockClear();
+    });
+
     it('H4: rejects SQL injection via conditional_event_filter (allowlist) and emits failure tracker event', async () => {
       const step = buildStep([
         {
@@ -2882,7 +2888,7 @@ describe('AppService', () => {
       expect(mocks.mockTrackerService.send).toHaveBeenCalledWith('MSGOPS_CONDITIONAL_EVAL_FAILED', expect.any(Object), expect.any(Number));
     });
 
-    it('H2: prototype-pollution key on custom_field returns false (no eval, no throw)', async () => {
+    it('H2: prototype-pollution key on custom_field routes to false AND emits failure tracker event (loud, not silent)', async () => {
       const step = buildStep([
         {
           type: 'custom_field',
@@ -2895,8 +2901,61 @@ describe('AppService', () => {
 
       const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
 
-      // Atom evaluates false → false branch
       expect(result).toEqual(FALSE_BRANCH_CHILD);
+      expect(mocks.mockTrackerService.send).toHaveBeenCalledWith('MSGOPS_CONDITIONAL_EVAL_FAILED', expect.any(Object), expect.any(Number));
+    });
+
+    it('H2: prototype-pollution segment on lead_field_key routes to false AND emits failure tracker event', async () => {
+      const step = buildStep([
+        {
+          type: 'lead',
+          conditional_lead_field: '=',
+          lead_field_key: 'data.__proto__.polluted',
+          lead_field_value: 'x',
+        },
+      ]);
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 63321184, accountId: 1, customFields: {}, lead: { data: {} } });
+
+      const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
+
+      expect(result).toEqual(FALSE_BRANCH_CHILD);
+      expect(mocks.mockTrackerService.send).toHaveBeenCalledWith('MSGOPS_CONDITIONAL_EVAL_FAILED', expect.any(Object), expect.any(Number));
+    });
+
+    it('H4: assertIsoDate accepts ISO-8601 datetime (legacy producers) without rejecting', async () => {
+      const step = buildStep([
+        {
+          type: 'custom_event',
+          conditional: 'and',
+          time_type: 'range',
+          conditional_event_type: 'in',
+          custom_event_date: '2025-01-01T00:00:00Z',
+          custom_event_date_end: '2025-01-31 23:59:59',
+          event: { name: 'click' },
+        },
+      ]);
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 63321184, accountId: 1, customFields: {} });
+      mocks.mockMsgopsService.queryEventsLogs.mockResolvedValue([{ contact_id: 63321184 }]);
+
+      const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
+
+      expect(result).toEqual(TRUE_BRANCH_CHILD);
+      expect(mocks.mockTrackerService.send).not.toHaveBeenCalledWith('MSGOPS_CONDITIONAL_EVAL_FAILED', expect.any(Object), expect.any(Number));
+    });
+
+    it('tag atom: normalizes comma-separated string tag_id (legacy eval shape)', async () => {
+      const step = buildStep([
+        {
+          type: 'tag',
+          conditional_tag: 'in',
+          tag_id: '10, 20, 30',
+        },
+      ]);
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 63321184, accountId: 1, tags: [20], customFields: {} });
+
+      const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
+
+      expect(result).toEqual(TRUE_BRANCH_CHILD);
     });
 
     it('H2: unknown conditional atom type does not silently fall to false — emits tracker event', async () => {

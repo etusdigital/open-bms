@@ -15,7 +15,17 @@ import * as timezone from 'dayjs/plugin/timezone';
 import { MsgopsService } from './msgops/msgops.service';
 import { HttpRequestProvider } from './providers/httpRequest.provider';
 import { Redis } from 'ioredis';
-import { applyComparison, assertAllowedClickhouseOperator, assertIsoDate, ConditionAtom, evaluateAtoms, hasSafeOwnProp, safeGetPath, safeOwnProp } from './utils/safe-evaluator';
+import {
+  applyComparison,
+  assertAllowedClickhouseOperator,
+  assertIsoDate,
+  assertSafeKey,
+  ConditionAtom,
+  evaluateAtoms,
+  hasSafeOwnProp,
+  safeGetPath,
+  safeOwnProp,
+} from './utils/safe-evaluator';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -467,7 +477,18 @@ export class AppService {
             }
             case 'tag': {
               loadContacts.add('tags');
-              const tagIds: any[] = Array.isArray(atomStep.tag_id) ? atomStep.tag_id : [atomStep.tag_id];
+              // Legacy producers may emit `tag_id` as an array, a single number, or a
+              // comma-separated string (the old `eval` path relied on JS array-literal
+              // interpolation of "1,2,3"). Normalize all three to a number/string array.
+              const tagIds: any[] = Array.isArray(atomStep.tag_id)
+                ? atomStep.tag_id
+                : typeof atomStep.tag_id === 'string' && atomStep.tag_id.includes(',')
+                  ? atomStep.tag_id
+                      .split(',')
+                      .map((s: string) => s.trim())
+                      .filter((s: string) => s.length > 0)
+                      .map((s: string) => (Number.isFinite(Number(s)) ? Number(s) : s))
+                  : [atomStep.tag_id];
               const wantIn = atomStep.conditional_tag == 'in';
               evaluators.push({
                 op,
@@ -482,15 +503,20 @@ export class AppService {
             case 'custom_field': {
               loadContacts.add('customFields');
               const op2 = atomStep.conditional_custom_field;
-              const fieldId = atomStep.custom_field_id;
+              // Reject prototype-poison keys loudly so the outer catch surfaces a
+              // MSGOPS_CONDITIONAL_EVAL_FAILED tracker event rather than silent false.
+              const fieldId = assertSafeKey(String(atomStep.custom_field_id), 'custom_field_id');
               const isCompareFields = atomStep.filter_custom_field == 'compare_fields';
               const rawValue = atomStep.custom_field_value;
+              if (isCompareFields) {
+                assertSafeKey(String(rawValue), 'custom_field_value');
+              }
               evaluators.push({
                 op,
                 fn: (contact: any) => {
                   const customFields = contact.customFields || {};
-                  if (!hasSafeOwnProp(customFields, String(fieldId))) return false;
-                  const lhs = safeOwnProp(customFields, String(fieldId));
+                  if (!hasSafeOwnProp(customFields, fieldId)) return false;
+                  const lhs = safeOwnProp(customFields, fieldId);
                   const rhs = isCompareFields ? (hasSafeOwnProp(customFields, String(rawValue)) ? safeOwnProp(customFields, String(rawValue)) : '') : rawValue;
                   return applyComparison(lhs, op2, rhs);
                 },
@@ -602,6 +628,10 @@ export class AppService {
             case 'lead': {
               loadLead = true;
               const leadKey = String(atomStep.lead_field_key);
+              // Reject prototype-poison segments loudly (surface via outer catch).
+              for (const segment of leadKey.split('.')) {
+                assertSafeKey(segment, 'lead_field_key');
+              }
               const leadOp = atomStep.conditional_lead_field;
               const leadValue = atomStep.lead_field_value;
               evaluators.push({

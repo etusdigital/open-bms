@@ -102,12 +102,24 @@ export function assertAllowedClickhouseOperator(op: unknown): string {
   return op;
 }
 
-/** Strict YYYY-MM-DD validator (the only format produced by the UI / dayjs format). */
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+/**
+ * Accepts `YYYY-MM-DD` or full ISO 8601 datetime (`YYYY-MM-DDTHH:MM:SS[.sss][Z|±HH:MM]`
+ * or space-separated variant). Legacy producers historically interpolated either
+ * shape into the query, so the validator preserves that surface area while still
+ * rejecting injection payloads (anything with quotes/semicolons/spaces in the wrong place).
+ */
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
 
 export function assertIsoDate(value: unknown, fieldName: string): string {
   if (typeof value !== 'string' || !ISO_DATE_RE.test(value)) {
     throw new Error(`Invalid date for ${fieldName}: ${String(value)}`);
   }
   return value;
+}
+
+export function assertSafeKey(key: unknown, fieldName: string): string {
+  if (typeof key !== 'string' || key.length === 0 || PROTOTYPE_KEYS.has(key)) {
+    throw new Error(`Unsafe key for ${fieldName}: ${String(key)}`);
+  }
+  return key;
 }
