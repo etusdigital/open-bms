@@ -1618,10 +1618,11 @@ describe('AppService', () => {
           const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
 
           expect(mocks.mockMsgopsService.queryEventsLogs).toHaveBeenCalled();
-          const queryArg = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0][0];
+          const [queryArg, paramsArg] = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0];
           expect(queryArg).toContain('FROM events_logs_v2');
-          expect(queryArg).toContain(`time_date >= '${rangeStart}'`);
-          expect(queryArg).toContain(`time BETWEEN '${rangeStart}' AND '${rangeEnd}'`);
+          expect(queryArg).toContain('time_date >= {startDate:String}');
+          expect(queryArg).toContain('time BETWEEN {rangeStart:String} AND {rangeEnd:String}');
+          expect(paramsArg).toMatchObject({ startDate: rangeStart, rangeStart, rangeEnd });
           expect(result).toEqual(TRUE_BRANCH_CHILD);
         });
 
@@ -1704,9 +1705,10 @@ describe('AppService', () => {
 
               const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
 
-              const queryArg = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0][0];
-              expect(queryArg).toContain(`time_date >= '${testDate}'`);
-              expect(queryArg).toContain(`time ${filter} '${testDate}'`);
+              const [queryArg, paramsArg] = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0];
+              expect(queryArg).toContain('time_date >= {startDate:String}');
+              expect(queryArg).toContain(`time ${filter} {filterDate:String}`);
+              expect(paramsArg).toMatchObject({ startDate: testDate, filterDate: testDate });
               expect(result).toEqual(TRUE_BRANCH_CHILD);
             });
 
@@ -1791,10 +1793,11 @@ describe('AppService', () => {
 
               const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
 
-              const queryArg = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0][0];
+              const [queryArg, paramsArg] = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0];
               // With mocked dayjs at 2024-06-15, 7 days ago = 2024-06-08
-              expect(queryArg).toContain('time_date >=');
-              expect(queryArg).toContain(`time ${filter}`);
+              expect(queryArg).toContain('time_date >= {startDate:String}');
+              expect(queryArg).toContain(`time ${filter} {filterDate:String}`);
+              expect(paramsArg.filterDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
               expect(result).toEqual(TRUE_BRANCH_CHILD);
             });
 
@@ -1889,8 +1892,9 @@ describe('AppService', () => {
 
         await service['definedConditional'](step as any, baseLeadStateMessage as any);
 
-        const queryArg = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0][0];
-        expect(queryArg).toContain("time_date >= '2025-01-01'");
+        const [queryArg, paramsArg] = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0];
+        expect(queryArg).toContain('time_date >= {startDate:String}');
+        expect(paramsArg.startDate).toBe('2025-01-01');
       });
 
       it('should include time_date partition filter for date time_type', async () => {
@@ -1906,8 +1910,9 @@ describe('AppService', () => {
 
         await service['definedConditional'](step as any, baseLeadStateMessage as any);
 
-        const queryArg = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0][0];
-        expect(queryArg).toContain("time_date >= '2025-06-15'");
+        const [queryArg, paramsArg] = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0];
+        expect(queryArg).toContain('time_date >= {startDate:String}');
+        expect(paramsArg.startDate).toBe('2025-06-15');
       });
 
       it('should include time_date partition filter with calculated date for relative time_type', async () => {
@@ -1959,8 +1964,9 @@ describe('AppService', () => {
 
         await service['definedConditional'](step as any, baseLeadStateMessage as any);
 
-        const queryArg = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0][0];
-        expect(queryArg).toContain('account_id = 1');
+        const [queryArg, paramsArg] = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0];
+        expect(queryArg).toContain('account_id = {accountId:UInt64}');
+        expect(paramsArg.accountId).toBe(1);
       });
 
       it('should include correct contact_id from contact', async () => {
@@ -1976,8 +1982,9 @@ describe('AppService', () => {
 
         await service['definedConditional'](step as any, baseLeadStateMessage as any);
 
-        const queryArg = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0][0];
-        expect(queryArg).toContain('contact_id = 63321184');
+        const [queryArg, paramsArg] = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0];
+        expect(queryArg).toContain('contact_id = {contactId:UInt64}');
+        expect(paramsArg.contactId).toBe(63321184);
       });
 
       it('should include correct event name from step config', async () => {
@@ -1994,8 +2001,9 @@ describe('AppService', () => {
 
         await service['definedConditional'](step as any, baseLeadStateMessage as any);
 
-        const queryArg = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0][0];
-        expect(queryArg).toContain("event = 'purchase_completed'");
+        const [queryArg, paramsArg] = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0];
+        expect(queryArg).toContain('event = {eventName:String}');
+        expect(paramsArg.eventName).toBe('purchase_completed');
       });
 
       it('should include LIMIT 1 in query', async () => {
@@ -2036,8 +2044,8 @@ describe('AppService', () => {
 
         await service['definedConditional'](step as any, baseLeadStateMessage as any);
 
-        const queryArg = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0][0];
-        expect(queryArg).toContain("event = '0'");
+        const [, paramsArg] = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0];
+        expect(paramsArg.eventName).toBe('0');
       });
 
       it('should handle empty event object gracefully (fallback to 0)', async () => {
@@ -2056,8 +2064,8 @@ describe('AppService', () => {
 
         await service['definedConditional'](step as any, baseLeadStateMessage as any);
 
-        const queryArg = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0][0];
-        expect(queryArg).toContain("event = '0'");
+        const [, paramsArg] = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0];
+        expect(paramsArg.eventName).toBe('0');
       });
 
       it('should return TRUE branch when query returns multiple results (length > 0)', async () => {
@@ -2750,6 +2758,281 @@ describe('AppService', () => {
 
       // Assert
       expect(result).toBe('message-id-123');
+    });
+  });
+
+  describe('definedConditional - hardening (EVO-1193)', () => {
+    const TRUE_BRANCH_CHILD = [{ id: 9001, type: 'httpRequest' }];
+    const FALSE_BRANCH_CHILD = [{ id: 9002, type: 'httpRequest' }];
+
+    const baseLeadStateMessage = {
+      id: 'lsm-1',
+      contact: {
+        id: 63321184,
+        accountId: 1,
+        email: 'test@example.com',
+        firstName: 'Test',
+        customFields: {},
+      },
+      startedAt: 1672148098000,
+      account: { id: 1, accountConfigs: { time_zone: 'America/Sao_Paulo' } },
+      automation: { id: 50, type: 'email', title: 'Test Automation', version: '1' },
+    };
+
+    const buildStep = (settings: any[]) => ({
+      id: 999,
+      type: 'conditional',
+      child: [
+        { id: 'true-1', type: 'conditionalTrue', settings, child: TRUE_BRANCH_CHILD },
+        { id: 'false-1', type: 'conditionalFalse', settings: {}, child: FALSE_BRANCH_CHILD },
+      ],
+    });
+
+    beforeEach(() => {
+      // Tracker-event assertions here must see only calls produced by the current test.
+      mocks.mockTrackerService.send.mockClear();
+      mocks.mockMsgopsService.queryEventsLogs.mockClear();
+    });
+
+    it('H4: rejects SQL injection via conditional_event_filter (allowlist) and emits failure tracker event', async () => {
+      const step = buildStep([
+        {
+          type: 'custom_event',
+          conditional: 'and',
+          time_type: 'date',
+          conditional_event_type: 'in',
+          conditional_event_filter: "= '' UNION SELECT * FROM users --",
+          custom_event_date: '2025-01-01',
+          event: { name: 'purchase' },
+        },
+      ]);
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 63321184, accountId: 1, customFields: {} });
+
+      const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
+
+      expect(result).toEqual(FALSE_BRANCH_CHILD);
+      // SQL must never reach ClickHouse with operator interpolated
+      expect(mocks.mockMsgopsService.queryEventsLogs).not.toHaveBeenCalled();
+      // Failure must be visible
+      expect(mocks.mockTrackerService.send).toHaveBeenCalledWith(
+        'MSGOPS_CONDITIONAL_EVAL_FAILED',
+        expect.objectContaining({ email: 'test@example.com', active_step: 999 }),
+        expect.any(Number),
+      );
+    });
+
+    it('H4: rejects malformed custom_event_date and emits failure tracker event', async () => {
+      const step = buildStep([
+        {
+          type: 'custom_event',
+          conditional: 'and',
+          time_type: 'date',
+          conditional_event_type: 'in',
+          conditional_event_filter: '>=',
+          custom_event_date: "2025-01-01' OR 1=1 --",
+          event: { name: 'purchase' },
+        },
+      ]);
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 63321184, accountId: 1, customFields: {} });
+
+      const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
+
+      expect(result).toEqual(FALSE_BRANCH_CHILD);
+      expect(mocks.mockMsgopsService.queryEventsLogs).not.toHaveBeenCalled();
+      expect(mocks.mockTrackerService.send).toHaveBeenCalledWith('MSGOPS_CONDITIONAL_EVAL_FAILED', expect.any(Object), expect.any(Number));
+    });
+
+    it('H4: parameterized query carries values out-of-band (no string interpolation of values)', async () => {
+      const step = buildStep([
+        {
+          type: 'custom_event',
+          conditional: 'and',
+          time_type: 'range',
+          conditional_event_type: 'in',
+          custom_event_date: '2025-01-01',
+          custom_event_date_end: '2025-01-31',
+          event: { name: 'click' },
+        },
+      ]);
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 63321184, accountId: 1, customFields: {} });
+      mocks.mockMsgopsService.queryEventsLogs.mockResolvedValue([{ contact_id: 63321184 }]);
+
+      await service['definedConditional'](step as any, baseLeadStateMessage as any);
+
+      const [sql, params] = mocks.mockMsgopsService.queryEventsLogs.mock.calls[0];
+      // Account/contact/event values never appear inline in the SQL
+      expect(sql).not.toMatch(/account_id\s*=\s*1\b/);
+      expect(sql).not.toMatch(/contact_id\s*=\s*63321184\b/);
+      expect(sql).not.toContain("'click'");
+      expect(params).toMatchObject({ accountId: 1, contactId: 63321184, eventName: 'click' });
+    });
+
+    it('H3: runtime ClickHouse failure routes to false branch AND emits failure tracker event (not silent)', async () => {
+      const step = buildStep([
+        {
+          type: 'custom_event',
+          conditional: 'and',
+          time_type: 'range',
+          conditional_event_type: 'in',
+          custom_event_date: '2025-01-01',
+          custom_event_date_end: '2025-01-31',
+          event: { name: 'click' },
+        },
+      ]);
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 63321184, accountId: 1, customFields: {} });
+      mocks.mockMsgopsService.queryEventsLogs.mockRejectedValue(new Error('ClickHouse timeout'));
+
+      const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
+
+      expect(result).toEqual(FALSE_BRANCH_CHILD);
+      expect(mocks.mockTrackerService.send).toHaveBeenCalledWith('MSGOPS_CONDITIONAL_EVAL_FAILED', expect.any(Object), expect.any(Number));
+    });
+
+    it('H2: prototype-pollution key on custom_field routes to false AND emits failure tracker event (loud, not silent)', async () => {
+      const step = buildStep([
+        {
+          type: 'custom_field',
+          conditional_custom_field: '=',
+          custom_field_id: '__proto__',
+          custom_field_value: 'anything',
+        },
+      ]);
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 63321184, accountId: 1, customFields: { plan: 'premium' } });
+
+      const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
+
+      expect(result).toEqual(FALSE_BRANCH_CHILD);
+      expect(mocks.mockTrackerService.send).toHaveBeenCalledWith('MSGOPS_CONDITIONAL_EVAL_FAILED', expect.any(Object), expect.any(Number));
+    });
+
+    it('H2: prototype-pollution segment on lead_field_key routes to false AND emits failure tracker event', async () => {
+      const step = buildStep([
+        {
+          type: 'lead',
+          conditional_lead_field: '=',
+          lead_field_key: 'data.__proto__.polluted',
+          lead_field_value: 'x',
+        },
+      ]);
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 63321184, accountId: 1, customFields: {}, lead: { data: {} } });
+
+      const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
+
+      expect(result).toEqual(FALSE_BRANCH_CHILD);
+      expect(mocks.mockTrackerService.send).toHaveBeenCalledWith('MSGOPS_CONDITIONAL_EVAL_FAILED', expect.any(Object), expect.any(Number));
+    });
+
+    it('H4: assertIsoDate accepts ISO-8601 datetime (legacy producers) without rejecting', async () => {
+      const step = buildStep([
+        {
+          type: 'custom_event',
+          conditional: 'and',
+          time_type: 'range',
+          conditional_event_type: 'in',
+          custom_event_date: '2025-01-01T00:00:00Z',
+          custom_event_date_end: '2025-01-31 23:59:59',
+          event: { name: 'click' },
+        },
+      ]);
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 63321184, accountId: 1, customFields: {} });
+      mocks.mockMsgopsService.queryEventsLogs.mockResolvedValue([{ contact_id: 63321184 }]);
+
+      const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
+
+      expect(result).toEqual(TRUE_BRANCH_CHILD);
+      expect(mocks.mockTrackerService.send).not.toHaveBeenCalledWith('MSGOPS_CONDITIONAL_EVAL_FAILED', expect.any(Object), expect.any(Number));
+    });
+
+    it('tag atom: normalizes comma-separated string tag_id (legacy eval shape)', async () => {
+      const step = buildStep([
+        {
+          type: 'tag',
+          conditional_tag: 'in',
+          tag_id: '10, 20, 30',
+        },
+      ]);
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 63321184, accountId: 1, tags: [20], customFields: {} });
+
+      const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
+
+      expect(result).toEqual(TRUE_BRANCH_CHILD);
+    });
+
+    it('H2: unknown conditional atom type does not silently fall to false — emits tracker event', async () => {
+      const step = buildStep([{ type: 'totally_unknown_type', conditional: 'and' }]);
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 63321184, accountId: 1, customFields: {} });
+
+      const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
+
+      expect(result).toEqual(FALSE_BRANCH_CHILD);
+      expect(mocks.mockTrackerService.send).toHaveBeenCalledWith('MSGOPS_CONDITIONAL_EVAL_FAILED', expect.any(Object), expect.any(Number));
+    });
+
+    it('H2: TRUE branch on custom_field iLike match (no eval path)', async () => {
+      const step = buildStep([
+        {
+          type: 'custom_field',
+          conditional_custom_field: 'iLike',
+          custom_field_id: 'company',
+          custom_field_value: 'Tech',
+        },
+      ]);
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 63321184, accountId: 1, customFields: { company: 'TechCorp Inc' } });
+
+      const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
+
+      expect(result).toEqual(TRUE_BRANCH_CHILD);
+    });
+
+    it('H2: FALSE branch on custom_field mismatch (no eval path)', async () => {
+      const step = buildStep([
+        {
+          type: 'custom_field',
+          conditional_custom_field: '=',
+          custom_field_id: 'plan',
+          custom_field_value: 'premium',
+        },
+      ]);
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 63321184, accountId: 1, customFields: { plan: 'basic' } });
+
+      const result = await service['definedConditional'](step as any, baseLeadStateMessage as any);
+
+      expect(result).toEqual(FALSE_BRANCH_CHILD);
+    });
+
+    it('H2: processHttpRequest rejects prototype-pollution path in dynamic id', async () => {
+      const mockLeadStateMessage: any = {
+        id: 'lsm-2',
+        contact: { id: 1, accountId: 1, email: 'a@b.com', firstName: 'A' },
+        automation: {
+          id: 50,
+          type: 'email',
+          title: 'HTTP Proto',
+          steps: [
+            {
+              id: 100,
+              type: StepType.HTTP_REQUEST,
+              settings: {
+                operation: 'post',
+                url: 'https://api.example.com/x',
+                headers: [{ key: 'X-Bad', value: { type: 'dynamic', id: '__proto__.polluted' } }],
+                body: [{ key: 'email', value: { type: 'dynamic', id: 'contact.email' } }],
+              },
+            },
+          ],
+        },
+      };
+      mocks.mockMsgopsService.findContactById.mockResolvedValue({ id: 1, accountId: 1, email: 'a@b.com', customFields: {} });
+      mocks.mockHttpRequestProvider.process.mockResolvedValue({ status: 200 });
+
+      await service.processHttpRequest(mockLeadStateMessage);
+
+      expect(mocks.mockHttpRequestProvider.process).toHaveBeenCalledWith(
+        'post',
+        'https://api.example.com/x',
+        expect.objectContaining({ 'X-Bad': '' }),
+        expect.objectContaining({ email: 'a@b.com' }),
+      );
     });
   });
 });

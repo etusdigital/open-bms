@@ -98,7 +98,7 @@ export class MsgopsService {
     return await this.entityManager.query(query);
   }
 
-  async queryEventsLogs(query: string) {
-    return await this.clickhouseProvider.runQuery(query);
+  async queryEventsLogs(query: string, params?: Record<string, unknown>) {
+    return await this.clickhouseProvider.runQuery(query, params);
   }
 }

@@ -15,10 +15,11 @@ export class ClickhouseProvider {
     });
   }
 
-  async runQuery(sql: string) {
+  async runQuery(sql: string, queryParams?: Record<string, unknown>) {
     const resultSet = await this.client.query({
       query: sql,
       format: 'JSON',
+      ...(queryParams ? { query_params: queryParams } : {}),
     });
 
     const response = await resultSet.json();

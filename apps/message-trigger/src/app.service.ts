@@ -15,6 +15,17 @@ import * as timezone from 'dayjs/plugin/timezone';
 import { MsgopsService } from './msgops/msgops.service';
 import { HttpRequestProvider } from './providers/httpRequest.provider';
 import { Redis } from 'ioredis';
+import {
+  applyComparison,
+  assertAllowedClickhouseOperator,
+  assertIsoDate,
+  assertSafeKey,
+  ConditionAtom,
+  evaluateAtoms,
+  hasSafeOwnProp,
+  safeGetPath,
+  safeOwnProp,
+} from './utils/safe-evaluator';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -431,109 +442,211 @@ export class AppService {
 
       const loadContacts = new Set();
       let loadLead = false;
-      let logic = '';
-      if (stepTrue && stepTrue.settings.length) {
-        for (const [index, step] of stepTrue.settings.entries()) {
-          if (index > 0 && step.conditional) {
-            logic += step.conditional == 'and' ? ' && ' : ' || ';
-          }
-          switch (step.type) {
-            case 'interation':
-              let timeFilter = `${step.conditional_interation == 'yes' ? ' != null ' : ' == null '}`;
-              if (step.time != 'all') {
-                timeFilter =
-                  step.conditional_interation == 'yes'
-                    ? ` > (dayjs().tz('${timeZone || 'UTC'}').subtract(parseInt('${step.time}'), 'day').format('YYYY-MM-DD'))`
-                    : ` < ((dayjs().tz('${timeZone || 'UTC'}').subtract(parseInt('${step.time}'), 'day').format('YYYY-MM-DD')) || !contact.${step.event})`;
-              }
-              logic += ` contact.${step.event}${timeFilter} `;
-              break;
-            case 'tag':
-              loadContacts.add('tags');
-              const conditionalTag = step.conditional_tag == 'in' ? ' > 0' : ' == 0 ';
-              logic += ` ([${step.tag_id}].filter(x => contact.tags.includes(x))).length ${conditionalTag} `;
-              break;
-            case 'custom_field':
-              loadContacts.add('customFields');
-              const conditionalField = step.conditional_custom_field === '=' ? '==' : step.conditional_custom_field;
-              if (step.filter_custom_field && step.filter_custom_field == 'compare_fields') {
-                step.custom_field_value = `(contact.customFields.hasOwnProperty(${step.custom_field_value}) ? contact.customFields[${step.custom_field_value}] : '')`;
-              } else {
-                step.custom_field_value = `'${step.custom_field_value}'`;
-              }
-              if (step.conditional_custom_field == 'iLike') {
-                logic += ` (contact.customFields.hasOwnProperty(${step.custom_field_id})
-                && contact.customFields[${step.custom_field_id}].includes(${step.custom_field_value})) `;
-                break;
-              }
-              logic += ` (contact.customFields.hasOwnProperty(${step.custom_field_id})
-                && contact.customFields[${step.custom_field_id}] ${conditionalField} ${step.custom_field_value}) `;
-              break;
-            case 'user_field':
-              const conditionalUser = step.conditional_user_field === '=' ? '==' : step.conditional_user_field;
-              if (step.user_field_key === 'created_at_date') {
-                if (step.conditional_user_field === '-') {
-                  logic += ` contact.created_at_date >= (dayjs().tz('${timeZone || 'UTC'}').subtract(${step.user_field_value}, 'day').format('YYYY-MM-DD')) `;
-                  break;
-                }
-                const date = new Date(step.user_field_value).toISOString();
-                logic += ` contact.created_at_date ${conditionalUser} '${date}' `;
-                break;
-              }
-              if (step.user_field_key === 'email_provider') {
-                logic += ` contact.email_provider ${conditionalUser} '${step.user_field_value}' `;
-                break;
-              }
-              if (step.user_field_key === 'communication_channels') {
-                logic += ` contact.${step.user_field_value} == ${step.conditional_user_field}`;
-                break;
-              }
-              break;
-            case 'automation':
-              loadContacts.add('contactAutomations');
-              const automationsIds = step.user_field_automation.map((automation) => {
-                return automation.id;
-              });
-              logic += ` contact.contactAutomations.filter((automation) => [${automationsIds}].includes(automation.automationId))
-                    .filter((automationFilter) => dayjs(automationFilter.createdAt).tz('${timeZone || 'UTC'}') 
-                    ${step.conditional_user_field} (dayjs().tz('${timeZone || 'UTC'}').subtract(${step.user_field_value}, 'day'))).length`;
-              break;
-            case 'custom_event':
-              // Calculate time_date for mandatory ClickHouse filter (partitioning)
-              const today = dayjs().format('YYYY-MM-DD');
-              let startDate = today;
+      const evaluators: Array<{ op?: 'and' | 'or'; fn: (contact: any) => boolean | Promise<boolean> }> = [];
 
-              if (step.time_type == 'range' || step.time_type == 'date') {
-                startDate = step.custom_event_date;
+      if (stepTrue && stepTrue.settings.length) {
+        for (const [index, atomStep] of stepTrue.settings.entries()) {
+          const op: 'and' | 'or' | undefined = index > 0 && atomStep.conditional ? (atomStep.conditional == 'and' ? 'and' : 'or') : undefined;
+
+          switch (atomStep.type) {
+            case 'interation': {
+              const event = String(atomStep.event);
+              const conditionalInteration = atomStep.conditional_interation;
+              const time = atomStep.time;
+              const threshold =
+                time != 'all'
+                  ? dayjs()
+                      .tz(timeZone || 'UTC')
+                      .subtract(parseInt(String(time)), 'day')
+                      .format('YYYY-MM-DD')
+                  : null;
+              evaluators.push({
+                op,
+                fn: (contact: any) => {
+                  const value = contact[event];
+                  if (time == 'all') {
+                    return conditionalInteration == 'yes' ? value != null : value == null;
+                  }
+                  if (conditionalInteration == 'yes') {
+                    return value > threshold;
+                  }
+                  return value < threshold || !value;
+                },
+              });
+              break;
+            }
+            case 'tag': {
+              loadContacts.add('tags');
+              // Legacy producers may emit `tag_id` as an array, a single number, or a
+              // comma-separated string (the old `eval` path relied on JS array-literal
+              // interpolation of "1,2,3"). Normalize all three to a number/string array.
+              const tagIds: any[] = Array.isArray(atomStep.tag_id)
+                ? atomStep.tag_id
+                : typeof atomStep.tag_id === 'string' && atomStep.tag_id.includes(',')
+                  ? atomStep.tag_id
+                      .split(',')
+                      .map((s: string) => s.trim())
+                      .filter((s: string) => s.length > 0)
+                      .map((s: string) => (Number.isFinite(Number(s)) ? Number(s) : s))
+                  : [atomStep.tag_id];
+              const wantIn = atomStep.conditional_tag == 'in';
+              evaluators.push({
+                op,
+                fn: (contact: any) => {
+                  const tags: any[] = contact.tags || [];
+                  const matches = tagIds.filter((x) => tags.includes(x)).length;
+                  return wantIn ? matches > 0 : matches == 0;
+                },
+              });
+              break;
+            }
+            case 'custom_field': {
+              loadContacts.add('customFields');
+              const op2 = atomStep.conditional_custom_field;
+              // Reject prototype-poison keys loudly so the outer catch surfaces a
+              // MSGOPS_CONDITIONAL_EVAL_FAILED tracker event rather than silent false.
+              const fieldId = assertSafeKey(String(atomStep.custom_field_id), 'custom_field_id');
+              const isCompareFields = atomStep.filter_custom_field == 'compare_fields';
+              const rawValue = atomStep.custom_field_value;
+              if (isCompareFields) {
+                assertSafeKey(String(rawValue), 'custom_field_value');
+              }
+              evaluators.push({
+                op,
+                fn: (contact: any) => {
+                  const customFields = contact.customFields || {};
+                  if (!hasSafeOwnProp(customFields, fieldId)) return false;
+                  const lhs = safeOwnProp(customFields, fieldId);
+                  const rhs = isCompareFields ? (hasSafeOwnProp(customFields, String(rawValue)) ? safeOwnProp(customFields, String(rawValue)) : '') : rawValue;
+                  return applyComparison(lhs, op2, rhs);
+                },
+              });
+              break;
+            }
+            case 'user_field': {
+              const userOp = atomStep.conditional_user_field;
+              const userKey = atomStep.user_field_key;
+              const userValue = atomStep.user_field_value;
+              if (userKey === 'created_at_date') {
+                if (userOp === '-') {
+                  const threshold = dayjs()
+                    .tz(timeZone || 'UTC')
+                    .subtract(userValue, 'day')
+                    .format('YYYY-MM-DD');
+                  evaluators.push({ op, fn: (contact: any) => contact.created_at_date >= threshold });
+                } else {
+                  const isoDate = new Date(userValue).toISOString();
+                  evaluators.push({ op, fn: (contact: any) => applyComparison(contact.created_at_date, userOp, isoDate) });
+                }
+                break;
+              }
+              if (userKey === 'email_provider') {
+                evaluators.push({ op, fn: (contact: any) => applyComparison(contact.email_provider, userOp, userValue) });
+                break;
+              }
+              if (userKey === 'communication_channels') {
+                // Original semantics: ` contact.${value} == ${conditionalUserField}` (no quotes),
+                // i.e. compare contact[channelKey] to a boolean-like literal expressed as the operator field.
+                const expected = userOp === 'true' ? true : userOp === 'false' ? false : userOp;
+                evaluators.push({
+                  op,
+                  fn: (contact: any) => {
+                    const channelValue = safeOwnProp(contact, String(userValue));
+
+                    return channelValue == expected;
+                  },
+                });
+                break;
+              }
+              // Unknown user_field key: surface rather than silent-true
+              throw new Error(`Unknown user_field key: ${userKey}`);
+            }
+            case 'automation': {
+              loadContacts.add('contactAutomations');
+              const automationIds: any[] = (atomStep.user_field_automation || []).map((a: any) => a.id);
+              const compareOp = atomStep.conditional_user_field;
+              const days = atomStep.user_field_value;
+              const tz = timeZone || 'UTC';
+              evaluators.push({
+                op,
+                fn: (contact: any) => {
+                  const list: any[] = contact.contactAutomations || [];
+                  const threshold = dayjs().tz(tz).subtract(days, 'day');
+                  const matched = list
+                    .filter((a) => automationIds.includes(a.automationId))
+                    .filter((a) => applyComparison(dayjs(a.createdAt).tz(tz).valueOf(), compareOp, threshold.valueOf()));
+                  return matched.length > 0;
+                },
+              });
+              break;
+            }
+            case 'custom_event': {
+              // Calculate time_date for mandatory ClickHouse filter (partitioning)
+              let startDate: string;
+              if (atomStep.time_type == 'range' || atomStep.time_type == 'date') {
+                startDate = assertIsoDate(atomStep.custom_event_date, 'custom_event_date');
               } else {
                 startDate = dayjs()
-                  .subtract(step.time || 30, 'day')
+                  .subtract(atomStep.time || 30, 'day')
                   .format('YYYY-MM-DD');
               }
 
-              let eventQuery = `SELECT *
-                FROM events_logs_v2
-                WHERE account_id = ${leadStateMessage.contact.accountId}
-                AND time_date >= '${startDate}'
-                AND event = '${step?.event?.name || 0}'
-                AND contact_id IS NOT NULL AND contact_id = ${leadStateMessage.contact.id}`;
-              if (step.time_type == 'range') {
-                eventQuery += ` AND time BETWEEN '${step.custom_event_date}' AND '${step.custom_event_date_end}'`;
-              } else if (step.time_type == 'date') {
-                eventQuery += ` AND time ${step.conditional_event_filter} '${step.custom_event_date}'`;
+              const eventName = atomStep?.event?.name ? String(atomStep.event.name) : '0';
+              const queryParams: Record<string, unknown> = {
+                accountId: leadStateMessage.contact.accountId,
+                contactId: leadStateMessage.contact.id,
+                startDate,
+                eventName,
+              };
+
+              let eventQuery = `SELECT *\n                FROM events_logs_v2\n                WHERE account_id = {accountId:UInt64}\n                AND time_date >= {startDate:String}\n                AND event = {eventName:String}\n                AND contact_id IS NOT NULL AND contact_id = {contactId:UInt64}`;
+
+              if (atomStep.time_type == 'range') {
+                const rangeStart = assertIsoDate(atomStep.custom_event_date, 'custom_event_date');
+                const rangeEnd = assertIsoDate(atomStep.custom_event_date_end, 'custom_event_date_end');
+                queryParams.rangeStart = rangeStart;
+                queryParams.rangeEnd = rangeEnd;
+                eventQuery += ` AND time BETWEEN {rangeStart:String} AND {rangeEnd:String}`;
+              } else if (atomStep.time_type == 'date') {
+                const operator = assertAllowedClickhouseOperator(atomStep.conditional_event_filter);
+                const filterDate = assertIsoDate(atomStep.custom_event_date, 'custom_event_date');
+                queryParams.filterDate = filterDate;
+                eventQuery += ` AND time ${operator} {filterDate:String}`;
               } else {
-                eventQuery += ` AND time ${step.conditional_event_filter} '${dayjs().subtract(step.time, 'day').format('YYYY-MM-DD')}'`;
+                const operator = assertAllowedClickhouseOperator(atomStep.conditional_event_filter);
+                const filterDate = dayjs().subtract(atomStep.time, 'day').format('YYYY-MM-DD');
+                queryParams.filterDate = filterDate;
+                eventQuery += ` AND time ${operator} {filterDate:String}`;
               }
               eventQuery += ' LIMIT 1';
-              const resultEvent = await this.msgopsService.queryEventsLogs(eventQuery);
-              const conditionalEvent = (step.conditional_event_type == 'in' && resultEvent.length > 0) || (step.conditional_event_type == 'not in' && resultEvent.length == 0);
-              logic += ` ${conditionalEvent}`;
+              const resultEvent = await this.msgopsService.queryEventsLogs(eventQuery, queryParams);
+              const conditionalEvent =
+                (atomStep.conditional_event_type == 'in' && resultEvent.length > 0) || (atomStep.conditional_event_type == 'not in' && resultEvent.length == 0);
+              evaluators.push({ op, fn: () => conditionalEvent });
               break;
-            case 'lead':
+            }
+            case 'lead': {
               loadLead = true;
-              const conditionalLead = step.conditional_lead_field === '=' ? '==' : step.conditional_lead_field;
-              logic += ` contact['lead'].${step.lead_field_key} ${conditionalLead} '${step.lead_field_value}'`;
+              const leadKey = String(atomStep.lead_field_key);
+              // Reject prototype-poison segments loudly (surface via outer catch).
+              for (const segment of leadKey.split('.')) {
+                assertSafeKey(segment, 'lead_field_key');
+              }
+              const leadOp = atomStep.conditional_lead_field;
+              const leadValue = atomStep.lead_field_value;
+              evaluators.push({
+                op,
+                fn: (contact: any) => {
+                  const lead = contact.lead;
+                  if (!lead) return false;
+                  const lhs = safeGetPath(lead, leadKey);
+                  return applyComparison(lhs, leadOp, leadValue);
+                },
+              });
               break;
+            }
+            default:
+              throw new Error(`Unknown conditional atom type: ${atomStep.type}`);
           }
         }
       }
@@ -550,11 +663,15 @@ export class AppService {
         }
       }
 
-      const definedConditional = eval(logic);
+      const atoms: ConditionAtom[] = [];
+      for (const e of evaluators) {
+        atoms.push({ op: e.op, value: Boolean(await e.fn(contact)) });
+      }
+      const definedConditional = evaluateAtoms(atoms);
+
       await this.processStepToInternalEvent(leadStateMessage, {
         stepId: step.id,
         stepType: step.type,
-        logic: logic,
         resultLogic: definedConditional,
         contactInfo: contact,
         stepConfig: step.settings,
@@ -566,7 +683,28 @@ export class AppService {
         return stepFalse?.child || null;
       }
     } catch (error) {
+      // EVO-1193 / H3: do not silently route to false. Emit a tracker event so the
+      // operator UI can show "N contacts skipped due to evaluation failure" instead
+      // of mis-routing without signal. Current routing (fall through to the false
+      // branch) is preserved for backwards compatibility — flipping to throw/DLQ
+      // would page on every transient ClickHouse blip until alerting is in place.
       console.log(`Error setting step: STEP: ${step.id} | error: ${error} | AUTOMATION: ${JSON.stringify(leadStateMessage)}`);
+      try {
+        this.trackerService.send(
+          MsgopsEvent.MSGOPS_CONDITIONAL_EVAL_FAILED,
+          {
+            automation_name: leadStateMessage.automation?.title,
+            automation_type: leadStateMessage.automation?.type,
+            automation_version: leadStateMessage.automation?.version || '-',
+            email: leadStateMessage.contact?.email,
+            active_step: step?.id || 0,
+            active_step_type: step?.type || 'NOT FOUND',
+          },
+          leadStateMessage.startedAt,
+        );
+      } catch (trackerError) {
+        console.log(`Failed to emit MSGOPS_CONDITIONAL_EVAL_FAILED: ${trackerError}`);
+      }
 
       const stepFalse = step.child.find((item) => item.type === 'conditionalFalse');
       return stepFalse?.child || null;
@@ -708,18 +846,19 @@ export class AppService {
 
       const headers = {};
       for (const header of step.settings.headers) {
-        headers[header.key] = header.value.type === 'custom' ? header.value.id : eval(`leadMessage.${header.value.id}`) || '';
+        headers[header.key] = header.value.type === 'custom' ? header.value.id : safeGetPath(leadMessage, String(header.value.id)) || '';
       }
 
       const payload = {};
       for (const item of step.settings.body) {
         if (step.settings.url.includes('isendme.com') && item.value.id.includes('phone')) {
-          payload[item.key] = item.value.type === 'custom' ? item.value.id : eval(`leadMessage.${item.value.id}`).replace('+', '') || '';
+          const phoneValue = item.value.type === 'custom' ? item.value.id : safeGetPath(leadMessage, String(item.value.id));
+          payload[item.key] = (typeof phoneValue === 'string' ? phoneValue.replace('+', '') : phoneValue) || '';
           continue;
         }
 
-        payload[item.key] = item.value.type === 'custom' ? item.value.id : eval(`leadMessage.${item.value.id}`) || '';
-        if (item.value.id === 'contact') {
+        payload[item.key] = item.value.type === 'custom' ? item.value.id : safeGetPath(leadMessage, String(item.value.id)) || '';
+        if (item.value.id === 'contact' && payload[item.key] && typeof payload[item.key] === 'object') {
           delete payload[item.key]['id'];
           delete payload[item.key]['uuid'];
           delete payload[item.key]['accountId'];
