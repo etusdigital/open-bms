@@ -101,7 +101,7 @@ describe('MsgopsService', () => {
       const query = 'SELECT * FROM events_logs_v2 WHERE account_id = 1';
       const result = await service.queryEventsLogs(query);
 
-      expect(mockClickhouseProvider.runQuery).toHaveBeenCalledWith(query);
+      expect(mockClickhouseProvider.runQuery).toHaveBeenCalledWith(query, undefined);
       expect(result).toEqual(mockResult);
     });
 
@@ -111,7 +111,7 @@ describe('MsgopsService', () => {
       const query = 'SELECT * FROM events_logs_v2 WHERE contact_id = 999';
       const result = await service.queryEventsLogs(query);
 
-      expect(mockClickhouseProvider.runQuery).toHaveBeenCalledWith(query);
+      expect(mockClickhouseProvider.runQuery).toHaveBeenCalledWith(query, undefined);
       expect(result).toEqual([]);
     });
 
@@ -128,7 +128,14 @@ describe('MsgopsService', () => {
 
       await service.queryEventsLogs(complexQuery);
 
-      expect(mockClickhouseProvider.runQuery).toHaveBeenCalledWith(complexQuery);
+      expect(mockClickhouseProvider.runQuery).toHaveBeenCalledWith(complexQuery, undefined);
+    });
+
+    it('should forward query params to clickhouseProvider when provided', async () => {
+      mockClickhouseProvider.runQuery.mockResolvedValue([]);
+      const params = { accountId: 1, contactId: 99 };
+      await service.queryEventsLogs('SELECT * FROM events_logs_v2 WHERE account_id = {accountId:UInt64}', params);
+      expect(mockClickhouseProvider.runQuery).toHaveBeenCalledWith('SELECT * FROM events_logs_v2 WHERE account_id = {accountId:UInt64}', params);
     });
   });
 
