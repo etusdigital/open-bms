@@ -377,15 +377,13 @@ export class AccountsService {
         console.error('Account created, but uploadWebPushFile failed (non-fatal):', err);
       }
 
-      if (!skipDefaults) {
-        try {
-          const minute = Math.floor(Math.random() * (40 - 1 + 1) + 1);
-          const dateSchedule = dayjs().tz('America/Sao_Paulo').add(24, 'hour').set('minute', minute).format('YYYY-MM-DD HH:mm:ss');
-          const currentDate = dayjs().tz('America/Sao_Paulo').format('YYYY-MM-DD');
-          await this.scheduler.create(`${account.id}/${currentDate}`, new Date(dateSchedule), `${process.env.BRIUS_HOSTURL}/statistics/usage`, QUEUE_BMS_USAGE);
-        } catch (err) {
-          console.error('Account created, but billing task scheduling failed (non-fatal):', err);
-        }
+      try {
+        const minute = Math.floor(Math.random() * (40 - 1 + 1) + 1);
+        const dateSchedule = dayjs().tz('America/Sao_Paulo').add(24, 'hour').set('minute', minute).format('YYYY-MM-DD HH:mm:ss');
+        const currentDate = dayjs().tz('America/Sao_Paulo').format('YYYY-MM-DD');
+        await this.scheduler.create(`${account.id}/${currentDate}`, new Date(dateSchedule), `${process.env.BRIUS_HOSTURL}/statistics/usage`, QUEUE_BMS_USAGE);
+      } catch (err) {
+        console.error('Account created, but billing task scheduling failed (non-fatal):', err);
       }
 
       return { account: accountEntity, dns };
