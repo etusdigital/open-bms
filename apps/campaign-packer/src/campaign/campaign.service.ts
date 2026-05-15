@@ -13,20 +13,17 @@ import * as timezone from 'dayjs/plugin/timezone';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+type ProcessPageResult = { audiences: unknown[]; contacts: number; packages: number } | Record<string, never>;
+
 @Injectable()
 export class CampaignService {
   private readonly logger = new Logger(CampaignService.name);
-  private packagesLength: number;
-  private contactsLength: number;
   constructor(
     private readonly msgopsService: MsgopsService,
     private readonly queuePublisher: QueuePublisher,
     private readonly redisService: RedisService,
     private readonly eventPublisher: EventPublisherService,
-  ) {
-    this.packagesLength = 0;
-    this.contactsLength = 0;
-  }
+  ) {}
 
   async createContactsSend(id: number) {
     this.logger.log(`Campaign processed: ${id}.`);
@@ -180,7 +177,7 @@ export class CampaignService {
     return jobId;
   }
 
-  async processPage(campaignBatch: CampaignBatch): Promise<{ [K: string]: any }> {
+  async processPage(campaignBatch: CampaignBatch): Promise<ProcessPageResult> {
     const redisClient = this.redisService.getOrThrow();
     const stopCampaign = await redisClient.get(`stop_campaign_${campaignBatch.campaign.id}`);
     if (stopCampaign) {
@@ -189,13 +186,12 @@ export class CampaignService {
     }
     this.validateData(campaignBatch);
 
-    await this.mountPackages(campaignBatch);
-    const toReturn = {
+    const { contactsLength } = await this.mountPackages(campaignBatch);
+    return {
       audiences: campaignBatch.campaign.audiences,
-      contacts: this.contactsLength,
-      packages: this.packagesLength,
+      contacts: contactsLength,
+      packages: 1,
     };
-    return toReturn;
   }
 
   async getContacts(campaign: Campaign, currentContactId: number, finalContactId: number): Promise<ContactEntity[]> {
@@ -207,12 +203,13 @@ export class CampaignService {
     }
   }
 
-  async mountPackages(campaignBatch: CampaignBatch) {
+  async mountPackages(campaignBatch: CampaignBatch): Promise<{ contactsLength: number }> {
     const message = campaignBatch.campaign.campaignMessage[0].message;
 
     const contacts: ContactEntity[] = await this.getContacts(campaignBatch.campaign, campaignBatch.currentContactId, campaignBatch.finalContactId);
 
     const contactsUnique = [...new Map(contacts.map((contact) => [contact.id, contact])).values()];
+    const contactsLength = contactsUnique.length;
 
     const currentpackage = {
       account: campaignBatch.campaign.account || {},
@@ -241,9 +238,9 @@ export class CampaignService {
     await this.eventPublisher.publish(EXCHANGES.campaigns, 'campaign.send', pubSubMessage);
     this.logger.log(`Message ${pubSubMessage.campaignKey} published to ${EXCHANGES.campaigns}/campaign.send.`);
 
-    await this.sendTracker(1, this.contactsLength, campaignBatch.campaign.id, 'CAMPAIGN_PACKAGED');
+    await this.sendTracker(1, contactsLength, campaignBatch.campaign.id, 'CAMPAIGN_PACKAGED');
 
-    return true;
+    return { contactsLength };
   }
 
   async createTest(id: number) {
