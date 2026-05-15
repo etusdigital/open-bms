@@ -48,21 +48,19 @@ export class ServicesService {
       }
     }
 
-    let ippool = sendEmailMessage.message.ippool;
+    const ippool = sendEmailMessage.message.ippool;
     let pool: PoolsDto;
     if (ippool) {
       pool = await this.poolService.findOneByPool(ippool, account.id);
       if (!pool) {
         throw new HttpException('Pool not found', HttpStatus.BAD_REQUEST);
       }
-    }
-
-    if (!sendEmailMessage.message.ippool) {
+    } else {
+      // No explicit ippool: resolve the pool by sender email only to honor a
+      // configured senderReplyTo. We must NOT derive ippool from pool.name —
+      // that is the sender display name, not a valid SendGrid IP pool, and
+      // SendGrid rejects the whole send (EVO-1280). Missing pool is non-fatal.
       pool = await this.poolService.findOneBySenderEmail(sendEmailMessage.message.from.email, account.id);
-      if (!pool) {
-        throw new HttpException('Sender not found for this email', HttpStatus.BAD_REQUEST);
-      }
-      ippool = pool.name;
     }
 
     const replyTo = pool?.senderReplyTo || sendEmailMessage.message.from.email;

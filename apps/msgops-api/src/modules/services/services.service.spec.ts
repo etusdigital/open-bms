@@ -155,8 +155,8 @@ describe('ServicesService', () => {
     };
 
     const mockPoolService = {
-      findOneBySenderEmail: jest.fn(),
       findOneByPool: jest.fn(),
+      findOneBySenderEmail: jest.fn(),
     };
 
     const mockMessagesService = {
@@ -269,13 +269,45 @@ describe('ServicesService', () => {
       await expect(service.sendEmail(dtoWithFutureDate)).rejects.toThrow(new HttpException('Send at must be in the future and within 72 hours from now', HttpStatus.BAD_REQUEST));
     });
 
-    it('should throw bad request when pool not found for sender email', async () => {
-      poolService.findOneBySenderEmail.mockResolvedValue(null);
+    it('should not derive ippool from the sender pool when none is provided (EVO-1280)', async () => {
+      const result = await service.sendEmail(mockEmailDto);
 
-      await expect(service.sendEmail(mockEmailDto)).rejects.toThrow(new HttpException('Sender not found for this email', HttpStatus.BAD_REQUEST));
+      expect(result).toEqual({ status: 'ok' });
+      expect(poolService.findOneByPool).not.toHaveBeenCalled();
+      expect(poolService.findOneBySenderEmail).toHaveBeenCalledWith(mockEmailDto.message.from.email, mockAccount.id);
+      expect(eventPublisher.publish).toHaveBeenCalledWith(
+        EXCHANGES.email,
+        'email.send',
+        expect.objectContaining({
+          message: expect.objectContaining({
+            ippool: undefined,
+            replyTo: mockPool.senderReplyTo,
+          }),
+        }),
+        expect.any(Object),
+      );
     });
 
-    it('should not check pool if ippool is provided in message', async () => {
+    it('should fall back to sender email for replyTo when no sender pool is found', async () => {
+      poolService.findOneBySenderEmail.mockResolvedValue(null);
+
+      const result = await service.sendEmail(mockEmailDto);
+
+      expect(result).toEqual({ status: 'ok' });
+      expect(eventPublisher.publish).toHaveBeenCalledWith(
+        EXCHANGES.email,
+        'email.send',
+        expect.objectContaining({
+          message: expect.objectContaining({
+            ippool: undefined,
+            replyTo: mockEmailDto.message.from.email,
+          }),
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it('should resolve the pool from an explicit ippool in the message', async () => {
       const dtoWithIpPool = {
         ...mockEmailDto,
         message: {
@@ -286,6 +318,7 @@ describe('ServicesService', () => {
 
       await service.sendEmail(dtoWithIpPool);
 
+      expect(poolService.findOneByPool).toHaveBeenCalledWith('test-pool', mockAccount.id);
       expect(poolService.findOneBySenderEmail).not.toHaveBeenCalled();
     });
 
