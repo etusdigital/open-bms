@@ -32,10 +32,6 @@ describe('SchedulerService', () => {
     }).compile();
 
     service = module.get(SchedulerService);
-    process.env.GOOGLE_TASK_QUEUE_TEST_AB = 'bms-scheduler-campaign-testab';
-    process.env.GOOGLE_TASK_SEGMENT = 'bms-scheduler-segment';
-    process.env.GOOGLE_TASK_BMS_USAGE = 'bms-scheduler-bms-usage';
-    process.env.GOOGLE_TASK_WHATSAPP_MESSAGE = 'bms-scheduler-whatsapp-message';
   });
 
   describe('create', () => {
@@ -45,19 +41,19 @@ describe('SchedulerService', () => {
       expect(testabQueue.add).not.toHaveBeenCalled();
     });
 
-    it('routes to testab queue when taskQueue matches GOOGLE_TASK_QUEUE_TEST_AB', async () => {
-      await service.create(7, new Date(Date.now() + 5_000), 'http://hub/x', process.env.GOOGLE_TASK_QUEUE_TEST_AB);
+    it('routes to testab queue', async () => {
+      await service.create(7, new Date(Date.now() + 5_000), 'http://hub/x', 'bms-scheduler-campaign-testab');
       expect(testabQueue.add).toHaveBeenCalled();
       expect(triggerQueue.add).not.toHaveBeenCalled();
     });
 
     it('routes segment to segment queue', async () => {
-      await service.create(9, new Date(), 'http://hub/seg', process.env.GOOGLE_TASK_SEGMENT);
+      await service.create(9, new Date(), 'http://hub/seg', 'bms-scheduler-segment');
       expect(segmentQueue.add).toHaveBeenCalled();
     });
 
     it('routes whatsapp message to whatsapp queue', async () => {
-      await service.create('abc/1', new Date(), 'http://hub/m', process.env.GOOGLE_TASK_WHATSAPP_MESSAGE);
+      await service.create('abc/1', new Date(), 'http://hub/m', 'bms-scheduler-whatsapp-message');
       expect(whatsappQueue.add).toHaveBeenCalled();
     });
 

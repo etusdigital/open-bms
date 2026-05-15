@@ -23,6 +23,7 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
   private readonly redisClient: Redis;
   private aggregationTimer: NodeJS.Timeout | null = null;
   private aggregationRunning = false;
+  private lastCleanupDay: string | null = null;
 
   constructor(
     private readonly accountService: AccountsService,
@@ -36,17 +37,16 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
     this.redisClient = this.redisService.getClient();
   }
 
-  // In SaaS prod the Cloud Scheduler hits /statistics/aggregated-statistics
-  // every 15 minutes. OSS dev has no external scheduler, so the same flush
-  // can be self-driven via STATISTICS_AGGREGATION_INTERVAL_MS (defaults to
-  // 60_000 in dev, off in production unless explicitly set so it doesn't
-  // race with the external cron). Set to 0 to disable.
+  // Flushes Redis counters into events_statistics on a fixed interval.
+  // Override via STATISTICS_AGGREGATION_INTERVAL_MS; set to 0 to disable.
   onModuleInit(): void {
+    // Treat empty string as "unset" so a blank line in .env doesn't silently
+    // disable the scheduler (Number("") === 0 would otherwise hit the off branch).
     const raw = process.env.STATISTICS_AGGREGATION_INTERVAL_MS;
-    const fallback = process.env.NODE_ENV === 'production' ? 0 : 60_000;
-    const interval = raw !== undefined ? Number(raw) : fallback;
+    const isProvided = raw != null && raw.trim() !== '';
+    const interval = isProvided ? Number(raw) : 60_000;
     if (!Number.isFinite(interval) || interval <= 0) {
-      this.logger.log('In-process aggregation scheduler disabled (STATISTICS_AGGREGATION_INTERVAL_MS=0 or unset in production)');
+      this.logger.log('In-process aggregation scheduler disabled (STATISTICS_AGGREGATION_INTERVAL_MS=0)');
       return;
     }
     this.logger.log(`In-process aggregation scheduler enabled — every ${interval}ms`);
@@ -63,18 +63,36 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
     }
   }
 
-  private async runAggregationCycle(): Promise<void> {
+  // Shared entry point for the scheduler and the /aggregated-statistics HTTP
+  // endpoint. The re-entrancy guard lives here (not just inside the timer)
+  // so an external trigger cannot race a concurrent in-process tick and
+  // double-write the same rows.
+  async runAggregationCycle(): Promise<void> {
     if (this.aggregationRunning) {
-      // Skip overlap — a slow tick must not pile up callers writing the same rows.
       return;
     }
     this.aggregationRunning = true;
     try {
       await Promise.all([this.transferRedisDataToPostgres(), this.transferVerifyRedisDataToPostgres()]);
+      await this.runDailyCleanupIfDue();
     } catch (err) {
       this.logger.error(`Scheduled aggregation cycle failed: ${(err as Error)?.message ?? err}`);
     } finally {
       this.aggregationRunning = false;
+    }
+  }
+
+  // Runs removeOldDataFromRedis once per UTC day. Previously triggered by an
+  // external Cloud Scheduler daily job; now folded into the in-process loop
+  // so OSS deploys don't need a separate scheduler.
+  private async runDailyCleanupIfDue(): Promise<void> {
+    const today = dayjs.utc().format('YYYY-MM-DD');
+    if (this.lastCleanupDay === today) return;
+    try {
+      await this.removeOldDataFromRedis();
+      this.lastCleanupDay = today;
+    } catch (err) {
+      this.logger.error(`Daily Redis cleanup failed: ${(err as Error)?.message ?? err}`);
     }
   }
 
@@ -85,7 +103,6 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
    * - Batches inserts for better performance
    * - Handles unique opens/clicks aggregation
    * - Manages test A/B campaign data
-   * @scheduled Runs every 15 minutes via Cloud Scheduler
    * @returns {Promise<void>}
    */
   async transferRedisDataToPostgres(date = null): Promise<void> {
@@ -573,7 +590,6 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
    * - Processes keys in batches of 500
    * - Uses UNLINK for non-blocking deletion
    * - Prevents memory spikes during cleanup
-   * @scheduled Runs daily at midnight via Cloud Scheduler
    * @returns {Promise<void>}
    */
   async removeOldDataFromRedis(): Promise<void> {

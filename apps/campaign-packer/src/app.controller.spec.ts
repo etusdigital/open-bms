@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CampaignService } from './campaign/campaign.service';
-import { FormatterUtils } from './utils/formatter.utils';
 
 describe('AppController', () => {
   let controller: AppController;
@@ -15,20 +14,14 @@ describe('AppController', () => {
     processResult: jest.fn().mockResolvedValue('result processed'),
   };
 
-  const mockFormatterUtils = {
-    logInfo: jest.fn(),
-    parseBatch: jest.fn(),
-  };
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [AppService, { provide: CampaignService, useValue: mockCampaignService }, { provide: FormatterUtils, useValue: mockFormatterUtils }],
+      providers: [AppService, { provide: CampaignService, useValue: mockCampaignService }],
     }).compile();
 
     controller = module.get<AppController>(AppController);
     module.get<CampaignService>(CampaignService);
-    module.get<FormatterUtils>(FormatterUtils);
   });
 
   afterEach(() => {

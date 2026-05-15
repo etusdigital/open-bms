@@ -85,6 +85,15 @@ x-backend-env: &backend-env
   CAMPAIGN_TRIGGER_ENDPOINT: ${CAMPAIGN_TRIGGER_ENDPOINT:-http://campaign-packer:3000/create-contacts-send}
   CAMPAIGN_TEST_AB_ENDPOINT: ${CAMPAIGN_TEST_AB_ENDPOINT:-http://campaign-packer:3000/create-test}
   CAMPAIGN_RESULT_TEST_AB_ENDPOINT: ${CAMPAIGN_RESULT_TEST_AB_ENDPOINT:-http://campaign-packer:3000/result-test}
+  # message-trigger queue topics — call sites look up by env var, not constant.
+  TOPIC_NAME_MESSAGE_TRIGGER: ${TOPIC_NAME_MESSAGE_TRIGGER:-message-trigger}
+  TOPIC_NAME_SEND_EMAIL: ${TOPIC_NAME_SEND_EMAIL:-send-email}
+  TOPIC_NAME_SEND_PUSH: ${TOPIC_NAME_SEND_PUSH:-send-push}
+  TOPIC_NAME_SEND_TWILIO: ${TOPIC_NAME_SEND_TWILIO:-send-twilio}
+  TOPIC_NAME_SEND_WHATSAPP: ${TOPIC_NAME_SEND_WHATSAPP:-send-whatsapp}
+  TOPIC_NAME_HTTP_REQUEST: ${TOPIC_NAME_HTTP_REQUEST:-http-request}
+  TOPIC_NAME_TAG_PROCESS: ${TOPIC_NAME_TAG_PROCESS:-tag-process}
+  TOPIC_NAME_EVENT_PROCESS: ${TOPIC_NAME_EVENT_PROCESS:-event-process}
 
 services:
   # === infra ===
@@ -417,7 +426,6 @@ services:
     environment:
       <<: *backend-env
       PORT: '3000'
-      LOG_LEVEL: INFO
     networks: [internal]
     deploy:
       <<: *restart-policy
@@ -443,6 +451,19 @@ services:
       <<: *backend-env
       PORT: '3000'
       # main.ts exige BRIDGE_ENDPOINT explícito quando NODE_ENV=production.
+      BRIDGE_ENDPOINT: http://localhost:3000
+    networks: [internal]
+    deploy:
+      <<: *restart-policy
+      resources:
+        limits:
+          memory: 512M
+
+  message-trigger:
+    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-message-trigger:${IMAGE_TAG:?must set IMAGE_TAG}
+    environment:
+      <<: *backend-env
+      PORT: '3000'
       BRIDGE_ENDPOINT: http://localhost:3000
     networks: [internal]
     deploy:

@@ -47,7 +47,7 @@ export class CustomEventService {
       // load statistics 7 days
       const pipeline = this.redisService.getClient().pipeline();
       const lastSevenDays: string[] = [];
-      const timezone = (await this.accountService.findConfig('time_zone'))[0].value;
+      const timezone = await this.accountService.getTimezone();
       for (let i = 7; i >= 0; i--) {
         lastSevenDays.push(dayjs().subtract(i, 'day').tz(timezone).format('YYYY-MM-DD'));
       }
@@ -186,17 +186,22 @@ export class CustomEventService {
   }
 
   async loadLogs(customEventId: number, params: any): Promise<EventsLogEntity[]> {
-    const { page = 1, itemsPerPage = 1000 } = params;
-    const timezone = (await this.accountService.findConfig('time_zone'))[0].value;
-    const startDate = dayjs().subtract(3, 'hour').tz(timezone).format('YYYY-MM-DD HH:mm:ss');
-    const endDate = dayjs().tz(timezone).format('YYYY-MM-DD HH:mm:ss');
+    try {
+      const { page = 1, itemsPerPage = 1000 } = params;
+      const timezone = await this.accountService.getTimezone();
+      const startDate = dayjs().subtract(3, 'hour').tz(timezone).format('YYYY-MM-DD HH:mm:ss');
+      const endDate = dayjs().tz(timezone).format('YYYY-MM-DD HH:mm:ss');
 
-    const customEvent = await this.customEventRepository.findOneOrFail({ where: { id: customEventId, accountId: this.cls.get('accountId') } });
+      const customEvent = await this.customEventRepository.findOneOrFail({ where: { id: customEventId, accountId: this.cls.get('accountId') } });
 
-    return this.eventsLogRepository.find({
-      where: { accountId: this.cls.get('accountId'), event: customEvent.name, time: Between(new Date(startDate), new Date(endDate)) },
-      take: itemsPerPage,
-      skip: (page - 1) * itemsPerPage,
-    });
+      return this.eventsLogRepository.find({
+        where: { accountId: this.cls.get('accountId'), event: customEvent.name, time: Between(new Date(startDate), new Date(endDate)) },
+        take: itemsPerPage,
+        skip: (page - 1) * itemsPerPage,
+      });
+    } catch (e) {
+      console.error(e);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 }

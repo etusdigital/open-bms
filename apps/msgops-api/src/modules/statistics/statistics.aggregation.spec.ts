@@ -56,3 +56,61 @@ describe('StatisticsAggregationService.aggregateRedisData', () => {
     expect(result.datacenter_click).toBeLessThanOrEqual(result.click);
   });
 });
+
+describe('StatisticsAggregationService.onModuleInit', () => {
+  const ORIGINAL = process.env.STATISTICS_AGGREGATION_INTERVAL_MS;
+
+  function makeService(): StatisticsAggregationService {
+    return new StatisticsAggregationService(null as any, { getClient: () => ({}) } as any, null as any, null as any);
+  }
+
+  afterEach(() => {
+    if (ORIGINAL === undefined) delete process.env.STATISTICS_AGGREGATION_INTERVAL_MS;
+    else process.env.STATISTICS_AGGREGATION_INTERVAL_MS = ORIGINAL;
+    jest.restoreAllMocks();
+  });
+
+  it('starts a 60s timer when the env var is unset', () => {
+    delete process.env.STATISTICS_AGGREGATION_INTERVAL_MS;
+    const spy = jest.spyOn(global, 'setInterval');
+    const svc = makeService();
+    svc.onModuleInit();
+    expect(spy).toHaveBeenCalledWith(expect.any(Function), 60_000);
+    svc.onModuleDestroy();
+  });
+
+  it('treats an empty-string env var as unset (uses 60s default)', () => {
+    process.env.STATISTICS_AGGREGATION_INTERVAL_MS = '';
+    const spy = jest.spyOn(global, 'setInterval');
+    const svc = makeService();
+    svc.onModuleInit();
+    expect(spy).toHaveBeenCalledWith(expect.any(Function), 60_000);
+    svc.onModuleDestroy();
+  });
+
+  it('disables the scheduler when the env var is "0"', () => {
+    process.env.STATISTICS_AGGREGATION_INTERVAL_MS = '0';
+    const spy = jest.spyOn(global, 'setInterval');
+    const svc = makeService();
+    svc.onModuleInit();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('honors a custom interval override', () => {
+    process.env.STATISTICS_AGGREGATION_INTERVAL_MS = '15000';
+    const spy = jest.spyOn(global, 'setInterval');
+    const svc = makeService();
+    svc.onModuleInit();
+    expect(spy).toHaveBeenCalledWith(expect.any(Function), 15_000);
+    svc.onModuleDestroy();
+  });
+
+  it('clears the timer on shutdown', () => {
+    delete process.env.STATISTICS_AGGREGATION_INTERVAL_MS;
+    const clearSpy = jest.spyOn(global, 'clearInterval');
+    const svc = makeService();
+    svc.onModuleInit();
+    svc.onModuleDestroy();
+    expect(clearSpy).toHaveBeenCalled();
+  });
+});

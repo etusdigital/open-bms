@@ -15,6 +15,7 @@ import { createHash, randomBytes } from 'crypto';
 import { replaceSpecialChars } from '../../utils/utils.service';
 import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import { SchedulerService } from 'src/providers/queue/scheduler.service';
+import { QUEUE_BMS_USAGE } from 'src/providers/queue/queue.constants';
 import dayjs from 'dayjs';
 import { ClsService } from 'nestjs-cls';
 import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
@@ -22,6 +23,8 @@ import { AccountCacheService } from './account-cache.service';
 import { AccountApiKeyEntity } from '../../entities/account-api-key.entity';
 import { RoleEntity } from '../../entities/role.entity';
 import { ROLE_CODES } from '../authz/authz.constants';
+
+export const DEFAULT_ACCOUNT_TIMEZONE = 'America/Sao_Paulo';
 
 @Injectable()
 export class AccountsService {
@@ -379,7 +382,7 @@ export class AccountsService {
           const minute = Math.floor(Math.random() * (40 - 1 + 1) + 1);
           const dateSchedule = dayjs().tz('America/Sao_Paulo').add(24, 'hour').set('minute', minute).format('YYYY-MM-DD HH:mm:ss');
           const currentDate = dayjs().tz('America/Sao_Paulo').format('YYYY-MM-DD');
-          await this.scheduler.create(`${account.id}/${currentDate}`, new Date(dateSchedule), `${process.env.BRIUS_HOSTURL}/statistics/usage`, process.env.GOOGLE_TASK_BMS_USAGE);
+          await this.scheduler.create(`${account.id}/${currentDate}`, new Date(dateSchedule), `${process.env.BRIUS_HOSTURL}/statistics/usage`, QUEUE_BMS_USAGE);
         } catch (err) {
           console.error('Account created, but billing task scheduling failed (non-fatal):', err);
         }
@@ -738,6 +741,11 @@ export class AccountsService {
         name,
       },
     });
+  }
+
+  async getTimezone(accountId?: number): Promise<string> {
+    const rows = await this.findConfig('time_zone', accountId);
+    return rows[0]?.value ?? DEFAULT_ACCOUNT_TIMEZONE;
   }
 
   private async checkProviderCredentials(accountId: number, provider: string): Promise<boolean> {

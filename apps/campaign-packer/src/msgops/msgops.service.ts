@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Campaign, CampaignMessageType } from 'src/interfaces';
 import { Repository, MoreThan, EntityManager } from 'typeorm';
@@ -20,6 +20,8 @@ dayjs.extend(timezone);
 
 @Injectable()
 export class MsgopsService {
+  private readonly logger = new Logger(MsgopsService.name);
+
   constructor(
     @InjectRepository(AccountConfigEntity)
     private readonly accountConfigRepository: Repository<AccountConfigEntity>,
@@ -89,7 +91,7 @@ export class MsgopsService {
 
       return await query.getMany();
     } catch (error) {
-      console.log(error);
+      this.logger.error(`findByTags failed for campaign ${campaign.id}`, error?.stack ?? String(error));
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -112,7 +114,7 @@ export class MsgopsService {
 
       return await this.entityManager.query(query);
     } catch (error) {
-      console.log(error);
+      this.logger.error(`countByTags failed for campaign ${campaign.id}`, error?.stack ?? String(error));
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
