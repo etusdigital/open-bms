@@ -72,12 +72,18 @@ export class EnterpriseSession {
     return this.paged('/labels', params);
   }
 
-  listUsers(accountId: number, params: PageParams): Promise<PagedResponse<any>> {
-    return this.paged(`/accounts/${accountId}/users`, params);
+  // `/users` é key-scoped (retorna os usuários da conta dona da API key) —
+  // confirmado contra o Enterprise real. O antigo `/accounts/{id}/users`
+  // exigia o id da conta no Enterprise (que o worker não tem em account-scope)
+  // → 404/403.
+  listUsers(params: PageParams): Promise<PagedResponse<any>> {
+    return this.paged('/users', params);
   }
 
+  // Algumas versões do Enterprise não expõem `/emails-templates` (404).
+  // Toleramos: retorna página vazia → importer pula sem falhar o job.
   listEmailTemplates(params: PageParams): Promise<PagedResponse<any>> {
-    return this.paged('/emails-templates', params);
+    return this.paged('/emails-templates', params, true);
   }
 
   listContacts(params: PageParams): Promise<PagedResponse<any>> {
@@ -127,8 +133,11 @@ export class EnterpriseSession {
 
   // -------------------------------------------------------------------------
 
-  private async paged(url: string, params: PageParams & Record<string, any>): Promise<PagedResponse<any>> {
-    const data = await this.requestWithRetry({ method: 'GET', url, params });
+  private async paged(url: string, params: PageParams & Record<string, any>, tolerate404 = false): Promise<PagedResponse<any>> {
+    const data = await this.requestWithRetry({ method: 'GET', url, params, tolerate404 });
+    // tolerate404 → requestWithRetry devolve null no 404: trata como vazio
+    // (importer encerra o loop sem erro).
+    if (data == null) return { results: [], page: params.page ?? 1, totalItems: 0, itemsPerPage: 0 };
     // Normalização defensiva: aceita {results,page,totalItems} ou só array.
     if (Array.isArray(data)) return { results: data, page: params.page ?? 1, totalItems: data.length, itemsPerPage: data.length };
     return {

@@ -36,7 +36,7 @@ export class UsersImporter implements ImporterStep {
     let totalKnown: number | undefined;
 
     while (true) {
-      const resp = await ctx.client.listUsers(ctx.accountId, { page, itemsPerPage: batchSize });
+      const resp = await ctx.client.listUsers({ page, itemsPerPage: batchSize });
       if (!resp.results || resp.results.length === 0) break;
       if (resp.totalItems !== undefined) totalKnown = resp.totalItems;
 
