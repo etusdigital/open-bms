@@ -138,6 +138,10 @@ export class PoolsService {
     return await this.poolRepository.findOne({ where: { poolName, accountId } });
   }
 
+  async findOneBySenderEmail(senderEmail: string, accountId: number): Promise<PoolsDto> {
+    return await this.poolRepository.findOne({ where: { senderEmail, accountId } });
+  }
+
   async getPoolsSendgrid() {
     // SendGrid is optional in OSS. If the account has no key, or the key is
     // invalid / network is down, return an empty list so the operator-facing
