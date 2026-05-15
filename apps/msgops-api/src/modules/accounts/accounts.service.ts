@@ -24,6 +24,8 @@ import { AccountApiKeyEntity } from '../../entities/account-api-key.entity';
 import { RoleEntity } from '../../entities/role.entity';
 import { ROLE_CODES } from '../authz/authz.constants';
 
+export const DEFAULT_ACCOUNT_TIMEZONE = 'America/Sao_Paulo';
+
 @Injectable()
 export class AccountsService {
   constructor(
@@ -726,6 +728,11 @@ export class AccountsService {
         name,
       },
     });
+  }
+
+  async getTimezone(accountId?: number): Promise<string> {
+    const rows = await this.findConfig('time_zone', accountId);
+    return rows[0]?.value ?? DEFAULT_ACCOUNT_TIMEZONE;
   }
 
   private async checkProviderCredentials(accountId: number, provider: string): Promise<boolean> {
