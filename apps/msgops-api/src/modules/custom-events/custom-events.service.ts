@@ -47,7 +47,8 @@ export class CustomEventService {
       // load statistics 7 days
       const pipeline = this.redisService.getClient().pipeline();
       const lastSevenDays: string[] = [];
-      const timezone = (await this.accountService.findConfig('time_zone'))[0].value;
+      const tzConfig = await this.accountService.findConfig('time_zone');
+      const timezone = tzConfig[0]?.value ?? 'America/Sao_Paulo';
       for (let i = 7; i >= 0; i--) {
         lastSevenDays.push(dayjs().subtract(i, 'day').tz(timezone).format('YYYY-MM-DD'));
       }
@@ -187,7 +188,8 @@ export class CustomEventService {
 
   async loadLogs(customEventId: number, params: any): Promise<EventsLogEntity[]> {
     const { page = 1, itemsPerPage = 1000 } = params;
-    const timezone = (await this.accountService.findConfig('time_zone'))[0].value;
+    const tzConfig = await this.accountService.findConfig('time_zone');
+    const timezone = tzConfig[0]?.value ?? 'America/Sao_Paulo';
     const startDate = dayjs().subtract(3, 'hour').tz(timezone).format('YYYY-MM-DD HH:mm:ss');
     const endDate = dayjs().tz(timezone).format('YYYY-MM-DD HH:mm:ss');
 
