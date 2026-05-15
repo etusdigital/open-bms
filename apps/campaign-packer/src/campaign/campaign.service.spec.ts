@@ -379,13 +379,20 @@ describe('CampaignService', () => {
       await expect(service.processPage(batch)).rejects.toThrow(BadRequestException);
     });
 
-    it('should publish campaign.send to AMQP campaigns exchange', async () => {
-      mockMsgopsService.findByTags.mockResolvedValue([{ id: 1, email: 'a@a.com', firstName: 'A', lastName: 'B', customFields: {}, contactDevices: [] }]);
-      const batch = { campaign: makeCampaign(), page: 1, totalPages: 1, currentContactId: 1, finalContactId: 100 };
+    it('should publish campaign.send to AMQP campaigns exchange and return real page counts (EVO-1150)', async () => {
+      mockMsgopsService.findByTags.mockResolvedValue([
+        { id: 1, email: 'a@a.com', firstName: 'A', lastName: 'B', customFields: {}, contactDevices: [] },
+        { id: 2, email: 'b@b.com', firstName: 'C', lastName: 'D', customFields: {}, contactDevices: [] },
+      ]);
+      const batch = { campaign: makeCampaign({ audiences: [] }), page: 1, totalPages: 1, currentContactId: 1, finalContactId: 100 };
       const result = await service.processPage(batch);
-      expect(result).toHaveProperty('contacts');
-      expect(result).toHaveProperty('packages');
+      expect(result).toEqual({ audiences: [], contacts: 2, packages: 1 });
       expect(mockEventPublisher.publish).toHaveBeenCalledWith(EXCHANGES.campaigns, 'campaign.send', expect.any(Object));
+      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
+        EXCHANGES.campaigns,
+        'campaign.tracked',
+        expect.objectContaining({ event: 'CAMPAIGN_PACKAGED', contacts_length: 2, packages_length: 1 }),
+      );
     });
 
     it('should deduplicate contacts by id', async () => {

@@ -13,6 +13,8 @@ import * as timezone from 'dayjs/plugin/timezone';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+type ProcessPageResult = { audiences: unknown[]; contacts: number; packages: number } | Record<string, never>;
+
 @Injectable()
 export class CampaignService {
   private readonly logger = new Logger(CampaignService.name);
@@ -175,7 +177,7 @@ export class CampaignService {
     return jobId;
   }
 
-  async processPage(campaignBatch: CampaignBatch): Promise<{ [K: string]: any }> {
+  async processPage(campaignBatch: CampaignBatch): Promise<ProcessPageResult> {
     const redisClient = this.redisService.getOrThrow();
     const stopCampaign = await redisClient.get(`stop_campaign_${campaignBatch.campaign.id}`);
     if (stopCampaign) {
@@ -184,11 +186,11 @@ export class CampaignService {
     }
     this.validateData(campaignBatch);
 
-    const { contactsLength, packagesLength } = await this.mountPackages(campaignBatch);
+    const { contactsLength } = await this.mountPackages(campaignBatch);
     return {
       audiences: campaignBatch.campaign.audiences,
       contacts: contactsLength,
-      packages: packagesLength,
+      packages: 1,
     };
   }
 
@@ -201,14 +203,13 @@ export class CampaignService {
     }
   }
 
-  async mountPackages(campaignBatch: CampaignBatch): Promise<{ contactsLength: number; packagesLength: number }> {
+  async mountPackages(campaignBatch: CampaignBatch): Promise<{ contactsLength: number }> {
     const message = campaignBatch.campaign.campaignMessage[0].message;
 
     const contacts: ContactEntity[] = await this.getContacts(campaignBatch.campaign, campaignBatch.currentContactId, campaignBatch.finalContactId);
 
     const contactsUnique = [...new Map(contacts.map((contact) => [contact.id, contact])).values()];
     const contactsLength = contactsUnique.length;
-    const packagesLength = 1;
 
     const currentpackage = {
       account: campaignBatch.campaign.account || {},
@@ -237,9 +238,9 @@ export class CampaignService {
     await this.eventPublisher.publish(EXCHANGES.campaigns, 'campaign.send', pubSubMessage);
     this.logger.log(`Message ${pubSubMessage.campaignKey} published to ${EXCHANGES.campaigns}/campaign.send.`);
 
-    await this.sendTracker(packagesLength, contactsLength, campaignBatch.campaign.id, 'CAMPAIGN_PACKAGED');
+    await this.sendTracker(1, contactsLength, campaignBatch.campaign.id, 'CAMPAIGN_PACKAGED');
 
-    return { contactsLength, packagesLength };
+    return { contactsLength };
   }
 
   async createTest(id: number) {
