@@ -38,6 +38,7 @@ APPS=(
   twilio-messaging
   tracker
   tag-process
+  message-trigger
   geolocation
 )
 

@@ -76,6 +76,19 @@ x-backend-env: &backend-env
   TAG_PROCESS_ENDPOINT: ${TAG_PROCESS_ENDPOINT:-http://tag-process:3000/process-segment}
   # campaign-packer calls tag-process directly (separate from the scheduler path above).
   TAG_PROCESS_API: ${TAG_PROCESS_API:-http://tag-process:3000/process-segment/}
+  # message-trigger publishes to itself (next-step BullMQ delay) and to downstream
+  # workers by topic name. The QueuePublisher constructor maps each TOPIC_NAME_* →
+  # Queue with a fallback to the constant; the callers, however, look up by the env
+  # var directly, so leaving them unset breaks every step type. Defaults match the
+  # constants in apps/message-trigger/src/providers/queue/queue.publisher.ts.
+  TOPIC_NAME_MESSAGE_TRIGGER: ${TOPIC_NAME_MESSAGE_TRIGGER:-message-trigger}
+  TOPIC_NAME_SEND_EMAIL: ${TOPIC_NAME_SEND_EMAIL:-send-email}
+  TOPIC_NAME_SEND_PUSH: ${TOPIC_NAME_SEND_PUSH:-send-push}
+  TOPIC_NAME_SEND_TWILIO: ${TOPIC_NAME_SEND_TWILIO:-send-twilio}
+  TOPIC_NAME_SEND_WHATSAPP: ${TOPIC_NAME_SEND_WHATSAPP:-send-whatsapp}
+  TOPIC_NAME_HTTP_REQUEST: ${TOPIC_NAME_HTTP_REQUEST:-http-request}
+  TOPIC_NAME_TAG_PROCESS: ${TOPIC_NAME_TAG_PROCESS:-tag-process}
+  TOPIC_NAME_EVENT_PROCESS: ${TOPIC_NAME_EVENT_PROCESS:-event-process}
 
 x-infra-deps: &infra-deps
   postgres:
@@ -434,6 +447,17 @@ services:
       context: .
       dockerfile: apps/tag-process/Dockerfile
     container_name: tag-process
+    <<: *restart-policy
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  message-trigger:
+    build:
+      context: .
+      dockerfile: apps/message-trigger/Dockerfile
+    container_name: message-trigger
     <<: *restart-policy
     environment:
       <<: *backend-env
