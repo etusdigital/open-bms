@@ -14,7 +14,7 @@ interface BulkActionsBarProps {
   selectedEmails: string[];
   onClearSelection: () => void;
   canDelete?: boolean;
-  onBulkDeleteSuccess?: (deletedCount: number) => void;
+  onBulkDeleteSuccess?: (deletedIds: number[]) => void;
 }
 
 export function BulkActionsBar({
@@ -89,11 +89,12 @@ export function BulkActionsBar({
   };
 
   const handleDelete = () => {
-    bulkDelete.mutate(selectedIds, {
-      onSuccess: (data) => {
+    const ids = selectedIds;
+    bulkDelete.mutate(ids, {
+      onSuccess: () => {
         setShowDeleteConfirm(false);
         onClearSelection();
-        onBulkDeleteSuccess?.(data.deleted);
+        onBulkDeleteSuccess?.(ids);
       },
     });
   };

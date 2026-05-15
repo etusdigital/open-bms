@@ -79,9 +79,11 @@ export default function ContactsPage({ searchParams }: ContactsPageProps) {
   }, [deleteTarget, deleteContact, query.data?.data, searchParams.page, setPagination]);
 
   const handleBulkDeleteSuccess = useCallback(
-    (deletedCount: number) => {
-      const visibleRows = query.data?.data?.length ?? 0;
-      if (deletedCount >= visibleRows && searchParams.page > 1) {
+    (deletedIds: number[]) => {
+      const visible = query.data?.data ?? [];
+      const deleted = new Set(deletedIds);
+      const pageEmptied = visible.length > 0 && visible.every((c) => deleted.has(c.id));
+      if (pageEmptied && searchParams.page > 1) {
         setPagination((prev) => ({ ...prev, pageIndex: prev.pageIndex - 1 }));
       }
     },
