@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ImportContext, ImporterStep } from './importers/importer.interface';
-import { SystemConfigEntity } from '../../msgops-api/src/entities/system-config.entity';
+import { SystemConfigEntity } from './entities/system-config.entity';
 
 // Whitelist de chaves system_config replicáveis Enterprise → OSS.
 //

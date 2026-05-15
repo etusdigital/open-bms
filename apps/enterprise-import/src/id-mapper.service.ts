@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { EnterpriseIdMappingEntity } from '../../msgops-api/src/entities/enterprise-id-mapping.entity';
+import { EnterpriseIdMappingEntity } from './entities/enterprise-id-mapping.entity';
 
 // Cache em memória + persistência por (jobId, entity, sourceId) → newId.
 // Em scope=instance, resolve() retorna o próprio sourceId (identidade) — IDs

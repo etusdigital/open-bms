@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
 import { EnterpriseSession } from '../enterprise-client/enterprise.client';
 import { IdMapperService } from '../id-mapper.service';
-import { EnterpriseImportScope } from '../../../msgops-api/src/entities/enterprise-import-job.entity';
+import { EnterpriseImportScope } from '../entities/enterprise-import-job.entity';
 
 export interface ImportProgressEntry {
   total?: number;

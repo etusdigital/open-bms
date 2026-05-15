@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ImportContext, ImporterStep } from './importer.interface';
-import { AccountConfigEntity } from '../../../msgops-api/src/entities/account-config.entity';
+import { AccountConfigEntity } from '../entities/account-config.entity';
 
 const PROVIDERS = ['sparkpost', 'sendgrid', 'mailersend', 'resend', 'ses', 'mandrill'] as const;
 

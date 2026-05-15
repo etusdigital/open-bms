@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { In } from 'typeorm';
 import { ImportContext, ImporterStep } from './importer.interface';
-import { UserEntity } from '../../../msgops-api/src/entities/users.entity';
-import { UserAccountEntity } from '../../../msgops-api/src/entities/users-account.entity';
+import { UserEntity } from '../entities/users.entity';
+import { UserAccountEntity } from '../entities/users-account.entity';
 import { rawInsertPreservingPk, dbNameMap } from '../raw-insert.util';
 
 // F2: a entity `users` NÃO tem colunas password_hash/password_reset_required —

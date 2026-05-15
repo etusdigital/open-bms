@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BaseImporter } from './base.importer';
 import { ImportContext } from './importer.interface';
 import { PagedResponse } from '../enterprise-client/enterprise.client';
-import { EmailsTemplatesEntity } from '../../../msgops-api/src/entities/emails-templates.entity';
+import { EmailsTemplatesEntity } from '../entities/emails-templates.entity';
 
 @Injectable()
 export class EmailTemplatesImporter extends BaseImporter<EmailsTemplatesEntity> {

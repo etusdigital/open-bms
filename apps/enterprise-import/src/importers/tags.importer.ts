@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BaseImporter } from './base.importer';
 import { ImportContext } from './importer.interface';
 import { PagedResponse } from '../enterprise-client/enterprise.client';
-import { TagEntity } from '../../../msgops-api/src/entities/tag.entity';
+import { TagEntity } from '../entities/tag.entity';
 
 @Injectable()
 export class TagsImporter extends BaseImporter<TagEntity> {

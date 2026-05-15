@@ -28,6 +28,7 @@
     "@nestjs/typeorm": "^11.0.0",
     "axios": "^1.7.9",
     "bullmq": "^5.56.0",
+    "class-transformer": "^0.5.1",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",

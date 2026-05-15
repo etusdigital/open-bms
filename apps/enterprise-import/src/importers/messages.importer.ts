@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { In } from 'typeorm';
 import { ImportContext, ImporterStep } from './importer.interface';
-import { CampaignEntity } from '../../../msgops-api/src/entities/campaign.entity';
-import { MessageEntity } from '../../../msgops-api/src/entities/message.entity';
-import { CampaignMessageEntity } from '../../../msgops-api/src/entities/campaign-message.entity';
+import { CampaignEntity } from '../entities/campaign.entity';
+import { MessageEntity } from '../entities/message.entity';
+import { CampaignMessageEntity } from '../entities/campaign-message.entity';
 import { rawInsertPreservingPk, dbNameMap } from '../raw-insert.util';
 
 // F1: `messages` NÃO tem coluna campaign_id — o vínculo é a tabela de junção

@@ -21,7 +21,7 @@ import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers
 // transforma os require de .ts). synchronize:true precisa do fecho completo
 // de relações — o schema operacional inteiro.
 type EntityClass = new (...args: any[]) => unknown;
-const ENTITIES_DIR = join(__dirname, '../../msgops-api/src/entities');
+const ENTITIES_DIR = join(__dirname, '../src/entities');
 function loadAllEntities(): EntityClass[] {
   const out: EntityClass[] = [];
   for (const f of readdirSync(ENTITIES_DIR)) {
@@ -77,10 +77,10 @@ import { IdMapperService } from '../src/id-mapper.service';
 import { TagsImporter } from '../src/importers/tags.importer';
 import { ImportContext } from '../src/importers/importer.interface';
 
-import { EnterpriseImportJobEntity } from '../../msgops-api/src/entities/enterprise-import-job.entity';
-import { EnterpriseIdMappingEntity } from '../../msgops-api/src/entities/enterprise-id-mapping.entity';
-import { AccountEntity } from '../../msgops-api/src/entities/account.entity';
-import { TagEntity } from '../../msgops-api/src/entities/tag.entity';
+import { EnterpriseImportJobEntity } from '../src/entities/enterprise-import-job.entity';
+import { EnterpriseIdMappingEntity } from '../src/entities/enterprise-id-mapping.entity';
+import { AccountEntity } from '../src/entities/account.entity';
+import { TagEntity } from '../src/entities/tag.entity';
 
 const enabled = process.env.ENABLE_INTEGRATION_TESTS === 'true';
 const d = enabled ? describe : describe.skip;

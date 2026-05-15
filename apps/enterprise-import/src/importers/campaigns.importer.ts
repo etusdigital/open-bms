@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BaseImporter } from './base.importer';
 import { ImportContext } from './importer.interface';
 import { PagedResponse } from '../enterprise-client/enterprise.client';
-import { CampaignEntity } from '../../../msgops-api/src/entities/campaign.entity';
+import { CampaignEntity } from '../entities/campaign.entity';
 
 // NOTA: `campaigns.tags` é json (array de ids de tag do Enterprise). Em
 // scope=account esses ids embutidos NÃO são remapeados aqui (json arbitrário);

@@ -24,27 +24,27 @@ import { ImportPipeline } from './pipeline';
 import { HealthController } from './health.controller';
 
 // F6: entities listadas EXPLICITAMENTE (classes), não via glob de filesystem.
-// O glob antigo (`__dirname/../../msgops-api/src/entities/*.ts`) era resolvido
+// O glob antigo (`__dirname/./entities/*.ts`) era resolvido
 // em runtime e quebrava no container (apontava p/ .ts inexistentes no dist).
 // Classes importadas são resolvidas em build (webpack bundle), sem fs runtime.
-import { EnterpriseImportJobEntity } from '../../msgops-api/src/entities/enterprise-import-job.entity';
-import { EnterpriseIdMappingEntity } from '../../msgops-api/src/entities/enterprise-id-mapping.entity';
-import { AccountEntity } from '../../msgops-api/src/entities/account.entity';
-import { AccountConfigEntity } from '../../msgops-api/src/entities/account-config.entity';
-import { ContactEntity } from '../../msgops-api/src/entities/contact.entity';
-import { TagEntity } from '../../msgops-api/src/entities/tag.entity';
-import { CustomFieldsEntity } from '../../msgops-api/src/entities/custom-fields.entity';
-import { LabelsEntity } from '../../msgops-api/src/entities/labels.entity';
-import { EmailsTemplatesEntity } from '../../msgops-api/src/entities/emails-templates.entity';
-import { CustomEventEntity } from '../../msgops-api/src/entities/custom-event.entity';
-import { AutomationEntity } from '../../msgops-api/src/entities/automation.entity';
-import { CampaignEntity } from '../../msgops-api/src/entities/campaign.entity';
-import { CampaignMessageEntity } from '../../msgops-api/src/entities/campaign-message.entity';
-import { MessageEntity } from '../../msgops-api/src/entities/message.entity';
-import { UserEntity } from '../../msgops-api/src/entities/users.entity';
-import { UserAccountEntity } from '../../msgops-api/src/entities/users-account.entity';
-import { EventStatisticsEntity } from '../../msgops-api/src/entities/event-statistics.entity';
-import { SystemConfigEntity } from '../../msgops-api/src/entities/system-config.entity';
+import { EnterpriseImportJobEntity } from './entities/enterprise-import-job.entity';
+import { EnterpriseIdMappingEntity } from './entities/enterprise-id-mapping.entity';
+import { AccountEntity } from './entities/account.entity';
+import { AccountConfigEntity } from './entities/account-config.entity';
+import { ContactEntity } from './entities/contact.entity';
+import { TagEntity } from './entities/tag.entity';
+import { CustomFieldsEntity } from './entities/custom-fields.entity';
+import { LabelsEntity } from './entities/labels.entity';
+import { EmailsTemplatesEntity } from './entities/emails-templates.entity';
+import { CustomEventEntity } from './entities/custom-event.entity';
+import { AutomationEntity } from './entities/automation.entity';
+import { CampaignEntity } from './entities/campaign.entity';
+import { CampaignMessageEntity } from './entities/campaign-message.entity';
+import { MessageEntity } from './entities/message.entity';
+import { UserEntity } from './entities/users.entity';
+import { UserAccountEntity } from './entities/users-account.entity';
+import { EventStatisticsEntity } from './entities/event-statistics.entity';
+import { SystemConfigEntity } from './entities/system-config.entity';
 
 const ENTITIES = [
   EnterpriseImportJobEntity,

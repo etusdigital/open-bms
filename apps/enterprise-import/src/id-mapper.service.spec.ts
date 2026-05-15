@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { IdMapperService } from './id-mapper.service';
-import { EnterpriseIdMappingEntity } from '../../msgops-api/src/entities/enterprise-id-mapping.entity';
+import { EnterpriseIdMappingEntity } from './entities/enterprise-id-mapping.entity';
 
 describe('IdMapperService', () => {
   let service: IdMapperService;

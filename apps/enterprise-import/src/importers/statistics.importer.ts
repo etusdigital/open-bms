@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ImportContext, ImporterStep } from './importer.interface';
 import { EnterpriseApi404Error } from '../enterprise-client/errors';
-import { EventStatisticsEntity } from '../../../msgops-api/src/entities/event-statistics.entity';
+import { EventStatisticsEntity } from '../entities/event-statistics.entity';
 
 // Rollups Postgres (events_statistics) em chunks de 30 dias. F5: o endpoint
 // /statistics/admin/export do Enterprise exige o accountId DE ORIGEM

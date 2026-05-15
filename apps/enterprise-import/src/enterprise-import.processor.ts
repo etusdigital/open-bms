@@ -13,9 +13,9 @@ import { ImportContext } from './importers/importer.interface';
 import { EnterpriseApi4xxError } from './enterprise-client/errors';
 import { rawInsertPreservingPk, dbNameMap } from './raw-insert.util';
 
-import { decryptApiKey } from '../../msgops-api/src/utils/api-key-encryption.util';
-import { EnterpriseImportJobEntity } from '../../msgops-api/src/entities/enterprise-import-job.entity';
-import { AccountEntity } from '../../msgops-api/src/entities/account.entity';
+import { decryptApiKey } from './utils/api-key-encryption.util';
+import { EnterpriseImportJobEntity } from './entities/enterprise-import-job.entity';
+import { AccountEntity } from './entities/account.entity';
 
 const QUEUE_NAME = 'enterprise-import';
 const TERMINAL_STATUSES = ['completed', 'failed'];

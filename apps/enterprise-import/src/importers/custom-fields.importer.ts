@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BaseImporter } from './base.importer';
 import { ImportContext } from './importer.interface';
 import { PagedResponse } from '../enterprise-client/enterprise.client';
-import { CustomFieldsEntity } from '../../../msgops-api/src/entities/custom-fields.entity';
+import { CustomFieldsEntity } from '../entities/custom-fields.entity';
 
 @Injectable()
 export class CustomFieldsImporter extends BaseImporter<CustomFieldsEntity> {

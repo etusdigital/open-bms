@@ -317,6 +317,9 @@ importers:
       bullmq:
         specifier: ^5.56.0
         version: 5.76.2
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
       pg:
         specifier: ^8.20.0
         version: 8.20.0

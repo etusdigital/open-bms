@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BaseImporter } from './base.importer';
 import { ImportContext } from './importer.interface';
 import { PagedResponse } from '../enterprise-client/enterprise.client';
-import { ContactEntity } from '../../../msgops-api/src/entities/contact.entity';
+import { ContactEntity } from '../entities/contact.entity';
 
 // Volume alto: batch 1000 (configurável via ENTERPRISE_IMPORT_BATCH_SIZE_CONTACTS).
 // Chave natural = (account_id, email). O Enterprise serializa o contato inteiro

@@ -1,28 +1,38 @@
-# F6/F20: build CONTEXT é a RAIZ do monorepo (não a pasta do app), porque o
-# worker importa entities de apps/msgops-api por caminho relativo. Construir com:
-#   docker build -f apps/enterprise-import/Dockerfile -t enterprise-import .
-FROM node:22-alpine AS builder
-WORKDIR /repo
+# Worker do import Enterprise → OSS (EVO-1123). Mesmo padrão dos workers do
+# monorepo (apps/message-trigger). Auto-contido: tem as próprias entities em
+# src/entities (não importa fonte de outro app), build com `nest build` (tsc).
+FROM node:24-alpine AS base
 RUN corepack enable
-# Manifests primeiro (cache de deps)
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
-COPY apps/enterprise-import/package.json apps/enterprise-import/
-COPY apps/msgops-api/package.json apps/msgops-api/
-RUN pnpm install --frozen-lockfile --filter enterprise-import...
-# Fontes (worker + entities do msgops-api que ele importa)
-COPY apps/enterprise-import apps/enterprise-import
-COPY apps/msgops-api/src/entities apps/msgops-api/src/entities
-COPY apps/msgops-api/src/utils apps/msgops-api/src/utils
-WORKDIR /repo/apps/enterprise-import
-RUN pnpm build
-
-# webpack (nest-cli compilerOptions.webpack) gera um único dist/main.js com
-# todas as deps de código bundladas — runtime só precisa do node_modules.
-FROM node:22-alpine AS runtime
 WORKDIR /app
-COPY --from=builder /repo/apps/enterprise-import/dist ./dist
-COPY --from=builder /repo/apps/enterprise-import/node_modules ./node_modules
-COPY --from=builder /repo/apps/enterprise-import/package.json ./
+COPY package.json ./
+# Remove o `prepare` (lefthook install) — precisa de git, ausente na imagem.
+RUN pnpm pkg delete scripts.prepare
+
+FROM base AS deps
+COPY pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/enterprise-import/package.json ./apps/enterprise-import/
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --filter enterprise-import...
+
+FROM deps AS build
+COPY apps/enterprise-import/ ./apps/enterprise-import/
+RUN pnpm --filter enterprise-import build
+
+FROM build AS deploy
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm --filter enterprise-import deploy --legacy --prod /deploy
+RUN cp -r /app/apps/enterprise-import/dist /deploy/dist
+
+FROM node:24-alpine AS production
+RUN apk add --no-cache dumb-init
+WORKDIR /app
+COPY --from=deploy /deploy/package.json ./
+COPY --from=deploy /deploy/dist ./dist
+COPY --from=deploy /deploy/node_modules ./node_modules
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nodejs
+USER nodejs
 ENV NODE_ENV=production
 EXPOSE 3001
+ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/main.js"]

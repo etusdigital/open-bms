@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BaseImporter } from './base.importer';
 import { ImportContext } from './importer.interface';
 import { PagedResponse } from '../enterprise-client/enterprise.client';
-import { CustomEventEntity } from '../../../msgops-api/src/entities/custom-event.entity';
+import { CustomEventEntity } from '../entities/custom-event.entity';
 
 @Injectable()
 export class CustomEventsImporter extends BaseImporter<CustomEventEntity> {

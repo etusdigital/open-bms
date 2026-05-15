@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BaseImporter } from './base.importer';
 import { ImportContext } from './importer.interface';
 import { PagedResponse } from '../enterprise-client/enterprise.client';
-import { AutomationEntity } from '../../../msgops-api/src/entities/automation.entity';
+import { AutomationEntity } from '../entities/automation.entity';
 
 // NOTA: `steps`/`triggers`/`flowLayout` são jsonb que podem embutir ids de
 // custom-fields/tags/campaigns do Enterprise. Em scope=account esses ids
