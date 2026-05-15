@@ -1,6 +1,6 @@
 import { Global, Module, OnModuleInit } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
-import { SCHEDULER_QUEUE_NAMES } from './queue.constants';
+import { QUEUE_ENTERPRISE_IMPORT, SCHEDULER_QUEUE_NAMES } from './queue.constants';
 import { SchedulerService } from './scheduler.service';
 import { BmsUsageProcessor, CampaignTestabProcessor, CampaignTriggerProcessor, SegmentProcessor, WhatsappMessageProcessor } from './scheduler.processor';
 
@@ -15,6 +15,7 @@ import { BmsUsageProcessor, CampaignTestabProcessor, CampaignTriggerProcessor, S
       },
     }),
     ...SCHEDULER_QUEUE_NAMES.map((name) => BullModule.registerQueue({ name })),
+    BullModule.registerQueue({ name: QUEUE_ENTERPRISE_IMPORT }),
   ],
   providers: [SchedulerService, CampaignTriggerProcessor, CampaignTestabProcessor, SegmentProcessor, BmsUsageProcessor, WhatsappMessageProcessor],
   exports: [SchedulerService, BullModule],

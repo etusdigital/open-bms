@@ -2,6 +2,11 @@ export interface SetupStatus {
   configured: boolean;
   currentStep: number;
   baseUrl?: string;
+  // F10: feature-flag do backend — frontend esconde o Step Enterprise se false.
+  enterpriseImportEnabled?: boolean;
+  // F11: já importou/pulou o Enterprise (system_config). Fonte da verdade pra
+  // retomada, já que o passo é UI-only e não tem step próprio no backend.
+  enterpriseImportDone?: boolean;
 }
 
 export interface ServiceHealthResult {

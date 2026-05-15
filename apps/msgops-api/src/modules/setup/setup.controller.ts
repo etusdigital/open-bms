@@ -9,6 +9,7 @@ import { TestSendgridDto } from './dtos/test-sendgrid.dto';
 import { GeoIpSettingsDto } from './dtos/geoip-settings.dto';
 import { AdminS3Service } from '../admin-integrations/s3/admin-s3.service';
 import { S3SettingsDto } from '../admin-integrations/s3/dtos/s3-settings.dto';
+import { ImportEnterpriseSetupDto } from './dtos/import-enterprise.dto';
 
 @Controller('setup')
 export class SetupController {
@@ -65,5 +66,14 @@ export class SetupController {
   @PublicRoute()
   saveS3(@Body() dto: S3SettingsDto) {
     return this.s3Service.saveSettings(dto);
+  }
+
+  // Fase 2 — UI-only step do wizard (igual GeoIP). Aceita {skip:true}
+  // ou {baseUrl, apiKey}. PublicRoute porque wizard roda antes do super-admin
+  // estar logado; gate manual em setupService rejeita se wizard já completo.
+  @Post('import-enterprise')
+  @PublicRoute()
+  importEnterprise(@Body() dto: ImportEnterpriseSetupDto, @IpAddress() ip?: string) {
+    return this.setupService.importEnterprise(dto, ip);
   }
 }

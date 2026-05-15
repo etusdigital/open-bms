@@ -11,9 +11,17 @@ import { AdminIntegrationsModule } from '../admin-integrations/admin-integration
 import { ClickhouseProvider } from '../../providers/clickhouse.provider';
 import { SetupService } from './setup.service';
 import { SetupController } from './setup.controller';
+import { EnterpriseImportModule } from '../enterprise-import/enterprise-import.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SystemConfigEntity, UserEntity, RoleEntity, AccountEntity, PoolEntity, UserAccountEntity]), AuthModule, AdminIntegrationsModule],
+  imports: [
+    TypeOrmModule.forFeature([SystemConfigEntity, UserEntity, RoleEntity, AccountEntity, PoolEntity, UserAccountEntity]),
+    AuthModule,
+    AdminIntegrationsModule,
+    // EnterpriseImportModule não importa SetupModule de volta (F7) — sem ciclo,
+    // import direto, DI determinística.
+    EnterpriseImportModule,
+  ],
   providers: [SetupService, ClickhouseProvider],
   controllers: [SetupController],
 })

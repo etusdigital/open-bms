@@ -41,6 +41,7 @@
     "settings": "Settings",
     "superAdmin": "Super Admin",
     "superAdminAccounts": "Accounts",
+    "superAdminImportEnterprise": "Import from Enterprise",
     "superAdminUsers": "Users",
     "superAdminIntegrations": "Integrations",
     "collapse": "Collapse menu",

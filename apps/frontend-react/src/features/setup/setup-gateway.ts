@@ -48,6 +48,13 @@ export const setupGateway = {
   async submitS3(data: S3SetupData): Promise<void> {
     await http.post('/setup/s3', data);
   },
+
+  // Step UI-only do wizard. Aceita {skip:true} ou {baseUrl, apiKey}.
+  // Quando inicia import, devolve {jobId} pra UI poder monitorar progresso.
+  async importEnterprise(payload: { skip: true } | { baseUrl: string; apiKey: string }): Promise<{ jobId?: string }> {
+    const res = await http.post<{ jobId?: string }>('/setup/import-enterprise', payload);
+    return res.data;
+  },
 };
 
 // Exported for tests that want to assert the underlying instance's config.

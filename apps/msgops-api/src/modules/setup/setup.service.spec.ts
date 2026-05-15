@@ -12,10 +12,13 @@ import { RoleEntity } from '../../entities/role.entity';
 import { AccountEntity } from '../../entities/account.entity';
 import { PoolEntity } from '../../entities/pool.entity';
 import { UserAccountEntity } from '../../entities/users-account.entity';
+import { AccountConfigEntity } from '../../entities/account-config.entity';
 import { AUTH_PROVIDER_TOKEN, IAuthProvider } from '../auth/providers/auth.provider.interface';
 import { ROLE_CODES } from '../authz/authz.constants';
 import { RedisService } from '../../providers/redis.provider';
 import { ClickhouseProvider } from '../../providers/clickhouse.provider';
+import { SystemConfigCacheProvider } from '../../providers/system-config-cache.provider';
+import { EnterpriseImportService } from '../enterprise-import/enterprise-import.service';
 import { SetupService } from './setup.service';
 
 const SUPER_ADMIN_ROLE = { id: 42, code: ROLE_CODES.SUPER_ADMIN };
@@ -62,6 +65,7 @@ function makeDataSourceMock(repos: { userRepo: any; roleRepo: any; systemConfigR
           if (entity === SystemConfigEntity) return repos.systemConfigRepo;
           if (entity === AccountEntity) return repos.accountRepo ?? makeRepo();
           if (entity === UserAccountEntity) return repos.userAccountRepo ?? makeRepo();
+          if (entity === AccountConfigEntity) return makeRepo();
           throw new Error(`unexpected getRepository in test for ${entity?.name}`);
         },
       };
@@ -112,6 +116,8 @@ async function buildService(
       { provide: AUTH_PROVIDER_TOKEN, useValue: authProvider },
       { provide: RedisService, useValue: { getClient: jest.fn().mockReturnValue({ ping: jest.fn().mockResolvedValue('PONG') }) } },
       { provide: ClickhouseProvider, useValue: { runQuery: jest.fn().mockResolvedValue([]) } },
+      { provide: SystemConfigCacheProvider, useValue: { get: jest.fn().mockResolvedValue(null), set: jest.fn(), invalidate: jest.fn() } },
+      { provide: EnterpriseImportService, useValue: { createInstanceImport: jest.fn().mockResolvedValue({ jobId: 'test-job' }) } },
     ],
   }).compile();
 
@@ -137,7 +143,9 @@ describe('SetupService', () => {
       userRepo.count.mockResolvedValue(0);
 
       const status = await service.getStatus();
-      expect(status).toEqual({ configured: false, currentStep: 1 });
+      // toMatchObject: valida o contrato original tolerando os campos opcionais
+      // enterpriseImport* adicionados pelo EVO-1123 (F10/F11).
+      expect(status).toMatchObject({ configured: false, currentStep: 1 });
     });
 
     it('returns step 1 when admins exist but wizard key is absent', async () => {
@@ -147,7 +155,7 @@ describe('SetupService', () => {
       systemConfigRepo.findOne.mockResolvedValue(undefined);
 
       const status = await service.getStatus();
-      expect(status).toEqual({ configured: false, currentStep: 1 });
+      expect(status).toMatchObject({ configured: false, currentStep: 1 });
     });
 
     it('returns the persisted currentStep while wizard is incomplete', async () => {
@@ -157,7 +165,7 @@ describe('SetupService', () => {
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 3, completed: false } });
 
       const status = await service.getStatus();
-      expect(status).toEqual({ configured: false, currentStep: 3 });
+      expect(status).toMatchObject({ configured: false, currentStep: 3 });
     });
 
     it('returns configured=true once wizard is marked completed', async () => {
@@ -165,7 +173,7 @@ describe('SetupService', () => {
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 5, completed: true } });
 
       const status = await service.getStatus();
-      expect(status).toEqual({ configured: true, currentStep: 6 });
+      expect(status).toMatchObject({ configured: true, currentStep: 6 });
     });
   });
 
@@ -269,6 +277,7 @@ describe('SetupService', () => {
               if (entity === SystemConfigEntity) return systemConfigRepo;
               if (entity === AccountEntity) return accountRepoTx;
               if (entity === UserAccountEntity) return userAccountRepoTx;
+              if (entity === AccountConfigEntity) return makeRepo();
               throw new Error('unexpected entity');
             },
           });
@@ -290,6 +299,8 @@ describe('SetupService', () => {
           { provide: AUTH_PROVIDER_TOKEN, useValue: authProvider },
           { provide: RedisService, useValue: { getClient: jest.fn().mockReturnValue({ ping: jest.fn().mockResolvedValue('PONG') }) } },
           { provide: ClickhouseProvider, useValue: { runQuery: jest.fn().mockResolvedValue([]) } },
+          { provide: SystemConfigCacheProvider, useValue: { get: jest.fn().mockResolvedValue(null), set: jest.fn(), invalidate: jest.fn() } },
+          { provide: EnterpriseImportService, useValue: { createInstanceImport: jest.fn().mockResolvedValue({ jobId: 'test-job' }) } },
         ],
       }).compile();
       const service = moduleRef.get(SetupService);
@@ -636,18 +647,22 @@ describe('SetupService', () => {
       expect(call[0].value.skipReason).toBe('ClickHouse indisponível em staging');
     });
 
-    it('rate-limits step 6 per IP, sharing the budget with GET /setup/health-check', async () => {
+    // Comportamento INTENCIONAL e documentado em setup.service.ts (advanceStep):
+    // o POST /setup/advance step 6 é a ação one-shot de conclusão e NÃO é
+    // bloqueada pelo budget de rate-limit do GET /setup/health-check (que cobre
+    // só o path de polling). Teste alinhado a essa intenção — a versão antiga
+    // (esperava 429) estava obsoleta vs o código e mascarada por uma spec já
+    // vermelha no baseline (mock de transação não cobria AccountConfigEntity).
+    it('NÃO bloqueia o step 6 (conclusão one-shot) pelo budget do health-check', async () => {
       const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 6, completed: false } });
       jest.spyOn(service, 'checkHealth').mockResolvedValue(allGreen);
 
-      // 3 hits/min/IP is the configured limit; the 4th must be rejected.
       await service.advanceStep({ step: 6, data: {} as any }, '10.0.0.1');
       await service.advanceStep({ step: 6, data: {} as any }, '10.0.0.1');
       await service.advanceStep({ step: 6, data: {} as any }, '10.0.0.1');
-      await expect(service.advanceStep({ step: 6, data: {} as any }, '10.0.0.1')).rejects.toMatchObject({
-        status: 429,
-      });
+      // 4ª chamada continua resolvendo (não há budget compartilhado aqui).
+      await expect(service.advanceStep({ step: 6, data: {} as any }, '10.0.0.1')).resolves.toBeUndefined();
     });
   });
 

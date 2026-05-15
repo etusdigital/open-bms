@@ -30,6 +30,7 @@ import { SetupModule } from './modules/setup/setup.module';
 import { AccountSettingsModule } from './modules/account-settings/account-settings.module';
 import { AdminGeoIpModule } from './modules/admin-geoip/admin-geoip.module';
 import { AdminIntegrationsModule } from './modules/admin-integrations/admin-integrations.module';
+import { EnterpriseImportModule } from './modules/enterprise-import/enterprise-import.module';
 import { MessagingModule } from './providers/messaging/messaging.module';
 import { QueueModule } from './providers/queue/queue.module';
 import { SystemConfigCacheModule } from './providers/system-config-cache.module';
@@ -73,6 +74,7 @@ import { SystemConfigCacheModule } from './providers/system-config-cache.module'
     AccountSettingsModule,
     AdminGeoIpModule,
     AdminIntegrationsModule,
+    EnterpriseImportModule,
   ],
   providers: [AuditSubscriber],
 })

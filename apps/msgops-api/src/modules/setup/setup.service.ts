@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inject, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { existsSync } from 'fs';
 import { geoIpEnvFilePath, writeGeoIpEnvFile } from '../../lib/geoip-config-file';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
@@ -28,6 +28,9 @@ import { enforceTestRateLimit } from '../../lib/test-rate-limit';
 import { SystemConfigCacheProvider } from '../../providers/system-config-cache.provider';
 import { S3SystemSettings } from '../../lib/integrations-config-file';
 import { S3_KEY } from '../admin-integrations/s3/admin-s3.service';
+import { EnterpriseImportService } from '../enterprise-import/enterprise-import.service';
+import { assertSafeEnterpriseBaseUrl } from '../enterprise-import/enterprise-import-url.util';
+import { ImportEnterpriseSetupDto } from './dtos/import-enterprise.dto';
 
 const WIZARD_KEY = 'setup_wizard_step';
 const SMTP_KEY = 'smtp_settings';
@@ -66,6 +69,7 @@ export class SetupService implements OnModuleInit {
     private readonly redisService: RedisService,
     private readonly clickhouse: ClickhouseProvider,
     private readonly cache: SystemConfigCacheProvider,
+    private readonly enterpriseImport: EnterpriseImportService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -84,24 +88,37 @@ export class SetupService implements OnModuleInit {
     }
   }
 
-  async getStatus(): Promise<{ configured: boolean; currentStep: number; baseUrl?: string }> {
+  async getStatus(): Promise<{
+    configured: boolean;
+    currentStep: number;
+    baseUrl?: string;
+    enterpriseImportEnabled: boolean;
+    enterpriseImportDone: boolean;
+  }> {
+    // F10: frontend usa isso pra esconder o Step2 (Enterprise import) quando a
+    // feature está desligada — o gate de backend já existe, este é cosmético.
+    const enterpriseImportEnabled = process.env.ENTERPRISE_IMPORT_ENABLED === 'true';
+    // F11: o passo Enterprise (UI-only) não tem step próprio no backend, então
+    // este flag é a fonte da verdade pra retomada saber se já foi feito/pulado.
+    const enterpriseImportDone = !!(await this.systemConfigRepo.findOne({ where: { key: 'enterprise_import_done' } }));
+
     const state = await this.readWizard();
-    if (state?.completed) return { configured: true, currentStep: 6 };
+    if (state?.completed) return { configured: true, currentStep: 6, enterpriseImportEnabled, enterpriseImportDone };
 
     const superAdminRole = await this.roleRepo.findOne({ where: { code: ROLE_CODES.SUPER_ADMIN } });
     if (superAdminRole) {
       const adminCount = await this.userRepo.count({ where: { globalRoleId: superAdminRole.id } });
-      if (adminCount === 0) return { configured: false, currentStep: 1 };
+      if (adminCount === 0) return { configured: false, currentStep: 1, enterpriseImportEnabled, enterpriseImportDone };
     }
 
-    if (!state) return { configured: false, currentStep: 1 };
+    if (!state) return { configured: false, currentStep: 1, enterpriseImportEnabled, enterpriseImportDone };
 
     // Expose the step-3 baseUrl so Step4Sendgrid can pre-fill the webhook URL
     // without a second round-trip.
     const domainCfg = await this.systemConfigRepo.findOne({ where: { key: DOMAIN_KEY } });
     const baseUrl: string | undefined = (domainCfg?.value as any)?.baseUrl;
 
-    return { configured: false, currentStep: state.currentStep || 1, ...(baseUrl && { baseUrl }) };
+    return { configured: false, currentStep: state.currentStep || 1, enterpriseImportEnabled, enterpriseImportDone, ...(baseUrl && { baseUrl }) };
   }
 
   async advanceStep(dto: AdvanceStepDto, requesterIp?: string): Promise<void> {
@@ -351,6 +368,34 @@ export class SetupService implements OnModuleInit {
     } catch (err: any) {
       this.logger.warn(`[GeoIP] could not write env file: ${err?.message} — sidecar will fall back to env vars`);
     }
+  }
+
+  // Fase 2 — endpoint UI-only do wizard. Aceita {skip:true} ou {baseUrl,apiKey}.
+  // Gates: (F10) feature-flag — 404 se desabilitado, igual ao guard do módulo;
+  // wizard ainda não concluído; (F9) rate-limit por IP + validação anti-SSRF
+  // do baseUrl antes de enfileirar o worker.
+  async importEnterprise(dto: ImportEnterpriseSetupDto, requesterIp?: string): Promise<{ jobId?: string }> {
+    if (process.env.ENTERPRISE_IMPORT_ENABLED !== 'true') {
+      throw new NotFoundException();
+    }
+    await this.ensureNotConfigured();
+    enforceTestRateLimit(this.testProviderHits, `enterprise-import:${requesterIp || 'unknown'}`, 'Enterprise import');
+
+    if (dto?.skip === true) {
+      const value = { imported: false, skippedAt: new Date().toISOString() };
+      await this.systemConfigRepo.save(this.systemConfigRepo.create({ key: 'enterprise_import_done', value }));
+      return {};
+    }
+
+    if (!dto?.baseUrl || !dto?.apiKey) {
+      throw new BadRequestException('Informe baseUrl e apiKey, ou marque skip=true');
+    }
+    const safeBaseUrl = assertSafeEnterpriseBaseUrl(dto.baseUrl);
+
+    const { jobId } = await this.enterpriseImport.createInstanceImport(safeBaseUrl, dto.apiKey, null);
+    const value = { imported: true, importedAt: new Date().toISOString(), sourceUrl: safeBaseUrl, jobId };
+    await this.systemConfigRepo.save(this.systemConfigRepo.create({ key: 'enterprise_import_done', value }));
+    return { jobId };
   }
 
   async getGeoIpSettings(): Promise<GeoIpSettingsDto | null> {

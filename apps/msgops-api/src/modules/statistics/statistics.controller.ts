@@ -5,6 +5,7 @@ import { DashboardStatisticsDto, StatisticsDto } from './dto/statistics.dto';
 import { StatisticsService } from './statistics.service';
 import { StatisticsAggregationService } from './statistics.aggregation';
 import { RequirePermission } from '../authz/require-permission.decorator';
+import { RequireSuperAdmin } from '../authz/require-super-admin.decorator';
 import { CronRoute } from '../authz/cron-route.decorator';
 
 @Controller('statistics')
@@ -118,5 +119,22 @@ export class StatisticsController {
   @Get('/insights/:period')
   async insights(@Param('period') period: string) {
     return await this.statisticsService.insights(period);
+  }
+
+  // Endpoint paginado de export de event_statistics. Necessário pelo
+  // importer Enterprise → OSS pra trazer rollups por dia (a API REST do
+  // Enterprise não expõe os eventos individuais, só rollups Postgres).
+  // Disponível tanto no msgops-api Enterprise quanto no OSS (mesmo codebase).
+  @ApiOperation({ summary: 'Export EventStatistics rollups paginated by date (super-admin only)' })
+  @RequireSuperAdmin()
+  @Get('/admin/export')
+  async adminExport(
+    @Query('accountId') accountId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('page') page?: string,
+    @Query('itemsPerPage') itemsPerPage?: string,
+  ) {
+    return this.statisticsService.exportForAccount(Number(accountId), from, to, Number(page || 1), Number(itemsPerPage || 500));
   }
 }
