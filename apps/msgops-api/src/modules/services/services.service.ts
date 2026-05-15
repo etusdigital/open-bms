@@ -48,21 +48,13 @@ export class ServicesService {
       }
     }
 
-    let ippool = sendEmailMessage.message.ippool;
+    const ippool = sendEmailMessage.message.ippool;
     let pool: PoolsDto;
     if (ippool) {
       pool = await this.poolService.findOneByPool(ippool, account.id);
       if (!pool) {
         throw new HttpException('Pool not found', HttpStatus.BAD_REQUEST);
       }
-    }
-
-    if (!sendEmailMessage.message.ippool) {
-      pool = await this.poolService.findOneBySenderEmail(sendEmailMessage.message.from.email, account.id);
-      if (!pool) {
-        throw new HttpException('Sender not found for this email', HttpStatus.BAD_REQUEST);
-      }
-      ippool = pool.name;
     }
 
     const replyTo = pool?.senderReplyTo || sendEmailMessage.message.from.email;

@@ -155,7 +155,6 @@ describe('ServicesService', () => {
     };
 
     const mockPoolService = {
-      findOneBySenderEmail: jest.fn(),
       findOneByPool: jest.fn(),
     };
 
@@ -219,7 +218,6 @@ describe('ServicesService', () => {
     clsService.get.mockReturnValue('test-account-id');
     accountService.findWithCleanConfigs.mockResolvedValue(mockAccount);
     poolService.findOneByPool.mockResolvedValue(mockPool);
-    poolService.findOneBySenderEmail.mockResolvedValue(mockPool);
   });
 
   describe('sendEmail', () => {
@@ -269,13 +267,14 @@ describe('ServicesService', () => {
       await expect(service.sendEmail(dtoWithFutureDate)).rejects.toThrow(new HttpException('Send at must be in the future and within 72 hours from now', HttpStatus.BAD_REQUEST));
     });
 
-    it('should throw bad request when pool not found for sender email', async () => {
-      poolService.findOneBySenderEmail.mockResolvedValue(null);
+    it('should send without resolving a pool when no ippool is provided', async () => {
+      const result = await service.sendEmail(mockEmailDto);
 
-      await expect(service.sendEmail(mockEmailDto)).rejects.toThrow(new HttpException('Sender not found for this email', HttpStatus.BAD_REQUEST));
+      expect(result).toEqual({ status: 'ok' });
+      expect(poolService.findOneByPool).not.toHaveBeenCalled();
     });
 
-    it('should not check pool if ippool is provided in message', async () => {
+    it('should resolve the pool only from an explicit ippool in the message', async () => {
       const dtoWithIpPool = {
         ...mockEmailDto,
         message: {
@@ -286,7 +285,7 @@ describe('ServicesService', () => {
 
       await service.sendEmail(dtoWithIpPool);
 
-      expect(poolService.findOneBySenderEmail).not.toHaveBeenCalled();
+      expect(poolService.findOneByPool).toHaveBeenCalledWith('test-pool', mockAccount.id);
     });
 
     it('should validate pool if provided', async () => {
