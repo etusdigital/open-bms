@@ -1,15 +1,15 @@
-import { Controller, Get, Param, Post, Body } from '@nestjs/common';
+import { Controller, Get, Logger, Param, Post, Body } from '@nestjs/common';
 import { AppService } from './app.service';
 import { Campaign, CampaignBatch } from './interfaces';
 import { CampaignService } from './campaign/campaign.service';
-import { FormatterUtils } from './utils/formatter.utils';
 
 @Controller()
 export class AppController {
+  private readonly logger = new Logger(AppController.name);
+
   constructor(
     private readonly appService: AppService,
     private readonly campaignService: CampaignService,
-    private readonly formatterUtils: FormatterUtils,
   ) {}
 
   @Get()
@@ -24,13 +24,13 @@ export class AppController {
 
   @Post('/create-batches')
   async createBatches(@Body() campaign: Campaign) {
-    this.formatterUtils.logInfo(`[Create Batches] Campaign: ${JSON.stringify(campaign)}`);
+    this.logger.log(`[Create Batches] Campaign id=${campaign.id} title=${campaign.title}`);
     return await this.campaignService.createBatches(campaign);
   }
 
   @Post('/process-page')
   async processPage(@Body() data: CampaignBatch) {
-    this.formatterUtils.logInfo(`[Process Page] Campaign: ${JSON.stringify(data)}`);
+    this.logger.log(`[Process Page] Campaign id=${data.campaign?.id} page=${data.page}/${data.totalPages}`);
     return await this.campaignService.processPage(data);
   }
 

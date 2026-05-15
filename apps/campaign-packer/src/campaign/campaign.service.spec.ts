@@ -1,12 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { EXCHANGES } from '@bms/messaging';
 import { CampaignService } from './campaign.service';
 import { MsgopsService } from '../msgops/msgops.service';
 import { QueuePublisher } from '../providers/queue/queue.publisher';
 import { RedisService } from '../providers/redis/redis.service';
 import { EventPublisherService } from '../providers/messaging/event-publisher.service';
-import { FormatterUtils } from '../utils/formatter.utils';
 import { CampaignMessageType, CampaignType } from '../interfaces';
 
 describe('CampaignService', () => {
@@ -45,11 +44,6 @@ describe('CampaignService', () => {
     publish: jest.fn().mockResolvedValue(undefined),
   };
 
-  const mockFormatterUtils = {
-    logInfo: jest.fn(),
-    parseBatch: jest.fn(),
-  };
-
   beforeAll(() => {
     process.env.NODE_ENV = 'test';
     process.env.LIMIT_CONTACT_BATCH = '1000';
@@ -67,7 +61,6 @@ describe('CampaignService', () => {
         { provide: MsgopsService, useValue: mockMsgopsService },
         { provide: QueuePublisher, useValue: mockQueuePublisher },
         { provide: RedisService, useValue: mockRedisService },
-        { provide: FormatterUtils, useValue: mockFormatterUtils },
         { provide: EventPublisherService, useValue: mockEventPublisher },
       ],
     }).compile();
@@ -403,6 +396,17 @@ describe('CampaignService', () => {
       const batch = { campaign: makeCampaign(), page: 1, totalPages: 1, currentContactId: 1, finalContactId: 100 };
       await service.processPage(batch);
       expect(mockRedisClient.set).toHaveBeenCalled();
+    });
+
+    // Regression: logInfo was gated by LOG_LEVEL=INFO so this line vanished in staging — see EVO-1149.
+    it('should emit per-page lifecycle log via Nest Logger', async () => {
+      const logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+      mockMsgopsService.findByTags.mockResolvedValue([{ id: 1, email: 'a@a.com', firstName: 'A', lastName: 'B', customFields: {}, contactDevices: [] }]);
+      const batch = { campaign: makeCampaign(), page: 2, totalPages: 3, currentContactId: 1, finalContactId: 100 };
+      await service.processPage(batch);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/\[Process Page\] Campaign: 1 - Page: 2 - Contacts: 1/));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/Message campaign-1-2-\d+ published to/));
+      logSpy.mockRestore();
     });
   });
 

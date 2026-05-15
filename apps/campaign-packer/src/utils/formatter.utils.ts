@@ -1,8 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { SubscriptionMessage } from '../interfaces';
 
 @Injectable()
 export class FormatterUtils {
+  private readonly logger = new Logger(FormatterUtils.name);
+
   stripString(text: string) {
     return text.replace(/(<([^>]+)>)/gi, '');
   }
@@ -16,16 +18,11 @@ export class FormatterUtils {
       const buff = Buffer.from(data, 'base64').toString();
       const campaign = JSON.parse(buff);
 
-      console.log(`[${messageId}] Received message: ${JSON.stringify(campaign)}`);
+      this.logger.log(`[${messageId}] Received message campaign id=${campaign?.id ?? 'unknown'}`);
 
       return campaign;
     } catch {
       throw new BadRequestException(`Unable to parse data to Batch. messageId: ${JSON.stringify(subscriptionMessage)} `);
     }
-  }
-
-  logInfo(message: string, args?: any) {
-    if (process.env.LOG_LEVEL === 'INFO' || process.env.LOG_LEVEL === 'DEBUG') console.log(message, args || '');
-    else return;
   }
 }

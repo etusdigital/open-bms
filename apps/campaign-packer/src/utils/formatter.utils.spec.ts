@@ -43,29 +43,4 @@ describe('FormatterUtils', () => {
       expect(() => formatter.parseBatch(msg)).toThrow(BadRequestException);
     });
   });
-
-  describe('logInfo', () => {
-    it('should log when LOG_LEVEL=INFO', () => {
-      process.env.LOG_LEVEL = 'INFO';
-      const spy = jest.spyOn(console, 'log').mockImplementation();
-      formatter.logInfo('test message');
-      expect(spy).toHaveBeenCalledWith('test message', '');
-      delete process.env.LOG_LEVEL;
-    });
-
-    it('should log when LOG_LEVEL=DEBUG', () => {
-      process.env.LOG_LEVEL = 'DEBUG';
-      const spy = jest.spyOn(console, 'log').mockImplementation();
-      formatter.logInfo('test message');
-      expect(spy).toHaveBeenCalledWith('test message', '');
-      delete process.env.LOG_LEVEL;
-    });
-
-    it('should not log when LOG_LEVEL is unset', () => {
-      delete process.env.LOG_LEVEL;
-      const spy = jest.spyOn(console, 'log').mockImplementation();
-      formatter.logInfo('test message');
-      expect(spy).not.toHaveBeenCalled();
-    });
-  });
 });
