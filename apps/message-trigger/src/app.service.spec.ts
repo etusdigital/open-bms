@@ -54,7 +54,7 @@ describe('AppService', () => {
         const messageId = 'msg-123';
         const redisKeyDelete = 'redis-key-to-delete';
 
-        redisClient.exists.mockResolvedValue(0);
+        redisClient.del.mockResolvedValueOnce(0);
         redisClient.del.mockResolvedValue(1);
 
         // Act
@@ -62,7 +62,6 @@ describe('AppService', () => {
 
         // Assert
         expect(result.status).toBe(true);
-        expect(redisClient.exists).toHaveBeenCalled();
         expect(redisClient.del).toHaveBeenCalledWith(redisKeyDelete);
         expectTrackerSendCalled(mocks.mockTrackerService, 'MSGOPS_RECEIVED_LEAD', {
           automation_name: 'Test Automation',
@@ -82,7 +81,7 @@ describe('AppService', () => {
         });
         const messageId = 'msg-456';
 
-        redisClient.exists.mockResolvedValue(1);
+        redisClient.del.mockResolvedValueOnce(1);
         redisClient.del.mockResolvedValue(1);
 
         // Act
@@ -108,7 +107,7 @@ describe('AppService', () => {
         });
         const messageId = 'msg-error';
 
-        redisClient.exists.mockResolvedValue(0);
+        redisClient.del.mockResolvedValueOnce(0);
         mocks.mockMsgopsService.getMessageById.mockRejectedValue(new Error('Database error'));
 
         // Act & Assert
@@ -144,7 +143,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-end';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
 
       // Act
       const result = await service.receiveMessage(mockLeadStateMessage, messageId, null);
@@ -174,7 +173,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-email';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.getMessageById.mockResolvedValue(createMockEmail());
 
       // Act
@@ -203,7 +202,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-email-increment';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.getMessageById.mockResolvedValue(createMockEmail());
 
       // Act
@@ -233,7 +232,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-wait-minutes';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
 
       // Act
       const result = await service.receiveMessage(mockLeadStateMessage, messageId, null);
@@ -262,7 +261,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-wait-hours';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
 
       // Act
       await service.receiveMessage(mockLeadStateMessage, messageId, null);
@@ -291,7 +290,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-wait-error';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockQueuePublisher.scheduleDelayedStep.mockRejectedValue(new Error('Task creation failed'));
 
       // Act & Assert
@@ -316,7 +315,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-add-tag';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
 
       // Act
       const result = await service.receiveMessage(mockLeadStateMessage, messageId, null);
@@ -342,7 +341,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-remove-tag';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
 
       // Act
       await service.receiveMessage(mockLeadStateMessage, messageId, null);
@@ -370,7 +369,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-add-multiple-tags';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       // Reset mocks from previous tests
       mocks.mockQueuePublisher.sendAsyncMessage.mockReset();
       mocks.mockQueuePublisher.sendAsyncMessage.mockResolvedValue('message-id-123');
@@ -410,7 +409,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-remove-multiple-tags';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       // Reset mocks from previous tests
       mocks.mockQueuePublisher.sendAsyncMessage.mockReset();
       mocks.mockQueuePublisher.sendAsyncMessage.mockResolvedValue('message-id-123');
@@ -444,7 +443,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-tag-error';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       // Make tag processing fail
       mocks.mockQueuePublisher.sendInternalEvent.mockResolvedValue('event-id'); // For processStepToInternalEvent
       mocks.mockQueuePublisher.sendAsyncMessage.mockRejectedValueOnce(new Error('PubSub tag processing failed')); // For processTag - this should trigger the catch block
@@ -471,7 +470,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-conditional-time';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockConditionStep.processConditionalTime.mockResolvedValue('task-id-456');
 
       // Act
@@ -500,7 +499,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-conditional';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
 
       // Act
       const result = await service.receiveMessage(mockLeadStateMessage, messageId, null);
@@ -526,7 +525,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-split';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
 
       // Act
       const result = await service.receiveMessage(mockLeadStateMessage, messageId, null);
@@ -558,7 +557,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-testab';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
 
       // Act
       const result = await service.receiveMessage(mockLeadStateMessage, messageId, null);
@@ -620,7 +619,7 @@ describe('AppService', () => {
         },
       });
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
 
       // Test Branch B selection (random = 60, should select branch with 26-75 range)
       jest.spyOn(Math, 'random').mockReturnValue(0.6);
@@ -678,7 +677,7 @@ describe('AppService', () => {
         },
       });
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
 
       // Test first branch selection (random = 15, should select first branch 0-30)
       jest.spyOn(Math, 'random').mockReturnValue(0.15);
@@ -712,7 +711,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-web-push';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.getMessageById.mockResolvedValue(createMockEmail());
 
       // Act
@@ -738,7 +737,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-sms';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.getMessageById.mockResolvedValue(createMockEmail());
 
       // Act
@@ -764,7 +763,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-whatsapp';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.getMessageById.mockResolvedValue(createMockEmail());
 
       // Act
@@ -799,7 +798,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-random';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.getMessageById.mockResolvedValue(createMockEmail());
       jest.spyOn(Math, 'random').mockReturnValue(0.5);
 
@@ -838,7 +837,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-random-web-push';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.getMessageById.mockResolvedValue(createMockEmail());
       jest.spyOn(Math, 'random').mockReturnValue(0.5);
 
@@ -874,7 +873,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-random-mobile-push';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.getMessageById.mockResolvedValue(createMockEmail());
       jest.spyOn(Math, 'random').mockReturnValue(0.3);
 
@@ -910,7 +909,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-remove-automation';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       redisClient.set.mockResolvedValue('OK');
 
       // Act
@@ -947,7 +946,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-transfer';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.findContactById.mockResolvedValue(mockContact);
       mocks.mockHttpRequestProvider.process.mockResolvedValue({ status: 200 });
 
@@ -988,7 +987,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-transfer-error';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.findContactById.mockResolvedValue(null);
 
       // Act & Assert
@@ -1018,7 +1017,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-update-field';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.createOrUpdateCustomFields.mockResolvedValue([]);
 
       // Act
@@ -1059,7 +1058,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-http';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
 
       // Act
       const result = await service.receiveMessage(mockLeadStateMessage, messageId, null);
@@ -1242,7 +1241,7 @@ describe('AppService', () => {
         });
         const messageId = 'msg-random-error';
 
-        redisClient.exists.mockResolvedValue(0);
+        redisClient.del.mockResolvedValueOnce(0);
 
         // Act & Assert
         await expect(service.receiveMessage(mockLeadStateMessage, messageId, null)).rejects.toThrow(BadRequestException);
@@ -1269,7 +1268,7 @@ describe('AppService', () => {
         });
         const messageId = 'msg-remove-error';
 
-        redisClient.exists.mockResolvedValue(0);
+        redisClient.del.mockResolvedValueOnce(0);
         redisClient.set.mockRejectedValue(new Error('Redis connection failed'));
 
         // Act & Assert
@@ -1294,7 +1293,7 @@ describe('AppService', () => {
           },
         });
 
-        redisClient.exists.mockResolvedValue(0);
+        redisClient.del.mockResolvedValueOnce(0);
         mocks.mockMsgopsService.getMessageById.mockResolvedValue(createMockEmail());
         // Make PubSub fail
         mocks.mockQueuePublisher.sendAsyncMessage.mockRejectedValue(new Error('PubSub service unavailable'));
@@ -1394,7 +1393,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-testab-finished';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
 
       // Act
       const result = await service.receiveMessage(mockLeadStateMessage, messageId, null);
@@ -1428,7 +1427,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-testab-redis';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       // Mock Redis returning winner message ID
       redisClient.get
         .mockResolvedValueOnce(null) // First call for automation check
@@ -1461,7 +1460,7 @@ describe('AppService', () => {
       });
       const messageId = 'msg-testab-no-message';
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       redisClient.get.mockResolvedValue('999'); // Non-existent message ID
 
       // Act
@@ -1493,9 +1492,8 @@ describe('AppService', () => {
       });
       const messageId = 'msg-testab-first';
 
-      redisClient.exists
-        .mockResolvedValueOnce(0) // automation check
-        .mockResolvedValueOnce(0); // stepRedisKey doesn't exist
+      redisClient.del.mockResolvedValueOnce(0); // automation stop-check: no keys
+      redisClient.exists.mockResolvedValueOnce(0); // stepRedisKey doesn't exist
       redisClient.get.mockResolvedValue(null); // no winner yet
       redisClient.set.mockResolvedValue('OK');
 
@@ -2175,7 +2173,7 @@ describe('AppService', () => {
         },
       });
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.findContactById.mockResolvedValue(mockContact);
 
       // Act
@@ -2229,7 +2227,7 @@ describe('AppService', () => {
         contact: mockContact,
       });
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.findContactById.mockResolvedValue(mockContact);
 
       // Act
@@ -2284,7 +2282,7 @@ describe('AppService', () => {
         contact: mockContact,
       });
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.findContactById.mockResolvedValue(mockContact);
 
       // Act
@@ -2341,7 +2339,7 @@ describe('AppService', () => {
         contact: mockContact,
       });
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.findContactById.mockResolvedValue(mockContact);
 
       // Act
@@ -2396,7 +2394,7 @@ describe('AppService', () => {
         contact: mockContact,
       });
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.findContactById.mockResolvedValue(mockContact);
 
       // Act
@@ -2455,7 +2453,7 @@ describe('AppService', () => {
         },
       });
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.findContactById.mockResolvedValue(mockContact);
 
       // Act
@@ -2506,7 +2504,7 @@ describe('AppService', () => {
         contact: mockContact,
       });
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.findContactById.mockResolvedValue(mockContact);
 
       // Act
@@ -2557,7 +2555,7 @@ describe('AppService', () => {
         contact: mockContact,
       });
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.findContactById.mockResolvedValue(mockContact);
 
       // Act
@@ -2628,7 +2626,7 @@ describe('AppService', () => {
         },
       });
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.findContactById.mockResolvedValue(mockContact);
 
       // Act
@@ -2690,7 +2688,7 @@ describe('AppService', () => {
         leadId: 999,
       });
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.findContactById.mockResolvedValue(mockContact);
       mocks.mockMsgopsService.findLeadById.mockResolvedValue(mockLead);
 
@@ -2743,7 +2741,7 @@ describe('AppService', () => {
         leadId: 999,
       });
 
-      redisClient.exists.mockResolvedValue(0);
+      redisClient.del.mockResolvedValueOnce(0);
       mocks.mockMsgopsService.findContactById.mockResolvedValue(mockContact);
       mocks.mockMsgopsService.findLeadById.mockResolvedValue(null);
 

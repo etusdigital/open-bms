@@ -1,4 +1,5 @@
 import { Body, Controller, Headers, Post, UnauthorizedException } from '@nestjs/common';
+import { timingSafeEqual } from 'crypto';
 import { AppService } from './app.service';
 import { ResultDto } from './dtos/result.dto';
 import { CompressedPayload, LeadStateMessage } from './interfaces';
@@ -8,7 +9,13 @@ export class InternalTriggerController {
   constructor(private readonly appService: AppService) {}
 
   private assertAuth(token: string): void {
-    if (!process.env.INTERNAL_AUTH_TOKEN || token !== process.env.INTERNAL_AUTH_TOKEN) {
+    const expected = process.env.INTERNAL_AUTH_TOKEN;
+    if (!expected || !token) {
+      throw new UnauthorizedException();
+    }
+    const a = Buffer.from(token);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
       throw new UnauthorizedException();
     }
   }

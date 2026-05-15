@@ -42,23 +42,16 @@ export class QueuePublisher implements OnModuleInit {
     @InjectQueue(QUEUE_MESSAGE_TRIGGER) private readonly messageTriggerQueue: Queue,
     @InjectQueue(QUEUE_TIMER) private readonly timerQueue: Queue,
     @InjectQueue(QUEUE_CONDITION) private readonly conditionQueue: Queue,
-    @InjectQueue(QUEUE_SEND_EMAIL) private readonly sendEmailQueue: Queue,
-    @InjectQueue(QUEUE_SEND_PUSH) private readonly sendPushQueue: Queue,
-    @InjectQueue(QUEUE_SEND_TWILIO) private readonly sendTwilioQueue: Queue,
-    @InjectQueue(QUEUE_SEND_WHATSAPP) private readonly sendWhatsappQueue: Queue,
     @InjectQueue(QUEUE_HTTP_REQUEST) private readonly httpRequestQueue: Queue,
     @InjectQueue(QUEUE_TAG_PROCESS) private readonly tagProcessQueue: Queue,
     @InjectQueue(QUEUE_EVENT_PROCESS) private readonly eventProcessQueue: Queue,
   ) {
+    // BullMQ-routed topics only. send-email/push/twilio/whatsapp/event-process
+    // go through AMQP_ROUTES below; their BullMQ queues would never be read.
     this.queueMap = new Map([
       [process.env.TOPIC_NAME_MESSAGE_TRIGGER || QUEUE_MESSAGE_TRIGGER, messageTriggerQueue],
-      [process.env.TOPIC_NAME_SEND_EMAIL || QUEUE_SEND_EMAIL, sendEmailQueue],
-      [process.env.TOPIC_NAME_SEND_PUSH || QUEUE_SEND_PUSH, sendPushQueue],
-      [process.env.TOPIC_NAME_SEND_TWILIO || QUEUE_SEND_TWILIO, sendTwilioQueue],
-      [process.env.TOPIC_NAME_SEND_WHATSAPP || QUEUE_SEND_WHATSAPP, sendWhatsappQueue],
       [process.env.TOPIC_NAME_HTTP_REQUEST || QUEUE_HTTP_REQUEST, httpRequestQueue],
       [process.env.TOPIC_NAME_TAG_PROCESS || QUEUE_TAG_PROCESS, tagProcessQueue],
-      [process.env.TOPIC_NAME_EVENT_PROCESS || QUEUE_EVENT_PROCESS, eventProcessQueue],
     ]);
 
     this.amqpRoutes = new Map([

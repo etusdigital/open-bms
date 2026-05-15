@@ -251,6 +251,13 @@ describe('Handler: Automation', () => {
       expect(msgopsService.createContactAutomations).toHaveBeenCalledWith(
         expect.objectContaining({ status: Status.running }),
       );
+      // Bridge to message-trigger must fire after updateContact on the happy path,
+      // otherwise the first step never executes (EVO-1188).
+      expect(msgopsService.updateContact).toHaveBeenCalled();
+      expect(queuePublisher.sendToMessageTrigger).toHaveBeenCalledTimes(1);
+      const updateContactOrder = msgopsService.updateContact.mock.invocationCallOrder[0];
+      const sendTriggerOrder = (queuePublisher.sendToMessageTrigger as jest.Mock).mock.invocationCallOrder[0];
+      expect(sendTriggerOrder).toBeGreaterThan(updateContactOrder);
     });
 
     it('should handle UNIQUE frequency - duplicate existing automation', async () => {
@@ -266,6 +273,8 @@ describe('Handler: Automation', () => {
       expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalledWith(
         expect.objectContaining({ event: `automation-${Status.duplicate}` }),
       );
+      // Duplicate path must not enter the running branch, so no first step gets dispatched.
+      expect(queuePublisher.sendToMessageTrigger).not.toHaveBeenCalled();
     });
 
     it('should cancel running automation when re-entering with MULTIPLY', async () => {
@@ -659,6 +668,9 @@ describe('Handler: Automation', () => {
       msgopsService.updateContact.mockRejectedValue(new Error('update failed'));
 
       await expect(automationHandler.startAutomation([automation], leadMessage, contact, dayjs)).rejects.toBeDefined();
+      // If updateContact fails, the bridge to message-trigger must not fire — otherwise
+      // the executor would start a step for an automation that failed to persist contact state.
+      expect(queuePublisher.sendToMessageTrigger).not.toHaveBeenCalled();
     });
 
     it('should handle UNIQUE frequency with no existing automation (allow)', async () => {

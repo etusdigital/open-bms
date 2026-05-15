@@ -56,13 +56,13 @@ export class AppService {
       leadStateMessage.startedAt,
     );
 
-    // TODO: Write tests to cover this
     const leadRedisKey = `automation_to_stop:${leadStateMessage.contact.email}:${leadStateMessage.automation.name}:${leadStateMessage.startedAt}`;
     const removeAutomationKey = `automation:${leadStateMessage.automation.id}:remove_contact:${leadStateMessage.contact.id}`;
     const automationTargetKey = `automation_target_contact:${leadStateMessage.contact.id}:${leadStateMessage.id}`;
-    const redisKey = await this.redisClient.exists([leadRedisKey, removeAutomationKey, automationTargetKey]);
-    if (redisKey) {
-      await this.redisClient.del([leadRedisKey, removeAutomationKey, automationTargetKey]);
+    // DEL returns the count of keys actually removed; only the first concurrent
+    // delivery sees a non-zero value, so the stop branch runs exactly once.
+    const deleted = await this.redisClient.del([leadRedisKey, removeAutomationKey, automationTargetKey]);
+    if (deleted) {
       const messageErrorProcess = `Automation stopped:  - ${leadStateMessage.automation.title} - ${leadStateMessage.contact.email}`;
 
       this.trackerService.send(
@@ -154,7 +154,11 @@ export class AppService {
 
       case StepType.WAIT:
         const taskMessage = { ...nextStepMessage.data };
-        const minutes = step.settings.timerType == 'hours' ? Number(step.settings.timer) * 60 : Number(step.settings.timer);
+        const rawTimer = Number(step.settings.timer);
+        if (!Number.isFinite(rawTimer) || rawTimer < 0) {
+          throw new BadRequestException(`[${messageId}] Invalid wait-step timer: ${step.settings.timer}`);
+        }
+        const minutes = step.settings.timerType == 'hours' ? rawTimer * 60 : rawTimer;
         await this.processStepToInternalEvent(leadStateMessage, { ...step.settings, minutes, stepId: step.id, stepType: step.type });
         return await this.scheduleDelayedStep(leadStateMessage, step, taskMessage, minutes, messageId);
 

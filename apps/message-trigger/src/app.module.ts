@@ -15,19 +15,7 @@ import { MsgopsModule } from './msgops/msgops.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { typeOrmConfig } from './ormconfig';
 import { HttpRequestProvider } from './providers/httpRequest.provider';
-import {
-  QueuePublisher,
-  QUEUE_MESSAGE_TRIGGER,
-  QUEUE_TIMER,
-  QUEUE_CONDITION,
-  QUEUE_SEND_EMAIL,
-  QUEUE_SEND_PUSH,
-  QUEUE_SEND_TWILIO,
-  QUEUE_SEND_WHATSAPP,
-  QUEUE_HTTP_REQUEST,
-  QUEUE_TAG_PROCESS,
-  QUEUE_EVENT_PROCESS,
-} from './providers/queue/queue.publisher';
+import { QueuePublisher, QUEUE_MESSAGE_TRIGGER, QUEUE_TIMER, QUEUE_CONDITION, QUEUE_HTTP_REQUEST, QUEUE_TAG_PROCESS, QUEUE_EVENT_PROCESS } from './providers/queue/queue.publisher';
 import { MessageTriggerProcessor, TimerProcessor, ConditionProcessor } from './providers/queue/processors';
 
 @Module({
@@ -48,10 +36,6 @@ import { MessageTriggerProcessor, TimerProcessor, ConditionProcessor } from './p
       { name: QUEUE_MESSAGE_TRIGGER },
       { name: QUEUE_TIMER },
       { name: QUEUE_CONDITION },
-      { name: QUEUE_SEND_EMAIL },
-      { name: QUEUE_SEND_PUSH },
-      { name: QUEUE_SEND_TWILIO },
-      { name: QUEUE_SEND_WHATSAPP },
       { name: QUEUE_HTTP_REQUEST },
       { name: QUEUE_TAG_PROCESS },
       { name: QUEUE_EVENT_PROCESS },

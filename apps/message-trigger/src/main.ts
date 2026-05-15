@@ -9,8 +9,17 @@ const SHUTDOWN_HARD_TIMEOUT_MS = 12_000;
 async function bootstrap() {
   if (process.env.NODE_ENV === 'production') {
     const token = process.env.INTERNAL_AUTH_TOKEN ?? '';
-    if (token === '' || token.startsWith('dev-') || token.length < 24) {
-      throw new Error('[message-trigger] refuse to boot in production with weak/default INTERNAL_AUTH_TOKEN (require >=24 chars, non-default)');
+    const lowered = token.toLowerCase();
+    const looksInsecure =
+      token === '' ||
+      token.length < 24 ||
+      token.startsWith('dev-') ||
+      lowered.includes('insecure') ||
+      lowered.includes('do-not-use') ||
+      lowered.includes('changeme') ||
+      lowered.includes('example');
+    if (looksInsecure) {
+      throw new Error('[message-trigger] refuse to boot in production with weak/default INTERNAL_AUTH_TOKEN (require >=24 chars, must not contain insecure/dev/example markers)');
     }
     if (!process.env.BRIDGE_ENDPOINT) {
       throw new Error('[message-trigger] BRIDGE_ENDPOINT must be set explicitly in production');
