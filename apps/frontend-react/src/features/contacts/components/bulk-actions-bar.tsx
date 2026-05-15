@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Tag, UserMinus, Download, X } from 'lucide-react';
+import { Tag, UserMinus, Download, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useBulkAddTags, useBulkRemoveTags, useBulkUnsubscribe, useTagOptions } from '../use-contact-tags';
+import { useBulkDeleteContacts } from '../use-contacts';
 import { useContactExport } from '../use-contact-export';
 import { BulkTagPicker } from './bulk-tag-picker';
 
@@ -12,18 +13,28 @@ interface BulkActionsBarProps {
   selectedIds: number[];
   selectedEmails: string[];
   onClearSelection: () => void;
+  canDelete?: boolean;
+  onBulkDeleteSuccess?: (deletedCount: number) => void;
 }
 
-export function BulkActionsBar({ selectedIds, selectedEmails, onClearSelection }: BulkActionsBarProps) {
+export function BulkActionsBar({
+  selectedIds,
+  selectedEmails,
+  onClearSelection,
+  canDelete = false,
+  onBulkDeleteSuccess,
+}: BulkActionsBarProps) {
   const { t } = useTranslation();
   const count = selectedIds.length;
 
   const addTags = useBulkAddTags();
   const removeTags = useBulkRemoveTags();
   const unsubscribe = useBulkUnsubscribe();
+  const bulkDelete = useBulkDeleteContacts();
   const exportContacts = useContactExport();
 
   const [showUnsubscribeConfirm, setShowUnsubscribeConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [addTagsOpen, setAddTagsOpen] = useState(false);
   const [removeTagsOpen, setRemoveTagsOpen] = useState(false);
 
@@ -77,11 +88,26 @@ export function BulkActionsBar({ selectedIds, selectedEmails, onClearSelection }
     );
   };
 
+  const handleDelete = () => {
+    bulkDelete.mutate(selectedIds, {
+      onSuccess: (data) => {
+        setShowDeleteConfirm(false);
+        onClearSelection();
+        onBulkDeleteSuccess?.(data.deleted);
+      },
+    });
+  };
+
   const handleExport = () => {
     exportContacts.mutate(selectedIds);
   };
 
-  const isPending = addTags.isPending || removeTags.isPending || unsubscribe.isPending || exportContacts.isPending;
+  const isPending =
+    addTags.isPending ||
+    removeTags.isPending ||
+    unsubscribe.isPending ||
+    bulkDelete.isPending ||
+    exportContacts.isPending;
 
   if (count === 0) return null;
 
@@ -129,6 +155,19 @@ export function BulkActionsBar({ selectedIds, selectedEmails, onClearSelection }
           {t('contacts.export')}
         </Button>
 
+        {canDelete && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive hover:text-destructive text-xs"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isPending}
+          >
+            <Trash2 className="mr-1 h-3.5 w-3.5" />
+            {t('contacts.bulkDelete')}
+          </Button>
+        )}
+
         <Button variant="ghost" size="sm" className="ml-auto text-xs" onClick={onClearSelection} disabled={isPending}>
           <X className="mr-1 h-3 w-3" />
           {t('contacts.clearSelection')}
@@ -143,6 +182,17 @@ export function BulkActionsBar({ selectedIds, selectedEmails, onClearSelection }
         onConfirm={handleUnsubscribe}
         loading={unsubscribe.isPending}
       />
+
+      {canDelete && (
+        <ConfirmDialog
+          open={showDeleteConfirm}
+          onOpenChange={setShowDeleteConfirm}
+          title={t('contacts.bulkDelete')}
+          description={t('contacts.bulkDeleteConfirm', { count })}
+          onConfirm={handleDelete}
+          loading={bulkDelete.isPending}
+        />
+      )}
     </>
   );
 }

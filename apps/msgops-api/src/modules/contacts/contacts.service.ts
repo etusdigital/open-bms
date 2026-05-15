@@ -705,6 +705,25 @@ export class ContactsService {
     }
   }
 
+  async bulkDelete(ids: number[]): Promise<{ deleted: number }> {
+    const accountId = this.cls.get('accountId');
+    if (!accountId) {
+      throw new HttpException('Account context is required.', HttpStatus.BAD_REQUEST);
+    }
+    const uniqueIds = [...new Set(ids)].filter((id) => Number.isInteger(id) && id > 0);
+    if (uniqueIds.length === 0) {
+      throw new HttpException('No valid contact ids provided.', HttpStatus.BAD_REQUEST);
+    }
+
+    try {
+      const result = await this.contactRepository.delete({ id: In(uniqueIds), accountId });
+      return { deleted: result.affected ?? 0 };
+    } catch (e) {
+      this.logger.error('Failed to bulk delete contacts', e?.stack || e);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
   async create(contactDto: ContactDto): Promise<ContactDto> {
     const accountId = this.cls.get('accountId');
     if (!accountId) {
