@@ -43,6 +43,7 @@ describe('Handler: Automation', () => {
     } as any;
     queuePublisher = {
       publishAnalyticsEvent: jest.fn().mockResolvedValue(undefined),
+      sendToMessageTrigger: jest.fn().mockResolvedValue(undefined),
     } as any;
     trackerService = {
       logInfo: jest.fn(),

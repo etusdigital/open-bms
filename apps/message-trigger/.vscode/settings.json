@@ -1,0 +1,8 @@
+{
+  "debug.javascript.unmapMissingSources": true,
+  "workbench.colorCustomizations": {
+    "statusBar.background": "#c2c8de",
+    "statusBar.foreground": "#000000",
+    "statusBarItem.hoverBackground": "#a2a8ca"
+  }
+}
