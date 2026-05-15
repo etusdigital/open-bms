@@ -122,6 +122,24 @@ export function useImportContacts() {
   });
 }
 
+export function useBulkDeleteContacts() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: number[]) => {
+      const { data } = await apiClient.post<{ deleted: number }>('/contacts/bulk-delete', { ids });
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.contacts.all });
+      toast.success(i18n.t('contacts.bulkDeleteSuccess', { count: data.deleted }));
+    },
+    onError: (error) => {
+      toast.error(extractApiErrorMessage(error) ?? i18n.t('contacts.bulkDeleteError'));
+    },
+  });
+}
+
 export function useDeleteContact() {
   const queryClient = useQueryClient();
 

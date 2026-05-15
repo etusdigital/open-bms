@@ -66,6 +66,7 @@ export default function ContactsPage({ searchParams }: ContactsPageProps) {
     deleteContact.mutate(deleteTarget.id, {
       onSuccess: () => {
         setDeleteTarget(null);
+        setRowSelection({});
         const data = query.data?.data ?? [];
         if (data.length === 1 && searchParams.page > 1) {
           setPagination((prev) => ({
@@ -76,6 +77,18 @@ export default function ContactsPage({ searchParams }: ContactsPageProps) {
       },
     });
   }, [deleteTarget, deleteContact, query.data?.data, searchParams.page, setPagination]);
+
+  const handleBulkDeleteSuccess = useCallback(
+    (deletedIds: number[]) => {
+      const visible = query.data?.data ?? [];
+      const deleted = new Set(deletedIds);
+      const pageEmptied = visible.length > 0 && visible.every((c) => deleted.has(c.id));
+      if (pageEmptied && searchParams.page > 1) {
+        setPagination((prev) => ({ ...prev, pageIndex: prev.pageIndex - 1 }));
+      }
+    },
+    [query.data?.data, searchParams.page, setPagination],
+  );
 
   const entityColumns = useContactsColumns({ onDelete: handleDelete, canDelete: canImport });
   const allColumns = useMemo(() => [selectColumn, ...entityColumns], [entityColumns]);
@@ -156,6 +169,8 @@ export default function ContactsPage({ searchParams }: ContactsPageProps) {
               selectedIds={selectedIds}
               selectedEmails={selectedEmails}
               onClearSelection={() => setRowSelection({})}
+              canDelete={canImport}
+              onBulkDeleteSuccess={handleBulkDeleteSuccess}
             />
           </div>
         )}

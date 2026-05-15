@@ -23,6 +23,7 @@ import { FormatterUtils } from '../../utils/pubSub/formatter.utils';
 import { PubSubMessage } from '../../utils/pubSub/interfaces';
 import { ContactEntity } from '../../entities/contact.entity';
 import { ContactsPageDto } from './dto/contactsPage.dto';
+import { BulkDeleteContactsDto } from './dto/bulkDeleteContacts.dto';
 import { ContactCustomField } from '../services/services.dto';
 import { ContactBatch } from './interfaces';
 import { Response } from 'express';
@@ -250,6 +251,13 @@ export class ContactsController {
   @Put('/custom-fields/edit')
   updateContactCustomFieldValue(@Body() params: any) {
     return this.contactsService.updateContactCustomFieldValue(params);
+  }
+
+  @ApiOperation({ summary: 'Delete multiple contacts by ID' })
+  @RequirePermission('audience:contacts_edit')
+  @Post('/bulk-delete')
+  async bulkDelete(@Body() params: BulkDeleteContactsDto): Promise<{ deleted: number }> {
+    return this.contactsService.bulkDelete(params.ids);
   }
 
   @ApiOperation({ summary: 'Delete a contact by ID' })
