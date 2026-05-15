@@ -417,7 +417,6 @@ services:
     environment:
       <<: *backend-env
       PORT: '3000'
-      LOG_LEVEL: INFO
     networks: [internal]
     deploy:
       <<: *restart-policy
