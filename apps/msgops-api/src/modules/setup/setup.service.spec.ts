@@ -117,7 +117,13 @@ async function buildService(
       { provide: RedisService, useValue: { getClient: jest.fn().mockReturnValue({ ping: jest.fn().mockResolvedValue('PONG') }) } },
       { provide: ClickhouseProvider, useValue: { runQuery: jest.fn().mockResolvedValue([]) } },
       { provide: SystemConfigCacheProvider, useValue: { get: jest.fn().mockResolvedValue(null), set: jest.fn(), invalidate: jest.fn() } },
-      { provide: EnterpriseImportService, useValue: { createInstanceImport: jest.fn().mockResolvedValue({ jobId: 'test-job' }) } },
+      {
+        provide: EnterpriseImportService,
+        useValue: {
+          createInstanceImport: jest.fn().mockResolvedValue({ jobId: 'test-job' }),
+          createAccountImport: jest.fn().mockResolvedValue({ accountId: 7, jobId: 'job-acc' }),
+        },
+      },
     ],
   }).compile();
 
@@ -300,7 +306,13 @@ describe('SetupService', () => {
           { provide: RedisService, useValue: { getClient: jest.fn().mockReturnValue({ ping: jest.fn().mockResolvedValue('PONG') }) } },
           { provide: ClickhouseProvider, useValue: { runQuery: jest.fn().mockResolvedValue([]) } },
           { provide: SystemConfigCacheProvider, useValue: { get: jest.fn().mockResolvedValue(null), set: jest.fn(), invalidate: jest.fn() } },
-          { provide: EnterpriseImportService, useValue: { createInstanceImport: jest.fn().mockResolvedValue({ jobId: 'test-job' }) } },
+          {
+            provide: EnterpriseImportService,
+            useValue: {
+              createInstanceImport: jest.fn().mockResolvedValue({ jobId: 'test-job' }),
+              createAccountImport: jest.fn().mockResolvedValue({ accountId: 7, jobId: 'job-acc' }),
+            },
+          },
         ],
       }).compile();
       const service = moduleRef.get(SetupService);
@@ -799,6 +811,43 @@ describe('SetupService', () => {
         expect(err).toBeInstanceOf(HttpException);
         expect(err.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
       }
+    });
+  });
+
+  describe('importEnterprise (wizard = account-scope)', () => {
+    const OLD = process.env.ENTERPRISE_IMPORT_ENABLED;
+    afterEach(() => {
+      process.env.ENTERPRISE_IMPORT_ENABLED = OLD;
+    });
+
+    it('skip:true grava enterprise_import_done={imported:false} e não importa', async () => {
+      process.env.ENTERPRISE_IMPORT_ENABLED = 'true';
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue(undefined); // wizard não concluído
+
+      const res = await service.importEnterprise({ skip: true } as any, '1.1.1.1');
+
+      expect(res).toEqual({});
+      const saved = systemConfigRepo.save.mock.calls.find(([v]: [any]) => v.key === 'enterprise_import_done');
+      expect(saved?.[0]?.value).toMatchObject({ imported: false });
+    });
+
+    it('account-scope: usa adminUserId do wizard e chama createAccountImport', async () => {
+      process.env.ENTERPRISE_IMPORT_ENABLED = 'true';
+      const { service, systemConfigRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ value: { completed: false, adminUserId: 99 } });
+
+      const res = await service.importEnterprise({ baseUrl: 'https://ent.example.com', apiKey: 'supersecret', accountName: 'Acme' } as any, '1.1.1.1');
+
+      expect(res).toEqual({ jobId: 'job-acc' });
+      const saved = systemConfigRepo.save.mock.calls.find(([v]: [any]) => v.key === 'enterprise_import_done');
+      expect(saved?.[0]?.value).toMatchObject({ imported: true, scope: 'account', accountId: 7, jobId: 'job-acc' });
+    });
+
+    it('404 (NotFoundException) quando ENTERPRISE_IMPORT_ENABLED != true', async () => {
+      process.env.ENTERPRISE_IMPORT_ENABLED = 'false';
+      const { service } = await buildService();
+      await expect(service.importEnterprise({ skip: true } as any, '1.1.1.1')).rejects.toBeInstanceOf(HttpException);
     });
   });
 });

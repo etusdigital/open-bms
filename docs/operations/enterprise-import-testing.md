@@ -143,17 +143,40 @@ curl -s localhost:3001/health   # {"status":"ok","service":"enterprise-import"}
 6. **4xx**: use uma API key inválida → `status=failed`, sem retry, e a conta
    recém-criada é soft-deleted (sem progresso) — não fica órfã.
 
-### 4.4 Fluxo B — Setup Wizard (instance-scope, OSS virgem)
+### 4.4 Fluxo B — Setup Wizard (ACCOUNT-scope)
 
-1. OSS sem dados (`accounts` vazia). Acesse `/setup`.
-2. Step 1 (Admin) → **Step 2 (Enterprise import)** aparece só com
-   `ENTERPRISE_IMPORT_ENABLED=true` (senão é pulado e escondido).
+> **Decisão de design (importante):** o wizard NÃO faz instance-scope. O Step 1
+> do wizard cria o admin **e uma account**; instance-scope (que preserva IDs e
+> exige `accounts` vazia) é assíncrono (job) e seria barrado/competiria com essa
+> account — incompatível por construção, não por ordem. Então o passo do wizard
+> faz **account-scope**: cria uma conta nova e importa os dados da conta
+> Enterprise nela (async-safe, funciona em OSS não-virgem). Migração de
+> instância inteira → seção 4.6.
+
+1. Acesse `/setup`. Step 1 (Admin) cria o super-admin.
+2. **Step 2 (Enterprise import)** aparece só com `ENTERPRISE_IMPORT_ENABLED=true`.
 3. "Pular" → grava `system_config.enterprise_import_done={imported:false}` e vai
    pro Domínio. Refresh **não** re-mostra o passo (flag é a fonte da verdade).
-4. Ou informe `baseUrl`+`apiKey` → cria job instance-scope. Confira:
-   - ids preservados (Enterprise `id=42` → OSS `id=42`).
-   - `accounts_id_seq` avançado pra `max(id)+1` (SequenceAdvancer).
-   - sem entradas de `accounts` em `enterprise_id_mappings` (identidade).
+4. Ou informe **Nome da conta** + `baseUrl` + `apiKey` → cria conta nova
+   (dona = admin do Step 1) e enfileira job **account-scope**. Confira:
+   - `accounts` ganha a nova conta (sem os custom fields default; **com**
+     `api_key_tracker` + managed API key).
+   - `enterprise_import_jobs.scope = 'account'`, `account_id` = id da conta nova.
+   - `enterprise_id_mappings` populado (remap de FKs por chave natural).
+   - `system_config.enterprise_import_done = { imported:true, scope:'account', accountId, jobId }`.
+
+### 4.6 Migração de instância inteira (instance-scope) — procedimento separado
+
+instance-scope (preserva todos os IDs do Enterprise 1:1) **só roda em OSS
+virgem** (`accounts` vazia) e **não** é feito pelo wizard. É um provisionamento
+controlado: rode o job `scope=instance` contra um DB **virgem**, ANTES de
+qualquer bootstrap/admin. Como os usuários importados não têm credencial (F2 —
+hash bcrypt não é exportável), o bootstrap do admin é feito **depois** do job
+concluir (ex.: criar super-admin via API/seed). Verifique:
+
+- ids preservados (Enterprise `id=42` → OSS `id=42`);
+- `accounts_id_seq` avançado pra `max(id)+1` (SequenceAdvancer);
+- sem entradas de `accounts` em `enterprise_id_mappings` (identidade).
 
 ### 4.5 Mock rápido do Enterprise (sem instância real)
 
@@ -174,8 +197,8 @@ um `node:http` que responde `/tags`, `/contacts`, ... no shape das entities
 | AC4 resume do checkpoint          | Fluxo A passo 5 + integração cenário 2                        |
 | AC5 4xx cancela sem retry         | Fluxo A passo 6 + integração cenário 4                        |
 | AC7 remap account-scope           | `enterprise_id_mappings` + integração cenário 1               |
-| AC8 instance preserva id          | Fluxo B passo 4 + integração cenário 3                        |
-| AC9 `enterprise_import_done`      | Fluxo B passo 3                                               |
+| AC8 instance preserva id          | Seção 4.6 (procedimento separado) + integração cenário 3      |
+| AC9 `enterprise_import_done`      | Fluxo B passos 3/4 (account-scope)                            |
 | AC10 conta sem defaults           | Fluxo A passo 4 (sem custom fields default)                   |
 | AC11/F14 concorrência             | 2 `POST` paralelos mesma conta → 2º = 409                     |
 | AC12/F10 feature-flag             | `ENTERPRISE_IMPORT_ENABLED` off → rotas 404 + Step2 escondido |

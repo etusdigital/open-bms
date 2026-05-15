@@ -392,8 +392,27 @@ export class SetupService implements OnModuleInit {
     }
     const safeBaseUrl = assertSafeEnterpriseBaseUrl(dto.baseUrl);
 
-    const { jobId } = await this.enterpriseImport.createInstanceImport(safeBaseUrl, dto.apiKey, null);
-    const value = { imported: true, importedAt: new Date().toISOString(), sourceUrl: safeBaseUrl, jobId };
+    // Wizard = ACCOUNT-SCOPE: cria uma conta nova e importa os dados da conta
+    // Enterprise nela. É async-safe (não exige DB virgem). instance-scope
+    // (migração de instância inteira, preserva IDs) é incompatível com o
+    // wizard — vide docs/operations/enterprise-import-testing.md (procedimento
+    // separado, rodado em DB virgem).
+    const state = await this.readWizard();
+    const adminUserId = state?.adminUserId;
+    if (!adminUserId) {
+      throw new BadRequestException('Crie o administrador (passo anterior) antes de importar do Enterprise.');
+    }
+    const accountName = dto.accountName?.trim() || 'Importado do Enterprise';
+    const { accountId, jobId } = await this.enterpriseImport.createAccountImport(
+      {
+        accountData: { name: accountName } as any,
+        enterpriseBaseUrl: safeBaseUrl,
+        enterpriseApiKey: dto.apiKey,
+        enterpriseSourceAccountId: dto.enterpriseSourceAccountId,
+      } as any,
+      adminUserId,
+    );
+    const value = { imported: true, scope: 'account', importedAt: new Date().toISOString(), sourceUrl: safeBaseUrl, accountId, jobId };
     await this.systemConfigRepo.save(this.systemConfigRepo.create({ key: 'enterprise_import_done', value }));
     return { jobId };
   }

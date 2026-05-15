@@ -19,6 +19,7 @@ interface Props {
 export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [accountName, setAccountName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -49,7 +50,11 @@ export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
     }
     setSubmitting(true);
     try {
-      const res = await setupGateway.importEnterprise({ baseUrl: baseUrl.trim(), apiKey: apiKey.trim() });
+      const res = await setupGateway.importEnterprise({
+        baseUrl: baseUrl.trim(),
+        apiKey: apiKey.trim(),
+        accountName: accountName.trim() || undefined,
+      });
       if (res.jobId) setJobId(res.jobId);
     } catch (err) {
       setError(extractError(err, 'Erro ao iniciar import.'));
@@ -78,8 +83,20 @@ export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
       <p className="text-muted-foreground text-sm">
-        Se você está migrando do BMS Enterprise, podemos copiar suas contas, contatos, campanhas, automações e estatísticas via API key. Caso contrário, pule esta etapa.
+        Cria uma conta neste OSS e importa os dados da sua conta do BMS Enterprise (contatos, campanhas, automações, mensagens e estatísticas) via API key. Roda em
+        background. Caso contrário, pule esta etapa. (Migração da instância inteira é um procedimento separado — consulte a documentação de operações.)
       </p>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="setup-import-accountName">Nome da conta no OSS</Label>
+        <Input
+          id="setup-import-accountName"
+          autoComplete="off"
+          placeholder="Ex.: Minha Empresa (importada do Enterprise)"
+          value={accountName}
+          onChange={(e) => setAccountName(e.target.value)}
+          disabled={submitting}
+        />
+      </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="setup-import-baseUrl">URL do msgops-api Enterprise</Label>
         <Input

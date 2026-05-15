@@ -49,9 +49,12 @@ export const setupGateway = {
     await http.post('/setup/s3', data);
   },
 
-  // Step UI-only do wizard. Aceita {skip:true} ou {baseUrl, apiKey}.
-  // Quando inicia import, devolve {jobId} pra UI poder monitorar progresso.
-  async importEnterprise(payload: { skip: true } | { baseUrl: string; apiKey: string }): Promise<{ jobId?: string }> {
+  // Step do wizard (ACCOUNT-SCOPE). Aceita {skip:true} ou
+  // {baseUrl, apiKey, accountName?}. Cria conta nova e importa nela; devolve
+  // {jobId} pra UI monitorar progresso.
+  async importEnterprise(
+    payload: { skip: true } | { baseUrl: string; apiKey: string; accountName?: string; enterpriseSourceAccountId?: number },
+  ): Promise<{ jobId?: string }> {
     const res = await http.post<{ jobId?: string }>('/setup/import-enterprise', payload);
     return res.data;
   },

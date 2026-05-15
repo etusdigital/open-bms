@@ -140,7 +140,7 @@ d('enterprise-import integration (testcontainers + Enterprise mock)', () => {
     }
 
     server = createServer((req, res) => {
-      if (req.headers.authorization !== 'Bearer good-key') {
+      if (req.headers['x-api-key'] !== 'good-key') {
         res.writeHead(401, { 'content-type': 'application/json' });
         return res.end(JSON.stringify({ message: 'unauthorized' }));
       }

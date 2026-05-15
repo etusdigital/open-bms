@@ -25,14 +25,19 @@ const MAX_RATE_LIMIT_RETRIES = 3;
 export class EnterpriseClient {
   private readonly logger = new Logger(EnterpriseClient.name);
 
-  // Por job: cria axios instance com baseURL + Authorization. Não compartilhamos
-  // entre jobs porque baseURL e apiKey mudam.
+  // Por job: cria axios instance com baseURL + auth por API KEY. Não
+  // compartilhamos entre jobs porque baseURL e apiKey mudam.
+  //
+  // IMPORTANTE: o BMS autentica API key gerenciada pelo header `x-api-key`
+  // (authz.service.getHeaderApiKey). `Authorization: Bearer` cai no caminho de
+  // JWT de usuário → a API key seria validada como JWT → 401 "Invalid token".
+  // Mandamos `x-api-key`; não é preciso usuário logado.
   createSession(baseUrl: string, apiKey: string): EnterpriseSession {
     const http = axios.create({
       baseURL: baseUrl.replace(/\/$/, ''),
       timeout: DEFAULT_TIMEOUT_MS,
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        'x-api-key': apiKey,
         'Content-Type': 'application/json',
       },
     });
