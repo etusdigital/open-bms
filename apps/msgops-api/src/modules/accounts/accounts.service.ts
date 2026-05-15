@@ -147,6 +147,15 @@ export class AccountsService {
     }
   }
 
+  // Idempotency helper for retried account provisioning (setup wizard / Enterprise
+  // import). `accounts.name` carries a DB UNIQUE constraint, so a retry after a
+  // partial failure would otherwise hit 23505 ("already exists"). Callers use this
+  // to reuse the leftover account instead of creating a duplicate. Soft-deleted
+  // rows are excluded automatically by TypeORM's @DeleteDateColumn.
+  async findByName(name: string): Promise<AccountEntity | null> {
+    return this.accountRepository.findOne({ where: { name } });
+  }
+
   async findWithCleanConfigs(id: number) {
     const account = await this.accountRepository.findOneOrFail({ where: { id } });
     account.customFields = await this.customFieldRepository.find({ where: { accountId: id } });

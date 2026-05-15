@@ -25,29 +25,63 @@ export class EnterpriseImportService {
 
   async createAccountImport(dto: ImportAccountDto, userId: number): Promise<{ accountId: number; jobId: string }> {
     const safeBaseUrl = assertSafeEnterpriseBaseUrl(dto.enterpriseBaseUrl); // F9 anti-SSRF
-    const { account } = await this.accountsService.create(dto.accountData, userId, { skipDefaults: true });
 
-    // F13: skipDefaults pula api_key_tracker/account_costs, e o account-settings
-    // importer só traz `<provider>_settings` — não a chave de tracking nem uma
-    // API key gerenciável. Sem isso a conta importada fica sem pixel de
-    // tracking e sem API key. Geramos as essenciais (são por-instância e NÃO
-    // transferíveis do Enterprise — hash/segredo diferentes por deploy).
-    try {
-      await this.accountsService.createAccountConfig(account.id, [{ api_key_tracker: createHash('md5').update(`bms-${account.id}-api_key_tracker`).digest('hex') }]);
-      await this.accountsService.createManagedApiKey(account.id, { name: 'imported-default' }, userId);
-    } catch (e: any) {
-      // Não aborta o import por causa disso — só loga; a chave pode ser
-      // recriada pela UI de API keys depois.
-      this.logger.warn(`[enterprise-import] could not provision default api key/tracker for account=${account.id}: ${e?.message ?? e}`);
+    // Idempotência: `accounts.name` tem UNIQUE no DB, então uma 2ª tentativa
+    // após o import falhar (worker erra, Redis cai, etc.) bateria em 23505
+    // "already exists". Reusa a conta deixada pela tentativa anterior em vez de
+    // criar duplicata ou explodir. Só cria/provisiona quando ela ainda não existe.
+    const accountName = (dto.accountData as any)?.name as string | undefined;
+    let account = accountName ? await this.accountsService.findByName(accountName) : null;
+    const reusedAccount = !!account;
+    if (!account) {
+      ({ account } = await this.accountsService.create(dto.accountData, userId, { skipDefaults: true }));
+
+      // F13: skipDefaults pula api_key_tracker/account_costs, e o account-settings
+      // importer só traz `<provider>_settings` — não a chave de tracking nem uma
+      // API key gerenciável. Sem isso a conta importada fica sem pixel de
+      // tracking e sem API key. Geramos as essenciais (são por-instância e NÃO
+      // transferíveis do Enterprise — hash/segredo diferentes por deploy).
+      // Só na criação: numa conta reusada essas já existem (e api_key_tracker
+      // tem UNIQUE (account_id, name) → re-insert daria 23505).
+      try {
+        await this.accountsService.createAccountConfig(account.id, [{ api_key_tracker: createHash('md5').update(`bms-${account.id}-api_key_tracker`).digest('hex') }]);
+        await this.accountsService.createManagedApiKey(account.id, { name: 'imported-default' }, userId);
+      } catch (e: any) {
+        // Não aborta o import por causa disso — só loga; a chave pode ser
+        // recriada pela UI de API keys depois.
+        this.logger.warn(`[enterprise-import] could not provision default api key/tracker for account=${account.id}: ${e?.message ?? e}`);
+      }
+    } else {
+      this.logger.log(`[enterprise-import] reusing existing account=${account.id} name="${accountName}" (retry-safe)`);
     }
 
-    // Pré-checa concorrência. Existe partial unique no DB (uniq_running_job_per_account)
-    // que é a defesa real; aqui é só mensagem amigável antes do conflito 23505.
-    const existing = await this.jobRepo.findOne({
-      where: { accountId: account.id, status: In(['pending', 'running', 'paused']) },
+    // Idempotência do job. Pega o último job dessa conta:
+    //  - pending/running  → import já em andamento; devolve o mesmo jobId (sem
+    //    erro, sem duplicar) — frontend só precisa pollar o status.
+    //  - paused/failed    → "resume": reaproveita a MESMA linha, atualiza
+    //    credenciais/baseUrl, zera erro e re-enfileira.
+    //  - completed/nenhum → cria um job novo.
+    const lastJob = await this.jobRepo.findOne({
+      where: { accountId: account.id },
+      order: { createdAt: 'DESC' },
     });
-    if (existing) {
-      throw new ConflictException(`Já existe um job de import ativo para a conta ${account.id} (jobId=${existing.id}).`);
+
+    if (lastJob && (lastJob.status === 'pending' || lastJob.status === 'running')) {
+      this.logger.log(`[enterprise-import] import já ativo jobId=${lastJob.id} accountId=${account.id} status=${lastJob.status} — idempotente`);
+      return { accountId: account.id, jobId: lastJob.id };
+    }
+
+    if (lastJob && (lastJob.status === 'paused' || lastJob.status === 'failed')) {
+      lastJob.enterpriseSourceAccountId = dto.enterpriseSourceAccountId ?? lastJob.enterpriseSourceAccountId ?? null;
+      lastJob.enterpriseBaseUrl = safeBaseUrl;
+      lastJob.encryptedApiKey = encryptApiKey(dto.enterpriseApiKey);
+      lastJob.status = 'pending';
+      lastJob.error = null;
+      lastJob.createdBy = lastJob.createdBy ?? userId ?? null;
+      const resumed = await this.saveJobWithConcurrencyGuard(lastJob, `conta ${account.id}`);
+      this.logger.log(`[enterprise-import] resuming job jobId=${resumed.id} accountId=${account.id} (era status=${lastJob.status})`);
+      await this.queue.add('import', { jobId: resumed.id }, JOB_OPTS_ENTERPRISE_IMPORT);
+      return { accountId: account.id, jobId: resumed.id };
     }
 
     const job = this.jobRepo.create({
@@ -64,7 +98,7 @@ export class EnterpriseImportService {
     const saved = await this.saveJobWithConcurrencyGuard(job, `conta ${account.id}`);
 
     // Nunca logar `enterpriseApiKey` ou `encryptedApiKey`. Apenas metadados.
-    this.logger.log(`[enterprise-import] enqueuing job jobId=${saved.id} accountId=${account.id} scope=account`);
+    this.logger.log(`[enterprise-import] enqueuing job jobId=${saved.id} accountId=${account.id} scope=account reused=${reusedAccount}`);
 
     await this.queue.add('import', { jobId: saved.id }, JOB_OPTS_ENTERPRISE_IMPORT);
 

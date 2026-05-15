@@ -273,13 +273,21 @@ export class SetupService implements OnModuleInit {
       // users_accounts row already exists for this admin, skip both account and link.
       const existingLink = await userAccountRepo.findOne({ where: { userId: adminUserId } });
       if (!existingLink) {
-        const account = accountRepo.create({
-          name: accountName,
-          groupId: 1,
-          isActive: true,
-          isInternal: false,
-        });
-        const savedAccount = await accountRepo.save(account);
+        // Idempotência: `accounts.name` tem UNIQUE no DB. Se uma tentativa
+        // anterior do passo 1 falhou depois de já ter criado a conta (ou ela
+        // veio de outro fluxo), reusar a linha existente em vez de bater em
+        // 23505 "already exists" numa nova tentativa com o mesmo nome.
+        const existingAccount = await accountRepo.findOne({ where: { name: accountName } });
+        const savedAccount =
+          existingAccount ??
+          (await accountRepo.save(
+            accountRepo.create({
+              name: accountName,
+              groupId: 1,
+              isActive: true,
+              isInternal: false,
+            }),
+          ));
         await userAccountRepo.save(
           userAccountRepo.create({
             userId: adminUserId,
@@ -288,15 +296,21 @@ export class SetupService implements OnModuleInit {
           }),
         );
 
+        // Insert idempotente: accounts_configs tem UNIQUE (account_id, name),
+        // então só cria o api_key_tracker se ainda não existir (conta reusada
+        // pode já ter o config de uma tentativa anterior).
         const accountConfigRepo = em.getRepository(AccountConfigEntity);
-        await accountConfigRepo.save([
-          accountConfigRepo.create({
-            accountId: savedAccount.id,
-            name: 'api_key_tracker',
-            value: createHash('md5').update(`bms-${savedAccount.id}-api_key_tracker`).digest('hex'),
-            isLoadConfig: true,
-          }),
-        ]);
+        const existingTracker = await accountConfigRepo.findOne({ where: { accountId: savedAccount.id, name: 'api_key_tracker' } });
+        if (!existingTracker) {
+          await accountConfigRepo.save([
+            accountConfigRepo.create({
+              accountId: savedAccount.id,
+              name: 'api_key_tracker',
+              value: createHash('md5').update(`bms-${savedAccount.id}-api_key_tracker`).digest('hex'),
+              isLoadConfig: true,
+            }),
+          ]);
+        }
       }
 
       await this.upsertWizardTx(systemConfigRepo, { currentStep: 2, adminUserId });
