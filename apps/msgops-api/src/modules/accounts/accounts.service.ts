@@ -148,12 +148,22 @@ export class AccountsService {
   }
 
   // Idempotency helper for retried account provisioning (setup wizard / Enterprise
-  // import). `accounts.name` carries a DB UNIQUE constraint, so a retry after a
-  // partial failure would otherwise hit 23505 ("already exists"). Callers use this
-  // to reuse the leftover account instead of creating a duplicate. Soft-deleted
-  // rows are excluded automatically by TypeORM's @DeleteDateColumn.
-  async findByName(name: string): Promise<AccountEntity | null> {
-    return this.accountRepository.findOne({ where: { name } });
+  // import). `accounts.name` carries a column-level DB UNIQUE constraint (NOT
+  // partial on deleted_at), so a retry after a partial failure would otherwise
+  // hit 23505 ("already exists"). Callers reuse the leftover account instead of
+  // recreating it. `withDeleted` is required because the Enterprise import worker
+  // soft-deletes the orphan account when a job fails before any progress
+  // (cleanupOrphanAccount/F18) — that row still occupies the unique name.
+  async findByName(name: string, opts?: { withDeleted?: boolean }): Promise<AccountEntity | null> {
+    return this.accountRepository.findOne({ where: { name }, withDeleted: opts?.withDeleted ?? false });
+  }
+
+  // Un-delete a soft-deleted account so the unique name is usable again and the
+  // row is visible/active. Used by the retry-safe import/wizard paths to recover
+  // an orphan account instead of creating a duplicate (which would 23505).
+  async restoreAccount(id: number): Promise<void> {
+    await this.accountRepository.restore(id);
+    await this.accountRepository.update(id, { isActive: true });
   }
 
   async findWithCleanConfigs(id: number) {

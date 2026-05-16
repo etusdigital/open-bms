@@ -26,13 +26,21 @@ export class EnterpriseImportService {
   async createAccountImport(dto: ImportAccountDto, userId: number): Promise<{ accountId: number; jobId: string }> {
     const safeBaseUrl = assertSafeEnterpriseBaseUrl(dto.enterpriseBaseUrl); // F9 anti-SSRF
 
-    // Idempotência: `accounts.name` tem UNIQUE no DB, então uma 2ª tentativa
-    // após o import falhar (worker erra, Redis cai, etc.) bateria em 23505
-    // "already exists". Reusa a conta deixada pela tentativa anterior em vez de
-    // criar duplicata ou explodir. Só cria/provisiona quando ela ainda não existe.
+    // Idempotência: `accounts.name` tem UNIQUE column-level no DB (não parcial),
+    // então uma 2ª tentativa após o import falhar bateria em 23505 "already
+    // exists". Reusa a conta deixada pela tentativa anterior em vez de criar
+    // duplicata. INCLUI soft-deleted: quando um job falha antes de qualquer
+    // progresso, o worker soft-deleta a conta órfã (cleanupOrphanAccount/F18) —
+    // a linha some do findOne normal mas o nome continua ocupado na constraint.
+    // Recuperamos (restore) a conta em vez de tentar recriar.
     const accountName = (dto.accountData as any)?.name as string | undefined;
-    let account = accountName ? await this.accountsService.findByName(accountName) : null;
+    let account = accountName ? await this.accountsService.findByName(accountName, { withDeleted: true }) : null;
     const reusedAccount = !!account;
+    if (account?.deletedAt) {
+      this.logger.log(`[enterprise-import] recovering soft-deleted orphan account=${account.id} name="${accountName}" (retry-safe)`);
+      await this.accountsService.restoreAccount(account.id);
+      account.deletedAt = null as any;
+    }
     if (!account) {
       ({ account } = await this.accountsService.create(dto.accountData, userId, { skipDefaults: true }));
 

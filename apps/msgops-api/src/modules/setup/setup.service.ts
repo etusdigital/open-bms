@@ -273,11 +273,17 @@ export class SetupService implements OnModuleInit {
       // users_accounts row already exists for this admin, skip both account and link.
       const existingLink = await userAccountRepo.findOne({ where: { userId: adminUserId } });
       if (!existingLink) {
-        // Idempotência: `accounts.name` tem UNIQUE no DB. Se uma tentativa
-        // anterior do passo 1 falhou depois de já ter criado a conta (ou ela
-        // veio de outro fluxo), reusar a linha existente em vez de bater em
-        // 23505 "already exists" numa nova tentativa com o mesmo nome.
-        const existingAccount = await accountRepo.findOne({ where: { name: accountName } });
+        // Idempotência: `accounts.name` tem UNIQUE column-level no DB (não
+        // parcial em deleted_at). Se uma tentativa anterior já criou a conta
+        // (ou o worker de import a soft-deletou como órfã), reusar a linha em
+        // vez de bater em 23505 "already exists". `withDeleted: true` +
+        // restore cobrem o caso soft-deleted (o nome continua ocupado mesmo
+        // após soft-delete).
+        const existingAccount = await accountRepo.findOne({ where: { name: accountName }, withDeleted: true });
+        if (existingAccount?.deletedAt) {
+          await accountRepo.restore(existingAccount.id);
+          await accountRepo.update(existingAccount.id, { isActive: true });
+        }
         const savedAccount =
           existingAccount ??
           (await accountRepo.save(
