@@ -8,7 +8,6 @@ import { EnterpriseClient } from './enterprise-client/enterprise.client';
 import { IdMapperService } from './id-mapper.service';
 import { SequenceAdvancerService } from './sequence-advancer.service';
 import { ImportPipeline } from './pipeline';
-import { InstanceConfigImporter } from './instance-config.importer';
 import { ImportContext } from './importers/importer.interface';
 import { EnterpriseApi4xxError } from './enterprise-client/errors';
 import { rawInsertPreservingPk, dbNameMap } from './raw-insert.util';
@@ -31,7 +30,6 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
     private readonly idMapper: IdMapperService,
     private readonly seq: SequenceAdvancerService,
     private readonly pipeline: ImportPipeline,
-    private readonly instanceConfig: InstanceConfigImporter,
   ) {
     super();
   }
@@ -99,11 +97,9 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
     }
     await this.idMapper.loadFromDb(entity.id);
 
-    // 1) configs globais (idempotente, DO NOTHING — não sobrescreve setup OSS).
-    await this.instanceConfig.run(this.buildCtx(entity, session, null, null));
-
-    // 2) iterar contas Enterprise ORDENADAS por id; watermark de retomada (F8):
-    // checkpoint.accountId = maior id de conta JÁ TOTALMENTE concluída.
+    // Config global da instância NÃO é importada (configuração manual, fora do
+    // escopo). Iteramos contas Enterprise ORDENADAS por id; watermark de
+    // retomada (F8): checkpoint.accountId = maior id de conta JÁ concluída.
     const fresh = await this.jobRepo.findOne({ where: { id: entity.id } });
     const watermark = fresh?.checkpoint?.accountId ?? 0;
     const accRepo = this.dataSource.getRepository(AccountEntity);
