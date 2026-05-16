@@ -66,9 +66,8 @@ describe('EnterpriseClient retry/backoff semantics', () => {
     // listEmailTemplates usa paged(..., tolerate404=true): 404 vira página vazia
     // (algumas versões do Enterprise não expõem /emails-templates).
     expect(await session(transport([{ status: 404 }])).listEmailTemplates({ page: 1 })).toEqual({ results: [], page: 1, totalItems: 0, itemsPerPage: 0 });
-    await expect(session(transport([{ status: 404 }])).exportStatistics({ accountId: 1, from: 'a', to: 'b', page: 1, itemsPerPage: 1 })).rejects.toBeInstanceOf(
-      EnterpriseApi404Error,
-    );
+    // listContacts usa paged(...) sem tolerate404: 404 não-tolerado propaga.
+    await expect(session(transport([{ status: 404 }])).listContacts({ page: 1 })).rejects.toBeInstanceOf(EnterpriseApi404Error);
   });
 
   it('5xx faz 5 retries e esgota → EnterpriseApi5xxError (6 chamadas)', async () => {

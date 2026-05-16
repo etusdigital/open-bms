@@ -19,10 +19,6 @@ export interface ImportContext {
   // Pra scope=instance, o currentAccountId é setado por iteração (1 conta por vez).
   // Pra scope=account, é fixo no jobId (id NOVO no OSS).
   accountId: number | null;
-  // ID da conta NO ENTERPRISE (origem). Em scope=account é o id que o operador
-  // informou; em scope=instance é o próprio id preservado. Usado por endpoints
-  // do Enterprise que exigem accountId explícito (ex.: statistics export).
-  enterpriseSourceAccountId: number | null;
   scope: EnterpriseImportScope;
   client: EnterpriseSession;
   idMapper: IdMapperService;

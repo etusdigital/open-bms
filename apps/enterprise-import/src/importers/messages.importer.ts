@@ -90,7 +90,8 @@ export class MessagesImporter implements ImporterStep {
               await ctx.idMapper.record(ctx.jobId, this.name, m[pkProp], newMsgId);
             }
             // Link campaigns_messages (statistics/winner/result_date NOT NULL —
-            // valores neutros; rollups reais vêm pelo importer de statistics).
+            // valores neutros; rollups de events_statistics estão fora do
+            // escopo do import — ver pipeline.ts).
             await txCm
               .createQueryBuilder()
               .insert()

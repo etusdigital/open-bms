@@ -60,7 +60,6 @@ function makeCtx(repo: FakeRepo, scope: 'account' | 'instance', overrides: Parti
   return {
     jobId: 'job-1',
     accountId: 99,
-    enterpriseSourceAccountId: 7,
     scope,
     client: {} as any,
     idMapper: {

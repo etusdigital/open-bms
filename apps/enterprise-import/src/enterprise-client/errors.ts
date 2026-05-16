@@ -29,8 +29,9 @@ export class EnterpriseApiTimeoutError extends Error {
   }
 }
 
-// Retornado pelo client quando o endpoint NÃO existe (404). Statistics importer
-// trata como skip silencioso ao invés de cancelar o job.
+// 404 distinto dos demais 4xx: usado pelo client p/ diferenciar "endpoint/
+// recurso inexistente" de outros erros do cliente (a versão do Enterprise de
+// origem pode não expor uma rota — endpoints opcionais usam tolerate404).
 export class EnterpriseApi404Error extends EnterpriseApi4xxError {
   constructor(message: string) {
     super(404, message);

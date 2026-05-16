@@ -16,7 +16,6 @@ import { CustomEventsImporter } from './importers/custom-events.importer';
 import { AutomationsImporter } from './importers/automations.importer';
 import { CampaignsImporter } from './importers/campaigns.importer';
 import { MessagesImporter } from './importers/messages.importer';
-import { StatisticsImporter } from './importers/statistics.importer';
 import { ImportPipeline } from './pipeline';
 import { HealthController } from './health.controller';
 
@@ -40,7 +39,6 @@ import { CampaignMessageEntity } from './entities/campaign-message.entity';
 import { MessageEntity } from './entities/message.entity';
 import { UserEntity } from './entities/users.entity';
 import { UserAccountEntity } from './entities/users-account.entity';
-import { EventStatisticsEntity } from './entities/event-statistics.entity';
 import { SystemConfigEntity } from './entities/system-config.entity';
 
 const ENTITIES = [
@@ -60,7 +58,6 @@ const ENTITIES = [
   MessageEntity,
   UserEntity,
   UserAccountEntity,
-  EventStatisticsEntity,
   SystemConfigEntity,
 ];
 
@@ -104,7 +101,6 @@ const ENTITIES = [
     AutomationsImporter,
     CampaignsImporter,
     MessagesImporter,
-    StatisticsImporter,
     ImportPipeline,
   ],
 })

@@ -14,7 +14,6 @@ const ENTITY_LABELS: Record<string, string> = {
   automations: 'Automations',
   campaigns: 'Campaigns',
   messages: 'Messages',
-  statistics: 'Statistics',
 };
 
 function entityLabel(key: string): string {
@@ -30,7 +29,7 @@ function pct(entry: ImportProgressEntry): number {
 export function ProgressList({ progress, jobStatus }: { progress: Record<string, ImportProgressEntry>; jobStatus?: ImportStatus }) {
   const keys = Object.keys(ENTITY_LABELS);
   // Job concluído ⇒ todo step que rodou está 100%. Vários importers
-  // (messages/statistics) emitem só {done, page} sem {total} — sem isso o
+  // (ex.: messages) emitem só {done, page} sem {total} — sem isso o
   // pct() não tem como calcular e a barra ficaria travada em 0% mesmo com o
   // job `completed`. Quando o job conclui, forçamos 100% (o que processou
   // também fica cheio, batendo com o status).

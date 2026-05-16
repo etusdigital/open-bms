@@ -89,49 +89,8 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
     if (!entity.accountId) throw new Error('account scope requires accountId');
     await this.idMapper.loadFromDb(entity.id);
 
-    // Resolve o accountId DE ORIGEM (Enterprise) a partir da própria API key
-    // quando o operador não informou. NÃO importa users/accounts: é só um
-    // lookup read-only de 1 registro num endpoint key-scoped (a key já é
-    // escopada na conta Enterprise; os outros importers já dependem disso
-    // implicitamente). Só o /statistics/admin/export exige o id explícito.
-    // Best-effort: se não resolver, StatisticsImporter pula com motivo claro.
-    let sourceAccountId = entity.enterpriseSourceAccountId ?? null;
-    if (sourceAccountId == null) {
-      sourceAccountId = await this.resolveEnterpriseSourceAccountId(session);
-      if (sourceAccountId != null) {
-        this.logger.log(`[enterprise-import] resolved enterpriseSourceAccountId=${sourceAccountId} from API key (job=${entity.id})`);
-        // Persiste pra transparência/UI. Update parcial (nunca save da entity
-        // velha — não clobberar progress/checkpoint).
-        await this.jobRepo.update({ id: entity.id }, { enterpriseSourceAccountId: sourceAccountId });
-      } else {
-        this.logger.warn(`[enterprise-import] could not resolve enterpriseSourceAccountId from API key (job=${entity.id}) — statistics será pulado`);
-      }
-    }
-
-    const ctx = this.buildCtx(entity, session, entity.accountId, sourceAccountId);
+    const ctx = this.buildCtx(entity, session, entity.accountId);
     await this.runPipeline(ctx);
-  }
-
-  // Lê o account_id da conta Enterprise dona da API key a partir de 1 registro
-  // de um endpoint key-scoped. /contacts é sempre puxado pelo import e cada
-  // contato vem com account_id (snake) na payload crua; /users é fallback
-  // (também key-scoped). Tudo best-effort — qualquer erro/ausência → null.
-  private async resolveEnterpriseSourceAccountId(session: ReturnType<EnterpriseClient['createSession']>): Promise<number | null> {
-    const pick = (rec: any): number | null => {
-      const v = rec?.account_id ?? rec?.accountId;
-      const n = Number(v);
-      return Number.isInteger(n) && n > 0 ? n : null;
-    };
-    for (const fetch of [() => session.listContacts({ page: 1, itemsPerPage: 1 }), () => session.listUsers({ page: 1, itemsPerPage: 1 })]) {
-      try {
-        const resp = await fetch();
-        const id = pick(resp?.results?.[0]);
-        if (id != null) return id;
-      } catch {
-        // tenta o próximo endpoint / cai pro skip
-      }
-    }
-    return null;
   }
 
   private async runInstanceScope(entity: EnterpriseImportJobEntity, session: ReturnType<EnterpriseClient['createSession']>): Promise<void> {
@@ -169,7 +128,7 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
         // QB ignoraria valor explícito em @PrimaryGeneratedColumn)
         await rawInsertPreservingPk(this.dataSource, 'accounts', accDbNames, [accRow]);
 
-        const ctx = this.buildCtx(entity, session, srcId, srcId);
+        const ctx = this.buildCtx(entity, session, srcId);
         await this.runPipeline(ctx);
 
         // Conta concluída → avança watermark (resume pula ela na próxima vez).
@@ -196,16 +155,10 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
     }
   }
 
-  private buildCtx(
-    entity: EnterpriseImportJobEntity,
-    session: ReturnType<EnterpriseClient['createSession']>,
-    accountId: number | null,
-    enterpriseSourceAccountId: number | null,
-  ): ImportContext {
+  private buildCtx(entity: EnterpriseImportJobEntity, session: ReturnType<EnterpriseClient['createSession']>, accountId: number | null): ImportContext {
     return {
       jobId: entity.id,
       accountId,
-      enterpriseSourceAccountId,
       scope: entity.scope,
       client: session,
       idMapper: this.idMapper,

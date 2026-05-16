@@ -21,8 +21,6 @@ import { Redis } from 'ioredis';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { ClickhouseProvider } from 'src/providers/clickhouse.provider';
-import { Between } from 'typeorm';
-import { BadRequestException } from '@nestjs/common';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
@@ -1001,39 +999,5 @@ export class StatisticsService {
       date: day,
       ...transformHourlyData(results[index][1] as Record<string, string>),
     }));
-  }
-
-  // paginação por dia ascendente. Usado pelo importer Enterprise → OSS.
-  // Validação simples: from/to em YYYY-MM-DD; from <= to; itemsPerPage capped 5000
-  // pra evitar OOM em ranges enormes.
-  async exportForAccount(
-    accountId: number,
-    from: string,
-    to: string,
-    page: number,
-    itemsPerPage: number,
-  ): Promise<{ results: EventStatisticsEntity[]; page: number; totalItems: number; itemsPerPage: number }> {
-    if (!Number.isFinite(accountId) || accountId <= 0) {
-      throw new BadRequestException('accountId inválido');
-    }
-    const fromDate = dayjs(from);
-    const toDate = dayjs(to);
-    if (!fromDate.isValid() || !toDate.isValid() || fromDate.isAfter(toDate)) {
-      throw new BadRequestException('Range from/to inválido (formato YYYY-MM-DD; from <= to)');
-    }
-    const safePage = Math.max(1, Number.isFinite(page) ? page : 1);
-    const safeItems = Math.max(1, Math.min(5000, Number.isFinite(itemsPerPage) ? itemsPerPage : 500));
-
-    const [results, totalItems] = await this.eventStatisticsRepository.findAndCount({
-      where: {
-        accountId,
-        date: Between(fromDate.toDate(), toDate.toDate()),
-      },
-      order: { date: 'ASC' },
-      skip: (safePage - 1) * safeItems,
-      take: safeItems,
-    });
-
-    return { results, page: safePage, totalItems, itemsPerPage: safeItems };
   }
 }

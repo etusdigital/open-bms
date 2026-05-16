@@ -9,7 +9,6 @@ import { CustomEventsImporter } from './importers/custom-events.importer';
 import { AutomationsImporter } from './importers/automations.importer';
 import { CampaignsImporter } from './importers/campaigns.importer';
 import { MessagesImporter } from './importers/messages.importer';
-import { StatisticsImporter } from './importers/statistics.importer';
 
 // Ordem importa: dependências de FK precisam vir antes (ex: campaigns antes de
 // messages; custom_events antes de campaigns que os referenciem etc.).
@@ -19,6 +18,9 @@ import { StatisticsImporter } from './importers/statistics.importer';
 //  - usuários (users): os dados importados são account-scoped e não dependem
 //    de user_id; o admin é criado/vinculado pelo wizard. Migração de users
 //    não é feita por nenhum scope.
+//  - statistics (events_statistics): rollup só exposto por endpoint
+//    super-admin que o import (API key de conta) não acessa, e ausente em
+//    versões antigas do Enterprise — fora do escopo do wizard.
 @Injectable()
 export class ImportPipeline {
   readonly steps: ImporterStep[];
@@ -33,8 +35,7 @@ export class ImportPipeline {
     automations: AutomationsImporter,
     campaigns: CampaignsImporter,
     messages: MessagesImporter,
-    statistics: StatisticsImporter,
   ) {
-    this.steps = [tags, customFields, labels, emailTemplates, customEvents, contacts, automations, campaigns, messages, statistics];
+    this.steps = [tags, customFields, labels, emailTemplates, customEvents, contacts, automations, campaigns, messages];
   }
 }

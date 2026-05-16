@@ -98,22 +98,6 @@ export class EnterpriseSession {
     return this.paged('/messages', params);
   }
 
-  // Task 10: endpoint adicionado em statistics.controller.
-  // Se Enterprise estiver em versão antiga sem essa rota, statistics importer
-  // trata 404 como skip (vide riscos no spec).
-  exportStatistics(params: { accountId: number; from: string; to: string; page: number; itemsPerPage: number }): Promise<{
-    results: any[];
-    page: number;
-    totalItems: number;
-    itemsPerPage: number;
-  }> {
-    return this.requestWithRetry({
-      method: 'GET',
-      url: '/statistics/admin/export',
-      params,
-    });
-  }
-
   // ---- Instance-scope endpoints ----
   listAllAccounts(params: PageParams): Promise<PagedResponse<any>> {
     return this.paged('/accounts/all', params);
