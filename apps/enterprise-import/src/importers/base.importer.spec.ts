@@ -144,6 +144,29 @@ describe('BaseImporter (rewrite F1/F3/F4/F8)', () => {
     expect(repo.rows).toHaveLength(1); // sem duplicata
   });
 
+  it('origem vazia (ou 404 tolerado) → emite estado terminal skipped:empty (não fica eterno "pendente")', async () => {
+    const repo = new FakeRepo(['id', 'accountId', 'name']);
+    const imp = new TestImporter();
+    imp.pages = []; // fetchPage devolve { results: [], page: 1 }
+    const ctx = makeCtx(repo, 'account');
+
+    await imp.run(ctx);
+
+    expect(ctx.updateProgress).toHaveBeenCalledWith('tags', { skipped: true, reason: 'empty' });
+  });
+
+  it('resume: tudo já existia (0 novos, totalItems>0) → fecha 100% (done=total)', async () => {
+    const repo = new FakeRepo(['id', 'accountId', 'name']);
+    repo.rows.push({ id: 1, accountId: 99, name: 'x' }); // já existe → 0 inserts
+    const imp = new TestImporter();
+    imp.pages = [{ results: [{ id: 1, name: 'x' }], page: 1, totalItems: 1 }];
+    const ctx = makeCtx(repo, 'account');
+
+    await imp.run(ctx);
+
+    expect(ctx.updateProgress).toHaveBeenCalledWith('tags', { total: 1, done: 1, page: 1 });
+  });
+
   it('instance-scope: preserva o id de origem e NÃO grava mapping', async () => {
     const repo = new FakeRepo(['id', 'accountId', 'name']);
     const imp = new TestImporter();

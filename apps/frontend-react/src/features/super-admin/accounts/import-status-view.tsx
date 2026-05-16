@@ -65,7 +65,7 @@ export function ImportStatusView({ jobId, hideResume = false }: { jobId: string;
 
       <Card className="p-4">
         <h3 className="font-medium mb-3">Progresso</h3>
-        <ProgressList progress={data.progress} />
+        <ProgressList progress={data.progress} jobStatus={data.status} />
       </Card>
 
       {data.status === 'failed' && !hideResume && (

@@ -49,9 +49,13 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
     const apiKey = decryptApiKey(entity.encryptedApiKey);
     const session = this.client.createSession(entity.enterpriseBaseUrl, apiKey);
 
-    entity.status = 'running';
-    entity.startedAt = entity.startedAt ?? new Date();
-    await this.jobRepo.save(entity);
+    // IMPORTANTE: nunca `jobRepo.save(entity)` aqui. `entity` foi lido no topo
+    // com progress/checkpoint vazios; durante o import os importers atualizam
+    // essas colunas DIRETO no banco (jsonb_set atômico). Um save da entity
+    // velha sobrescreveria tudo de volta pra `{}` — era por isso que o job
+    // ficava `completed` mas a tela voltava pra "pendente". Só updates parciais.
+    const startedAt = entity.startedAt ?? new Date();
+    await this.jobRepo.update({ id: jobId }, { status: 'running', startedAt });
 
     try {
       if (entity.scope === 'instance') {
@@ -60,19 +64,17 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
         await this.runAccountScope(entity, session);
       }
 
-      entity.status = 'completed';
-      entity.finishedAt = new Date();
-      entity.encryptedApiKey = null; // descarta segredo
-      await this.jobRepo.save(entity);
+      await this.jobRepo.update({ id: jobId }, { status: 'completed', finishedAt: new Date(), encryptedApiKey: null });
       this.logger.log(`[enterprise-import] job=${jobId} completed`);
     } catch (err) {
       const isClientError = err instanceof EnterpriseApi4xxError;
       entity.error = (err as Error)?.message?.slice(0, 500) ?? 'unknown';
       if (isClientError) {
-        // 4xx: não retry — cancela imediatamente (AC5).
+        // 4xx: não retry — cancela imediatamente (AC5). Update parcial (idem
+        // racional do completed: não clobberar progress/checkpoint do banco).
         entity.status = 'failed';
         entity.finishedAt = new Date();
-        await this.jobRepo.save(entity);
+        await this.jobRepo.update({ id: jobId }, { status: 'failed', finishedAt: entity.finishedAt, error: entity.error });
         await this.cleanupOrphanAccount(entity); // F18
         this.logger.warn(`[enterprise-import] job=${jobId} cancelled (4xx): ${entity.error}`);
         return; // não relança — BullMQ não fará retry
@@ -190,7 +192,12 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
   // vazia. Soft-delete conservador: só se NENHUM progresso foi registrado.
   private async cleanupOrphanAccount(entity: EnterpriseImportJobEntity): Promise<void> {
     if (entity.scope !== 'account' || !entity.accountId) return;
-    const progressed = Object.values(entity.progress ?? {}).some((p) => (p?.done ?? 0) > 0);
+    // Relê o progress do BANCO — `entity` pode estar velha (lida no topo do
+    // process() com progress={}); confiar nela soft-deletaria uma conta que
+    // de fato importou dados num 4xx tardio. Os importers gravam progress
+    // direto no DB, então a verdade está lá.
+    const fresh = await this.jobRepo.findOne({ where: { id: entity.id } });
+    const progressed = Object.values(fresh?.progress ?? {}).some((p: any) => (p?.done ?? 0) > 0);
     if (progressed) return;
     try {
       await this.dataSource.query(`UPDATE accounts SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL`, [entity.accountId]);
@@ -218,7 +225,7 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
     current.status = 'failed';
     current.finishedAt = new Date();
     current.error = err?.message?.slice(0, 500) ?? current.error ?? 'unknown';
-    await this.jobRepo.save(current);
+    await this.jobRepo.update({ id: jobId }, { status: 'failed', finishedAt: current.finishedAt, error: current.error });
     await this.cleanupOrphanAccount(current); // F18
   }
 }

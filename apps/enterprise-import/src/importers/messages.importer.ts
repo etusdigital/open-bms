@@ -114,6 +114,13 @@ export class MessagesImporter implements ImporterStep {
         page++;
       }
     }
+
+    // Estado terminal (paridade com BaseImporter): se nenhuma campanha tinha
+    // mensagens (ou não há campanhas), nada foi emitido no loop → marca
+    // skipped:empty pra não ficar eternamente "pendente" na tela.
+    if (totalDone === 0) {
+      await ctx.updateProgress(this.name, { skipped: true, reason: 'empty' });
+    }
   }
 
   // Reverse lookup: new_id (camp.id no OSS) → source_id (Enterprise).

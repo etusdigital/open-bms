@@ -150,6 +150,21 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
       if (resp.results.length < this.batchSize) break;
       page++;
     }
+
+    // Estado terminal pra UI. Entidades vazias na origem (ou cujo endpoint deu
+    // 404 tolerado → resp.results vazio) saem do while no 1º `break` SEM nunca
+    // ter chamado updateProgress → ficariam eternamente "pendente" na tela
+    // mesmo com o job `completed`. Aqui garantimos que todo step que rodou
+    // fecha num estado terminal (100%): `done>0` já foi emitido no loop; se
+    // nada foi importado, marca skipped(empty) — exceto resume onde tudo já
+    // existia (totalKnown>0), aí conta como concluído.
+    if (totalDone === 0) {
+      if (totalKnown && totalKnown > 0) {
+        await ctx.updateProgress(this.name, { total: totalKnown, done: totalKnown, page });
+      } else {
+        await ctx.updateProgress(this.name, { skipped: true, reason: 'empty' });
+      }
+    }
   }
 
   // Copia do source só as propriedades que são colunas da entity; ajusta PK

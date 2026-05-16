@@ -18,18 +18,21 @@ describe('EnterpriseImportProcessor onFailed (F15) + orphan cleanup (F18)', () =
   it('NÃO marca failed enquanto ainda há tentativas (F15 — sem off-by-one)', async () => {
     const { proc, jobRepo } = make({ id: 'j1', status: 'running', scope: 'account', accountId: 5, progress: {} });
     await proc.onFailed(job(2, 5), new Error('5xx transient'));
-    expect(jobRepo.save).not.toHaveBeenCalled();
+    expect(jobRepo.update).not.toHaveBeenCalled();
   });
 
   it('marca failed quando esgota as tentativas', async () => {
     const { proc, jobRepo } = make({ id: 'j1', status: 'running', scope: 'instance', accountId: null, progress: {} });
     await proc.onFailed(job(5, 5), new Error('5xx exhausted'));
-    expect(jobRepo.save).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+    // Update parcial (não save da entity inteira — não clobbera progress/checkpoint).
+    expect(jobRepo.update).toHaveBeenCalledWith({ id: 'j1' }, expect.objectContaining({ status: 'failed' }));
+    expect(jobRepo.save).not.toHaveBeenCalled();
   });
 
   it('NÃO clobbera estado terminal já existente (completed/failed)', async () => {
     const { proc, jobRepo } = make({ id: 'j1', status: 'completed', scope: 'account', accountId: 5, progress: {} });
     await proc.onFailed(job(5, 5), new Error('late failure'));
+    expect(jobRepo.update).not.toHaveBeenCalled();
     expect(jobRepo.save).not.toHaveBeenCalled();
   });
 

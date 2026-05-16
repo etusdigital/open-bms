@@ -13,7 +13,12 @@ export class StatisticsImporter implements ImporterStep {
   readonly name = 'statistics';
 
   async run(ctx: ImportContext): Promise<void> {
-    if (ctx.accountId === null) return;
+    if (ctx.accountId === null) {
+      // Antes era `return` mudo (não emitia nada → ficava "pendente"). Padrão
+      // único: todo step que roda emite ≥1 estado terminal.
+      await ctx.updateProgress(this.name, { skipped: true, reason: 'no_account_id' });
+      return;
+    }
 
     const sourceAccountId = ctx.scope === 'instance' ? ctx.accountId : ctx.enterpriseSourceAccountId;
     if (!sourceAccountId) {
@@ -75,6 +80,12 @@ export class StatisticsImporter implements ImporterStep {
         if (resp.results.length < itemsPerPage) break;
         page++;
       }
+    }
+
+    // Estado terminal (paridade com BaseImporter): chegou aqui sem nenhum
+    // skipped e sem rollups → origem não tinha estatísticas no período.
+    if (totalDone === 0) {
+      await ctx.updateProgress(this.name, { skipped: true, reason: 'empty' });
     }
   }
 
