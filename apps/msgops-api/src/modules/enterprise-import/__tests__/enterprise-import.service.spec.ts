@@ -110,10 +110,7 @@ describe('EnterpriseImportService', () => {
     it('idempotente: conta órfã soft-deletada → restaura e reusa (não recria → sem 23505)', async () => {
       accountsService.findByName.mockResolvedValueOnce({ id: 88, deletedAt: new Date() });
       jobRepo.findOne.mockResolvedValueOnce(null);
-      const result = await service.createAccountImport(
-        { accountData: { name: 'BMS' } as any, enterpriseBaseUrl: 'https://x', enterpriseApiKey: 'aaaaaaaa' },
-        1,
-      );
+      const result = await service.createAccountImport({ accountData: { name: 'BMS' } as any, enterpriseBaseUrl: 'https://x', enterpriseApiKey: 'aaaaaaaa' }, 1);
       expect(accountsService.findByName).toHaveBeenCalledWith('BMS', { withDeleted: true });
       expect(accountsService.restoreAccount).toHaveBeenCalledWith(88);
       expect(accountsService.create).not.toHaveBeenCalled();
