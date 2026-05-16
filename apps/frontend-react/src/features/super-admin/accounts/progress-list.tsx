@@ -1,13 +1,13 @@
 import { Progress } from '@/components/ui/progress';
-import type { ImportProgressEntry } from './import-gateway';
+import type { ImportProgressEntry, ImportStatus } from './import-gateway';
 
+// Mantido em sincronia com o pipeline do worker (apps/enterprise-import
+// pipeline.ts). instance-config, account-settings e users foram removidos do
+// import (config manual / dados account-scoped) — não aparecem mais aqui.
 const ENTITY_LABELS: Record<string, string> = {
-  'instance-config': 'Configs globais (instance)',
-  'account-settings': 'Account settings (providers)',
   tags: 'Tags',
   'custom-fields': 'Custom fields',
   labels: 'Labels',
-  users: 'Users',
   'email-templates': 'Email templates',
   contacts: 'Contacts',
   'custom-events': 'Custom events',

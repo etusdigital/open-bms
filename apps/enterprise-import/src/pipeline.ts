@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ImporterStep } from './importers/importer.interface';
-import { AccountSettingsImporter } from './importers/account-settings.importer';
 import { TagsImporter } from './importers/tags.importer';
 import { CustomFieldsImporter } from './importers/custom-fields.importer';
 import { LabelsImporter } from './importers/labels.importer';
-import { UsersImporter } from './importers/users.importer';
 import { EmailTemplatesImporter } from './importers/email-templates.importer';
 import { ContactsImporter } from './importers/contacts.importer';
 import { CustomEventsImporter } from './importers/custom-events.importer';
@@ -15,16 +13,20 @@ import { StatisticsImporter } from './importers/statistics.importer';
 
 // Ordem importa: dependências de FK precisam vir antes (ex: campaigns antes de
 // messages; custom_events antes de campaigns que os referenciem etc.).
+// FORA DO ESCOPO do import (removidos — são config manual de setup/plataforma):
+//  - config de provider/conta (account-settings)
+//  - config global da instância (instance-config)
+//  - usuários (users): os dados importados são account-scoped e não dependem
+//    de user_id; o admin é criado/vinculado pelo wizard. Migração de users
+//    não é feita por nenhum scope.
 @Injectable()
 export class ImportPipeline {
   readonly steps: ImporterStep[];
 
   constructor(
-    accountSettings: AccountSettingsImporter,
     tags: TagsImporter,
     customFields: CustomFieldsImporter,
     labels: LabelsImporter,
-    users: UsersImporter,
     emailTemplates: EmailTemplatesImporter,
     customEvents: CustomEventsImporter,
     contacts: ContactsImporter,
@@ -33,6 +35,6 @@ export class ImportPipeline {
     messages: MessagesImporter,
     statistics: StatisticsImporter,
   ) {
-    this.steps = [accountSettings, tags, customFields, labels, users, emailTemplates, customEvents, contacts, automations, campaigns, messages, statistics];
+    this.steps = [tags, customFields, labels, emailTemplates, customEvents, contacts, automations, campaigns, messages, statistics];
   }
 }

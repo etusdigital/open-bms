@@ -62,8 +62,10 @@ describe('EnterpriseClient retry/backoff semantics', () => {
     expect(sleepSpy).not.toHaveBeenCalled();
   });
 
-  it('404 tolerado → null; 404 não-tolerado → EnterpriseApi404Error', async () => {
-    expect(await session(transport([{ status: 404 }])).getAccountSettings(1, 'ses')).toBeNull();
+  it('404 tolerado → vazio; 404 não-tolerado → EnterpriseApi404Error', async () => {
+    // listEmailTemplates usa paged(..., tolerate404=true): 404 vira página vazia
+    // (algumas versões do Enterprise não expõem /emails-templates).
+    expect(await session(transport([{ status: 404 }])).listEmailTemplates({ page: 1 })).toEqual({ results: [], page: 1, totalItems: 0, itemsPerPage: 0 });
     await expect(session(transport([{ status: 404 }])).exportStatistics({ accountId: 1, from: 'a', to: 'b', page: 1, itemsPerPage: 1 })).rejects.toBeInstanceOf(
       EnterpriseApi404Error,
     );

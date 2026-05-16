@@ -10,7 +10,7 @@ describe('EnterpriseImportProcessor onFailed (F15) + orphan cleanup (F18)', () =
       query: jest.fn(async () => {}),
     };
     const dataSource: any = { query: jest.fn(async () => {}) };
-    const proc = new EnterpriseImportProcessor(jobRepo, dataSource, {} as any, {} as any, {} as any, {} as any, {} as any);
+    const proc = new EnterpriseImportProcessor(jobRepo, dataSource, {} as any, {} as any, {} as any, {} as any);
     return { proc, jobRepo, dataSource };
   }
   const job = (attemptsMade: number, attempts = 5) => ({ id: 'b1', data: { jobId: 'j1' }, attemptsMade, opts: { attempts } }) as any;

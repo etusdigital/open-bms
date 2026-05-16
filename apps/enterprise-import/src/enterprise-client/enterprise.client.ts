@@ -52,14 +52,6 @@ export class EnterpriseSession {
   ) {}
 
   // ---- Account-scope endpoints ----
-  getAccountSettings(accountId: number, provider: string): Promise<Record<string, any> | null> {
-    return this.requestWithRetry({
-      method: 'GET',
-      url: `/accounts/${accountId}/settings/${provider}`,
-      tolerate404: true,
-    });
-  }
-
   listTags(params: PageParams): Promise<PagedResponse<any>> {
     return this.paged('/tags', params);
   }
@@ -125,10 +117,6 @@ export class EnterpriseSession {
   // ---- Instance-scope endpoints ----
   listAllAccounts(params: PageParams): Promise<PagedResponse<any>> {
     return this.paged('/accounts/all', params);
-  }
-
-  getInstanceConfig(): Promise<Record<string, any>> {
-    return this.requestWithRetry({ method: 'GET', url: '/admin/system-config' });
   }
 
   // -------------------------------------------------------------------------

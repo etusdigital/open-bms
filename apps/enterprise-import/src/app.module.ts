@@ -7,12 +7,9 @@ import { EnterpriseClient } from './enterprise-client/enterprise.client';
 import { IdMapperService } from './id-mapper.service';
 import { SequenceAdvancerService } from './sequence-advancer.service';
 import { EnterpriseImportProcessor } from './enterprise-import.processor';
-import { InstanceConfigImporter } from './instance-config.importer';
-import { AccountSettingsImporter } from './importers/account-settings.importer';
 import { TagsImporter } from './importers/tags.importer';
 import { CustomFieldsImporter } from './importers/custom-fields.importer';
 import { LabelsImporter } from './importers/labels.importer';
-import { UsersImporter } from './importers/users.importer';
 import { EmailTemplatesImporter } from './importers/email-templates.importer';
 import { ContactsImporter } from './importers/contacts.importer';
 import { CustomEventsImporter } from './importers/custom-events.importer';
@@ -98,12 +95,9 @@ const ENTITIES = [
     IdMapperService,
     SequenceAdvancerService,
     EnterpriseImportProcessor,
-    InstanceConfigImporter,
-    AccountSettingsImporter,
     TagsImporter,
     CustomFieldsImporter,
     LabelsImporter,
-    UsersImporter,
     EmailTemplatesImporter,
     ContactsImporter,
     CustomEventsImporter,
