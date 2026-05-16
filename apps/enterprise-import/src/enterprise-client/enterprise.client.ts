@@ -72,10 +72,13 @@ export class EnterpriseSession {
     return this.paged('/users', params);
   }
 
-  // Algumas versões do Enterprise não expõem `/emails-templates` (404).
-  // Toleramos: retorna página vazia → importer pula sem falhar o job.
+  // Path correto é `/email-template` (singular) — confirmado contra o
+  // Enterprise real (200 c/ dado). O antigo `/emails-templates` dava 404 e o
+  // tolerate404 engolia em silêncio → nenhum template importado (mesma classe
+  // do bug `/users`). `tolerate404` mantido como defensivo: versões que de
+  // fato não exponham o endpoint pulam o step sem falhar o job.
   listEmailTemplates(params: PageParams): Promise<PagedResponse<any>> {
-    return this.paged('/emails-templates', params, true);
+    return this.paged('/email-template', params, true);
   }
 
   listContacts(params: PageParams): Promise<PagedResponse<any>> {

@@ -64,10 +64,16 @@ describe('EnterpriseClient retry/backoff semantics', () => {
 
   it('404 tolerado → vazio; 404 não-tolerado → EnterpriseApi404Error', async () => {
     // listEmailTemplates usa paged(..., tolerate404=true): 404 vira página vazia
-    // (algumas versões do Enterprise não expõem /emails-templates).
+    // (versões que não expõem o endpoint pulam o step sem falhar o job).
     expect(await session(transport([{ status: 404 }])).listEmailTemplates({ page: 1 })).toEqual({ results: [], page: 1, totalItems: 0, itemsPerPage: 0 });
     // listContacts usa paged(...) sem tolerate404: 404 não-tolerado propaga.
     await expect(session(transport([{ status: 404 }])).listContacts({ page: 1 })).rejects.toBeInstanceOf(EnterpriseApi404Error);
+  });
+
+  it('listEmailTemplates bate em /email-template (não /emails-templates — trava o bug de path)', async () => {
+    const fn = transport([{ status: 200, data: [] }]);
+    await session(fn).listEmailTemplates({ page: 1 });
+    expect(fn).toHaveBeenCalledWith(expect.objectContaining({ url: '/email-template' }));
   });
 
   it('5xx faz 5 retries e esgota → EnterpriseApi5xxError (6 chamadas)', async () => {
