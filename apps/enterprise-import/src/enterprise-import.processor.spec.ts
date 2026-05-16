@@ -42,6 +42,38 @@ describe('EnterpriseImportProcessor onFailed (F15) + orphan cleanup (F18)', () =
     expect(dataSource.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE accounts SET deleted_at'), [77]);
   });
 
+  describe('resolveEnterpriseSourceAccountId (auto-resolve via API key, sem importar users/accounts)', () => {
+    const session = (over: any = {}) => ({
+      listContacts: jest.fn(async () => ({ results: [], page: 1 })),
+      listUsers: jest.fn(async () => ({ results: [], page: 1 })),
+      ...over,
+    });
+
+    it('lê account_id (snake) do 1º contato', async () => {
+      const { proc } = make({ id: 'j1' });
+      const s = session({ listContacts: jest.fn(async () => ({ results: [{ id: 9, account_id: 144, email: 'a@b.c' }], page: 1 })) });
+      const id = await (proc as any).resolveEnterpriseSourceAccountId(s);
+      expect(id).toBe(144);
+      expect(s.listUsers).not.toHaveBeenCalled();
+    });
+
+    it('fallback p/ /users quando /contacts vazio', async () => {
+      const { proc } = make({ id: 'j1' });
+      const s = session({ listUsers: jest.fn(async () => ({ results: [{ id: 1, accountId: 77 }], page: 1 })) });
+      expect(await (proc as any).resolveEnterpriseSourceAccountId(s)).toBe(77);
+    });
+
+    it('null quando nada resolve (→ statistics pula com motivo claro)', async () => {
+      const { proc } = make({ id: 'j1' });
+      const s = session({
+        listContacts: jest.fn(async () => {
+          throw new Error('boom');
+        }),
+      });
+      expect(await (proc as any).resolveEnterpriseSourceAccountId(s)).toBeNull();
+    });
+  });
+
   it('F18: NÃO apaga a conta se já houve progresso (import parcial)', async () => {
     const { proc, dataSource } = make({
       id: 'j1',
