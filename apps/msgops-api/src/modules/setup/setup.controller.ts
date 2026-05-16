@@ -76,4 +76,13 @@ export class SetupController {
   importEnterprise(@Body() dto: ImportEnterpriseSetupDto, @IpAddress() ip?: string) {
     return this.setupService.importEnterprise(dto, ip);
   }
+
+  // Chamado quando o usuário (re)abre o Step 2: para a fila e apaga a pegada
+  // do import pra sempre começar do 0. PublicRoute (wizard roda antes do
+  // login); gate manual no service rejeita se o setup já foi concluído.
+  @Post('import-enterprise/reset')
+  @PublicRoute()
+  resetImportEnterprise() {
+    return this.setupService.resetEnterpriseImport();
+  }
 }

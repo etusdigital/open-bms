@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import axios from 'axios';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,26 @@ export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  // Sempre começar do 0: ao (re)abrir o step, para a fila e apaga a pegada do
+  // import anterior ANTES de liberar o form (senão um novo import seria
+  // criado e logo apagado). Idempotente; falha é não-fatal.
+  const [resetting, setResetting] = useState(true);
+  const didReset = useRef(false);
+
+  useEffect(() => {
+    if (didReset.current) return; // guarda contra double-mount (StrictMode)
+    didReset.current = true;
+    (async () => {
+      try {
+        await setupGateway.resetEnterpriseImport();
+      } catch {
+        // não-fatal: feature off (404) / setup concluído / erro — o submit
+        // reaplica os mesmos gates no backend.
+      } finally {
+        setResetting(false);
+      }
+    })();
+  }, []);
 
   async function handleSkip() {
     setSubmitting(true);
@@ -61,6 +81,14 @@ export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (resetting) {
+    return (
+      <div className="space-y-4">
+        <p className="text-muted-foreground text-sm">Preparando o ambiente de import (sempre começa do zero)…</p>
+      </div>
+    );
   }
 
   if (jobId) {

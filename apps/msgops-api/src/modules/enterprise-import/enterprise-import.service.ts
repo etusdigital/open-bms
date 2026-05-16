@@ -113,6 +113,50 @@ export class EnterpriseImportService {
     return { accountId: account.id, jobId: saved.id };
   }
 
+  // Reset "começar do zero" do import account-scope, chamado quando o usuário
+  // (re)abre o Step 2 do wizard. Ordem importa: PRIMEIRO esvazia a fila BullMQ
+  // (para/remove jobs waiting/active/delayed) pra o worker não continuar
+  // escrevendo numa conta que vamos apagar; SÓ DEPOIS deleta os dados.
+  // Escopo estrito: só a pegada do próprio import (jobs scope=account +
+  // id-mappings via cascade + as contas que o import criou + seus filhos via
+  // cascade). NÃO toca em outras contas/users/config. `extraAccountIds` cobre
+  // o accountId do enterprise_import_done caso o job já não exista.
+  async resetForSetup(extraAccountIds: number[] = []): Promise<{ accountsDeleted: number; jobsDeleted: number }> {
+    // 1) Para/remove TUDO da fila dedicada (force: remove até jobs active).
+    try {
+      await this.queue.obliterate({ force: true });
+    } catch (e: any) {
+      this.logger.warn(`[enterprise-import] queue obliterate falhou (seguindo p/ limpeza de dados): ${e?.message ?? e}`);
+    }
+
+    // 2) Apaga os dados em transação.
+    return this.jobRepo.manager.transaction(async (em) => {
+      const jobRows: Array<{ account_id: number | null }> = await em.query(
+        `SELECT DISTINCT account_id FROM enterprise_import_jobs WHERE scope = 'account' AND account_id IS NOT NULL`,
+      );
+      const ids = Array.from(new Set([...jobRows.map((r) => Number(r.account_id)), ...extraAccountIds].filter((n) => Number.isInteger(n) && n > 0)));
+
+      let accountsDeleted = 0;
+      if (ids.length > 0) {
+        // labels e automations_targets têm FK p/ accounts SEM onDelete (NO
+        // ACTION) → precisam ser apagados ANTES da conta; o resto é CASCADE.
+        await em.query(`DELETE FROM automations_targets WHERE account_id = ANY($1)`, [ids]);
+        await em.query(`DELETE FROM labels WHERE account_id = ANY($1)`, [ids]);
+        // RETURNING: em.query no driver pg devolve as rows, não [rows,count].
+        const del: unknown[] = await em.query(`DELETE FROM accounts WHERE id = ANY($1) RETURNING id`, [ids]);
+        accountsDeleted = Array.isArray(del) ? del.length : 0;
+      }
+
+      // Jobs scope=account não têm FK p/ accounts (account_id é int puro), então
+      // apaga aqui; isso cascateia enterprise_id_mappings (job_id FK CASCADE).
+      const delJobs: unknown[] = await em.query(`DELETE FROM enterprise_import_jobs WHERE scope = 'account' RETURNING id`);
+      const jobsDeleted = Array.isArray(delJobs) ? delJobs.length : 0;
+
+      this.logger.warn(`[enterprise-import] reset-for-setup: contas=${ids.join(',') || '∅'} accountsDeleted=${accountsDeleted} jobsDeleted=${jobsDeleted}`);
+      return { accountsDeleted, jobsDeleted };
+    });
+  }
+
   async createInstanceImport(enterpriseBaseUrl: string, enterpriseApiKey: string, userId: number | null): Promise<{ jobId: string }> {
     // scope=instance: 1 ativo por vez (não há account_id pra constraint partial).
     const existing = await this.jobRepo.findOne({

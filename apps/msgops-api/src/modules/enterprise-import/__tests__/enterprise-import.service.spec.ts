@@ -11,9 +11,10 @@ import { _resetEncryptionKeyCache } from '../../../utils/api-key-encryption.util
 
 describe('EnterpriseImportService', () => {
   let service: EnterpriseImportService;
-  let jobRepo: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; update: jest.Mock };
-  let queue: { add: jest.Mock };
-  let accountsService: { create: jest.Mock; findByName: jest.Mock; createAccountConfig: jest.Mock; createManagedApiKey: jest.Mock };
+  let jobRepo: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; update: jest.Mock; manager: { transaction: jest.Mock } };
+  let queue: { add: jest.Mock; obliterate: jest.Mock };
+  let accountsService: { create: jest.Mock; findByName: jest.Mock; restoreAccount: jest.Mock; createAccountConfig: jest.Mock; createManagedApiKey: jest.Mock };
+  let em: { query: jest.Mock };
 
   beforeAll(() => {
     process.env.ENTERPRISE_IMPORT_ENCRYPTION_KEY = randomBytes(32).toString('base64');
@@ -21,16 +22,25 @@ describe('EnterpriseImportService', () => {
   });
 
   beforeEach(async () => {
+    em = {
+      query: jest.fn(async (sql: string) => {
+        if (/^SELECT DISTINCT account_id/.test(sql)) return [{ account_id: 88 }];
+        if (/RETURNING id/.test(sql)) return [{ id: 1 }];
+        return [];
+      }),
+    };
     jobRepo = {
       findOne: jest.fn(),
       create: jest.fn((payload) => ({ ...payload, id: 'job-uuid' })),
       save: jest.fn(async (j) => ({ ...j, id: j.id ?? 'job-uuid' })),
       update: jest.fn(),
+      manager: { transaction: jest.fn(async (cb: any) => cb(em)) },
     };
-    queue = { add: jest.fn().mockResolvedValue(undefined) };
+    queue = { add: jest.fn().mockResolvedValue(undefined), obliterate: jest.fn().mockResolvedValue(undefined) };
     accountsService = {
       create: jest.fn().mockResolvedValue({ account: { id: 99 } }),
       findByName: jest.fn().mockResolvedValue(null),
+      restoreAccount: jest.fn().mockResolvedValue(undefined),
       createAccountConfig: jest.fn().mockResolvedValue(undefined),
       createManagedApiKey: jest.fn().mockResolvedValue(undefined),
     };
@@ -95,6 +105,55 @@ describe('EnterpriseImportService', () => {
       expect(accountsService.createManagedApiKey).not.toHaveBeenCalled();
       expect(result.accountId).toBe(77);
       expect(queue.add).toHaveBeenCalled();
+    });
+
+    it('idempotente: conta órfã soft-deletada → restaura e reusa (não recria → sem 23505)', async () => {
+      accountsService.findByName.mockResolvedValueOnce({ id: 88, deletedAt: new Date() });
+      jobRepo.findOne.mockResolvedValueOnce(null);
+      const result = await service.createAccountImport(
+        { accountData: { name: 'BMS' } as any, enterpriseBaseUrl: 'https://x', enterpriseApiKey: 'aaaaaaaa' },
+        1,
+      );
+      expect(accountsService.findByName).toHaveBeenCalledWith('BMS', { withDeleted: true });
+      expect(accountsService.restoreAccount).toHaveBeenCalledWith(88);
+      expect(accountsService.create).not.toHaveBeenCalled();
+      expect(result.accountId).toBe(88);
+      expect(queue.add).toHaveBeenCalled();
+    });
+  });
+
+  describe('resetForSetup', () => {
+    it('obliterate na fila ANTES de apagar, deleta filhos não-cascade + conta + jobs', async () => {
+      const res = await service.resetForSetup();
+
+      expect(queue.obliterate).toHaveBeenCalledWith({ force: true });
+      const sqls = em.query.mock.calls.map((c) => String(c[0]));
+      // ordem: collect ids → automations_targets → labels → accounts → jobs
+      expect(sqls[0]).toMatch(/SELECT DISTINCT account_id/);
+      expect(sqls.some((s) => /DELETE FROM automations_targets/.test(s))).toBe(true);
+      expect(sqls.some((s) => /DELETE FROM labels/.test(s))).toBe(true);
+      expect(sqls.some((s) => /DELETE FROM accounts WHERE id = ANY/.test(s))).toBe(true);
+      expect(sqls.some((s) => /DELETE FROM enterprise_import_jobs WHERE scope = 'account'/.test(s))).toBe(true);
+      expect(res).toEqual({ accountsDeleted: 1, jobsDeleted: 1 });
+    });
+
+    it('inclui extraAccountIds (accountId do enterprise_import_done) mesmo sem job', async () => {
+      em.query.mockImplementation(async (sql: string) => {
+        if (/^SELECT DISTINCT account_id/.test(sql)) return []; // nenhum job
+        if (/RETURNING id/.test(sql)) return [{ id: 7 }];
+        return [];
+      });
+      const res = await service.resetForSetup([7]);
+      const accountsDel = em.query.mock.calls.find((c) => /DELETE FROM accounts WHERE id = ANY/.test(String(c[0])));
+      expect(accountsDel?.[1]).toEqual([[7]]);
+      expect(res.accountsDeleted).toBe(1);
+    });
+
+    it('queue obliterate falhar não aborta a limpeza de dados', async () => {
+      queue.obliterate.mockRejectedValueOnce(new Error('redis down'));
+      const res = await service.resetForSetup();
+      expect(em.query).toHaveBeenCalled();
+      expect(res.jobsDeleted).toBe(1);
     });
   });
 

@@ -437,6 +437,32 @@ export class SetupService implements OnModuleInit {
     return { jobId };
   }
 
+  // Chamado quando o usuário (re)abre o Step 2 do wizard: zera o ambiente de
+  // import pra sempre começar do 0 — para/remove a fila BullMQ e apaga a
+  // pegada do import (jobs + contas criadas + filhos). Gates iguais ao
+  // importEnterprise: 404 se feature off; ForbiddenException via
+  // ensureNotConfigured se o setup já foi concluído (aí é tenant vivo, não
+  // pode apagar). Idempotente: reabrir sem nada pra apagar é no-op.
+  async resetEnterpriseImport(): Promise<{ ok: true; accountsDeleted: number; jobsDeleted: number }> {
+    if (process.env.ENTERPRISE_IMPORT_ENABLED !== 'true') {
+      throw new NotFoundException();
+    }
+    await this.ensureNotConfigured();
+
+    // Inclui o accountId persistido em enterprise_import_done (defesa: o job
+    // pode já ter sumido mas a conta ficou).
+    const doneCfg = await this.systemConfigRepo.findOne({ where: { key: 'enterprise_import_done' } });
+    const extraId = Number((doneCfg?.value as any)?.accountId);
+    const extraAccountIds = Number.isInteger(extraId) && extraId > 0 ? [extraId] : [];
+
+    const result = await this.enterpriseImport.resetForSetup(extraAccountIds);
+
+    // Limpa a flag pra o status refletir "import não feito" (step volta ao 0).
+    if (doneCfg) await this.systemConfigRepo.delete({ key: 'enterprise_import_done' });
+
+    return { ok: true, ...result };
+  }
+
   async getGeoIpSettings(): Promise<GeoIpSettingsDto | null> {
     const cfg = await this.systemConfigRepo.findOne({ where: { key: GEOIP_KEY } });
     if (!cfg) return null;

@@ -58,6 +58,12 @@ export const setupGateway = {
     const res = await http.post<{ jobId?: string }>('/setup/import-enterprise', payload);
     return res.data;
   },
+
+  // Zera o ambiente de import (para a fila + apaga jobs/contas do import).
+  // Chamado ao (re)abrir o Step 2 pra sempre começar do 0. Idempotente.
+  async resetEnterpriseImport(): Promise<void> {
+    await http.post('/setup/import-enterprise/reset', {});
+  },
 };
 
 // Exported for tests that want to assert the underlying instance's config.
