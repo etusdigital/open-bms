@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inj
 import { existsSync } from 'fs';
 import { geoIpEnvFilePath, writeGeoIpEnvFile } from '../../lib/geoip-config-file';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import * as nodemailer from 'nodemailer';
 import * as amqplib from 'amqplib';
 import { S3Client, HeadBucketCommand } from '@aws-sdk/client-s3';
@@ -94,6 +94,7 @@ export class SetupService implements OnModuleInit {
     baseUrl?: string;
     enterpriseImportEnabled: boolean;
     enterpriseImportDone: boolean;
+    step1Account?: { id: number; name: string };
   }> {
     // F10: frontend usa isso pra esconder o Step2 (Enterprise import) quando a
     // feature está desligada — o gate de backend já existe, este é cosmético.
@@ -118,7 +119,18 @@ export class SetupService implements OnModuleInit {
     const domainCfg = await this.systemConfigRepo.findOne({ where: { key: DOMAIN_KEY } });
     const baseUrl: string | undefined = (domainCfg?.value as any)?.baseUrl;
 
-    return { configured: false, currentStep: state.currentStep || 1, enterpriseImportEnabled, enterpriseImportDone, ...(baseUrl && { baseUrl }) };
+    // Conta do passo 1 — o Step 2 do front oferece importar nela (checkbox)
+    // em vez de criar uma conta nova/descartável.
+    const step1Account = await this.resolveStep1Account(state.adminUserId);
+
+    return {
+      configured: false,
+      currentStep: state.currentStep || 1,
+      enterpriseImportEnabled,
+      enterpriseImportDone,
+      ...(baseUrl && { baseUrl }),
+      ...(step1Account && { step1Account }),
+    };
   }
 
   async advanceStep(dto: AdvanceStepDto, requesterIp?: string): Promise<void> {
@@ -228,8 +240,6 @@ export class SetupService implements OnModuleInit {
 
       const userRepo = em.getRepository(UserEntity);
       const roleRepo = em.getRepository(RoleEntity);
-      const accountRepo = em.getRepository(AccountEntity);
-      const userAccountRepo = em.getRepository(UserAccountEntity);
       const systemConfigRepo = em.getRepository(SystemConfigEntity);
 
       const existing = await userRepo.findOne({ where: { email } });
@@ -268,59 +278,77 @@ export class SetupService implements OnModuleInit {
         }
       }
 
-      // Ensure the admin has at least one Account linked as master_user. Without this, the
-      // app falls into the "Nenhuma conta atribuída" broken state. Idempotent: if a
-      // users_accounts row already exists for this admin, skip both account and link.
-      const existingLink = await userAccountRepo.findOne({ where: { userId: adminUserId } });
-      if (!existingLink) {
-        // Idempotência: `accounts.name` tem UNIQUE column-level no DB (não
-        // parcial em deleted_at). Se uma tentativa anterior já criou a conta
-        // (ou o worker de import a soft-deletou como órfã), reusar a linha em
-        // vez de bater em 23505 "already exists". `withDeleted: true` +
-        // restore cobrem o caso soft-deleted (o nome continua ocupado mesmo
-        // após soft-delete).
-        const existingAccount = await accountRepo.findOne({ where: { name: accountName }, withDeleted: true });
-        if (existingAccount?.deletedAt) {
-          await accountRepo.restore(existingAccount.id);
-          await accountRepo.update(existingAccount.id, { isActive: true });
-        }
-        const savedAccount =
-          existingAccount ??
-          (await accountRepo.save(
-            accountRepo.create({
-              name: accountName,
-              groupId: 1,
-              isActive: true,
-              isInternal: false,
-            }),
-          ));
-        await userAccountRepo.save(
-          userAccountRepo.create({
-            userId: adminUserId,
-            accountId: savedAccount.id,
-            isMasterUser: true,
-          }),
-        );
-
-        // Insert idempotente: accounts_configs tem UNIQUE (account_id, name),
-        // então só cria o api_key_tracker se ainda não existir (conta reusada
-        // pode já ter o config de uma tentativa anterior).
-        const accountConfigRepo = em.getRepository(AccountConfigEntity);
-        const existingTracker = await accountConfigRepo.findOne({ where: { accountId: savedAccount.id, name: 'api_key_tracker' } });
-        if (!existingTracker) {
-          await accountConfigRepo.save([
-            accountConfigRepo.create({
-              accountId: savedAccount.id,
-              name: 'api_key_tracker',
-              value: createHash('md5').update(`bms-${savedAccount.id}-api_key_tracker`).digest('hex'),
-              isLoadConfig: true,
-            }),
-          ]);
-        }
-      }
+      await this.ensureAdminAccount(em, adminUserId, accountName);
 
       await this.upsertWizardTx(systemConfigRepo, { currentStep: 2, adminUserId });
     });
+  }
+
+  // Garante que o admin do wizard tem uma Account vinculada como master_user
+  // (sem isso o app cai no estado quebrado "Nenhuma conta atribuída").
+  // Idempotente: se já existe users_accounts pro admin, no-op. Usado pelo
+  // passo 1 E pela recriação pós-reset do Enterprise import (o reset apaga a
+  // conta-alvo, que pode ser justamente a do passo 1 quando reusada — aqui ela
+  // volta com o mesmo nome). `accounts.name` tem UNIQUE column-level no DB
+  // (não parcial em deleted_at); `withDeleted:true` + restore cobrem o caso de
+  // o worker ter soft-deletado a conta órfã (o nome continua ocupado).
+  private async ensureAdminAccount(em: EntityManager, adminUserId: number, accountName: string): Promise<void> {
+    const accountRepo = em.getRepository(AccountEntity);
+    const userAccountRepo = em.getRepository(UserAccountEntity);
+    const accountConfigRepo = em.getRepository(AccountConfigEntity);
+
+    const existingLink = await userAccountRepo.findOne({ where: { userId: adminUserId } });
+    if (existingLink) return;
+
+    const existingAccount = await accountRepo.findOne({ where: { name: accountName }, withDeleted: true });
+    if (existingAccount?.deletedAt) {
+      await accountRepo.restore(existingAccount.id);
+      await accountRepo.update(existingAccount.id, { isActive: true });
+    }
+    const savedAccount =
+      existingAccount ??
+      (await accountRepo.save(
+        accountRepo.create({
+          name: accountName,
+          groupId: 1,
+          isActive: true,
+          isInternal: false,
+        }),
+      ));
+    await userAccountRepo.save(
+      userAccountRepo.create({
+        userId: adminUserId,
+        accountId: savedAccount.id,
+        isMasterUser: true,
+      }),
+    );
+
+    // Insert idempotente: accounts_configs tem UNIQUE (account_id, name),
+    // então só cria o api_key_tracker se ainda não existir (conta reusada
+    // pode já ter o config de uma tentativa anterior).
+    const existingTracker = await accountConfigRepo.findOne({ where: { accountId: savedAccount.id, name: 'api_key_tracker' } });
+    if (!existingTracker) {
+      await accountConfigRepo.save([
+        accountConfigRepo.create({
+          accountId: savedAccount.id,
+          name: 'api_key_tracker',
+          value: createHash('md5').update(`bms-${savedAccount.id}-api_key_tracker`).digest('hex'),
+          isLoadConfig: true,
+        }),
+      ]);
+    }
+  }
+
+  // Resolve a conta criada no passo 1 (master_user link do admin do wizard).
+  // Usado pelo checkbox "usar conta do passo 1" e pelo getStatus. Retorna null
+  // se o passo 1 ainda não rodou ou o admin não tem conta vinculada.
+  private async resolveStep1Account(adminUserId?: number): Promise<{ id: number; name: string } | null> {
+    if (!adminUserId) return null;
+    const link = await this.userAccountRepo.findOne({ where: { userId: adminUserId }, order: { isMasterUser: 'DESC' } });
+    if (!link) return null;
+    const account = await this.accountRepo.findOne({ where: { id: link.accountId }, withDeleted: true });
+    if (!account) return null;
+    return { id: account.id, name: account.name };
   }
 
   private async step2(data: Step2Data): Promise<void> {
@@ -422,17 +450,36 @@ export class SetupService implements OnModuleInit {
     if (!adminUserId) {
       throw new BadRequestException('Crie o administrador (passo anterior) antes de importar do Enterprise.');
     }
-    const accountName = dto.accountName?.trim() || 'Importado do Enterprise';
-    const { accountId, jobId } = await this.enterpriseImport.createAccountImport(
-      {
-        accountData: { name: accountName } as any,
-        enterpriseBaseUrl: safeBaseUrl,
-        enterpriseApiKey: dto.apiKey,
-        enterpriseSourceAccountId: dto.enterpriseSourceAccountId,
-      } as any,
-      adminUserId,
-    );
-    const value = { imported: true, scope: 'account', importedAt: new Date().toISOString(), sourceUrl: safeBaseUrl, accountId, jobId };
+    // useStep1Account: importa NA conta criada no passo 1 (resolvida pelo
+    // admin do wizard) em vez de criar uma conta nova/descartável. O cliente
+    // nunca informa accountId — é sempre resolvido server-side.
+    let accountId: number;
+    let jobId: string;
+    let reusedStep1Account = false;
+    if (dto.useStep1Account) {
+      const step1 = await this.resolveStep1Account(adminUserId);
+      if (!step1) {
+        throw new BadRequestException('Conta do passo 1 não encontrada. Conclua o passo 1 (criar admin) antes de reusar a conta.');
+      }
+      reusedStep1Account = true;
+      ({ accountId, jobId } = await this.enterpriseImport.createAccountImportForExistingAccount(
+        step1.id,
+        { enterpriseBaseUrl: safeBaseUrl, enterpriseApiKey: dto.apiKey, enterpriseSourceAccountId: dto.enterpriseSourceAccountId },
+        adminUserId,
+      ));
+    } else {
+      const accountName = dto.accountName?.trim() || 'Importado do Enterprise';
+      ({ accountId, jobId } = await this.enterpriseImport.createAccountImport(
+        {
+          accountData: { name: accountName } as any,
+          enterpriseBaseUrl: safeBaseUrl,
+          enterpriseApiKey: dto.apiKey,
+          enterpriseSourceAccountId: dto.enterpriseSourceAccountId,
+        } as any,
+        adminUserId,
+      ));
+    }
+    const value = { imported: true, scope: 'account', importedAt: new Date().toISOString(), sourceUrl: safeBaseUrl, accountId, jobId, reusedStep1Account };
     await this.systemConfigRepo.save(this.systemConfigRepo.create({ key: 'enterprise_import_done', value }));
     return { jobId };
   }
@@ -455,10 +502,24 @@ export class SetupService implements OnModuleInit {
     const extraId = Number((doneCfg?.value as any)?.accountId);
     const extraAccountIds = Number.isInteger(extraId) && extraId > 0 ? [extraId] : [];
 
+    // Captura o admin + nome da conta do passo 1 ANTES do reset: se o import
+    // reusou a conta do passo 1, o resetForSetup vai apagá-la (ela é referida
+    // pelos enterprise_import_jobs / extraAccountIds) e o nome se perde depois.
+    const state = await this.readWizard();
+    const step1Before = await this.resolveStep1Account(state?.adminUserId);
+
     const result = await this.enterpriseImport.resetForSetup(extraAccountIds);
 
     // Limpa a flag pra o status refletir "import não feito" (step volta ao 0).
     if (doneCfg) await this.systemConfigRepo.delete({ key: 'enterprise_import_done' });
+
+    // Recria a conta do passo 1 se o reset a apagou (caso "usar conta do passo
+    // 1"). Idempotente: se uma conta descartável foi usada, a do passo 1
+    // continua viva e o vínculo do admin ainda existe → ensureAdminAccount é
+    // no-op. Sem isso o admin ficaria sem conta ("Nenhuma conta atribuída").
+    if (state?.adminUserId && step1Before) {
+      await this.dataSource.transaction((em) => this.ensureAdminAccount(em, state.adminUserId as number, step1Before.name));
+    }
 
     return { ok: true, ...result };
   }

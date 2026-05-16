@@ -53,7 +53,9 @@ export const setupGateway = {
   // {baseUrl, apiKey, accountName?}. Cria conta nova e importa nela; devolve
   // {jobId} pra UI monitorar progresso.
   async importEnterprise(
-    payload: { skip: true } | { baseUrl: string; apiKey: string; accountName?: string; enterpriseSourceAccountId?: number },
+    payload:
+      | { skip: true }
+      | { baseUrl: string; apiKey: string; accountName?: string; useStep1Account?: boolean; enterpriseSourceAccountId?: number },
   ): Promise<{ jobId?: string }> {
     const res = await http.post<{ jobId?: string }>('/setup/import-enterprise', payload);
     return res.data;

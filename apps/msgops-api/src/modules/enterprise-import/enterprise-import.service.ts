@@ -63,54 +63,90 @@ export class EnterpriseImportService {
       this.logger.log(`[enterprise-import] reusing existing account=${account.id} name="${accountName}" (retry-safe)`);
     }
 
-    // Idempotência do job. Pega o último job dessa conta:
-    //  - pending/running  → import já em andamento; devolve o mesmo jobId (sem
-    //    erro, sem duplicar) — frontend só precisa pollar o status.
-    //  - paused/failed    → "resume": reaproveita a MESMA linha, atualiza
-    //    credenciais/baseUrl, zera erro e re-enfileira.
-    //  - completed/nenhum → cria um job novo.
+    return this.resolveJobAndEnqueue(
+      account.id,
+      safeBaseUrl,
+      { enterpriseApiKey: dto.enterpriseApiKey, enterpriseSourceAccountId: dto.enterpriseSourceAccountId },
+      userId,
+      reusedAccount,
+    );
+  }
+
+  // Importa para uma conta que JÁ existe (passo 1 do wizard reusado). NÃO
+  // cria/procura conta por nome e NÃO provisiona tracker/api-key (o passo 1 já
+  // criou esses). O accountId é resolvido server-side a partir do admin do
+  // wizard — o cliente nunca informa id. Mesma idempotência de job das outras
+  // rotas (pending/running → mesmo job; paused/failed → resume; senão novo).
+  async createAccountImportForExistingAccount(
+    accountId: number,
+    params: { enterpriseBaseUrl: string; enterpriseApiKey: string; enterpriseSourceAccountId?: number | null },
+    userId: number,
+  ): Promise<{ accountId: number; jobId: string }> {
+    const safeBaseUrl = assertSafeEnterpriseBaseUrl(params.enterpriseBaseUrl); // F9 anti-SSRF
+    // Defesa: valida que a conta existe (lança 404 se não). O id vem do
+    // SetupService já resolvido pelo admin do wizard, mas não confiamos cego.
+    await this.accountsService.findOne(accountId);
+    this.logger.log(`[enterprise-import] importing into existing account=${accountId} (step1 account reuse)`);
+    return this.resolveJobAndEnqueue(accountId, safeBaseUrl, params, userId, true);
+  }
+
+  // Resolve/enfileira o job para uma conta-alvo já decidida (criada, reusada
+  // por nome, ou a conta do passo 1). Idempotência do job — pega o último job
+  // dessa conta:
+  //  - pending/running  → import já em andamento; devolve o mesmo jobId (sem
+  //    erro, sem duplicar) — frontend só precisa pollar o status.
+  //  - paused/failed    → "resume": reaproveita a MESMA linha, atualiza
+  //    credenciais/baseUrl, zera erro e re-enfileira.
+  //  - completed/nenhum → cria um job novo.
+  private async resolveJobAndEnqueue(
+    accountId: number,
+    safeBaseUrl: string,
+    params: { enterpriseApiKey: string; enterpriseSourceAccountId?: number | null },
+    userId: number,
+    reusedAccount: boolean,
+  ): Promise<{ accountId: number; jobId: string }> {
     const lastJob = await this.jobRepo.findOne({
-      where: { accountId: account.id },
+      where: { accountId },
       order: { createdAt: 'DESC' },
     });
 
     if (lastJob && (lastJob.status === 'pending' || lastJob.status === 'running')) {
-      this.logger.log(`[enterprise-import] import já ativo jobId=${lastJob.id} accountId=${account.id} status=${lastJob.status} — idempotente`);
-      return { accountId: account.id, jobId: lastJob.id };
+      this.logger.log(`[enterprise-import] import já ativo jobId=${lastJob.id} accountId=${accountId} status=${lastJob.status} — idempotente`);
+      return { accountId, jobId: lastJob.id };
     }
 
     if (lastJob && (lastJob.status === 'paused' || lastJob.status === 'failed')) {
-      lastJob.enterpriseSourceAccountId = dto.enterpriseSourceAccountId ?? lastJob.enterpriseSourceAccountId ?? null;
+      lastJob.enterpriseSourceAccountId = params.enterpriseSourceAccountId ?? lastJob.enterpriseSourceAccountId ?? null;
       lastJob.enterpriseBaseUrl = safeBaseUrl;
-      lastJob.encryptedApiKey = encryptApiKey(dto.enterpriseApiKey);
+      lastJob.encryptedApiKey = encryptApiKey(params.enterpriseApiKey);
       lastJob.status = 'pending';
       lastJob.error = null;
       lastJob.createdBy = lastJob.createdBy ?? userId ?? null;
-      const resumed = await this.saveJobWithConcurrencyGuard(lastJob, `conta ${account.id}`);
-      this.logger.log(`[enterprise-import] resuming job jobId=${resumed.id} accountId=${account.id} (era status=${lastJob.status})`);
+      const resumed = await this.saveJobWithConcurrencyGuard(lastJob, `conta ${accountId}`);
+      this.logger.log(`[enterprise-import] resuming job jobId=${resumed.id} accountId=${accountId} (era status=${lastJob.status})`);
       await this.queue.add('import', { jobId: resumed.id }, JOB_OPTS_ENTERPRISE_IMPORT);
-      return { accountId: account.id, jobId: resumed.id };
+      return { accountId, jobId: resumed.id };
     }
 
     const job = this.jobRepo.create({
-      accountId: account.id,
-      enterpriseSourceAccountId: dto.enterpriseSourceAccountId ?? null,
+      accountId,
+      enterpriseSourceAccountId: params.enterpriseSourceAccountId ?? null,
       scope: 'account',
       enterpriseBaseUrl: safeBaseUrl,
-      encryptedApiKey: encryptApiKey(dto.enterpriseApiKey),
+      encryptedApiKey: encryptApiKey(params.enterpriseApiKey),
       status: 'pending',
       progress: {},
       checkpoint: {},
       createdBy: userId || null,
     });
-    const saved = await this.saveJobWithConcurrencyGuard(job, `conta ${account.id}`);
+    const saved = await this.saveJobWithConcurrencyGuard(job, `conta ${accountId}`);
 
     // Nunca logar `enterpriseApiKey` ou `encryptedApiKey`. Apenas metadados.
-    this.logger.log(`[enterprise-import] enqueuing job jobId=${saved.id} accountId=${account.id} scope=account reused=${reusedAccount}`);
+    this.logger.log(`[enterprise-import] enqueuing job jobId=${saved.id} accountId=${accountId} scope=account reused=${reusedAccount}`);
 
     await this.queue.add('import', { jobId: saved.id }, JOB_OPTS_ENTERPRISE_IMPORT);
 
-    return { accountId: account.id, jobId: saved.id };
+    return { accountId, jobId: saved.id };
   }
 
   // Reset "começar do zero" do import account-scope, chamado quando o usuário

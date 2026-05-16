@@ -23,8 +23,15 @@ export class ImportEnterpriseSetupDto {
   apiKey?: string;
 
   // Nome da conta a ser criada no OSS para receber os dados importados.
+  // Ignorado quando useStep1Account=true (importa na conta já criada no passo 1).
   @JoiSchema(Joi.string().trim().min(1).max(255).optional())
   accountName?: string;
+
+  // Importa para a conta criada no passo 1 do wizard (admin) em vez de criar
+  // uma conta nova/descartável. O id da conta é resolvido server-side a partir
+  // do admin do wizard — o cliente nunca informa accountId.
+  @JoiSchema(Joi.boolean().optional())
+  useStep1Account?: boolean;
 
   // ID da conta no Enterprise (origem). Opcional: sem ele o rollup de
   // statistics é pulado (não há como resolver a conta de origem).

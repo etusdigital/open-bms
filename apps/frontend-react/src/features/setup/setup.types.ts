@@ -7,6 +7,9 @@ export interface SetupStatus {
   // F11: já importou/pulou o Enterprise (system_config). Fonte da verdade pra
   // retomada, já que o passo é UI-only e não tem step próprio no backend.
   enterpriseImportDone?: boolean;
+  // Conta criada no passo 1 (admin). Quando presente, o Step 2 oferece
+  // importar nela (checkbox) em vez de criar uma conta nova/descartável.
+  step1Account?: { id: number; name: string };
 }
 
 export interface ServiceHealthResult {

@@ -94,6 +94,7 @@ async function buildService(
   userAccountRepo: any;
   authProvider: jest.Mocked<IAuthProvider>;
   dataSource: any;
+  enterpriseImport: any;
 }> {
   const systemConfigRepo = overrides.systemConfigRepo ?? makeRepo();
   const userRepo = overrides.userRepo ?? makeRepo();
@@ -102,6 +103,12 @@ async function buildService(
   const poolRepo = overrides.poolRepo ?? makeRepo();
   const userAccountRepo = overrides.userAccountRepo ?? makeRepo();
   const dataSource = makeDataSourceMock({ userRepo, roleRepo, systemConfigRepo, accountRepo, userAccountRepo });
+  const enterpriseImport = {
+    createInstanceImport: jest.fn().mockResolvedValue({ jobId: 'test-job' }),
+    createAccountImport: jest.fn().mockResolvedValue({ accountId: 7, jobId: 'job-acc' }),
+    createAccountImportForExistingAccount: jest.fn().mockResolvedValue({ accountId: 50, jobId: 'job-step1' }),
+    resetForSetup: jest.fn().mockResolvedValue({ accountsDeleted: 1, jobsDeleted: 1 }),
+  };
 
   const moduleRef = await Test.createTestingModule({
     providers: [
@@ -117,13 +124,7 @@ async function buildService(
       { provide: RedisService, useValue: { getClient: jest.fn().mockReturnValue({ ping: jest.fn().mockResolvedValue('PONG') }) } },
       { provide: ClickhouseProvider, useValue: { runQuery: jest.fn().mockResolvedValue([]) } },
       { provide: SystemConfigCacheProvider, useValue: { get: jest.fn().mockResolvedValue(null), set: jest.fn(), invalidate: jest.fn() } },
-      {
-        provide: EnterpriseImportService,
-        useValue: {
-          createInstanceImport: jest.fn().mockResolvedValue({ jobId: 'test-job' }),
-          createAccountImport: jest.fn().mockResolvedValue({ accountId: 7, jobId: 'job-acc' }),
-        },
-      },
+      { provide: EnterpriseImportService, useValue: enterpriseImport },
     ],
   }).compile();
 
@@ -137,6 +138,7 @@ async function buildService(
     userAccountRepo,
     authProvider: authProvider as jest.Mocked<IAuthProvider>,
     dataSource,
+    enterpriseImport,
   };
 }
 
@@ -180,6 +182,18 @@ describe('SetupService', () => {
 
       const status = await service.getStatus();
       expect(status).toMatchObject({ configured: true, currentStep: 6 });
+    });
+
+    it('expõe step1Account (conta do passo 1) quando o admin tem conta vinculada', async () => {
+      const { service, roleRepo, userRepo, systemConfigRepo, userAccountRepo, accountRepo } = await buildService();
+      roleRepo.findOne.mockResolvedValue(SUPER_ADMIN_ROLE);
+      userRepo.count.mockResolvedValue(1);
+      systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 2, completed: false, adminUserId: 9 } });
+      userAccountRepo.findOne.mockResolvedValue({ userId: 9, accountId: 50, isMasterUser: true });
+      accountRepo.findOne.mockResolvedValue({ id: 50, name: 'Acme' });
+
+      const status = await service.getStatus();
+      expect(status).toMatchObject({ configured: false, currentStep: 2, step1Account: { id: 50, name: 'Acme' } });
     });
   });
 
@@ -844,10 +858,92 @@ describe('SetupService', () => {
       expect(saved?.[0]?.value).toMatchObject({ imported: true, scope: 'account', accountId: 7, jobId: 'job-acc' });
     });
 
+    it('useStep1Account: resolve a conta do passo 1 e chama createAccountImportForExistingAccount', async () => {
+      process.env.ENTERPRISE_IMPORT_ENABLED = 'true';
+      const { service, systemConfigRepo, userAccountRepo, accountRepo, enterpriseImport } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ value: { completed: false, adminUserId: 9 } });
+      userAccountRepo.findOne.mockResolvedValue({ userId: 9, accountId: 50, isMasterUser: true });
+      accountRepo.findOne.mockResolvedValue({ id: 50, name: 'Acme' });
+
+      const res = await service.importEnterprise(
+        { baseUrl: 'https://ent.example.com', apiKey: 'supersecret', useStep1Account: true } as any,
+        '1.1.1.1',
+      );
+
+      expect(enterpriseImport.createAccountImportForExistingAccount).toHaveBeenCalledWith(
+        50,
+        expect.objectContaining({ enterpriseBaseUrl: expect.stringContaining('ent.example.com'), enterpriseApiKey: 'supersecret' }),
+        9,
+      );
+      expect(enterpriseImport.createAccountImport).not.toHaveBeenCalled();
+      expect(res).toEqual({ jobId: 'job-step1' });
+      const saved = systemConfigRepo.save.mock.calls.find(([v]: [any]) => v.key === 'enterprise_import_done');
+      expect(saved?.[0]?.value).toMatchObject({ imported: true, scope: 'account', accountId: 50, jobId: 'job-step1', reusedStep1Account: true });
+    });
+
+    it('useStep1Account sem conta do passo 1 → BadRequest', async () => {
+      process.env.ENTERPRISE_IMPORT_ENABLED = 'true';
+      const { service, systemConfigRepo, userAccountRepo } = await buildService();
+      systemConfigRepo.findOne.mockResolvedValue({ value: { completed: false, adminUserId: 9 } });
+      userAccountRepo.findOne.mockResolvedValue(null); // admin sem conta vinculada
+
+      await expect(
+        service.importEnterprise({ baseUrl: 'https://ent.example.com', apiKey: 'supersecret', useStep1Account: true } as any, '1.1.1.1'),
+      ).rejects.toBeInstanceOf(HttpException);
+    });
+
     it('404 (NotFoundException) quando ENTERPRISE_IMPORT_ENABLED != true', async () => {
       process.env.ENTERPRISE_IMPORT_ENABLED = 'false';
       const { service } = await buildService();
       await expect(service.importEnterprise({ skip: true } as any, '1.1.1.1')).rejects.toBeInstanceOf(HttpException);
+    });
+  });
+
+  describe('resetEnterpriseImport — preserva a conta do passo 1', () => {
+    const OLD = process.env.ENTERPRISE_IMPORT_ENABLED;
+    afterEach(() => {
+      process.env.ENTERPRISE_IMPORT_ENABLED = OLD;
+    });
+
+    function wizardAndDone() {
+      return (opts: any) => {
+        const key = opts?.where?.key;
+        if (key === 'enterprise_import_done') return Promise.resolve({ key: 'enterprise_import_done', value: { accountId: 50 } });
+        return Promise.resolve({ key: 'setup_wizard_step', value: { completed: false, adminUserId: 9 } });
+      };
+    }
+
+    it('reusou a conta do passo 1 (reset apagou) → recria conta + vínculo do admin', async () => {
+      process.env.ENTERPRISE_IMPORT_ENABLED = 'true';
+      const { service, systemConfigRepo, userAccountRepo, accountRepo, enterpriseImport } = await buildService();
+      systemConfigRepo.findOne.mockImplementation(wizardAndDone());
+      // resolveStep1Account (antes do reset) acha a conta; ensureAdminAccount
+      // (depois do reset) não acha o vínculo → recria.
+      userAccountRepo.findOne.mockResolvedValueOnce({ userId: 9, accountId: 50, isMasterUser: true }).mockResolvedValueOnce(null);
+      accountRepo.findOne.mockResolvedValueOnce({ id: 50, name: 'Acme' }).mockResolvedValueOnce(null);
+      accountRepo.save.mockResolvedValue({ id: 50, name: 'Acme' });
+
+      const res = await service.resetEnterpriseImport();
+
+      expect(enterpriseImport.resetForSetup).toHaveBeenCalledWith([50]);
+      expect(systemConfigRepo.delete).toHaveBeenCalledWith({ key: 'enterprise_import_done' });
+      expect(accountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Acme', groupId: 1, isActive: true }));
+      expect(userAccountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ userId: 9, accountId: 50, isMasterUser: true }));
+      expect(res).toEqual({ ok: true, accountsDeleted: 1, jobsDeleted: 1 });
+    });
+
+    it('conta descartável (passo 1 intacta) → ensureAdminAccount é no-op (não recria)', async () => {
+      process.env.ENTERPRISE_IMPORT_ENABLED = 'true';
+      const { service, systemConfigRepo, userAccountRepo, accountRepo } = await buildService();
+      systemConfigRepo.findOne.mockImplementation(wizardAndDone());
+      // vínculo do admin sobrevive nas duas leituras → no-op.
+      userAccountRepo.findOne.mockResolvedValue({ userId: 9, accountId: 50, isMasterUser: true });
+      accountRepo.findOne.mockResolvedValue({ id: 50, name: 'Acme' });
+
+      await service.resetEnterpriseImport();
+
+      expect(accountRepo.save).not.toHaveBeenCalled();
+      expect(userAccountRepo.save).not.toHaveBeenCalled();
     });
   });
 });

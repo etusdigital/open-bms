@@ -13,7 +13,14 @@ describe('EnterpriseImportService', () => {
   let service: EnterpriseImportService;
   let jobRepo: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; update: jest.Mock; manager: { transaction: jest.Mock } };
   let queue: { add: jest.Mock; obliterate: jest.Mock };
-  let accountsService: { create: jest.Mock; findByName: jest.Mock; restoreAccount: jest.Mock; createAccountConfig: jest.Mock; createManagedApiKey: jest.Mock };
+  let accountsService: {
+    create: jest.Mock;
+    findOne: jest.Mock;
+    findByName: jest.Mock;
+    restoreAccount: jest.Mock;
+    createAccountConfig: jest.Mock;
+    createManagedApiKey: jest.Mock;
+  };
   let em: { query: jest.Mock };
 
   beforeAll(() => {
@@ -39,6 +46,7 @@ describe('EnterpriseImportService', () => {
     queue = { add: jest.fn().mockResolvedValue(undefined), obliterate: jest.fn().mockResolvedValue(undefined) };
     accountsService = {
       create: jest.fn().mockResolvedValue({ account: { id: 99 } }),
+      findOne: jest.fn().mockResolvedValue({ id: 42 }),
       findByName: jest.fn().mockResolvedValue(null),
       restoreAccount: jest.fn().mockResolvedValue(undefined),
       createAccountConfig: jest.fn().mockResolvedValue(undefined),
@@ -116,6 +124,43 @@ describe('EnterpriseImportService', () => {
       expect(accountsService.create).not.toHaveBeenCalled();
       expect(result.accountId).toBe(88);
       expect(queue.add).toHaveBeenCalled();
+    });
+  });
+
+  describe('createAccountImportForExistingAccount', () => {
+    it('importa na conta existente sem criar/buscar-por-nome e enfileira job novo', async () => {
+      jobRepo.findOne.mockResolvedValueOnce(null);
+      const result = await service.createAccountImportForExistingAccount(
+        42,
+        { enterpriseBaseUrl: 'https://api.enterprise.example.com', enterpriseApiKey: 'secret-key-1234' },
+        7,
+      );
+      expect(accountsService.findOne).toHaveBeenCalledWith(42);
+      expect(accountsService.create).not.toHaveBeenCalled();
+      expect(accountsService.findByName).not.toHaveBeenCalled();
+      expect(accountsService.createManagedApiKey).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith('import', { jobId: 'job-uuid' }, expect.any(Object));
+      expect(result).toEqual({ accountId: 42, jobId: 'job-uuid' });
+    });
+
+    it('idempotente: job já ativo (running) p/ a conta → mesmo jobId, sem duplicar', async () => {
+      jobRepo.findOne.mockResolvedValueOnce({ id: 'job-running', status: 'running' });
+      const result = await service.createAccountImportForExistingAccount(
+        42,
+        { enterpriseBaseUrl: 'https://x', enterpriseApiKey: 'aaaaaaaa' },
+        1,
+      );
+      expect(result).toEqual({ accountId: 42, jobId: 'job-running' });
+      expect(jobRepo.save).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
+    it('propaga 404 quando a conta não existe (defesa server-side)', async () => {
+      accountsService.findOne.mockRejectedValueOnce(new NotFoundException('Account not found'));
+      await expect(
+        service.createAccountImportForExistingAccount(123, { enterpriseBaseUrl: 'https://x', enterpriseApiKey: 'aaaaaaaa' }, 1),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(queue.add).not.toHaveBeenCalled();
     });
   });
 
