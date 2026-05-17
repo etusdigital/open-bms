@@ -15,12 +15,11 @@ interface Props {
   disabled?: boolean;
 }
 
-// Combobox "creatable" para o nome da conta destino do import. O backend
-// (`createAccountImport`) faz `findByName(name, { withDeleted: true })`: se o
-// nome bate numa conta existente ele REUSA essa conta (os dados importados são
-// mesclados nela); se não bate, cria uma conta nova. Esse combobox expõe as
-// duas intenções num campo só — escolher da lista (mesclar) ou digitar um nome
-// novo (criar) — e avisa qual das duas vai acontecer.
+// Creatable combobox for the import target account name. Backend
+// `createAccountImport` does `findByName(name, { withDeleted: true })`: a name
+// matching an existing account REUSES it (imported data is merged in),
+// otherwise a new account is created. This combobox exposes both intents in
+// one field and signals which one will happen.
 export function AccountNameCombobox({ id, value, onChange, disabled }: Props) {
   const { t } = useTranslation();
   const { data: accounts, isLoading } = useSuperAdminAccountsAll();
@@ -36,8 +35,8 @@ export function AccountNameCombobox({ id, value, onChange, disabled }: Props) {
     return list.filter((a) => a.name.toLowerCase().includes(q));
   }, [accounts, trimmed]);
 
-  // Match exato (case-insensitive) determina se o nome digitado já é uma conta
-  // existente — espelha o `findByName` do backend.
+  // Exact (case-insensitive) match decides whether the typed name is an
+  // existing account — mirrors the backend `findByName`.
   const existingMatch = useMemo(
     () => (accounts ?? []).find((a) => a.name.toLowerCase() === value.trim().toLowerCase()) ?? null,
     [accounts, value],

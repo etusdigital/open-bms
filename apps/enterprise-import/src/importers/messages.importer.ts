@@ -5,23 +5,16 @@ import { MessageEntity } from '../entities/message.entity';
 import { CampaignMessageEntity } from '../entities/campaign-message.entity';
 import { rawInsertPreservingPk, dbNameMap } from '../raw-insert.util';
 
-// `messages` é M:N com `campaigns` pela tabela de junção `campaigns_messages`
-// (PK composta campaign_id+message_id). NÃO existe filtro por campanha na API
-// do Enterprise: `GET /messages?campaignId=X` tem o `campaignId` DESCARTADO
-// (MessagesPageDto não declara o campo e o PageDto base usa
-// `stripUnknown:true`) → a versão antiga deste importer, que iterava campanha
-// a campanha chamando `/messages?campaignId`, recebia a lista da conta INTEIRA
-// a cada campanha. Efeitos confirmados em produção: `progress.done` inflado
-// (nº de mensagens × nº de campanhas, ex.: 57×53=3021) e `campaigns_messages`
-// virando produto cartesiano (toda mensagem ligada a toda campanha).
-//
-// Abordagem correta, em duas fases:
-//   A) Pagina `/messages` UMA vez (account-wide) e insere as mensagens. Chave
-//      natural = (account_id, name) — `messages` tem @Unique(accountId,name)
-//      e os nomes são únicos por conta. Grava o mapping src.id→newId.
-//   B) Reconstrói `campaigns_messages` a partir da fonte real do vínculo: o
-//      array `campaignMessage` embutido em cada campanha de `/campaigns`,
-//      resolvendo campanha (camp.id) e mensagem (cm.messageId) via idMapper.
+// messages is M:N with campaigns via campaigns_messages (composite PK
+// campaign_id+message_id). The Enterprise API has NO per-campaign filter:
+// `GET /messages?campaignId=X` strips campaignId server-side (stripUnknown),
+// so filtering by campaign would return the whole account list and produce a
+// cartesian product. Two phases:
+//   A) Page /messages once (account-wide), insert messages. Natural key =
+//      (account_id, name) — messages has @Unique(accountId,name). Record
+//      src.id->newId.
+//   B) Rebuild campaigns_messages from the real link source: the
+//      `campaignMessage` array embedded in each /campaigns campaign.
 @Injectable()
 export class MessagesImporter implements ImporterStep {
   readonly name = 'messages';
@@ -38,14 +31,14 @@ export class MessagesImporter implements ImporterStep {
     const columnProps = new Set(meta.columns.map((c) => c.propertyName));
     const pkProp = meta.primaryColumns[0]?.propertyName ?? 'id';
 
-    // -------- Fase A: mensagens da conta (uma passada paginada) --------
+    // Phase A: account messages (single paged pass).
     let page = 1;
     let totalDone = 0;
     while (true) {
       const resp = await ctx.client.listMessages({ page, itemsPerPage: batchSize });
       if (!resp.results || resp.results.length === 0) break;
 
-      // Dedup por nome dentro da página (chave natural = account_id+name).
+      // Dedup by name within the page (natural key = account_id+name).
       const byName = new Map<string, any>();
       for (const m of resp.results) {
         const nm = m?.name ?? `msg-${m?.id}`;
@@ -84,8 +77,8 @@ export class MessagesImporter implements ImporterStep {
           }
         }
 
-        // Relê tudo da página (pré-existentes + inseridas) e resolve src→newId
-        // pela chave natural (name).
+        // Re-read the page (preexisting + inserted) and resolve src->newId by
+        // natural key (name).
         const all = await txMsg.find({ where: { accountId: ctx.accountId, name: In(names) } as any });
         for (const e of all as any[]) idByName.set(e.name, e[pkProp]);
         for (const [nm, m] of byName) {
@@ -109,10 +102,10 @@ export class MessagesImporter implements ImporterStep {
       return;
     }
 
-    // -------- Fase B: vínculo campanha↔mensagem (M:N real) --------
-    // A relação verdadeira vem do `campaignMessage` embutido em cada campanha
-    // de `/campaigns` (não de `/messages?campaignId`, que não filtra).
-    // Idempotente: PK composta (campaign_id, message_id) + orIgnore.
+    // Phase B: campaign<->message link (real M:N). The true relation comes
+    // from `campaignMessage` embedded in each /campaigns campaign (not
+    // /messages?campaignId, which does not filter). Idempotent: composite PK +
+    // orIgnore.
     let cpage = 1;
     while (true) {
       const cresp = await ctx.client.listCampaigns({ page: cpage, itemsPerPage: 500 });

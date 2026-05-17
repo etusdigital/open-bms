@@ -10,17 +10,11 @@ import { AutomationsImporter } from './importers/automations.importer';
 import { CampaignsImporter } from './importers/campaigns.importer';
 import { MessagesImporter } from './importers/messages.importer';
 
-// Ordem importa: dependências de FK precisam vir antes (ex: campaigns antes de
-// messages; custom_events antes de campaigns que os referenciem etc.).
-// FORA DO ESCOPO do import (removidos — são config manual de setup/plataforma):
-//  - config de provider/conta (account-settings)
-//  - config global da instância (instance-config)
-//  - usuários (users): os dados importados são account-scoped e não dependem
-//    de user_id; o admin é criado/vinculado pelo wizard. Migração de users
-//    não é feita por nenhum scope.
-//  - statistics (events_statistics): rollup só exposto por endpoint
-//    super-admin que o import (API key de conta) não acessa, e ausente em
-//    versões antigas do Enterprise — fora do escopo do wizard.
+// Order matters: FK dependencies must come first (e.g. campaigns before
+// messages; custom_events before campaigns that reference them).
+// Out of scope (manual platform setup): account-settings, instance-config,
+// users (imported data is account-scoped; admin is created by the wizard),
+// and events_statistics (super-admin-only rollup, unavailable to a key).
 @Injectable()
 export class ImportPipeline {
   readonly steps: ImporterStep[];

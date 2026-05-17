@@ -18,8 +18,8 @@ import { EnterpriseImportModule } from '../enterprise-import/enterprise-import.m
     TypeOrmModule.forFeature([SystemConfigEntity, UserEntity, RoleEntity, AccountEntity, PoolEntity, UserAccountEntity]),
     AuthModule,
     AdminIntegrationsModule,
-    // EnterpriseImportModule não importa SetupModule de volta (F7) — sem ciclo,
-    // import direto, DI determinística.
+    // EnterpriseImportModule does not import SetupModule back — no cycle, so
+    // a direct import keeps DI deterministic.
     EnterpriseImportModule,
   ],
   providers: [SetupService, ClickhouseProvider],

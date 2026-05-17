@@ -4,44 +4,33 @@ import { ImportContext, ImporterStep } from './importer.interface';
 import { PagedResponse } from '../enterprise-client/enterprise.client';
 import { rawInsertPreservingPk } from '../raw-insert.util';
 
-// Base genérica para importadores entidade→entidade.
-//
-// Premissa-chave (validada): OSS e Enterprise rodam o MESMO codebase, logo a
-// API REST do Enterprise serializa cada recurso no mesmo shape da entity
-// TypeORM do OSS (propriedades camelCase iguais às `propertyName` das colunas).
-// Por isso NÃO escolhemos colunas a dedo (era o bug F1 — colunas inventadas e
-// NOT NULL faltando). Em vez disso:
-//   1. Inserimos via Repository da entity REAL, copiando apenas as propriedades
-//      que correspondem a colunas da entity (metadata-driven) — preserva todos
-//      os NOT NULL que o Enterprise já manda preenchidos.
-//   2. Resolução src→newId é feita por CHAVE NATURAL relendo as linhas (F3 —
-//      antes era posicional sobre `RETURNING` com `ON CONFLICT`, que desalinha).
-//   3. FKs escalares são remapeadas via idMapper.resolve em scope=account (F4 —
-//      antes `record()` gravava mas nada consumia).
-//   4. Idempotência de retomada (F8): a página em curso é pré-filtrada contra o
-//      que já existe (por chave natural), então reprocessá-la não duplica mesmo
-//      em tabelas sem unique constraint natural.
+// Generic base for entity-to-entity importers.
+// Key assumption: OSS and Enterprise run the same codebase, so the Enterprise
+// REST API serializes each resource with the same shape as the OSS TypeORM
+// entity (camelCase props == column propertyNames). Therefore:
+//   1. Insert via the real entity Repository, copying only properties that map
+//      to columns (metadata-driven), preserving all NOT NULL columns.
+//   2. src->newId is resolved by natural key by re-reading rows (not positional).
+//   3. Scalar FKs are remapped via idMapper.resolve in scope=account.
+//   4. The in-progress page is pre-filtered against existing rows by natural
+//      key, so reprocessing it does not duplicate even without a unique constraint.
 export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implements ImporterStep {
   protected readonly logger: Logger;
   abstract readonly name: string;
-  // Classe da entity TypeORM (do msgops-api) que esse importer popula.
+  // TypeORM entity (from msgops-api) this importer populates.
   protected abstract readonly entity: EntityTarget<TEntity>;
   protected abstract readonly batchSize: number;
-  // Propriedade(s) que formam a chave natural (além de accountId, se aplicável).
-  // Ex.: ['name'] para tags/campaigns; ['email'] para contacts/users.
+  // Property(ies) forming the natural key (besides accountId if applicable).
   protected abstract readonly naturalKey: string[];
-  // Se a entity é escopada por conta (coluna accountId): inclui accountId na
-  // chave natural e força accountId = ctx.accountId no insert.
+  // If the entity is account-scoped: include accountId in the natural key and
+  // force accountId = ctx.accountId on insert.
   protected readonly scopedByAccount: boolean = true;
-  // Mapa FK: propriedade-escalar-da-entity → nome-da-entidade-no-idMapper.
-  // Aplicado só em scope=account. Ex.: { campaignId: 'campaigns' }.
+  // FK map: entity scalar property -> idMapper entity name. scope=account only.
   protected readonly fkRemap: Record<string, string> = {};
-  // Grava src.id → newId no idMapper (necessário p/ remap de filhos).
+  // Records src.id -> newId in idMapper (needed to remap child rows).
   protected readonly recordsIdMapping: boolean = true;
-  // Se o endpoint da origem devolve um `totalItems` que é o TOTAL real (e não,
-  // p.ex., o tamanho da página). Quando false, o progresso não emite `total`
-  // (denominador) — evita barra com done≫total. Ex.: `/contacts` do Enterprise
-  // retorna `total: results.length` (tamanho da última página), não o geral.
+  // True only if the source `totalItems` is the real total (not page size).
+  // When false, progress omits `total` to avoid done >> total.
   protected readonly reportsTotal: boolean = true;
 
   constructor() {
@@ -49,12 +38,11 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
   }
 
   protected abstract fetchPage(ctx: ImportContext, page: number): Promise<PagedResponse<TEntity>>;
-  // Override opcional: ajuste fino por linha após o mapeamento genérico.
-  // Retornar null pula a linha.
+  // Optional override: per-row tweak after generic mapping. Return null to skip the row.
   protected async customize(_ctx: ImportContext, _src: any, mapped: Record<string, any>): Promise<Record<string, any> | null> {
     return mapped;
   }
-  // Override opcional: checagem antes do loop; false → pula o importer.
+  // Optional override: pre-loop check; false skips the importer.
   protected async preflight(_ctx: ImportContext): Promise<boolean> {
     return true;
   }
@@ -83,7 +71,7 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
       if (!resp.results || resp.results.length === 0) break;
       if (resp.totalItems !== undefined) totalKnown = resp.totalItems;
 
-      // Monta linhas candidatas (dedup por chave natural dentro da página).
+      // Build candidate rows (dedup by natural key within the page).
       const candidates: Array<{ src: any; row: Record<string, any>; nk: string }> = [];
       const seen = new Set<string>();
       for (const src of resp.results) {
@@ -106,29 +94,29 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
 
       await ctx.dataSource.transaction(async (em) => {
         const txRepo = em.getRepository<TEntity>(this.entity);
-        // Pré-filtra o que já existe (idempotência de retomada — F8).
+        // Pre-filter rows that already exist (resume idempotency).
         const existing = await txRepo.find({ where: { ...whereBase, [nkProp]: In(nkValues) } as any });
         const existingNk = new Set(existing.map((e: any) => String(e[nkProp])));
 
         const toInsert = candidates.filter((c) => !existingNk.has(c.nk)).map((c) => c.row);
         if (toInsert.length > 0) {
           if (ctx.scope === 'instance') {
-            // Instance-scope PRESERVA o id de origem (ver raw-insert.util).
+            // Instance-scope preserves the source id (see raw-insert.util).
             await rawInsertPreservingPk(em, tableName, dbNameByProp, toInsert);
           } else {
-            // Account-scope: PK omitida → a sequence atribui novo id.
+            // Account-scope: PK omitted so the sequence assigns a new id.
             await txRepo
               .createQueryBuilder()
               .insert()
               .values(toInsert as any)
               .updateEntity(false)
-              .orIgnore() // rede de segurança; idempotência real vem do pré-filtro
+              .orIgnore() // safety net; real idempotency comes from the pre-filter
               .execute();
           }
         }
 
-        // Relê TODAS as linhas da página (pré-existentes + recém-inseridas) e
-        // resolve src→newId pela CHAVE NATURAL (não posicional — F3).
+        // Re-read all page rows (preexisting + just inserted) and resolve
+        // src->newId by natural key (not positional).
         if (this.recordsIdMapping && ctx.scope === 'account') {
           const all = await txRepo.find({ where: { ...whereBase, [nkProp]: In(nkValues) } as any });
           const idByNk = new Map<string, any>();
@@ -142,8 +130,8 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
         }
       });
 
-      // Grava mappings APÓS o commit (idMapper usa conexão própria — evita
-      // cross-connection dentro da transação).
+      // Record mappings after commit: idMapper uses its own connection,
+      // avoiding a cross-connection write inside the transaction.
       for (const m of mappings) {
         await ctx.idMapper.record(ctx.jobId, this.name, m.sourceId, m.newId);
       }
@@ -156,13 +144,11 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
       page++;
     }
 
-    // Estado terminal pra UI. Entidades vazias na origem (ou cujo endpoint deu
-    // 404 tolerado → resp.results vazio) saem do while no 1º `break` SEM nunca
-    // ter chamado updateProgress → ficariam eternamente "pendente" na tela
-    // mesmo com o job `completed`. Aqui garantimos que todo step que rodou
-    // fecha num estado terminal (100%): `done>0` já foi emitido no loop; se
-    // nada foi importado, marca skipped(empty) — exceto resume onde tudo já
-    // existia (totalKnown>0), aí conta como concluído.
+    // Ensure every step that ran ends in a terminal UI state. An empty source
+    // (or tolerated 404) breaks before any updateProgress call, which would
+    // leave the step "pending" forever even though the job completed. If
+    // nothing was imported, mark skipped(empty); a resume where everything
+    // already existed (totalKnown>0) counts as done.
     if (totalDone === 0) {
       if (this.reportsTotal && totalKnown && totalKnown > 0) {
         await ctx.updateProgress(this.name, { total: totalKnown, done: totalKnown, page });
@@ -172,31 +158,30 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
     }
   }
 
-  // Copia do source só as propriedades que são colunas da entity; ajusta PK
-  // (descarta em account-scope, preserva em instance-scope) e remapeia FKs.
+  // Copies only source properties that are entity columns; adjusts the PK
+  // (drop in account-scope, preserve in instance-scope) and remaps FKs.
   private async buildRow(ctx: ImportContext, src: any, columnProps: Set<string>, pkProp: string): Promise<Record<string, any> | null> {
     const row: Record<string, any> = {};
     for (const key of Object.keys(src ?? {})) {
       if (columnProps.has(key)) row[key] = src[key];
     }
-    // PK: account-scope deixa a sequence atribuir; instance-scope preserva.
+    // PK: account-scope lets the sequence assign; instance-scope preserves it.
     if (ctx.scope === 'account') {
       delete row[pkProp];
     } else if (src?.[pkProp] !== undefined) {
       row[pkProp] = src[pkProp];
     }
-    // accountId sempre o da conta-alvo do contexto.
+    // accountId is always the context's target account.
     if (this.scopedByAccount && columnProps.has('accountId')) {
       row.accountId = ctx.accountId;
     }
-    // Remapeia FKs escalares declaradas (só faz sentido em scope=account;
-    // em instance os ids são preservados → identidade).
+    // Remap declared scalar FKs (scope=account only; instance preserves ids).
     for (const [prop, mapEntity] of Object.entries(this.fkRemap)) {
       const srcVal = src?.[prop];
       if (srcVal === undefined || srcVal === null) continue;
       const resolved = ctx.idMapper.resolve(ctx.jobId, ctx.scope, mapEntity, srcVal);
-      // Em scope=account, se a FK não foi mapeada ainda, melhor pular a linha
-      // do que gravar um FK órfão.
+      // In scope=account, skip the row rather than write an orphan FK if the
+      // FK is not yet mapped.
       if (ctx.scope === 'account' && resolved === null) return null;
       row[prop] = ctx.scope === 'account' ? Number(resolved) : srcVal;
     }
@@ -205,8 +190,8 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
 
   protected resumePage(ctx: ImportContext): number {
     if (ctx.checkpoint?.entity === this.name && typeof ctx.checkpoint?.page === 'number') {
-      // Reprocessa a página em curso — seguro: o pré-filtro por chave natural
-      // dedup contra o que já foi inserido (F8).
+      // Reprocess the in-progress page: safe because the natural-key
+      // pre-filter dedups against already-inserted rows.
       return ctx.checkpoint.page;
     }
     return 1;

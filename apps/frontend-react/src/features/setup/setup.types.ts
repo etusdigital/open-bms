@@ -2,13 +2,13 @@ export interface SetupStatus {
   configured: boolean;
   currentStep: number;
   baseUrl?: string;
-  // F10: feature-flag do backend — frontend esconde o Step Enterprise se false.
+  // Backend feature flag — frontend hides the Enterprise step when false.
   enterpriseImportEnabled?: boolean;
-  // F11: já importou/pulou o Enterprise (system_config). Fonte da verdade pra
-  // retomada, já que o passo é UI-only e não tem step próprio no backend.
+  // Whether Enterprise import was already done/skipped (system_config). Source
+  // of truth for resume, since this step is UI-only with no backend step.
   enterpriseImportDone?: boolean;
-  // Conta criada no passo 1 (admin). Quando presente, o Step 2 oferece
-  // importar nela (checkbox) em vez de criar uma conta nova/descartável.
+  // Account created in step 1 (admin). When present, Step 2 offers importing
+  // into it (checkbox) instead of creating a new throwaway account.
   step1Account?: { id: number; name: string };
 }
 

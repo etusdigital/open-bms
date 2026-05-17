@@ -66,7 +66,7 @@ describe('EnterpriseImportService', () => {
   });
 
   describe('createAccountImport', () => {
-    it('cria conta com skipDefaults:true, persiste job e enfileira', async () => {
+    it('creates account with skipDefaults:true, persists job and enqueues', async () => {
       jobRepo.findOne.mockResolvedValueOnce(null);
 
       const result = await service.createAccountImport(
@@ -84,7 +84,7 @@ describe('EnterpriseImportService', () => {
       expect(result).toEqual({ accountId: 99, jobId: 'job-uuid' });
     });
 
-    it('idempotente: job ativo (running) p/ mesma conta → devolve o mesmo jobId sem duplicar', async () => {
+    it('idempotent: active (running) job for same account returns the same jobId without duplicating', async () => {
       jobRepo.findOne.mockResolvedValueOnce({ id: 'job-running', status: 'running' });
       const result = await service.createAccountImport({ accountData: { name: 'X' } as any, enterpriseBaseUrl: 'https://x', enterpriseApiKey: 'aaaaaaaa' }, 1);
       expect(result).toEqual({ accountId: 99, jobId: 'job-running' });
@@ -92,7 +92,7 @@ describe('EnterpriseImportService', () => {
       expect(queue.add).not.toHaveBeenCalled();
     });
 
-    it('idempotente: job failed p/ mesma conta → resume (reusa a linha, re-enfileira)', async () => {
+    it('idempotent: failed job for same account resumes (reuses the row, re-enqueues)', async () => {
       const failed = { id: 'job-failed', status: 'failed', encryptedApiKey: 'old', error: 'boom', createdBy: 1 };
       jobRepo.findOne.mockResolvedValueOnce(failed);
       const result = await service.createAccountImport({ accountData: { name: 'X' } as any, enterpriseBaseUrl: 'https://x', enterpriseApiKey: 'newkey1234' }, 1);
@@ -105,7 +105,7 @@ describe('EnterpriseImportService', () => {
       expect(queue.add).toHaveBeenCalledWith('import', { jobId: 'job-failed' }, expect.any(Object));
     });
 
-    it('idempotente: conta já existe (nome) → reusa, não chama accounts.create', async () => {
+    it('idempotent: account already exists (by name) reuses it, does not call accounts.create', async () => {
       accountsService.findByName.mockResolvedValueOnce({ id: 77 });
       jobRepo.findOne.mockResolvedValueOnce(null);
       const result = await service.createAccountImport({ accountData: { name: 'Cliente X' } as any, enterpriseBaseUrl: 'https://x', enterpriseApiKey: 'aaaaaaaa' }, 1);
@@ -115,7 +115,7 @@ describe('EnterpriseImportService', () => {
       expect(queue.add).toHaveBeenCalled();
     });
 
-    it('idempotente: conta órfã soft-deletada → restaura e reusa (não recria → sem 23505)', async () => {
+    it('idempotent: soft-deleted orphan account is restored and reused (no recreate, avoids 23505)', async () => {
       accountsService.findByName.mockResolvedValueOnce({ id: 88, deletedAt: new Date() });
       jobRepo.findOne.mockResolvedValueOnce(null);
       const result = await service.createAccountImport({ accountData: { name: 'BMS' } as any, enterpriseBaseUrl: 'https://x', enterpriseApiKey: 'aaaaaaaa' }, 1);
@@ -128,13 +128,9 @@ describe('EnterpriseImportService', () => {
   });
 
   describe('createAccountImportForExistingAccount', () => {
-    it('importa na conta existente sem criar/buscar-por-nome e enfileira job novo', async () => {
+    it('imports into the existing account without create/find-by-name and enqueues a new job', async () => {
       jobRepo.findOne.mockResolvedValueOnce(null);
-      const result = await service.createAccountImportForExistingAccount(
-        42,
-        { enterpriseBaseUrl: 'https://api.enterprise.example.com', enterpriseApiKey: 'secret-key-1234' },
-        7,
-      );
+      const result = await service.createAccountImportForExistingAccount(42, { enterpriseBaseUrl: 'https://api.enterprise.example.com', enterpriseApiKey: 'secret-key-1234' }, 7);
       expect(accountsService.findOne).toHaveBeenCalledWith(42);
       expect(accountsService.create).not.toHaveBeenCalled();
       expect(accountsService.findByName).not.toHaveBeenCalled();
@@ -143,34 +139,30 @@ describe('EnterpriseImportService', () => {
       expect(result).toEqual({ accountId: 42, jobId: 'job-uuid' });
     });
 
-    it('idempotente: job já ativo (running) p/ a conta → mesmo jobId, sem duplicar', async () => {
+    it('idempotent: job already active (running) for the account returns same jobId, no duplicate', async () => {
       jobRepo.findOne.mockResolvedValueOnce({ id: 'job-running', status: 'running' });
-      const result = await service.createAccountImportForExistingAccount(
-        42,
-        { enterpriseBaseUrl: 'https://x', enterpriseApiKey: 'aaaaaaaa' },
-        1,
-      );
+      const result = await service.createAccountImportForExistingAccount(42, { enterpriseBaseUrl: 'https://x', enterpriseApiKey: 'aaaaaaaa' }, 1);
       expect(result).toEqual({ accountId: 42, jobId: 'job-running' });
       expect(jobRepo.save).not.toHaveBeenCalled();
       expect(queue.add).not.toHaveBeenCalled();
     });
 
-    it('propaga 404 quando a conta não existe (defesa server-side)', async () => {
+    it('propagates 404 when the account does not exist (server-side defense)', async () => {
       accountsService.findOne.mockRejectedValueOnce(new NotFoundException('Account not found'));
-      await expect(
-        service.createAccountImportForExistingAccount(123, { enterpriseBaseUrl: 'https://x', enterpriseApiKey: 'aaaaaaaa' }, 1),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.createAccountImportForExistingAccount(123, { enterpriseBaseUrl: 'https://x', enterpriseApiKey: 'aaaaaaaa' }, 1)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
       expect(queue.add).not.toHaveBeenCalled();
     });
   });
 
   describe('resetForSetup', () => {
-    it('obliterate na fila ANTES de apagar, deleta filhos não-cascade + conta + jobs', async () => {
+    it('obliterates the queue BEFORE deleting, removes non-cascade children + account + jobs', async () => {
       const res = await service.resetForSetup();
 
       expect(queue.obliterate).toHaveBeenCalledWith({ force: true });
       const sqls = em.query.mock.calls.map((c) => String(c[0]));
-      // ordem: collect ids → automations_targets → labels → accounts → jobs
+      // order: collect ids -> automations_targets -> labels -> accounts -> jobs
       expect(sqls[0]).toMatch(/SELECT DISTINCT account_id/);
       expect(sqls.some((s) => /DELETE FROM automations_targets/.test(s))).toBe(true);
       expect(sqls.some((s) => /DELETE FROM labels/.test(s))).toBe(true);
@@ -179,9 +171,9 @@ describe('EnterpriseImportService', () => {
       expect(res).toEqual({ accountsDeleted: 1, jobsDeleted: 1 });
     });
 
-    it('inclui extraAccountIds (accountId do enterprise_import_done) mesmo sem job', async () => {
+    it('includes extraAccountIds (accountId from enterprise_import_done) even without a job', async () => {
       em.query.mockImplementation(async (sql: string) => {
-        if (/^SELECT DISTINCT account_id/.test(sql)) return []; // nenhum job
+        if (/^SELECT DISTINCT account_id/.test(sql)) return []; // no job
         if (/RETURNING id/.test(sql)) return [{ id: 7 }];
         return [];
       });
@@ -191,7 +183,7 @@ describe('EnterpriseImportService', () => {
       expect(res.accountsDeleted).toBe(1);
     });
 
-    it('queue obliterate falhar não aborta a limpeza de dados', async () => {
+    it('queue obliterate failure does not abort the data cleanup', async () => {
       queue.obliterate.mockRejectedValueOnce(new Error('redis down'));
       const res = await service.resetForSetup();
       expect(em.query).toHaveBeenCalled();
@@ -200,7 +192,7 @@ describe('EnterpriseImportService', () => {
   });
 
   describe('getStatus', () => {
-    it('retorna ImportStatusDto sem apiKey', async () => {
+    it('returns ImportStatusDto without apiKey', async () => {
       const job = {
         id: 'jid',
         accountId: 5,
@@ -224,14 +216,14 @@ describe('EnterpriseImportService', () => {
       expect(status.progress).toEqual(job.progress);
     });
 
-    it('404 quando jobId não existe', async () => {
+    it('404 when jobId does not exist', async () => {
       jobRepo.findOne.mockResolvedValueOnce(null);
       await expect(service.getStatus('missing')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
   describe('resume', () => {
-    it('re-enfileira job em status=failed', async () => {
+    it('re-enqueues a job in status=failed', async () => {
       const job = { id: 'j1', status: 'failed', encryptedApiKey: 'old-cipher', error: 'boom' };
       jobRepo.findOne.mockResolvedValueOnce(job);
       await service.resume('j1');
@@ -239,16 +231,16 @@ describe('EnterpriseImportService', () => {
       expect(jobRepo.save).toHaveBeenCalled();
     });
 
-    it('rejeita 409 se status=running', async () => {
+    it('rejects with 409 if status=running', async () => {
       jobRepo.findOne.mockResolvedValueOnce({ id: 'j1', status: 'running' });
       await expect(service.resume('j1')).rejects.toBeInstanceOf(ConflictException);
     });
 
-    it('aceita nova apiKey no body e re-cifra', async () => {
+    it('accepts a new apiKey in the body and re-encrypts', async () => {
       const job = { id: 'j1', status: 'failed', encryptedApiKey: 'old-cipher' };
       jobRepo.findOne.mockResolvedValueOnce(job);
       await service.resume('j1', 'novachave1234');
-      // O save deve ter sido chamado com encryptedApiKey alterado
+      // save must have been called with a changed encryptedApiKey
       const savedArg = jobRepo.save.mock.calls[0][0];
       expect(savedArg.encryptedApiKey).toBeTruthy();
       expect(savedArg.encryptedApiKey).not.toBe('old-cipher');

@@ -49,11 +49,10 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
     const apiKey = decryptApiKey(entity.encryptedApiKey);
     const session = this.client.createSession(entity.enterpriseBaseUrl, apiKey);
 
-    // IMPORTANTE: nunca `jobRepo.save(entity)` aqui. `entity` foi lido no topo
-    // com progress/checkpoint vazios; durante o import os importers atualizam
-    // essas colunas DIRETO no banco (jsonb_set atômico). Um save da entity
-    // velha sobrescreveria tudo de volta pra `{}` — era por isso que o job
-    // ficava `completed` mas a tela voltava pra "pendente". Só updates parciais.
+    // Never `jobRepo.save(entity)` here: entity was read with empty
+    // progress/checkpoint, while importers update those columns directly in
+    // the DB (atomic jsonb_set). A full save would overwrite them back to {}.
+    // Use partial updates only.
     const startedAt = entity.startedAt ?? new Date();
     await this.jobRepo.update({ id: jobId }, { status: 'running', startedAt });
 
@@ -70,17 +69,17 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
       const isClientError = err instanceof EnterpriseApi4xxError;
       entity.error = (err as Error)?.message?.slice(0, 500) ?? 'unknown';
       if (isClientError) {
-        // 4xx: não retry — cancela imediatamente (AC5). Update parcial (idem
-        // racional do completed: não clobberar progress/checkpoint do banco).
+        // 4xx: cancel immediately, no retry. Partial update so DB
+        // progress/checkpoint are not clobbered.
         entity.status = 'failed';
         entity.finishedAt = new Date();
         await this.jobRepo.update({ id: jobId }, { status: 'failed', finishedAt: entity.finishedAt, error: entity.error });
-        await this.cleanupOrphanAccount(entity); // F18
+        await this.cleanupOrphanAccount(entity);
         this.logger.warn(`[enterprise-import] job=${jobId} cancelled (4xx): ${entity.error}`);
-        return; // não relança — BullMQ não fará retry
+        return; // do not rethrow: no BullMQ retry
       }
-      // 5xx/timeout/erro genérico: relança pra BullMQ aplicar attempts/backoff.
-      // Se esgotar attempts, @OnWorkerEvent('failed') marca status='failed'.
+      // 5xx/timeout/generic: rethrow so BullMQ applies attempts/backoff.
+      // On attempts exhausted, @OnWorkerEvent('failed') marks status='failed'.
       throw err;
     }
   }
@@ -100,9 +99,8 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
     }
     await this.idMapper.loadFromDb(entity.id);
 
-    // Config global da instância NÃO é importada (configuração manual, fora do
-    // escopo). Iteramos contas Enterprise ORDENADAS por id; watermark de
-    // retomada (F8): checkpoint.accountId = maior id de conta JÁ concluída.
+    // Iterate Enterprise accounts ordered by id; resume watermark
+    // checkpoint.accountId = highest already-completed account id.
     const fresh = await this.jobRepo.findOne({ where: { id: entity.id } });
     const watermark = fresh?.checkpoint?.accountId ?? 0;
     const accRepo = this.dataSource.getRepository(AccountEntity);
@@ -117,21 +115,21 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
       const sorted = [...resp.results].sort((a: any, b: any) => Number(a.id) - Number(b.id));
       for (const sourceAccount of sorted) {
         const srcId = Number(sourceAccount.id);
-        // Pula contas já concluídas em execução anterior (resume — F8). A conta
-        // == watermark é reprocessada (pode ter parado no meio do pipeline); os
-        // importers são idempotentes por chave natural.
+        // Skip accounts finished in a prior run. The account == watermark is
+        // reprocessed (may have stopped mid-pipeline); importers are
+        // idempotent by natural key.
         if (srcId < watermark) continue;
 
         const accRow: Record<string, any> = {};
         for (const k of Object.keys(sourceAccount)) if (accCols.has(k)) accRow[k] = sourceAccount[k];
-        accRow.id = srcId; // instance-scope preserva o id (raw insert — TypeORM
-        // QB ignoraria valor explícito em @PrimaryGeneratedColumn)
+        accRow.id = srcId; // instance-scope preserves the id; raw insert is
+        // required since TypeORM QB ignores explicit @PrimaryGeneratedColumn values
         await rawInsertPreservingPk(this.dataSource, 'accounts', accDbNames, [accRow]);
 
         const ctx = this.buildCtx(entity, session, srcId);
         await this.runPipeline(ctx);
 
-        // Conta concluída → avança watermark (resume pula ela na próxima vez).
+        // Account done: advance watermark so resume skips it next time.
         await this.jobRepo.update({ id: entity.id }, { checkpoint: { accountId: srcId } });
       }
 
@@ -144,7 +142,7 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
 
   private async runPipeline(ctx: ImportContext): Promise<void> {
     const fresh = await this.jobRepo.findOne({ where: { id: ctx.jobId } });
-    // Em instance-scope o checkpoint guarda accountId (watermark), não entity.
+    // In instance-scope the checkpoint stores accountId (watermark), not entity.
     const checkpointEntity = ctx.scope === 'account' ? fresh?.checkpoint?.entity : undefined;
     let skipUntil = checkpointEntity ?? null;
 
@@ -164,8 +162,8 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
       idMapper: this.idMapper,
       dataSource: this.dataSource,
       checkpoint: entity.checkpoint ?? {},
-      // F16: merge atômico via jsonb_set — sem read-modify-write, sem ler o
-      // jsonb inteiro a cada página (evita O(n²) em import de 1M+ contatos).
+      // Atomic merge via jsonb_set, avoiding read-modify-write of the whole
+      // jsonb per page (would be O(n^2) for 1M+ contact imports).
       updateProgress: async (name, patch) => {
         await this.jobRepo.query(
           `UPDATE enterprise_import_jobs
@@ -182,15 +180,14 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
     };
   }
 
-  // F18: em scope=account, a conta é criada ANTES do job. Se falhar logo
-  // (ex.: API Key inválida → 4xx) sem ter importado nada, a conta fica órfã e
-  // vazia. Soft-delete conservador: só se NENHUM progresso foi registrado.
+  // In scope=account the account is created before the job. If it fails early
+  // (e.g. invalid API key) with nothing imported, the account is left orphan
+  // and empty. Conservative soft-delete: only if no progress was recorded.
   private async cleanupOrphanAccount(entity: EnterpriseImportJobEntity): Promise<void> {
     if (entity.scope !== 'account' || !entity.accountId) return;
-    // Relê o progress do BANCO — `entity` pode estar velha (lida no topo do
-    // process() com progress={}); confiar nela soft-deletaria uma conta que
-    // de fato importou dados num 4xx tardio. Os importers gravam progress
-    // direto no DB, então a verdade está lá.
+    // Re-read progress from the DB: `entity` may be stale (read with
+    // progress={}); trusting it would soft-delete an account that did import
+    // data on a late 4xx. Importers write progress directly to the DB.
     const fresh = await this.jobRepo.findOne({ where: { id: entity.id } });
     const progressed = Object.values(fresh?.progress ?? {}).some((p: any) => (p?.done ?? 0) > 0);
     if (progressed) return;
@@ -206,21 +203,21 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
   async onFailed(job: Job<{ jobId: string }>, err: Error): Promise<void> {
     this.logger.warn(`[enterprise-import] bullJob=${job.id} failed: ${err?.message}`);
     const maxAttempts = job.opts?.attempts ?? 1;
-    // F15: só marca terminal quando NÃO há mais tentativas. attemptsMade no
-    // evento 'failed' já reflete a tentativa que acabou de falhar.
+    // Only mark terminal when no attempts remain. attemptsMade in the
+    // 'failed' event already reflects the attempt that just failed.
     if (job.attemptsMade < maxAttempts) return;
 
     const jobId = job.data?.jobId;
     if (!jobId) return;
     const current = await this.jobRepo.findOne({ where: { id: jobId } });
     if (!current) return;
-    // Não clobber estados terminais (4xx já marcou failed; completed não toca).
+    // Do not clobber terminal states (4xx already marked failed; leave completed).
     if (TERMINAL_STATUSES.includes(current.status)) return;
 
     current.status = 'failed';
     current.finishedAt = new Date();
     current.error = err?.message?.slice(0, 500) ?? current.error ?? 'unknown';
     await this.jobRepo.update({ id: jobId }, { status: 'failed', finishedAt: current.finishedAt, error: current.error });
-    await this.cleanupOrphanAccount(current); // F18
+    await this.cleanupOrphanAccount(current);
   }
 }

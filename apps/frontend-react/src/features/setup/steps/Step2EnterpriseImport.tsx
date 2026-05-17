@@ -26,13 +26,9 @@ interface Props {
 
 type SubmitPayload = { baseUrl: string; apiKey: string; accountName?: string; useStep1Account?: boolean };
 
-// UI-only wizard step. Aceita "Pular" (registra enterprise_import_done) ou
-// form (inicia job e mostra progresso). Três ações pedidas:
-//  1. Checkbox "usar a conta do passo 1" — importa na conta já criada no passo
-//     1 em vez de criar uma conta nova/descartável.
-//  2. "Tentar novamente" quando o job falha — reusa o reset existente (cancela
-//     o job + limpa) e reinicia o import com os mesmos dados (job novo).
-//  3. "Recomeçar do zero" sempre visível — mesmo reset e volta ao formulário.
+// UI-only wizard step. Either skip (records enterprise_import_done) or submit
+// the form (starts a job and shows progress). Retry reuses the reset endpoint
+// (cancels the job + cleans) and restarts the import with the same data.
 export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
@@ -43,33 +39,33 @@ export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
   const [step1Account, setStep1Account] = useState<{ id: number; name: string } | null>(null);
   const [useStep1Account, setUseStep1Account] = useState(false);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
-  // Sempre começar do 0: ao (re)abrir o step, para a fila e apaga a pegada do
-  // import anterior ANTES de liberar o form (senão um novo import seria
-  // criado e logo apagado). Idempotente; falha é não-fatal.
+  // Always start from scratch: on (re)open, stop the queue and wipe the prior
+  // import footprint BEFORE enabling the form, otherwise a new import would be
+  // created and immediately deleted. Idempotent; failure is non-fatal.
   const [resetting, setResetting] = useState(true);
   const didReset = useRef(false);
-  // Guarda o último payload enviado pra o "Tentar novamente" reenviar igual.
+  // Holds the last submitted payload so retry can resend it unchanged.
   const lastSubmitRef = useRef<SubmitPayload | null>(null);
 
-  // Status do job (mesma query/poll do ImportStatusView — react-query dedupe
-  // pela queryKey, então não duplica polling). Usado só pra saber se falhou.
+  // Same query/poll as ImportStatusView (react-query dedupes by queryKey, so no
+  // duplicate polling). Used only to detect failure.
   const { data: jobStatus } = useImportStatus(jobId ?? undefined);
   const failed = jobStatus?.status === 'failed';
 
-  // Reset-on-open + carrega a conta do passo 1 (pro checkbox). O getStatus vem
-  // DEPOIS do reset porque o reset recria a conta do passo 1 server-side.
+  // Reset-on-open then load the step 1 account (for the checkbox). getStatus
+  // runs AFTER the reset because the reset recreates the step 1 account server-side.
   async function prepareEnvironment() {
     try {
       await setupGateway.resetEnterpriseImport();
     } catch {
-      // não-fatal: feature off (404) / setup concluído / erro — o submit
-      // reaplica os mesmos gates no backend.
+      // Non-fatal: feature off (404) / setup done / error — submit re-applies
+      // the same gates on the backend.
     }
     try {
       const status = await setupGateway.getStatus();
       setStep1Account(status.step1Account ?? null);
-      // Reusar a conta do passo 1 é o caminho recomendado (não prolifera
-      // contas) — vem marcado quando existe; o usuário pode desmarcar.
+      // Reusing the step 1 account is the recommended path (doesn't proliferate
+      // accounts) — checked by default when present; the user can uncheck.
       setUseStep1Account(!!status.step1Account);
     } catch {
       setStep1Account(null);
@@ -77,7 +73,7 @@ export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
   }
 
   useEffect(() => {
-    if (didReset.current) return; // guarda contra double-mount (StrictMode)
+    if (didReset.current) return; // guard against double-mount (StrictMode)
     didReset.current = true;
     (async () => {
       await prepareEnvironment();
@@ -135,8 +131,8 @@ export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
     }
   }
 
-  // Ação 2: reusa o reset existente (cancela o job atual + limpa) e reinicia
-  // o import com os MESMOS dados — job novo, do zero.
+  // Retry: reuse the reset (cancels the current job + cleans) and restart the
+  // import with the same data — a fresh job from scratch.
   async function handleRetry() {
     if (!lastSubmitRef.current) return;
     setSubmitting(true);
@@ -152,7 +148,7 @@ export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
     }
   }
 
-  // Ação 3: reset manual — limpa tudo e volta ao formulário.
+  // Manual reset — wipes everything and returns to the form.
   async function handleManualReset() {
     setConfirmResetOpen(false);
     setSubmitting(true);
@@ -180,8 +176,8 @@ export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
         <AlertDialogHeader>
           <AlertDialogTitle>Recomeçar o import do zero?</AlertDialogTitle>
           <AlertDialogDescription>
-            Isto cancela o job atual e apaga os dados já importados. A conta criada no passo 1 é preservada (o vínculo do
-            admin não é perdido). Esta ação não pode ser desfeita.
+            Isto cancela o job atual e apaga os dados já importados. A conta criada no passo 1 é preservada (o vínculo
+            do admin não é perdido). Esta ação não pode ser desfeita.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

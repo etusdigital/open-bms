@@ -1,8 +1,7 @@
-// Erros tipados pra o processor distinguir falha-vs-pausa:
-// - 4xx (exceto 429) → cancela com status='failed' (cliente errou: API key
-//   inválida, sem permissão, payload errado). BullMQ não deve retry.
-// - 5xx + timeout → retry com backoff exponencial até esgotar attempts.
-// - 429 → backoff longo (60s) e retry separado.
+// Typed errors so the processor can decide fail-vs-retry:
+// - 4xx (except 429): fail, no BullMQ retry (client error).
+// - 5xx/timeout: retry with exponential backoff until attempts exhausted.
+// - 429: long (60s) backoff, retried separately.
 
 export class EnterpriseApi4xxError extends Error {
   readonly status: number;
@@ -29,9 +28,8 @@ export class EnterpriseApiTimeoutError extends Error {
   }
 }
 
-// 404 distinto dos demais 4xx: usado pelo client p/ diferenciar "endpoint/
-// recurso inexistente" de outros erros do cliente (a versão do Enterprise de
-// origem pode não expor uma rota — endpoints opcionais usam tolerate404).
+// 404 split out from other 4xx so the client can distinguish a missing
+// endpoint/resource (optional endpoints use tolerate404) from real client errors.
 export class EnterpriseApi404Error extends EnterpriseApi4xxError {
   constructor(message: string) {
     super(404, message);

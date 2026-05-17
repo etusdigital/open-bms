@@ -4,10 +4,9 @@ import { ImportContext } from './importer.interface';
 import { PagedResponse } from '../enterprise-client/enterprise.client';
 import { AutomationEntity } from '../entities/automation.entity';
 
-// NOTA: `steps`/`triggers`/`flowLayout` são jsonb que podem embutir ids de
-// custom-fields/tags/campaigns do Enterprise. Em scope=account esses ids
-// embutidos NÃO são remapeados (remap profundo de json arbitrário está fora
-// de escopo) — documentado como limitação conhecida no runbook.
+// `steps`/`triggers`/`flowLayout` are jsonb that may embed Enterprise
+// custom-field/tag/campaign ids. In scope=account these embedded ids are NOT
+// remapped (deep remap of arbitrary json is out of scope) — known limitation.
 @Injectable()
 export class AutomationsImporter extends BaseImporter<AutomationEntity> {
   readonly name = 'automations';

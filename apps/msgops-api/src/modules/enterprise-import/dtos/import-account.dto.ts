@@ -25,8 +25,8 @@ export class ImportAccountDto {
   @JoiSchema(Joi.string().min(8).required())
   enterpriseApiKey: string;
 
-  // ID da conta no Enterprise (origem). Opcional: se ausente, o import roda
-  // mas o rollup de statistics é pulado (sem como resolver a conta de origem).
+  // Source account ID on Enterprise. Optional: if absent, the import runs but
+  // the statistics rollup is skipped (no way to resolve the source account).
   @JoiSchema(Joi.number().integer().positive().optional())
   enterpriseSourceAccountId?: number;
 }

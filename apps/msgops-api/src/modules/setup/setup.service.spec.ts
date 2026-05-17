@@ -151,8 +151,7 @@ describe('SetupService', () => {
       userRepo.count.mockResolvedValue(0);
 
       const status = await service.getStatus();
-      // toMatchObject: valida o contrato original tolerando os campos opcionais
-      // enterpriseImport* adicionados pelo EVO-1123 (F10/F11).
+      // toMatchObject tolerates the optional enterpriseImport* fields.
       expect(status).toMatchObject({ configured: false, currentStep: 1 });
     });
 
@@ -184,7 +183,7 @@ describe('SetupService', () => {
       expect(status).toMatchObject({ configured: true, currentStep: 6 });
     });
 
-    it('expõe step1Account (conta do passo 1) quando o admin tem conta vinculada', async () => {
+    it('exposes step1Account when the admin has a linked account', async () => {
       const { service, roleRepo, userRepo, systemConfigRepo, userAccountRepo, accountRepo } = await buildService();
       roleRepo.findOne.mockResolvedValue(SUPER_ADMIN_ROLE);
       userRepo.count.mockResolvedValue(1);
@@ -673,13 +672,10 @@ describe('SetupService', () => {
       expect(call[0].value.skipReason).toBe('ClickHouse indisponível em staging');
     });
 
-    // Comportamento INTENCIONAL e documentado em setup.service.ts (advanceStep):
-    // o POST /setup/advance step 6 é a ação one-shot de conclusão e NÃO é
-    // bloqueada pelo budget de rate-limit do GET /setup/health-check (que cobre
-    // só o path de polling). Teste alinhado a essa intenção — a versão antiga
-    // (esperava 429) estava obsoleta vs o código e mascarada por uma spec já
-    // vermelha no baseline (mock de transação não cobria AccountConfigEntity).
-    it('NÃO bloqueia o step 6 (conclusão one-shot) pelo budget do health-check', async () => {
+    // Intentional (see setup.service.ts advanceStep): step 6 is the one-shot
+    // completion action and is not bound by the GET /setup/health-check
+    // rate-limit budget, which only covers the polling path.
+    it('does NOT block step 6 (one-shot completion) via the health-check budget', async () => {
       const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ key: 'setup_wizard_step', value: { currentStep: 6, completed: false } });
       jest.spyOn(service, 'checkHealth').mockResolvedValue(allGreen);
@@ -687,7 +683,7 @@ describe('SetupService', () => {
       await service.advanceStep({ step: 6, data: {} as any }, '10.0.0.1');
       await service.advanceStep({ step: 6, data: {} as any }, '10.0.0.1');
       await service.advanceStep({ step: 6, data: {} as any }, '10.0.0.1');
-      // 4ª chamada continua resolvendo (não há budget compartilhado aqui).
+      // 4th call still resolves (no shared budget here).
       await expect(service.advanceStep({ step: 6, data: {} as any }, '10.0.0.1')).resolves.toBeUndefined();
     });
   });
@@ -834,10 +830,10 @@ describe('SetupService', () => {
       process.env.ENTERPRISE_IMPORT_ENABLED = OLD;
     });
 
-    it('skip:true grava enterprise_import_done={imported:false} e não importa', async () => {
+    it('skip:true writes enterprise_import_done={imported:false} and does not import', async () => {
       process.env.ENTERPRISE_IMPORT_ENABLED = 'true';
       const { service, systemConfigRepo } = await buildService();
-      systemConfigRepo.findOne.mockResolvedValue(undefined); // wizard não concluído
+      systemConfigRepo.findOne.mockResolvedValue(undefined); // wizard not completed
 
       const res = await service.importEnterprise({ skip: true } as any, '1.1.1.1');
 
@@ -846,7 +842,7 @@ describe('SetupService', () => {
       expect(saved?.[0]?.value).toMatchObject({ imported: false });
     });
 
-    it('account-scope: usa adminUserId do wizard e chama createAccountImport', async () => {
+    it('account-scope: uses the wizard adminUserId and calls createAccountImport', async () => {
       process.env.ENTERPRISE_IMPORT_ENABLED = 'true';
       const { service, systemConfigRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ value: { completed: false, adminUserId: 99 } });
@@ -858,17 +854,14 @@ describe('SetupService', () => {
       expect(saved?.[0]?.value).toMatchObject({ imported: true, scope: 'account', accountId: 7, jobId: 'job-acc' });
     });
 
-    it('useStep1Account: resolve a conta do passo 1 e chama createAccountImportForExistingAccount', async () => {
+    it('useStep1Account: resolves the step 1 account and calls createAccountImportForExistingAccount', async () => {
       process.env.ENTERPRISE_IMPORT_ENABLED = 'true';
       const { service, systemConfigRepo, userAccountRepo, accountRepo, enterpriseImport } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ value: { completed: false, adminUserId: 9 } });
       userAccountRepo.findOne.mockResolvedValue({ userId: 9, accountId: 50, isMasterUser: true });
       accountRepo.findOne.mockResolvedValue({ id: 50, name: 'Acme' });
 
-      const res = await service.importEnterprise(
-        { baseUrl: 'https://ent.example.com', apiKey: 'supersecret', useStep1Account: true } as any,
-        '1.1.1.1',
-      );
+      const res = await service.importEnterprise({ baseUrl: 'https://ent.example.com', apiKey: 'supersecret', useStep1Account: true } as any, '1.1.1.1');
 
       expect(enterpriseImport.createAccountImportForExistingAccount).toHaveBeenCalledWith(
         50,
@@ -881,25 +874,25 @@ describe('SetupService', () => {
       expect(saved?.[0]?.value).toMatchObject({ imported: true, scope: 'account', accountId: 50, jobId: 'job-step1', reusedStep1Account: true });
     });
 
-    it('useStep1Account sem conta do passo 1 → BadRequest', async () => {
+    it('useStep1Account without a step 1 account → BadRequest', async () => {
       process.env.ENTERPRISE_IMPORT_ENABLED = 'true';
       const { service, systemConfigRepo, userAccountRepo } = await buildService();
       systemConfigRepo.findOne.mockResolvedValue({ value: { completed: false, adminUserId: 9 } });
-      userAccountRepo.findOne.mockResolvedValue(null); // admin sem conta vinculada
+      userAccountRepo.findOne.mockResolvedValue(null); // admin with no linked account
 
-      await expect(
-        service.importEnterprise({ baseUrl: 'https://ent.example.com', apiKey: 'supersecret', useStep1Account: true } as any, '1.1.1.1'),
-      ).rejects.toBeInstanceOf(HttpException);
+      await expect(service.importEnterprise({ baseUrl: 'https://ent.example.com', apiKey: 'supersecret', useStep1Account: true } as any, '1.1.1.1')).rejects.toBeInstanceOf(
+        HttpException,
+      );
     });
 
-    it('404 (NotFoundException) quando ENTERPRISE_IMPORT_ENABLED != true', async () => {
+    it('404 (NotFoundException) when ENTERPRISE_IMPORT_ENABLED != true', async () => {
       process.env.ENTERPRISE_IMPORT_ENABLED = 'false';
       const { service } = await buildService();
       await expect(service.importEnterprise({ skip: true } as any, '1.1.1.1')).rejects.toBeInstanceOf(HttpException);
     });
   });
 
-  describe('resetEnterpriseImport — preserva a conta do passo 1', () => {
+  describe('resetEnterpriseImport — preserves the step 1 account', () => {
     const OLD = process.env.ENTERPRISE_IMPORT_ENABLED;
     afterEach(() => {
       process.env.ENTERPRISE_IMPORT_ENABLED = OLD;
@@ -913,12 +906,12 @@ describe('SetupService', () => {
       };
     }
 
-    it('reusou a conta do passo 1 (reset apagou) → recria conta + vínculo do admin', async () => {
+    it('reused the step 1 account (reset deleted it) → recreates account + admin link', async () => {
       process.env.ENTERPRISE_IMPORT_ENABLED = 'true';
       const { service, systemConfigRepo, userAccountRepo, accountRepo, enterpriseImport } = await buildService();
       systemConfigRepo.findOne.mockImplementation(wizardAndDone());
-      // resolveStep1Account (antes do reset) acha a conta; ensureAdminAccount
-      // (depois do reset) não acha o vínculo → recria.
+      // resolveStep1Account (before reset) finds the account; ensureAdminAccount
+      // (after reset) does not find the link → recreates it.
       userAccountRepo.findOne.mockResolvedValueOnce({ userId: 9, accountId: 50, isMasterUser: true }).mockResolvedValueOnce(null);
       accountRepo.findOne.mockResolvedValueOnce({ id: 50, name: 'Acme' }).mockResolvedValueOnce(null);
       accountRepo.save.mockResolvedValue({ id: 50, name: 'Acme' });
@@ -932,11 +925,11 @@ describe('SetupService', () => {
       expect(res).toEqual({ ok: true, accountsDeleted: 1, jobsDeleted: 1 });
     });
 
-    it('conta descartável (passo 1 intacta) → ensureAdminAccount é no-op (não recria)', async () => {
+    it('throwaway account (step 1 intact) → ensureAdminAccount is a no-op (does not recreate)', async () => {
       process.env.ENTERPRISE_IMPORT_ENABLED = 'true';
       const { service, systemConfigRepo, userAccountRepo, accountRepo } = await buildService();
       systemConfigRepo.findOne.mockImplementation(wizardAndDone());
-      // vínculo do admin sobrevive nas duas leituras → no-op.
+      // admin link survives both reads → no-op.
       userAccountRepo.findOne.mockResolvedValue({ userId: 9, accountId: 50, isMasterUser: true });
       accountRepo.findOne.mockResolvedValue({ id: 50, name: 'Acme' });
 

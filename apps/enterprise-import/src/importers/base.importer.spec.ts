@@ -2,7 +2,7 @@ import { BaseImporter } from './base.importer';
 import { ImportContext } from './importer.interface';
 import { PagedResponse } from '../enterprise-client/enterprise.client';
 
-// DB em memória mínimo que imita o subset de Repository usado pelo BaseImporter:
+// Minimal in-memory DB mimicking the Repository subset BaseImporter uses:
 // metadata.columns/primaryColumns, find({where}), createQueryBuilder().insert().
 class FakeRepo {
   rows: any[] = [];
@@ -67,12 +67,12 @@ function makeCtx(repo: FakeRepo, scope: 'account' | 'instance', overrides: Parti
         recorded.push({ src, nid });
       }),
       resolve: jest.fn(() => null),
-      // expõe pro teste
+      // exposed for assertions
       _recorded: recorded,
     } as any,
     dataSource: {
       getRepository: () => repo,
-      // em do tx: getRepository + query (instance-scope usa rawInsertPreservingPk).
+      // tx exposes getRepository + query (instance-scope uses rawInsertPreservingPk).
       transaction: async (fn: any) =>
         fn({
           getRepository: () => repo,
@@ -96,14 +96,13 @@ function makeCtx(repo: FakeRepo, scope: 'account' | 'instance', overrides: Parti
   };
 }
 
-// patch In() do TypeORM usado dentro do BaseImporter: o módulo importa { In }
-// de 'typeorm'; substituímos por nosso matcher compatível com o FakeRepo.
+// Patch TypeORM's In() used inside BaseImporter with a FakeRepo-compatible matcher.
 jest.mock('typeorm', () => ({
   In: (arr: any[]) => ({ _type: 'in', _value: arr }),
 }));
 
-describe('BaseImporter (rewrite F1/F3/F4/F8)', () => {
-  it('account-scope: descarta id, insere por chave natural e mapeia src→newId NÃO posicional', async () => {
+describe('BaseImporter', () => {
+  it('account-scope: discards source id, inserts by natural key, maps src→newId non-positionally', async () => {
     const repo = new FakeRepo(['id', 'accountId', 'name']);
     const imp = new TestImporter();
     imp.pages = [
@@ -120,17 +119,17 @@ describe('BaseImporter (rewrite F1/F3/F4/F8)', () => {
     await imp.run(ctx);
 
     expect(repo.rows).toHaveLength(2);
-    // ids reescritos pela sequence (não os 500/400 do Enterprise)
+    // ids rewritten by the sequence (not Enterprise's 500/400)
     expect(repo.rows.every((r) => r.id < 100)).toBe(true);
     expect(repo.rows.every((r) => r.accountId === 99)).toBe(true);
-    // mapping liga pela CHAVE NATURAL: src 500/'b' → id do 'b'; 400/'a' → 'a'
+    // mapping links by natural key: src 500/'b' → id of 'b'; 400/'a' → 'a'
     const rec = (ctx.idMapper as any)._recorded as Array<{ src: any; nid: any }>;
     const bySrc = new Map(rec.map((r) => [r.src, r.nid]));
     expect(bySrc.get(500)).toBe(repo.rows.find((r) => r.name === 'b').id);
     expect(bySrc.get(400)).toBe(repo.rows.find((r) => r.name === 'a').id);
   });
 
-  it('é idempotente: reprocessar a mesma página não duplica (F8)', async () => {
+  it('is idempotent: reprocessing the same page does not duplicate', async () => {
     const repo = new FakeRepo(['id', 'accountId', 'name']);
     const imp1 = new TestImporter();
     imp1.pages = [{ results: [{ id: 1, name: 'x' }], page: 1 }];
@@ -140,13 +139,13 @@ describe('BaseImporter (rewrite F1/F3/F4/F8)', () => {
     const imp2 = new TestImporter();
     imp2.pages = [{ results: [{ id: 1, name: 'x' }], page: 1 }];
     await imp2.run(makeCtx(repo, 'account'));
-    expect(repo.rows).toHaveLength(1); // sem duplicata
+    expect(repo.rows).toHaveLength(1); // no duplicate
   });
 
-  it('origem vazia (ou 404 tolerado) → emite estado terminal skipped:empty (não fica eterno "pendente")', async () => {
+  it('empty source (or tolerated 404) emits terminal state skipped:empty instead of staying pending forever', async () => {
     const repo = new FakeRepo(['id', 'accountId', 'name']);
     const imp = new TestImporter();
-    imp.pages = []; // fetchPage devolve { results: [], page: 1 }
+    imp.pages = []; // fetchPage returns { results: [], page: 1 }
     const ctx = makeCtx(repo, 'account');
 
     await imp.run(ctx);
@@ -154,9 +153,9 @@ describe('BaseImporter (rewrite F1/F3/F4/F8)', () => {
     expect(ctx.updateProgress).toHaveBeenCalledWith('tags', { skipped: true, reason: 'empty' });
   });
 
-  it('resume: tudo já existia (0 novos, totalItems>0) → fecha 100% (done=total)', async () => {
+  it('resume: everything already existed (0 new, totalItems>0) closes at 100% (done=total)', async () => {
     const repo = new FakeRepo(['id', 'accountId', 'name']);
-    repo.rows.push({ id: 1, accountId: 99, name: 'x' }); // já existe → 0 inserts
+    repo.rows.push({ id: 1, accountId: 99, name: 'x' }); // already exists → 0 inserts
     const imp = new TestImporter();
     imp.pages = [{ results: [{ id: 1, name: 'x' }], page: 1, totalItems: 1 }];
     const ctx = makeCtx(repo, 'account');
@@ -166,7 +165,7 @@ describe('BaseImporter (rewrite F1/F3/F4/F8)', () => {
     expect(ctx.updateProgress).toHaveBeenCalledWith('tags', { total: 1, done: 1, page: 1 });
   });
 
-  it('instance-scope: preserva o id de origem e NÃO grava mapping', async () => {
+  it('instance-scope: preserves the source id and does not write a mapping', async () => {
     const repo = new FakeRepo(['id', 'accountId', 'name']);
     const imp = new TestImporter();
     imp.pages = [{ results: [{ id: 42, name: 'keep' }], page: 1 }];

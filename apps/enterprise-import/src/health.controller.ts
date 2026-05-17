@@ -1,7 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 
-// F20: liveness/readiness pro k8s. O worker processa jobs via BullMQ; este
-// endpoint só confirma que o processo está de pé (espelha campaign-packer).
+// k8s liveness/readiness. Only confirms the process is up; jobs run via BullMQ.
 @Controller()
 export class HealthController {
   @Get('/health')

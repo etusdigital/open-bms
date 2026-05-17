@@ -14,25 +14,25 @@ describe('SequenceAdvancerService', () => {
     service = moduleRef.get(SequenceAdvancerService);
   });
 
-  it('advance executa pg_get_serial_sequence + setval', async () => {
+  it('advance runs pg_get_serial_sequence + setval', async () => {
     dataSource.query.mockResolvedValueOnce([{ seq: 'public.accounts_id_seq' }]).mockResolvedValueOnce([{ setval: 10 }]);
     await service.advance('accounts', 'id');
     expect(dataSource.query).toHaveBeenCalledWith(`SELECT pg_get_serial_sequence($1, $2) AS seq`, ['accounts', 'id']);
     expect(dataSource.query.mock.calls[1][0]).toContain('setval');
   });
 
-  it('advance silenciosamente quando sequence não existe', async () => {
+  it('advance is a no-op when the sequence does not exist', async () => {
     dataSource.query.mockResolvedValueOnce([{ seq: null }]);
     await service.advance('foo', 'bar');
     expect(dataSource.query).toHaveBeenCalledTimes(1);
   });
 
-  it('ensureInstanceTablesEmpty retorna ok quando accounts vazia', async () => {
+  it('ensureInstanceTablesEmpty returns ok when accounts is empty', async () => {
     dataSource.query.mockResolvedValueOnce([{ c: 0 }]);
     await expect(service.ensureInstanceTablesEmpty()).resolves.toEqual({ ok: true });
   });
 
-  it('ensureInstanceTablesEmpty rejeita com offending quando accounts tem dados', async () => {
+  it('ensureInstanceTablesEmpty reports offending when accounts has data', async () => {
     dataSource.query.mockResolvedValueOnce([{ c: 5 }]);
     await expect(service.ensureInstanceTablesEmpty()).resolves.toEqual({ ok: false, offending: 'accounts' });
   });

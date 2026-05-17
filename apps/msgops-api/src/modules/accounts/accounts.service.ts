@@ -223,12 +223,12 @@ export class AccountsService {
   }
 
   async create(accountDto: CreateAccountDto, userId: number, opts?: { skipDefaults?: boolean }): Promise<{ account: AccountEntity; dns?: any }> {
-    // skipDefaults é setado pelo importer Enterprise → OSS: o caller
-    // assume responsabilidade pelos custom fields, custom events, account_configs
-    // e scheduler de billing — todos vêm replicados do Enterprise. Os efeitos
-    // colaterais que ficam (insert principal, link users_accounts e upload S3 do
-    // service worker) continuam executando porque sustentam invariantes de
-    // funcionamento do app (sem users_accounts a UI quebra com "Nenhuma conta").
+    // skipDefaults is set by the Enterprise → OSS importer: the caller takes
+    // responsibility for custom fields, custom events, account_configs, and the
+    // billing scheduler — all replicated from Enterprise. The remaining side
+    // effects (main insert, users_accounts link, service-worker S3 upload) still
+    // run because they uphold app invariants (without users_accounts the UI
+    // breaks with "no accounts").
     const skipDefaults = opts?.skipDefaults ?? false;
     try {
       const account = this.accountRepository.create(accountDto);

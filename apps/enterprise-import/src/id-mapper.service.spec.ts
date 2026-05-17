@@ -11,7 +11,9 @@ describe('IdMapperService', () => {
     repo = {
       find: jest.fn().mockResolvedValue([]),
       createQueryBuilder: jest.fn(() => ({
-        insert: () => ({ into: () => ({ values: () => ({ orIgnore: () => ({ execute: jest.fn().mockResolvedValue({}) }) }) }) }),
+        insert: () => ({
+          into: () => ({ values: () => ({ orIgnore: () => ({ execute: jest.fn().mockResolvedValue({}) }) }) }),
+        }),
       })),
     };
     const moduleRef = await Test.createTestingModule({
@@ -20,20 +22,20 @@ describe('IdMapperService', () => {
     service = moduleRef.get(IdMapperService);
   });
 
-  it('record + resolve roundtrip em scope=account', async () => {
+  it('record + resolve roundtrip in account scope', async () => {
     await service.record('job1', 'tags', 42, 100);
     expect(service.resolve('job1', 'account', 'tags', 42)).toBe('100');
   });
 
-  it('resolve em scope=instance retorna identidade', () => {
+  it('resolve in instance scope returns the identity id', () => {
     expect(service.resolve('job1', 'instance', 'tags', 99)).toBe('99');
   });
 
-  it('resolve retorna null quando mapping ausente', () => {
+  it('resolve returns null when the mapping is missing', () => {
     expect(service.resolve('job1', 'account', 'tags', 999)).toBeNull();
   });
 
-  it('loadFromDb hidrata cache', async () => {
+  it('loadFromDb hydrates the cache', async () => {
     repo.find.mockResolvedValue([
       { jobId: 'job1', entity: 'tags', sourceId: '1', newId: '101' },
       { jobId: 'job1', entity: 'tags', sourceId: '2', newId: '102' },

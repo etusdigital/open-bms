@@ -19,10 +19,8 @@ import { MessagesImporter } from './importers/messages.importer';
 import { ImportPipeline } from './pipeline';
 import { HealthController } from './health.controller';
 
-// F6: entities listadas EXPLICITAMENTE (classes), não via glob de filesystem.
-// O glob antigo (`__dirname/./entities/*.ts`) era resolvido
-// em runtime e quebrava no container (apontava p/ .ts inexistentes no dist).
-// Classes importadas são resolvidas em build (webpack bundle), sem fs runtime.
+// Entities listed explicitly as classes (not a filesystem glob): a runtime
+// glob resolves to non-existent .ts paths in the bundled container build.
 import { EnterpriseImportJobEntity } from './entities/enterprise-import-job.entity';
 import { EnterpriseIdMappingEntity } from './entities/enterprise-id-mapping.entity';
 import { AccountEntity } from './entities/account.entity';

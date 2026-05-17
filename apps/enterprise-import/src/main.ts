@@ -7,8 +7,7 @@ const SHUTDOWN_HARD_TIMEOUT_MS = 12_000;
 async function bootstrap() {
   const logger = new Logger('enterprise-import');
 
-  // HTTP app (espelha campaign-packer): processa jobs BullMQ + expõe /health
-  // pra liveness/readiness do k8s (F20).
+  // HTTP app: processes BullMQ jobs and exposes /health for k8s probes.
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
   app.enableShutdownHooks();
   const port = parseInt(process.env.PORT || '3001', 10);

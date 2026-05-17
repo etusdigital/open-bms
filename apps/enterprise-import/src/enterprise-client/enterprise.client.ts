@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
 import { EnterpriseApi4xxError, EnterpriseApi404Error, EnterpriseApi5xxError, EnterpriseApiTimeoutError } from './errors';
 
-// Resposta paginada normalizada. Diferentes endpoints do Enterprise expõem
-// shapes ligeiramente diferentes — adapte aqui se necessário.
+// Normalized paged response: different Enterprise endpoints expose slightly
+// different shapes.
 export interface PagedResponse<T> {
   results: T[];
   page: number;
@@ -25,13 +25,9 @@ const MAX_RATE_LIMIT_RETRIES = 3;
 export class EnterpriseClient {
   private readonly logger = new Logger(EnterpriseClient.name);
 
-  // Por job: cria axios instance com baseURL + auth por API KEY. Não
-  // compartilhamos entre jobs porque baseURL e apiKey mudam.
-  //
-  // IMPORTANTE: o BMS autentica API key gerenciada pelo header `x-api-key`
-  // (authz.service.getHeaderApiKey). `Authorization: Bearer` cai no caminho de
-  // JWT de usuário → a API key seria validada como JWT → 401 "Invalid token".
-  // Mandamos `x-api-key`; não é preciso usuário logado.
+  // One axios instance per job (baseURL/apiKey differ per job).
+  // BMS authenticates managed API keys via the `x-api-key` header;
+  // `Authorization: Bearer` would route to user-JWT validation and 401.
   createSession(baseUrl: string, apiKey: string): EnterpriseSession {
     const http = axios.create({
       baseURL: baseUrl.replace(/\/$/, ''),
@@ -51,7 +47,6 @@ export class EnterpriseSession {
     private readonly logger: Logger,
   ) {}
 
-  // ---- Account-scope endpoints ----
   listTags(params: PageParams): Promise<PagedResponse<any>> {
     return this.paged('/tags', params);
   }
@@ -64,19 +59,14 @@ export class EnterpriseSession {
     return this.paged('/labels', params);
   }
 
-  // `/users` é key-scoped (retorna os usuários da conta dona da API key) —
-  // confirmado contra o Enterprise real. O antigo `/accounts/{id}/users`
-  // exigia o id da conta no Enterprise (que o worker não tem em account-scope)
-  // → 404/403.
+  // `/users` is key-scoped (returns users of the API key's owning account).
+  // `/accounts/{id}/users` would 404/403: account-scope has no Enterprise id.
   listUsers(params: PageParams): Promise<PagedResponse<any>> {
     return this.paged('/users', params);
   }
 
-  // Path correto é `/email-template` (singular) — confirmado contra o
-  // Enterprise real (200 c/ dado). O antigo `/emails-templates` dava 404 e o
-  // tolerate404 engolia em silêncio → nenhum template importado (mesma classe
-  // do bug `/users`). `tolerate404` mantido como defensivo: versões que de
-  // fato não exponham o endpoint pulam o step sem falhar o job.
+  // Path is `/email-template` (singular). tolerate404 is kept defensively so
+  // Enterprise versions without this endpoint skip the step without failing.
   listEmailTemplates(params: PageParams): Promise<PagedResponse<any>> {
     return this.paged('/email-template', params, true);
   }
@@ -101,19 +91,15 @@ export class EnterpriseSession {
     return this.paged('/messages', params);
   }
 
-  // ---- Instance-scope endpoints ----
   listAllAccounts(params: PageParams): Promise<PagedResponse<any>> {
     return this.paged('/accounts/all', params);
   }
 
-  // -------------------------------------------------------------------------
-
   private async paged(url: string, params: PageParams & Record<string, any>, tolerate404 = false): Promise<PagedResponse<any>> {
     const data = await this.requestWithRetry({ method: 'GET', url, params, tolerate404 });
-    // tolerate404 → requestWithRetry devolve null no 404: trata como vazio
-    // (importer encerra o loop sem erro).
+    // tolerate404: requestWithRetry returns null on 404; treat as empty.
     if (data == null) return { results: [], page: params.page ?? 1, totalItems: 0, itemsPerPage: 0 };
-    // Normalização defensiva: aceita {results,page,totalItems} ou só array.
+    // Accept either {results,page,totalItems} or a bare array.
     if (Array.isArray(data)) return { results: data, page: params.page ?? 1, totalItems: data.length, itemsPerPage: data.length };
     return {
       results: data?.results ?? [],
@@ -126,7 +112,7 @@ export class EnterpriseSession {
   private async requestWithRetry(opts: { method: 'GET' | 'POST'; url: string; params?: Record<string, any>; tolerate404?: boolean }): Promise<any> {
     let attempt = 0;
     let rateLimitRetries = 0;
-    // Loop com short-circuit em 4xx; 5xx/timeout/network: até 5 tentativas com backoff exp.
+    // Short-circuit on 4xx; 5xx/timeout/network retried with exponential backoff.
     while (true) {
       try {
         const res: AxiosResponse = await this.http.request({ method: opts.method, url: opts.url, params: opts.params });
@@ -153,7 +139,7 @@ export class EnterpriseSession {
           throw new EnterpriseApi4xxError(status, extractMessage(ax));
         }
 
-        // 5xx, timeout, ou erro de rede: retry com backoff
+        // 5xx, timeout, or network error: retry with backoff.
         if (attempt >= RETRY_DELAYS_MS.length) {
           if (isTimeout) throw new EnterpriseApiTimeoutError(extractMessage(ax));
           if (status && status >= 500) throw new EnterpriseApi5xxError(status, extractMessage(ax));

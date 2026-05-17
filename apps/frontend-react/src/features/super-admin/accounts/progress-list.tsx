@@ -2,10 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { Progress } from '@/components/ui/progress';
 import type { ImportProgressEntry, ImportStatus } from './import-gateway';
 
-// Mantido em sincronia com o pipeline do worker (apps/enterprise-import
-// pipeline.ts). instance-config, account-settings e users foram removidos do
-// import (config manual / dados account-scoped) — não aparecem mais aqui.
-// A chave da entidade no progresso → chave i18n em superAdmin.accounts.import.entities.
+// Kept in sync with the worker pipeline (apps/enterprise-import pipeline.ts).
+// Maps the progress entity key → i18n key under superAdmin.accounts.import.entities.
 const ENTITY_I18N: Record<string, string> = {
   tags: 'tags',
   'custom-fields': 'customFields',
@@ -33,11 +31,10 @@ export function ProgressList({
 }) {
   const { t } = useTranslation();
   const keys = Object.keys(ENTITY_I18N);
-  // Job concluído ⇒ todo step que rodou está 100%. Vários importers
-  // (ex.: messages) emitem só {done, page} sem {total} — sem isso o
-  // pct() não tem como calcular e a barra ficaria travada em 0% mesmo com o
-  // job `completed`. Quando o job conclui, forçamos 100% (o que processou
-  // também fica cheio, batendo com o status).
+  // Job completed ⇒ every step that ran is 100%. Some importers (e.g. messages)
+  // emit only {done, page} without {total}, so pct() can't compute and the bar
+  // would stay stuck at 0% even with a `completed` job. On completion we force
+  // 100% so processed steps render full, matching the status.
   const jobDone = jobStatus === 'completed';
   return (
     <div className="space-y-3">

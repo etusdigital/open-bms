@@ -1,7 +1,7 @@
 import { EnterpriseImportProcessor } from './enterprise-import.processor';
 
-// F15/F18: lógica de estado terminal do onFailed e cleanup de conta órfã.
-describe('EnterpriseImportProcessor onFailed (F15) + orphan cleanup (F18)', () => {
+// onFailed terminal-state logic and orphan-account cleanup.
+describe('EnterpriseImportProcessor onFailed + orphan cleanup', () => {
   function make(jobRow: any) {
     const jobRepo: any = {
       findOne: jest.fn(async () => ({ ...jobRow })),
@@ -15,34 +15,34 @@ describe('EnterpriseImportProcessor onFailed (F15) + orphan cleanup (F18)', () =
   }
   const job = (attemptsMade: number, attempts = 5) => ({ id: 'b1', data: { jobId: 'j1' }, attemptsMade, opts: { attempts } }) as any;
 
-  it('NÃO marca failed enquanto ainda há tentativas (F15 — sem off-by-one)', async () => {
+  it('does not mark failed while retries remain (no off-by-one)', async () => {
     const { proc, jobRepo } = make({ id: 'j1', status: 'running', scope: 'account', accountId: 5, progress: {} });
     await proc.onFailed(job(2, 5), new Error('5xx transient'));
     expect(jobRepo.update).not.toHaveBeenCalled();
   });
 
-  it('marca failed quando esgota as tentativas', async () => {
+  it('marks failed once retries are exhausted', async () => {
     const { proc, jobRepo } = make({ id: 'j1', status: 'running', scope: 'instance', accountId: null, progress: {} });
     await proc.onFailed(job(5, 5), new Error('5xx exhausted'));
-    // Update parcial (não save da entity inteira — não clobbera progress/checkpoint).
+    // Partial update (not a full-entity save) so progress/checkpoint are not clobbered.
     expect(jobRepo.update).toHaveBeenCalledWith({ id: 'j1' }, expect.objectContaining({ status: 'failed' }));
     expect(jobRepo.save).not.toHaveBeenCalled();
   });
 
-  it('NÃO clobbera estado terminal já existente (completed/failed)', async () => {
+  it('does not clobber an already-terminal state (completed/failed)', async () => {
     const { proc, jobRepo } = make({ id: 'j1', status: 'completed', scope: 'account', accountId: 5, progress: {} });
     await proc.onFailed(job(5, 5), new Error('late failure'));
     expect(jobRepo.update).not.toHaveBeenCalled();
     expect(jobRepo.save).not.toHaveBeenCalled();
   });
 
-  it('F18: soft-delete da conta órfã quando account-scope falha sem progresso', async () => {
+  it('soft-deletes the orphan account when account-scope fails with no progress', async () => {
     const { proc, dataSource } = make({ id: 'j1', status: 'running', scope: 'account', accountId: 77, progress: {} });
     await proc.onFailed(job(5, 5), new Error('bad api key'));
     expect(dataSource.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE accounts SET deleted_at'), [77]);
   });
 
-  it('F18: NÃO apaga a conta se já houve progresso (import parcial)', async () => {
+  it('does not delete the account when there was partial progress', async () => {
     const { proc, dataSource } = make({
       id: 'j1',
       status: 'running',

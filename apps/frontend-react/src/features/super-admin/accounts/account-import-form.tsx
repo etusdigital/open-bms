@@ -16,10 +16,9 @@ export function AccountImportForm() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const importMutation = useAccountImport();
-  // Progresso inline (como no wizard Step2EnterpriseImport): após iniciar o
-  // job, mostramos o ImportStatusView aqui mesmo em vez de navegar para a rota
-  // /import-enterprise/$jobId. A rota por jobId continua existindo para
-  // deep-link, mas o fluxo do formulário não sai mais da página.
+  // Inline progress: after starting the job we show ImportStatusView here
+  // instead of navigating away. The /import-enterprise/$jobId route is kept for
+  // deep-link back-compat, but the form flow no longer leaves the page.
   const [jobId, setJobId] = useState<string | null>(null);
 
   const form = useForm<AccountImportFormValues>({

@@ -96,11 +96,9 @@ export class SetupService implements OnModuleInit {
     enterpriseImportDone: boolean;
     step1Account?: { id: number; name: string };
   }> {
-    // F10: frontend usa isso pra esconder o Step2 (Enterprise import) quando a
-    // feature está desligada — o gate de backend já existe, este é cosmético.
     const enterpriseImportEnabled = process.env.ENTERPRISE_IMPORT_ENABLED === 'true';
-    // F11: o passo Enterprise (UI-only) não tem step próprio no backend, então
-    // este flag é a fonte da verdade pra retomada saber se já foi feito/pulado.
+    // The Enterprise step has no backend step of its own, so this flag is the
+    // source of truth for resume logic to know whether it was done/skipped.
     const enterpriseImportDone = !!(await this.systemConfigRepo.findOne({ where: { key: 'enterprise_import_done' } }));
 
     const state = await this.readWizard();
@@ -119,8 +117,6 @@ export class SetupService implements OnModuleInit {
     const domainCfg = await this.systemConfigRepo.findOne({ where: { key: DOMAIN_KEY } });
     const baseUrl: string | undefined = (domainCfg?.value as any)?.baseUrl;
 
-    // Conta do passo 1 — o Step 2 do front oferece importar nela (checkbox)
-    // em vez de criar uma conta nova/descartável.
     const step1Account = await this.resolveStep1Account(state.adminUserId);
 
     return {
@@ -284,14 +280,10 @@ export class SetupService implements OnModuleInit {
     });
   }
 
-  // Garante que o admin do wizard tem uma Account vinculada como master_user
-  // (sem isso o app cai no estado quebrado "Nenhuma conta atribuída").
-  // Idempotente: se já existe users_accounts pro admin, no-op. Usado pelo
-  // passo 1 E pela recriação pós-reset do Enterprise import (o reset apaga a
-  // conta-alvo, que pode ser justamente a do passo 1 quando reusada — aqui ela
-  // volta com o mesmo nome). `accounts.name` tem UNIQUE column-level no DB
-  // (não parcial em deleted_at); `withDeleted:true` + restore cobrem o caso de
-  // o worker ter soft-deletado a conta órfã (o nome continua ocupado).
+  // Idempotent (no-op if a users_accounts link exists). Also called by the
+  // post-reset recreation: accounts.name is column-level UNIQUE (not partial on
+  // deleted_at), so withDeleted+restore reclaims a soft-deleted orphan whose
+  // name is still taken.
   private async ensureAdminAccount(em: EntityManager, adminUserId: number, accountName: string): Promise<void> {
     const accountRepo = em.getRepository(AccountEntity);
     const userAccountRepo = em.getRepository(UserAccountEntity);
@@ -323,9 +315,8 @@ export class SetupService implements OnModuleInit {
       }),
     );
 
-    // Insert idempotente: accounts_configs tem UNIQUE (account_id, name),
-    // então só cria o api_key_tracker se ainda não existir (conta reusada
-    // pode já ter o config de uma tentativa anterior).
+    // accounts_configs has UNIQUE (account_id, name), so only create the
+    // api_key_tracker if absent (a reused account may already have it).
     const existingTracker = await accountConfigRepo.findOne({ where: { accountId: savedAccount.id, name: 'api_key_tracker' } });
     if (!existingTracker) {
       await accountConfigRepo.save([
@@ -339,9 +330,8 @@ export class SetupService implements OnModuleInit {
     }
   }
 
-  // Resolve a conta criada no passo 1 (master_user link do admin do wizard).
-  // Usado pelo checkbox "usar conta do passo 1" e pelo getStatus. Retorna null
-  // se o passo 1 ainda não rodou ou o admin não tem conta vinculada.
+  // Resolves the step 1 account (the wizard admin's master_user link).
+  // Returns null if step 1 has not run or the admin has no linked account.
   private async resolveStep1Account(adminUserId?: number): Promise<{ id: number; name: string } | null> {
     if (!adminUserId) return null;
     const link = await this.userAccountRepo.findOne({ where: { userId: adminUserId }, order: { isMasterUser: 'DESC' } });
@@ -418,10 +408,8 @@ export class SetupService implements OnModuleInit {
     }
   }
 
-  // Fase 2 — endpoint UI-only do wizard. Aceita {skip:true} ou {baseUrl,apiKey}.
-  // Gates: (F10) feature-flag — 404 se desabilitado, igual ao guard do módulo;
-  // wizard ainda não concluído; (F9) rate-limit por IP + validação anti-SSRF
-  // do baseUrl antes de enfileirar o worker.
+  // Gates: feature-flag (404 if disabled), wizard not yet completed, per-IP
+  // rate-limit, and anti-SSRF baseUrl validation before enqueuing the worker.
   async importEnterprise(dto: ImportEnterpriseSetupDto, requesterIp?: string): Promise<{ jobId?: string }> {
     if (process.env.ENTERPRISE_IMPORT_ENABLED !== 'true') {
       throw new NotFoundException();
@@ -440,19 +428,12 @@ export class SetupService implements OnModuleInit {
     }
     const safeBaseUrl = assertSafeEnterpriseBaseUrl(dto.baseUrl);
 
-    // Wizard = ACCOUNT-SCOPE: cria uma conta nova e importa os dados da conta
-    // Enterprise nela. É async-safe (não exige DB virgem). instance-scope
-    // (migração de instância inteira, preserva IDs) é incompatível com o
-    // wizard — vide docs/operations/enterprise-import-testing.md (procedimento
-    // separado, rodado em DB virgem).
     const state = await this.readWizard();
     const adminUserId = state?.adminUserId;
     if (!adminUserId) {
       throw new BadRequestException('Crie o administrador (passo anterior) antes de importar do Enterprise.');
     }
-    // useStep1Account: importa NA conta criada no passo 1 (resolvida pelo
-    // admin do wizard) em vez de criar uma conta nova/descartável. O cliente
-    // nunca informa accountId — é sempre resolvido server-side.
+    // accountId is always resolved server-side; the client never supplies it.
     let accountId: number;
     let jobId: string;
     let reusedStep1Account = false;
@@ -484,39 +465,36 @@ export class SetupService implements OnModuleInit {
     return { jobId };
   }
 
-  // Chamado quando o usuário (re)abre o Step 2 do wizard: zera o ambiente de
-  // import pra sempre começar do 0 — para/remove a fila BullMQ e apaga a
-  // pegada do import (jobs + contas criadas + filhos). Gates iguais ao
-  // importEnterprise: 404 se feature off; ForbiddenException via
-  // ensureNotConfigured se o setup já foi concluído (aí é tenant vivo, não
-  // pode apagar). Idempotente: reabrir sem nada pra apagar é no-op.
+  // Stops/removes the BullMQ queue and deletes the import footprint (jobs +
+  // created accounts + children). Gated: 404 if feature off; ForbiddenException
+  // via ensureNotConfigured once setup is complete (live tenant must not be
+  // wiped). Idempotent: reopening with nothing to delete is a no-op.
   async resetEnterpriseImport(): Promise<{ ok: true; accountsDeleted: number; jobsDeleted: number }> {
     if (process.env.ENTERPRISE_IMPORT_ENABLED !== 'true') {
       throw new NotFoundException();
     }
     await this.ensureNotConfigured();
 
-    // Inclui o accountId persistido em enterprise_import_done (defesa: o job
-    // pode já ter sumido mas a conta ficou).
+    // Include the accountId from enterprise_import_done: the job may be gone
+    // while the account remains.
     const doneCfg = await this.systemConfigRepo.findOne({ where: { key: 'enterprise_import_done' } });
     const extraId = Number((doneCfg?.value as any)?.accountId);
     const extraAccountIds = Number.isInteger(extraId) && extraId > 0 ? [extraId] : [];
 
-    // Captura o admin + nome da conta do passo 1 ANTES do reset: se o import
-    // reusou a conta do passo 1, o resetForSetup vai apagá-la (ela é referida
-    // pelos enterprise_import_jobs / extraAccountIds) e o nome se perde depois.
+    // Capture the step 1 account before the reset: if the import reused it,
+    // resetForSetup deletes it (referenced by jobs/extraAccountIds) and the
+    // name is lost afterwards.
     const state = await this.readWizard();
     const step1Before = await this.resolveStep1Account(state?.adminUserId);
 
     const result = await this.enterpriseImport.resetForSetup(extraAccountIds);
 
-    // Limpa a flag pra o status refletir "import não feito" (step volta ao 0).
     if (doneCfg) await this.systemConfigRepo.delete({ key: 'enterprise_import_done' });
 
-    // Recria a conta do passo 1 se o reset a apagou (caso "usar conta do passo
-    // 1"). Idempotente: se uma conta descartável foi usada, a do passo 1
-    // continua viva e o vínculo do admin ainda existe → ensureAdminAccount é
-    // no-op. Sem isso o admin ficaria sem conta ("Nenhuma conta atribuída").
+    // Recreate the step 1 account if the reset deleted it (reuse case).
+    // Idempotent: with a throwaway account the admin link survives and
+    // ensureAdminAccount is a no-op. Without this the admin would have no
+    // account.
     if (state?.adminUserId && step1Before) {
       await this.dataSource.transaction((em) => this.ensureAdminAccount(em, state.adminUserId as number, step1Before.name));
     }

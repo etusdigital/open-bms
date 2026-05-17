@@ -8,7 +8,7 @@ export function useImportStatus(jobId: string | undefined) {
     queryKey: ['enterprise-import', jobId],
     queryFn: ({ signal }) => importGateway.getStatus(jobId as string, signal),
     enabled: !!jobId,
-    // Polling: pára em terminal states (completed/failed). Padrão segments/use-segments.
+    // Polling stops at terminal states (completed/failed).
     refetchInterval: (q) => {
       const status = q.state.data?.status;
       if (status === 'completed' || status === 'failed') return false;

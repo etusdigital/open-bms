@@ -49,20 +49,25 @@ export const setupGateway = {
     await http.post('/setup/s3', data);
   },
 
-  // Step do wizard (ACCOUNT-SCOPE). Aceita {skip:true} ou
-  // {baseUrl, apiKey, accountName?}. Cria conta nova e importa nela; devolve
-  // {jobId} pra UI monitorar progresso.
+  // Account-scoped wizard step. Creates a new account and imports into it;
+  // returns {jobId} for the UI to monitor progress.
   async importEnterprise(
     payload:
       | { skip: true }
-      | { baseUrl: string; apiKey: string; accountName?: string; useStep1Account?: boolean; enterpriseSourceAccountId?: number },
+      | {
+          baseUrl: string;
+          apiKey: string;
+          accountName?: string;
+          useStep1Account?: boolean;
+          enterpriseSourceAccountId?: number;
+        },
   ): Promise<{ jobId?: string }> {
     const res = await http.post<{ jobId?: string }>('/setup/import-enterprise', payload);
     return res.data;
   },
 
-  // Zera o ambiente de import (para a fila + apaga jobs/contas do import).
-  // Chamado ao (re)abrir o Step 2 pra sempre começar do 0. Idempotente.
+  // Resets the import environment (stops the queue, deletes import jobs/accounts).
+  // Called when (re)opening Step 2 to always start from scratch. Idempotent.
   async resetEnterpriseImport(): Promise<void> {
     await http.post('/setup/import-enterprise/reset', {});
   },

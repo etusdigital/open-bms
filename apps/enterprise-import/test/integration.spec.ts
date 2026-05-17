@@ -1,13 +1,13 @@
 /**
- * Integration tests (Task 34) — agora REAIS.
+ * Real integration tests.
  *
- * Sobe um Postgres efêmero (testcontainers), cria o schema das entities REAIS
- * via TypeORM synchronize, sobe um mock HTTP do msgops-api Enterprise e roda
- * o importer de verdade contra tudo isso. Valida ponta-a-ponta os fixes
- * F1 (todas as colunas), F3 (resolução por chave natural), F4 (FK/accountId),
- * F8 (idempotência de retomada) e o short-circuit 4xx do EnterpriseClient.
+ * Starts an ephemeral Postgres (testcontainers), builds the schema from the
+ * real entity metadata, stands up an HTTP mock of the Enterprise msgops-api,
+ * and runs the real importer end-to-end. Validates all columns persisted,
+ * natural-key resolution, FK/accountId handling, resume idempotency, and the
+ * EnterpriseClient 4xx short-circuit.
  *
- * Exige Docker. NÃO roda em CI por padrão:
+ * Requires Docker. Off by default in CI:
  *   ENABLE_INTEGRATION_TESTS=true pnpm --filter enterprise-import test -- test/integration
  */
 import { createServer, Server } from 'node:http';
@@ -17,9 +17,8 @@ import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
-// Carrega TODAS as entity classes do msgops-api dinamicamente (ts-jest
-// transforma os require de .ts). synchronize:true precisa do fecho completo
-// de relações — o schema operacional inteiro.
+// Loads all msgops-api entity classes dynamically (ts-jest transforms the .ts
+// requires). The full relation closure is needed for complete metadata.
 type EntityClass = new (...args: any[]) => unknown;
 const ENTITIES_DIR = join(__dirname, '../src/entities');
 function loadAllEntities(): EntityClass[] {
@@ -34,9 +33,9 @@ function loadAllEntities(): EntityClass[] {
   return out;
 }
 
-// synchronize:true falha em FK duplicada de schema legado (bug conhecido do
-// TypeORM — prod usa migrations). Geramos o DDL das tabelas sob teste a partir
-// da METADATA REAL (colunas autênticas, sem FK — desnecessárias p/ o importer).
+// synchronize:true breaks on the legacy schema's duplicate FKs (known TypeORM
+// bug; prod uses migrations). The DDL for the tables under test is generated
+// from the real metadata (authentic columns, no FKs — not needed by the importer).
 function pgType(col: any): string {
   const t = typeof col.type === 'function' ? col.type.name.toLowerCase() : String(col.type).toLowerCase();
   if (col.isGenerated && col.generationStrategy === 'uuid') return 'uuid';
@@ -85,9 +84,9 @@ import { TagEntity } from '../src/entities/tag.entity';
 const enabled = process.env.ENABLE_INTEGRATION_TESTS === 'true';
 const d = enabled ? describe : describe.skip;
 
-// Tag completa no shape que o Enterprise (mesmo codebase) serializa — todas as
-// colunas NOT NULL preenchidas. Se o importer perdesse colunas (bug F1), o
-// INSERT estouraria contra o DDL real.
+// Full Tag in the shape the Enterprise serializes, with every NOT NULL column
+// filled. If the importer dropped columns, the INSERT would fail against the
+// real DDL.
 function makeTag(id: number, name: string) {
   return {
     id,
@@ -130,11 +129,11 @@ d('enterprise-import integration (testcontainers + Enterprise mock)', () => {
     ds = new DataSource({
       type: 'postgres',
       url: pg.getConnectionUri(),
-      entities: loadAllEntities(), // fecho completo p/ metadata
+      entities: loadAllEntities(), // full closure for metadata
       synchronize: false,
     });
     await ds.initialize();
-    // Cria só as tabelas sob teste, a partir da metadata REAL.
+    // Create only the tables under test, from the real metadata.
     for (const e of [EnterpriseImportJobEntity, EnterpriseIdMappingEntity, AccountEntity, TagEntity]) {
       await createTableFromMetadata(ds, e);
     }
@@ -193,39 +192,39 @@ d('enterprise-import integration (testcontainers + Enterprise mock)', () => {
     };
   }
 
-  it('1. account-scope: persiste TODAS as colunas, sobrescreve accountId e mapeia src→newId por chave natural', async () => {
-    // O importer não lê enterprise_import_jobs (o processor lê); idMapper grava
-    // em enterprise_id_mappings.job_id (varchar). jobId arbitrário serve.
+  it('1. account-scope: persists all columns, overwrites accountId, maps src→newId by natural key', async () => {
+    // The importer does not read enterprise_import_jobs (the processor does);
+    // idMapper writes to enterprise_id_mappings.job_id (varchar). Any jobId works.
     await new TagsImporter().run(ctx('account', 'job-1'));
 
     const tags = await ds.getRepository(TagEntity).find({ order: { name: 'ASC' } });
     expect(tags.map((t) => t.name)).toEqual(['alpha', 'beta', 'gamma']);
     expect(tags.every((t) => t.accountId === 1)).toBe(true);
     expect(tags.every((t) => t.type === 'static' && t.status === 'active')).toBe(true);
-    // ids reescritos pela sequence (não 101/102/103 do Enterprise)
+    // ids rewritten by the sequence (not Enterprise's 101/102/103)
     expect(tags.every((t) => t.id < 100)).toBe(true);
 
     const maps = await ds.getRepository(EnterpriseIdMappingEntity).find();
     const bySource = new Map(maps.map((m) => [m.sourceId, m.newId]));
     const alpha = tags.find((t) => t.name === 'alpha')!;
-    expect(bySource.get('101')).toBe(String(alpha.id)); // ligado pela chave natural, não posicional
+    expect(bySource.get('101')).toBe(String(alpha.id)); // linked by natural key, not positionally
   });
 
-  it('2. idempotente: rodar o mesmo importer 2x não duplica (F8)', async () => {
+  it('2. idempotent: running the same importer twice does not duplicate', async () => {
     await new TagsImporter().run(ctx('account', 'j2'));
     await new TagsImporter().run(ctx('account', 'j2'));
     const count = await ds.getRepository(TagEntity).count();
     expect(count).toBe(3);
   });
 
-  it('3. instance-scope: preserva o id de origem e não grava mapping', async () => {
+  it('3. instance-scope: preserves the source id and does not write a mapping', async () => {
     await new TagsImporter().run(ctx('instance', 'j3'));
     const ids = (await ds.getRepository(TagEntity).find()).map((t) => t.id).sort();
     expect(ids).toEqual([101, 102, 103]);
     expect(await ds.getRepository(EnterpriseIdMappingEntity).count()).toBe(0);
   });
 
-  it('4. 4xx do Enterprise → EnterpriseApi4xxError sem retry', async () => {
+  it('4. Enterprise 4xx throws EnterpriseApi4xxError without retry', async () => {
     mode = 'unauthorized';
     await expect(new TagsImporter().run(ctx('account', 'j4'))).rejects.toBeInstanceOf(EnterpriseApi4xxError);
   });

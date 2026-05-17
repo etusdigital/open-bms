@@ -1,9 +1,9 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
-// AES-256-GCM com IV randômico de 12 bytes por valor. Output: base64 de
-// `iv | authTag | ciphertext` (sem separador — tamanhos fixos: 12 + 16 = 28 bytes
-// de header, resto é ciphertext). GCM dá integridade nativa: se o ciphertext for
-// adulterado o decipher.final() lança. Chave em base64 no env (32 bytes brutos).
+// AES-256-GCM, random 12-byte IV per value. Output: base64 of
+// `iv | authTag | ciphertext` (fixed 12+16=28-byte header). GCM provides
+// integrity: a tampered ciphertext makes decipher.final() throw. Key is
+// base64 in env (32 raw bytes).
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;

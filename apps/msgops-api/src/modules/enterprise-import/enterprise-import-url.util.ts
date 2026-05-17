@@ -1,10 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
 import { isIP } from 'node:net';
 
-// F9: o baseUrl do Enterprise é fornecido pelo usuário e o worker faz requests
-// pra ele → vetor de SSRF. Bloqueamos loopback/privado/link-local/metadata e,
-// opcionalmente, restringimos a uma allowlist (ENTERPRISE_IMPORT_ALLOWED_HOSTS,
-// CSV de hosts). Em produção, exigimos https salvo se NODE_ENV !== production.
+// The Enterprise baseUrl is user-supplied and the worker makes requests to it
+// -> SSRF vector. Block loopback/private/link-local/metadata and optionally
+// restrict to an allowlist (ENTERPRISE_IMPORT_ALLOWED_HOSTS, CSV of hosts).
+// In production, require https.
 
 const BLOCKED_HOSTNAMES = new Set(['localhost', 'localhost.localdomain', 'ip6-localhost', 'ip6-loopback']);
 
@@ -15,7 +15,7 @@ function isPrivateIpv4(ip: string): boolean {
   if (a === 10) return true; // 10.0.0.0/8
   if (a === 127) return true; // loopback
   if (a === 0) return true; // 0.0.0.0/8
-  if (a === 169 && b === 254) return true; // link-local (inclui 169.254.169.254 metadata)
+  if (a === 169 && b === 254) return true; // link-local (includes 169.254.169.254 metadata)
   if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
   if (a === 192 && b === 168) return true; // 192.168.0.0/16
   if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT 100.64.0.0/10
@@ -70,7 +70,7 @@ export function assertSafeEnterpriseBaseUrl(rawUrl: string): string {
   if (ipVersion === 6 && isPrivateIpv6(host)) {
     throw new BadRequestException('enterpriseBaseUrl aponta para IP privado/loopback — bloqueado (SSRF)');
   }
-  // Hostnames que resolvem só pra IP privado ainda podem passar aqui; a
-  // allowlist é a defesa forte recomendada em ambientes sensíveis.
+  // Hostnames that resolve only to a private IP can still pass here; the
+  // allowlist is the strong defense recommended in sensitive environments.
   return url.toString();
 }

@@ -1,8 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { assertSafeEnterpriseBaseUrl } from '../enterprise-import-url.util';
 
-// F9: o validador é a defesa de SSRF do baseUrl fornecido pelo usuário.
-describe('assertSafeEnterpriseBaseUrl (F9 anti-SSRF)', () => {
+// The validator is the SSRF defense for the user-supplied baseUrl.
+describe('assertSafeEnterpriseBaseUrl (anti-SSRF)', () => {
   const OLD_ENV = process.env;
   beforeEach(() => {
     process.env = { ...OLD_ENV };
@@ -13,7 +13,7 @@ describe('assertSafeEnterpriseBaseUrl (F9 anti-SSRF)', () => {
     process.env = OLD_ENV;
   });
 
-  it('aceita host público https', () => {
+  it('accepts a public https host', () => {
     expect(assertSafeEnterpriseBaseUrl('https://enterprise.acme.com')).toContain('enterprise.acme.com');
   });
 
@@ -26,22 +26,22 @@ describe('assertSafeEnterpriseBaseUrl (F9 anti-SSRF)', () => {
     'http://169.254.169.254/latest/meta-data', // AWS metadata
     'http://[::1]:8080',
     'http://0.0.0.0',
-  ])('bloqueia alvo interno: %s', (url) => {
+  ])('blocks internal target: %s', (url) => {
     expect(() => assertSafeEnterpriseBaseUrl(url)).toThrow(BadRequestException);
   });
 
-  it('rejeita protocolo não-http(s)', () => {
+  it('rejects non-http(s) protocols', () => {
     expect(() => assertSafeEnterpriseBaseUrl('file:///etc/passwd')).toThrow(BadRequestException);
     expect(() => assertSafeEnterpriseBaseUrl('not-a-url')).toThrow(BadRequestException);
   });
 
-  it('exige https em produção', () => {
+  it('requires https in production', () => {
     process.env.NODE_ENV = 'production';
     expect(() => assertSafeEnterpriseBaseUrl('http://enterprise.acme.com')).toThrow(/https/);
     expect(assertSafeEnterpriseBaseUrl('https://enterprise.acme.com')).toContain('https');
   });
 
-  it('allowlist: só passa host listado, mesmo público', () => {
+  it('allowlist: only listed hosts pass, even public ones', () => {
     process.env.ENTERPRISE_IMPORT_ALLOWED_HOSTS = 'enterprise.acme.com';
     expect(assertSafeEnterpriseBaseUrl('https://enterprise.acme.com')).toContain('acme');
     expect(() => assertSafeEnterpriseBaseUrl('https://evil.example.com')).toThrow(/allowlist/);

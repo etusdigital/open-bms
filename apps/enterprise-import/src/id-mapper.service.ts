@@ -3,9 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EnterpriseIdMappingEntity } from './entities/enterprise-id-mapping.entity';
 
-// Cache em memória + persistência por (jobId, entity, sourceId) → newId.
-// Em scope=instance, resolve() retorna o próprio sourceId (identidade) — IDs
-// foram preservados via SequenceAdvancer.
+// In-memory cache + persistence of (jobId, entity, sourceId) -> newId.
+// In scope=instance, resolve() returns sourceId itself (ids preserved via
+// SequenceAdvancer).
 @Injectable()
 export class IdMapperService {
   private readonly logger = new Logger(IdMapperService.name);
@@ -16,7 +16,7 @@ export class IdMapperService {
     private readonly repo: Repository<EnterpriseIdMappingEntity>,
   ) {}
 
-  // Chamado no início do processor pra hidratar cache em scope=account.
+  // Hydrates the cache at processor start for scope=account.
   async loadFromDb(jobId: string): Promise<void> {
     this.cache.clear();
     const rows = await this.repo.find({ where: { jobId } });
@@ -30,15 +30,15 @@ export class IdMapperService {
     const sId = String(sourceId);
     const nId = String(newId);
     this.cache.set(this.key(jobId, entity, sId), nId);
-    // Upsert defensivo (PK composto): retomadas que reprocessam uma página podem
-    // re-gravar; ON CONFLICT DO NOTHING preserva o primeiro mapping.
+    // Composite-PK upsert: resumed runs may re-record a page; ON CONFLICT DO
+    // NOTHING keeps the first mapping.
     await this.repo.createQueryBuilder().insert().into(EnterpriseIdMappingEntity).values({ jobId, entity, sourceId: sId, newId: nId }).orIgnore().execute();
   }
 
   resolve(jobId: string, scope: 'account' | 'instance', entity: string, sourceId: string | number | null | undefined): string | null {
     if (sourceId === null || sourceId === undefined) return null;
     const sId = String(sourceId);
-    if (scope === 'instance') return sId; // IDs preservados via setval
+    if (scope === 'instance') return sId; // ids preserved via setval
     return this.cache.get(this.key(jobId, entity, sId)) ?? null;
   }
 

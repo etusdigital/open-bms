@@ -24,15 +24,15 @@ export class EnterpriseImportService {
   ) {}
 
   async createAccountImport(dto: ImportAccountDto, userId: number): Promise<{ accountId: number; jobId: string }> {
-    const safeBaseUrl = assertSafeEnterpriseBaseUrl(dto.enterpriseBaseUrl); // F9 anti-SSRF
+    const safeBaseUrl = assertSafeEnterpriseBaseUrl(dto.enterpriseBaseUrl); // anti-SSRF
 
-    // Idempotência: `accounts.name` tem UNIQUE column-level no DB (não parcial),
-    // então uma 2ª tentativa após o import falhar bateria em 23505 "already
-    // exists". Reusa a conta deixada pela tentativa anterior em vez de criar
-    // duplicata. INCLUI soft-deleted: quando um job falha antes de qualquer
-    // progresso, o worker soft-deleta a conta órfã (cleanupOrphanAccount/F18) —
-    // a linha some do findOne normal mas o nome continua ocupado na constraint.
-    // Recuperamos (restore) a conta em vez de tentar recriar.
+    // Idempotency: `accounts.name` has a column-level (non-partial) UNIQUE in
+    // the DB, so a 2nd attempt after a failed import would hit 23505 "already
+    // exists". Reuse the account left by the previous attempt instead of
+    // creating a duplicate. INCLUDES soft-deleted: when a job fails before any
+    // progress, the worker soft-deletes the orphan account, so the row vanishes
+    // from a normal findOne but the name still occupies the constraint —
+    // restore it instead of recreating.
     const accountName = (dto.accountData as any)?.name as string | undefined;
     let account = accountName ? await this.accountsService.findByName(accountName, { withDeleted: true }) : null;
     const reusedAccount = !!account;
@@ -44,19 +44,20 @@ export class EnterpriseImportService {
     if (!account) {
       ({ account } = await this.accountsService.create(dto.accountData, userId, { skipDefaults: true }));
 
-      // F13: skipDefaults pula api_key_tracker/account_costs, e o account-settings
-      // importer só traz `<provider>_settings` — não a chave de tracking nem uma
-      // API key gerenciável. Sem isso a conta importada fica sem pixel de
-      // tracking e sem API key. Geramos as essenciais (são por-instância e NÃO
-      // transferíveis do Enterprise — hash/segredo diferentes por deploy).
-      // Só na criação: numa conta reusada essas já existem (e api_key_tracker
-      // tem UNIQUE (account_id, name) → re-insert daria 23505).
+      // skipDefaults skips api_key_tracker/account_costs, and the
+      // account-settings importer only brings `<provider>_settings` — not the
+      // tracking key nor a managed API key. Without these the imported account
+      // has no tracking pixel and no API key. Generate the essentials (they are
+      // per-instance and NOT transferable from Enterprise — different
+      // hash/secret per deploy). Only on creation: on a reused account these
+      // already exist (and api_key_tracker has UNIQUE (account_id, name), so a
+      // re-insert would 23505).
       try {
         await this.accountsService.createAccountConfig(account.id, [{ api_key_tracker: createHash('md5').update(`bms-${account.id}-api_key_tracker`).digest('hex') }]);
         await this.accountsService.createManagedApiKey(account.id, { name: 'imported-default' }, userId);
       } catch (e: any) {
-        // Não aborta o import por causa disso — só loga; a chave pode ser
-        // recriada pela UI de API keys depois.
+        // Do not abort the import for this — just log; the key can be recreated
+        // later via the API keys UI.
         this.logger.warn(`[enterprise-import] could not provision default api key/tracker for account=${account.id}: ${e?.message ?? e}`);
       }
     } else {
@@ -72,32 +73,34 @@ export class EnterpriseImportService {
     );
   }
 
-  // Importa para uma conta que JÁ existe (passo 1 do wizard reusado). NÃO
-  // cria/procura conta por nome e NÃO provisiona tracker/api-key (o passo 1 já
-  // criou esses). O accountId é resolvido server-side a partir do admin do
-  // wizard — o cliente nunca informa id. Mesma idempotência de job das outras
-  // rotas (pending/running → mesmo job; paused/failed → resume; senão novo).
+  // Imports into an account that ALREADY exists (reused wizard step 1). Does
+  // NOT create/look-up an account by name and does NOT provision
+  // tracker/api-key (step 1 already created those). accountId is resolved
+  // server-side from the wizard admin — the client never supplies an id. Same
+  // job idempotency as the other routes (pending/running -> same job;
+  // paused/failed -> resume; otherwise new).
   async createAccountImportForExistingAccount(
     accountId: number,
     params: { enterpriseBaseUrl: string; enterpriseApiKey: string; enterpriseSourceAccountId?: number | null },
     userId: number,
   ): Promise<{ accountId: number; jobId: string }> {
-    const safeBaseUrl = assertSafeEnterpriseBaseUrl(params.enterpriseBaseUrl); // F9 anti-SSRF
-    // Defesa: valida que a conta existe (lança 404 se não). O id vem do
-    // SetupService já resolvido pelo admin do wizard, mas não confiamos cego.
+    const safeBaseUrl = assertSafeEnterpriseBaseUrl(params.enterpriseBaseUrl); // anti-SSRF
+    // Validate the account exists (throws 404 if not). The id comes from
+    // SetupService already resolved by the wizard admin, but do not trust it
+    // blindly.
     await this.accountsService.findOne(accountId);
     this.logger.log(`[enterprise-import] importing into existing account=${accountId} (step1 account reuse)`);
     return this.resolveJobAndEnqueue(accountId, safeBaseUrl, params, userId, true);
   }
 
-  // Resolve/enfileira o job para uma conta-alvo já decidida (criada, reusada
-  // por nome, ou a conta do passo 1). Idempotência do job — pega o último job
-  // dessa conta:
-  //  - pending/running  → import já em andamento; devolve o mesmo jobId (sem
-  //    erro, sem duplicar) — frontend só precisa pollar o status.
-  //  - paused/failed    → "resume": reaproveita a MESMA linha, atualiza
-  //    credenciais/baseUrl, zera erro e re-enfileira.
-  //  - completed/nenhum → cria um job novo.
+  // Resolve/enqueue the job for an already-decided target account (created,
+  // reused by name, or the step-1 account). Job idempotency — takes the latest
+  // job for that account:
+  //  - pending/running  -> import already in progress; return the same jobId
+  //    (no error, no duplicate) — frontend just polls the status.
+  //  - paused/failed    -> "resume": reuse the SAME row, update
+  //    credentials/baseUrl, clear error and re-enqueue.
+  //  - completed/none   -> create a new job.
   private async resolveJobAndEnqueue(
     accountId: number,
     safeBaseUrl: string,
@@ -141,7 +144,7 @@ export class EnterpriseImportService {
     });
     const saved = await this.saveJobWithConcurrencyGuard(job, `conta ${accountId}`);
 
-    // Nunca logar `enterpriseApiKey` ou `encryptedApiKey`. Apenas metadados.
+    // Never log `enterpriseApiKey` or `encryptedApiKey`. Metadata only.
     this.logger.log(`[enterprise-import] enqueuing job jobId=${saved.id} accountId=${accountId} scope=account reused=${reusedAccount}`);
 
     await this.queue.add('import', { jobId: saved.id }, JOB_OPTS_ENTERPRISE_IMPORT);
@@ -149,23 +152,24 @@ export class EnterpriseImportService {
     return { accountId, jobId: saved.id };
   }
 
-  // Reset "começar do zero" do import account-scope, chamado quando o usuário
-  // (re)abre o Step 2 do wizard. Ordem importa: PRIMEIRO esvazia a fila BullMQ
-  // (para/remove jobs waiting/active/delayed) pra o worker não continuar
-  // escrevendo numa conta que vamos apagar; SÓ DEPOIS deleta os dados.
-  // Escopo estrito: só a pegada do próprio import (jobs scope=account +
-  // id-mappings via cascade + as contas que o import criou + seus filhos via
-  // cascade). NÃO toca em outras contas/users/config. `extraAccountIds` cobre
-  // o accountId do enterprise_import_done caso o job já não exista.
+  // "Start from scratch" reset of the account-scope import, called when the
+  // user (re)opens wizard Step 2. Order matters: FIRST drain the BullMQ queue
+  // (stop/remove waiting/active/delayed jobs) so the worker does not keep
+  // writing to an account we are about to delete; ONLY THEN delete the data.
+  // Strict scope: only this import's own footprint (scope=account jobs +
+  // id-mappings via cascade + the accounts the import created + their children
+  // via cascade). Does NOT touch other accounts/users/config. `extraAccountIds`
+  // covers the enterprise_import_done accountId in case the job no longer
+  // exists.
   async resetForSetup(extraAccountIds: number[] = []): Promise<{ accountsDeleted: number; jobsDeleted: number }> {
-    // 1) Para/remove TUDO da fila dedicada (force: remove até jobs active).
+    // 1) Stop/remove EVERYTHING from the dedicated queue (force: removes even active jobs).
     try {
       await this.queue.obliterate({ force: true });
     } catch (e: any) {
       this.logger.warn(`[enterprise-import] queue obliterate falhou (seguindo p/ limpeza de dados): ${e?.message ?? e}`);
     }
 
-    // 2) Apaga os dados em transação.
+    // 2) Delete the data in a transaction.
     return this.jobRepo.manager.transaction(async (em) => {
       const jobRows: Array<{ account_id: number | null }> = await em.query(
         `SELECT DISTINCT account_id FROM enterprise_import_jobs WHERE scope = 'account' AND account_id IS NOT NULL`,
@@ -174,17 +178,18 @@ export class EnterpriseImportService {
 
       let accountsDeleted = 0;
       if (ids.length > 0) {
-        // labels e automations_targets têm FK p/ accounts SEM onDelete (NO
-        // ACTION) → precisam ser apagados ANTES da conta; o resto é CASCADE.
+        // labels and automations_targets have an FK to accounts WITHOUT
+        // onDelete (NO ACTION) -> must be deleted BEFORE the account; the rest
+        // is CASCADE.
         await em.query(`DELETE FROM automations_targets WHERE account_id = ANY($1)`, [ids]);
         await em.query(`DELETE FROM labels WHERE account_id = ANY($1)`, [ids]);
-        // RETURNING: em.query no driver pg devolve as rows, não [rows,count].
+        // RETURNING: em.query on the pg driver returns the rows, not [rows,count].
         const del: unknown[] = await em.query(`DELETE FROM accounts WHERE id = ANY($1) RETURNING id`, [ids]);
         accountsDeleted = Array.isArray(del) ? del.length : 0;
       }
 
-      // Jobs scope=account não têm FK p/ accounts (account_id é int puro), então
-      // apaga aqui; isso cascateia enterprise_id_mappings (job_id FK CASCADE).
+      // scope=account jobs have no FK to accounts (account_id is a plain int),
+      // so delete here; this cascades enterprise_id_mappings (job_id FK CASCADE).
       const delJobs: unknown[] = await em.query(`DELETE FROM enterprise_import_jobs WHERE scope = 'account' RETURNING id`);
       const jobsDeleted = Array.isArray(delJobs) ? delJobs.length : 0;
 
@@ -194,7 +199,7 @@ export class EnterpriseImportService {
   }
 
   async createInstanceImport(enterpriseBaseUrl: string, enterpriseApiKey: string, userId: number | null): Promise<{ jobId: string }> {
-    // scope=instance: 1 ativo por vez (não há account_id pra constraint partial).
+    // scope=instance: one active at a time (no account_id for a partial constraint).
     const existing = await this.jobRepo.findOne({
       where: { scope: 'instance', status: In(['pending', 'running', 'paused']) },
     });
@@ -206,7 +211,7 @@ export class EnterpriseImportService {
       accountId: null,
       enterpriseSourceAccountId: null,
       scope: 'instance',
-      enterpriseBaseUrl: assertSafeEnterpriseBaseUrl(enterpriseBaseUrl), // F9 (defesa em profundidade)
+      enterpriseBaseUrl: assertSafeEnterpriseBaseUrl(enterpriseBaseUrl), // anti-SSRF (defense in depth)
       encryptedApiKey: encryptApiKey(enterpriseApiKey),
       status: 'pending',
       progress: {},
@@ -253,10 +258,10 @@ export class EnterpriseImportService {
     return { jobId, status: 'pending' };
   }
 
-  // F14: o índice parcial único (uniq_running_job_per_account e
-  // uniq_running_instance_job) é a defesa real de concorrência. Se a race
-  // check-then-insert escapar, o INSERT viola e o Postgres devolve 23505 —
-  // traduzimos pra 409 amigável em vez de vazar um 500.
+  // The unique partial index (uniq_running_job_per_account and
+  // uniq_running_instance_job) is the real concurrency defense. If the
+  // check-then-insert race slips through, the INSERT violates it and Postgres
+  // returns 23505 — translate it to a friendly 409 instead of leaking a 500.
   private async saveJobWithConcurrencyGuard(job: EnterpriseImportJobEntity, scopeLabel: string): Promise<EnterpriseImportJobEntity> {
     try {
       return await this.jobRepo.save(job);

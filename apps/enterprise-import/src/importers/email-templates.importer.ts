@@ -4,18 +4,11 @@ import { ImportContext } from './importer.interface';
 import { PagedResponse } from '../enterprise-client/enterprise.client';
 import { EmailsTemplatesEntity } from '../entities/emails-templates.entity';
 
-// Preventivo: `emails_templates` NÃO tem @Unique e não tem `uuid` — o único
-// campo estável por registro na origem é o `id` do Enterprise (descartado em
-// account-scope, que deixa a sequence atribuir o id novo). Com a chave natural
-// só `name`, dois templates distintos de mesmo nome colapsariam e a perda
-// seria silenciosa (sem constraint pra barrar). Diferente de contacts (uuid)
-// não há outra coluna estável pra usar como chave; então embutimos o id de
-// origem no próprio `name`, de forma determinística e idempotente.
-//
-// O BaseImporter calcula a chave natural a partir de `src[nkProp]` (e relê o
-// DB por essa coluna), então o `customize` reescreve TANTO `src.name` quanto a
-// linha mapeada — assim a chave (src.name) e a coluna persistida (name) ficam
-// consistentes e o re-import continua idempotente (o sufixo vem do id estável).
+// `emails_templates` has no @Unique and no `uuid`; the only stable per-record
+// field is the Enterprise `id`. With natural key `name` alone, distinct
+// same-name templates would silently collapse, so the source id is embedded
+// deterministically into `name`. customize rewrites both src.name and the
+// mapped row so the key and persisted column stay consistent and idempotent.
 @Injectable()
 export class EmailTemplatesImporter extends BaseImporter<EmailsTemplatesEntity> {
   readonly name = 'email-templates';
@@ -29,12 +22,12 @@ export class EmailTemplatesImporter extends BaseImporter<EmailsTemplatesEntity> 
 
   protected async customize(_ctx: ImportContext, src: any, mapped: Record<string, any>): Promise<Record<string, any> | null> {
     const srcId = src?.id;
-    if (srcId === undefined || srcId === null) return mapped; // sem id: não dá pra desambiguar
+    if (srcId === undefined || srcId === null) return mapped; // no id: cannot disambiguate
     const suffix = ` #${srcId}`;
     const base = String(src?.name ?? mapped?.name ?? '');
-    // Idempotente: se já está no formato sufixado, não acumula.
+    // Idempotent: do not re-append if already suffixed.
     const stableName = base.endsWith(suffix) ? base : base.slice(0, 255 - suffix.length) + suffix;
-    // A chave natural sai de src[nkProp]; manter src.name e a coluna alinhados.
+    // Natural key reads src[nkProp]; keep src.name and the column aligned.
     src.name = stableName;
     mapped.name = stableName;
     return mapped;

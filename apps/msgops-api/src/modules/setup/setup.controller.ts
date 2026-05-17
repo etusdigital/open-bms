@@ -68,18 +68,16 @@ export class SetupController {
     return this.s3Service.saveSettings(dto);
   }
 
-  // Fase 2 — UI-only step do wizard (igual GeoIP). Aceita {skip:true}
-  // ou {baseUrl, apiKey}. PublicRoute porque wizard roda antes do super-admin
-  // estar logado; gate manual em setupService rejeita se wizard já completo.
+  // PublicRoute because the wizard runs before the super-admin is logged in;
+  // a manual gate in setupService rejects once the wizard is complete.
   @Post('import-enterprise')
   @PublicRoute()
   importEnterprise(@Body() dto: ImportEnterpriseSetupDto, @IpAddress() ip?: string) {
     return this.setupService.importEnterprise(dto, ip);
   }
 
-  // Chamado quando o usuário (re)abre o Step 2: para a fila e apaga a pegada
-  // do import pra sempre começar do 0. PublicRoute (wizard roda antes do
-  // login); gate manual no service rejeita se o setup já foi concluído.
+  // PublicRoute (wizard runs before login); manual gate in the service
+  // rejects once setup is complete.
   @Post('import-enterprise/reset')
   @PublicRoute()
   resetImportEnterprise() {

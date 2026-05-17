@@ -16,21 +16,21 @@ export type SetCheckpointFn = (entity: string, page: number, accountId?: number)
 
 export interface ImportContext {
   jobId: string;
-  // Pra scope=instance, o currentAccountId é setado por iteração (1 conta por vez).
-  // Pra scope=account, é fixo no jobId (id NOVO no OSS).
+  // scope=instance: set per iteration (one account at a time).
+  // scope=account: fixed (the new OSS account id).
   accountId: number | null;
   scope: EnterpriseImportScope;
   client: EnterpriseSession;
   idMapper: IdMapperService;
   dataSource: DataSource;
-  // Checkpoint atual (lido do DB no início). Importer pode pular se entity != self.
+  // Current checkpoint (read from DB at start). Importer skips if entity != self.
   checkpoint: { entity?: string; page?: number; accountId?: number };
   updateProgress: UpdateProgressFn;
   setCheckpoint: SetCheckpointFn;
 }
 
 export interface ImporterStep {
-  // Nome curto pra checkpoint (ex.: 'tags', 'contacts'). Tem que ser único na pipeline.
+  // Short checkpoint name (e.g. 'tags'); must be unique in the pipeline.
   readonly name: string;
   run(ctx: ImportContext): Promise<void>;
 }

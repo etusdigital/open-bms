@@ -4,10 +4,9 @@ import { ImportContext } from './importer.interface';
 import { PagedResponse } from '../enterprise-client/enterprise.client';
 import { CampaignEntity } from '../entities/campaign.entity';
 
-// NOTA: `campaigns.tags` é json (array de ids de tag do Enterprise). Em
-// scope=account esses ids embutidos NÃO são remapeados aqui (json arbitrário);
-// segmentação por tag pode precisar de re-sync manual pós-import. Limitação
-// conhecida, documentada no runbook.
+// `campaigns.tags` is json (Enterprise tag ids). In scope=account these
+// embedded ids are NOT remapped; tag segmentation may need a manual post-import
+// re-sync. Known limitation.
 @Injectable()
 export class CampaignsImporter extends BaseImporter<CampaignEntity> {
   readonly name = 'campaigns';

@@ -1,8 +1,8 @@
 import { EnterpriseImportScope, EnterpriseImportStatus } from '../../../entities/enterprise-import-job.entity';
 
-// Shape devolvido nos endpoints públicos. NUNCA inclui `encryptedApiKey`
-// nem qualquer outro segredo. Construído manualmente em mapToStatusDto()
-// no service pra garantir whitelist de campos.
+// Shape returned by the public endpoints. NEVER includes `encryptedApiKey` or
+// any other secret. Built manually in the service's mapToStatusDto() to enforce
+// a field whitelist.
 export interface ImportProgressEntry {
   total?: number;
   done?: number;

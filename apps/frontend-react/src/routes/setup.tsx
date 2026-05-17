@@ -32,16 +32,16 @@ const STEP_TITLES: Record<number, string> = {
   6: 'Verificação de saúde dos serviços',
 };
 
-// Backend mantém 6 steps internos (1=Admin, 2=SMTP, 3=Domain, 4=SendGrid,
-// 5=Pool, 6=Health). A UI tem até 6 steps visíveis: Admin / Enterprise import /
-// Domínio / GeoIP / S3 / Health. Enterprise/GeoIP/S3 são UI-only.
+// Backend keeps 6 internal steps (1=Admin, 2=SMTP, 3=Domain, 4=SendGrid,
+// 5=Pool, 6=Health). The UI has up to 6 visible steps: Admin / Enterprise
+// import / Domain / GeoIP / S3 / Health. Enterprise/GeoIP/S3 are UI-only.
 //
-// F11: o passo Enterprise (UI 2) NÃO tem step próprio no backend, então a
-// retomada não pode derivar dele do backend.currentStep. Usamos:
-//  - admin ainda não criado (backend step <=1)            → UI 1
-//  - admin criado, Enterprise habilitado e ainda não feito → UI 2
-//  - wizard concluído                                      → UI 6
-//  - caso contrário (Enterprise feito/desligado, mid-flow) → UI 3 (Domínio)
+// The Enterprise step (UI 2) has no backend step, so resume can't derive it
+// from backend.currentStep. Mapping:
+//  - admin not created yet (backend step <=1)               → UI 1
+//  - admin created, Enterprise enabled and not yet done     → UI 2
+//  - wizard complete                                        → UI 6
+//  - otherwise (Enterprise done/off, mid-flow)              → UI 3 (Domain)
 function resolveUiStep(status: {
   currentStep?: number;
   enterpriseImportEnabled?: boolean;
@@ -88,7 +88,7 @@ function SetupPage() {
     };
   }, [navigate]);
 
-  // F10: quando Enterprise está desligado, o Step 2 não existe — pular de 1→3.
+  // When Enterprise is disabled, Step 2 doesn't exist — skip from 1→3.
   function advance() {
     setCurrentStep((s) => {
       const next = s + 1;
@@ -115,25 +115,17 @@ function SetupPage() {
     <div className="bg-background flex min-h-screen items-center justify-center px-4 py-12">
       <div className="w-full max-w-xl">
         <div className="mb-8 text-center">
-          <h1 className="text-foreground text-2xl font-semibold tracking-wider">
-            Configuração inicial da plataforma
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Complete os passos abaixo para começar a usar o sistema.
-          </p>
+          <h1 className="text-foreground text-2xl font-semibold tracking-wider">Configuração inicial da plataforma</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Complete os passos abaixo para começar a usar o sistema.</p>
         </div>
 
         <StepIndicator currentStep={currentStep} enterpriseEnabled={enterpriseEnabled} />
 
         <div className="bg-card border-border rounded-2xl border px-8 pt-6 pb-8 shadow-md">
-          <h2 className="text-foreground mb-5 text-base font-semibold tracking-wide">
-            {STEP_TITLES[currentStep]}
-          </h2>
+          <h2 className="text-foreground mb-5 text-base font-semibold tracking-wide">{STEP_TITLES[currentStep]}</h2>
 
           {currentStep === 1 && <Step1Admin onComplete={advance} />}
-          {currentStep === 2 && enterpriseEnabled && (
-            <Step2EnterpriseImport onComplete={advance} onBack={back} />
-          )}
+          {currentStep === 2 && enterpriseEnabled && <Step2EnterpriseImport onComplete={advance} onBack={back} />}
           {currentStep === 3 && <Step3Domain onComplete={advance} onBack={back} />}
           {currentStep === 4 && <Step4GeoIp onComplete={advance} onBack={back} />}
           {currentStep === 5 && <Step5S3 onComplete={advance} onBack={back} />}
@@ -145,7 +137,7 @@ function SetupPage() {
 }
 
 function StepIndicator({ currentStep, enterpriseEnabled }: { currentStep: number; enterpriseEnabled: boolean }) {
-  // F10: sem a feature, o passo Enterprise (num 2) não aparece no indicador.
+  // Without the feature, the Enterprise step (num 2) is hidden from the indicator.
   const steps = enterpriseEnabled ? STEPS : STEPS.filter((s) => s.num !== 2);
   return (
     <div className="mb-8 flex items-center justify-center">
@@ -175,10 +167,7 @@ function StepIndicator({ currentStep, enterpriseEnabled }: { currentStep: number
           </div>
           {i < steps.length - 1 && (
             <div
-              className={
-                'mx-2 mb-5 h-px w-10 flex-shrink-0 ' +
-                (step.num < currentStep ? 'bg-primary' : 'bg-muted')
-              }
+              className={'mx-2 mb-5 h-px w-10 flex-shrink-0 ' + (step.num < currentStep ? 'bg-primary' : 'bg-muted')}
             />
           )}
         </div>

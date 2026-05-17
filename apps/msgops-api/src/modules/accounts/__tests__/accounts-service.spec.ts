@@ -223,9 +223,9 @@ describe('AccountsService — updateAccountConfig — default_email_provider cro
   });
 });
 
-// SkipDefaults bypassa custom fields/events default + scheduler de
-// billing + account_configs (api_key_tracker, account_costs). Mantém só o
-// insert principal, link users_account e tentativa de upload S3.
+// skipDefaults bypasses default custom fields/events, the billing scheduler,
+// and account_configs (api_key_tracker, account_costs). Only the main insert,
+// users_account link, and the S3 upload attempt remain.
 describe('AccountsService.create — skipDefaults', () => {
   let service: AccountsService;
   let accountRepository: any;
@@ -283,7 +283,7 @@ describe('AccountsService.create — skipDefaults', () => {
     service = module.get<AccountsService>(AccountsService);
   });
 
-  it('com skipDefaults:true NÃO insere custom fields, custom events nem chama scheduler', async () => {
+  it('with skipDefaults:true does not insert custom fields, custom events, nor call the scheduler', async () => {
     const customFieldsSpy = jest.spyOn(service as any, 'createOrUpdateCustomFields').mockResolvedValue({});
     const customEventsSpy = jest.spyOn(service as any, 'createOrUpdateCustomEvents').mockResolvedValue({});
     const accountConfigsSpy = jest.spyOn(service as any, 'createOrUpdateAccountsConfigs').mockResolvedValue({});
@@ -292,14 +292,14 @@ describe('AccountsService.create — skipDefaults', () => {
     await service.create({ name: 'X' } as any, 1, { skipDefaults: true });
 
     expect(accountRepository.save).toHaveBeenCalled();
-    expect(permissionsSpy).toHaveBeenCalled(); // user-account link sempre acontece
+    expect(permissionsSpy).toHaveBeenCalled(); // user-account link always happens
     expect(customFieldsSpy).not.toHaveBeenCalled();
     expect(customEventsSpy).not.toHaveBeenCalled();
     expect(accountConfigsSpy).not.toHaveBeenCalled();
     expect(scheduler.create).not.toHaveBeenCalled();
   });
 
-  it('comportamento default (sem opts) preserva inserts default', async () => {
+  it('default behavior (no opts) preserves default inserts', async () => {
     const customFieldsSpy = jest.spyOn(service as any, 'createOrUpdateCustomFields').mockResolvedValue({});
     const customEventsSpy = jest.spyOn(service as any, 'createOrUpdateCustomEvents').mockResolvedValue({});
     const accountConfigsSpy = jest.spyOn(service as any, 'createOrUpdateAccountsConfigs').mockResolvedValue({});
