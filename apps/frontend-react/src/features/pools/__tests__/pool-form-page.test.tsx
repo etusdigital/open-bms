@@ -64,12 +64,12 @@ describe('PoolFormPage', () => {
   describe('create mode (no poolId)', () => {
     it('renders the create title', async () => {
       await renderFormPage();
-      expect(screen.getByText(/criar sender/i)).toBeInTheDocument();
+      expect(screen.getByText(/criar pool de ip/i)).toBeInTheDocument();
     });
 
     it('renders an empty form', async () => {
       await renderFormPage();
-      const nameInput = screen.getByLabelText(/nome/i);
+      const nameInput = screen.getByLabelText('Nome');
       expect(nameInput).toHaveValue('');
     });
 
@@ -109,9 +109,6 @@ describe('PoolFormPage', () => {
           name: 'Main Pool',
           description: 'Primary pool',
           poolName: 'main-pool',
-          senderEmail: 'test@example.com',
-          senderName: 'Test Sender',
-          senderReplyTo: '',
           isDefault: false,
           ip: '',
           dailyLimit: '1000',
@@ -123,7 +120,7 @@ describe('PoolFormPage', () => {
       await renderFormPage(5);
       expect(screen.getByDisplayValue('Main Pool')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Primary pool')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('Test Sender')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('1000')).toBeInTheDocument();
     });
 
     it('shows save button instead of create', async () => {
@@ -155,7 +152,7 @@ describe('PoolFormPage', () => {
       };
       await renderFormPage(5);
 
-      fireEvent.change(screen.getByLabelText(/nome/i), {
+      fireEvent.change(screen.getByLabelText('Nome'), {
         target: { value: 'Updated Pool' },
       });
       fireEvent.submit(screen.getByRole('button', { name: /salvar/i }));
@@ -172,7 +169,7 @@ describe('PoolFormPage', () => {
   describe('back navigation', () => {
     it('renders back link to pools list', async () => {
       await renderFormPage();
-      const backLink = screen.getByRole('link', { name: /senders/i });
+      const backLink = screen.getByRole('link', { name: /pools de ip/i });
       expect(backLink).toBeInTheDocument();
     });
   });

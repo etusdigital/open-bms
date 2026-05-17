@@ -39,18 +39,6 @@ export class PoolsDto {
   dailyLimit?: number;
 
   @ApiProperty()
-  @JoiSchema(Joi.string().optional())
-  senderEmail?: string;
-
-  @ApiProperty()
-  @JoiSchema(Joi.string().optional())
-  senderName?: string;
-
-  @ApiProperty()
-  @JoiSchema(Joi.string().allow('', null).optional())
-  senderReplyTo?: string;
-
-  @ApiProperty()
   @JoiSchema(Joi.boolean().optional())
   isDefault?: boolean;
 

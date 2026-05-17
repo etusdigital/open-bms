@@ -6,47 +6,59 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { DescriptionCell } from '@/components/data-table/description-cell';
-import type { Pool } from './types';
+import type { Sender } from './types';
 
-const staticColumns: ColumnDef<Pool, unknown>[] = [
+const staticColumns: ColumnDef<Sender, unknown>[] = [
   {
-    accessorKey: 'name',
-    header: 'pools.name',
+    accessorKey: 'senderName',
+    header: 'senders.senderName',
     enableSorting: true,
     cell: ({ row }) => (
       <div className="max-w-[300px]">
         <Link
-          to="/pools/$poolId"
-          params={{ poolId: String(row.original.id) }}
+          to="/senders/$senderId"
+          params={{ senderId: String(row.original.id) }}
           className="text-primary font-medium hover:underline"
         >
-          {row.original.name}
+          {row.original.senderName}
         </Link>
-        <DescriptionCell description={row.original.description} />
       </div>
     ),
   },
   {
-    accessorKey: 'poolName',
-    header: 'pools.poolName',
+    accessorKey: 'senderEmail',
+    header: 'senders.senderEmail',
     enableSorting: true,
-    cell: ({ row }) => <span className="font-mono text-xs">{row.original.poolName}</span>,
+    cell: ({ row }) => <span className="text-sm">{row.original.senderEmail}</span>,
+  },
+  {
+    accessorKey: 'senderReplyTo',
+    header: 'senders.senderReplyTo',
+    enableSorting: false,
+    cell: ({ row }) => <span className="text-sm">{row.original.senderReplyTo || '—'}</span>,
+  },
+  {
+    accessorKey: 'sendingLimit',
+    header: 'senders.sendingLimit',
+    enableSorting: false,
+    cell: ({ row }) => (
+      <span className="font-mono text-xs">{row.original.sendingLimit ?? 0}</span>
+    ),
   },
   {
     accessorKey: 'isDefault',
-    header: 'pools.isDefault',
+    header: 'senders.isDefault',
     enableSorting: false,
     cell: ({ row }) => (row.original.isDefault ? <Badge variant="secondary">Default</Badge> : null),
   },
 ];
 
-interface UsePoolsColumnsOptions {
-  onDelete: (pool: Pool) => void;
+interface UseSendersColumnsOptions {
+  onDelete: (sender: Sender) => void;
   canDelete: boolean;
 }
 
-export function usePoolsColumns({ onDelete, canDelete }: UsePoolsColumnsOptions): ColumnDef<Pool, unknown>[] {
+export function useSendersColumns({ onDelete, canDelete }: UseSendersColumnsOptions): ColumnDef<Sender, unknown>[] {
   const { t } = useTranslation();
 
   return useMemo(() => {
@@ -58,10 +70,20 @@ export function usePoolsColumns({ onDelete, canDelete }: UsePoolsColumnsOptions)
     return [
       ...translated,
       {
+        id: 'status',
+        header: '',
+        cell: ({ row }) =>
+          row.original.removedAtSource ? (
+            <Badge variant="outline" className="text-muted-foreground">
+              {t('senders.removedAtSource')}
+            </Badge>
+          ) : null,
+      },
+      {
         id: 'actions',
         cell: ({ row }) => {
           const editLabel = t('common.edit');
-          const deleteLabel = t('common.deleteEntity', { entity: t('pools.entityName') });
+          const deleteLabel = t('common.deleteEntity', { entity: t('senders.entityName') });
 
           return (
             <div className="flex justify-end gap-1">
@@ -69,7 +91,7 @@ export function usePoolsColumns({ onDelete, canDelete }: UsePoolsColumnsOptions)
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon-xs" asChild>
-                      <Link to="/pools/$poolId" params={{ poolId: String(row.original.id) }}>
+                      <Link to="/senders/$senderId" params={{ senderId: String(row.original.id) }}>
                         <Pencil className="h-3.5 w-3.5" />
                         <span className="sr-only">{editLabel}</span>
                       </Link>
@@ -99,6 +121,6 @@ export function usePoolsColumns({ onDelete, canDelete }: UsePoolsColumnsOptions)
           );
         },
       },
-    ] as ColumnDef<Pool, unknown>[];
+    ] as ColumnDef<Sender, unknown>[];
   }, [t, onDelete, canDelete]);
 }

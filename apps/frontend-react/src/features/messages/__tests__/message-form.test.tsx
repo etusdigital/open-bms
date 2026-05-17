@@ -4,7 +4,7 @@ import { renderWithRouter } from '@/test-utils/render-with-router';
 import { authenticateStore } from '@/test-utils/authenticate-store';
 import '@/lib/i18n';
 import MessageForm from '../message-form';
-import type { Pool } from '@/features/pools/types';
+import type { Sender } from '@/features/senders/types';
 
 // Mock react-email-editor since Unlayer can't load in jsdom
 vi.mock('react-email-editor', () => ({
@@ -19,17 +19,16 @@ vi.mock('../use-messages', async (importOriginal) => {
   const original = await importOriginal<Record<string, unknown>>();
   return {
     ...original,
-    usePoolsForSelect: vi.fn().mockReturnValue({
+    useSendersForSelect: vi.fn().mockReturnValue({
       data: [
         {
           id: 1,
-          poolName: 'default-pool',
           senderEmail: 'sender@test.com',
           senderName: 'Sender Name',
           senderReplyTo: 'reply@test.com',
           isDefault: true,
         },
-      ] as Pool[],
+      ] as Sender[],
       isLoading: false,
       isSuccess: true,
     }),

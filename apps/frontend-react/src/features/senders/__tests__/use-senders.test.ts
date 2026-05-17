@@ -1,0 +1,264 @@
+// @vitest-environment jsdom
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { renderHook, waitFor } from '@testing-library/react';
+import { AxiosError } from 'axios';
+import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
+import { authenticateStore } from '@/test-utils/authenticate-store';
+import {
+  useSendersList,
+  useSender,
+  useUpdateSender,
+  useDeleteSender,
+  useSyncSenders,
+} from '../use-senders';
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/api-client', () => ({
+  apiClient: {
+    get: vi.fn().mockResolvedValue({
+      data: {
+        results: [
+          { id: 1, senderEmail: 'sender@test.com', senderName: 'Sender One' },
+          { id: 2, senderEmail: 'other@test.com', senderName: 'Sender Two' },
+        ],
+        totalItems: 2,
+        page: '1',
+        itemsPerPage: '20',
+      },
+    }),
+    post: vi.fn().mockResolvedValue({ data: { created: 1, updated: 2, removed: 0 } }),
+    put: vi.fn().mockResolvedValue({ data: { id: 1, senderEmail: 'sender@test.com' } }),
+    delete: vi.fn().mockResolvedValue({}),
+  },
+}));
+
+import { apiClient } from '@/lib/api-client';
+
+const mockGet = vi.mocked(apiClient.get);
+const mockPost = vi.mocked(apiClient.post);
+const mockPut = vi.mocked(apiClient.put);
+const mockDelete = vi.mocked(apiClient.delete);
+
+const defaultParams = {
+  page: 1,
+  pageSize: 20,
+  search: '',
+  sort: '',
+  order: 'asc' as const,
+};
+
+describe('useSendersList', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authenticateStore();
+  });
+
+  it('calls GET /senders with correct params', async () => {
+    const { result } = renderHook(() => useSendersList({ ...defaultParams, search: 'sender', page: 2 }), {
+      wrapper: createQueryWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockGet).toHaveBeenCalledWith('/senders', {
+      params: expect.objectContaining({
+        page: 2,
+        itemsPerPage: 20,
+        name: 'sender',
+      }),
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it('omits name param when search is empty', async () => {
+    const { result } = renderHook(() => useSendersList(defaultParams), {
+      wrapper: createQueryWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const params = mockGet.mock.calls[0][1]?.params;
+    expect(params).not.toHaveProperty('name');
+  });
+
+  it('returns sender data and meta', async () => {
+    const { result } = renderHook(() => useSendersList(defaultParams), {
+      wrapper: createQueryWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data?.data).toHaveLength(2);
+    expect(result.current.data?.meta.total).toBe(2);
+  });
+});
+
+describe('useSender', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authenticateStore();
+  });
+
+  it('calls GET /senders/:id', async () => {
+    mockGet.mockResolvedValueOnce({
+      data: { id: 5, senderEmail: 'sender@test.com', senderName: 'Sender One' },
+    });
+
+    const { result } = renderHook(() => useSender(5), {
+      wrapper: createQueryWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockGet).toHaveBeenCalledWith('/senders/5', {
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it('does not fetch when id is 0', () => {
+    const { result } = renderHook(() => useSender(0), {
+      wrapper: createQueryWrapper(),
+    });
+
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+});
+
+describe('useUpdateSender', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authenticateStore();
+  });
+
+  it('calls PUT /senders/:id with only sendingLimit and senderReplyTo', async () => {
+    const { result } = renderHook(() => useUpdateSender(5), {
+      wrapper: createQueryWrapper(),
+    });
+
+    result.current.mutate({
+      sendingLimit: '500',
+      senderReplyTo: 'reply@test.com',
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockPut).toHaveBeenCalledWith('/senders/5', {
+      sendingLimit: '500',
+      senderReplyTo: 'reply@test.com',
+    });
+  });
+
+  it('shows API error message on update failure', async () => {
+    const { toast } = await import('sonner');
+
+    const apiError = new AxiosError('Bad Request', '400', undefined, undefined, {
+      status: 400,
+      data: { status: 400, error: 'Invalid reply-to' },
+      statusText: 'Bad Request',
+      headers: {},
+      config: {} as never,
+    });
+    mockPut.mockRejectedValueOnce(apiError);
+
+    const { result } = renderHook(() => useUpdateSender(5), {
+      wrapper: createQueryWrapper(),
+    });
+
+    result.current.mutate({ sendingLimit: '', senderReplyTo: 'bad' });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(toast.error).toHaveBeenCalledWith('Invalid reply-to');
+  });
+});
+
+describe('useDeleteSender', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authenticateStore();
+  });
+
+  it('calls DELETE /senders/:id', async () => {
+    const { result } = renderHook(() => useDeleteSender(), {
+      wrapper: createQueryWrapper(),
+    });
+
+    result.current.mutate(3);
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockDelete).toHaveBeenCalledWith('/senders/3');
+  });
+
+  it('shows API error message on delete failure', async () => {
+    const { toast } = await import('sonner');
+
+    const apiError = new AxiosError('Conflict', '409', undefined, undefined, {
+      status: 409,
+      data: { status: 409, error: 'Cannot delete default sender' },
+      statusText: 'Conflict',
+      headers: {},
+      config: {} as never,
+    });
+    mockDelete.mockRejectedValueOnce(apiError);
+
+    const { result } = renderHook(() => useDeleteSender(), {
+      wrapper: createQueryWrapper(),
+    });
+
+    result.current.mutate(3);
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(toast.error).toHaveBeenCalledWith('Cannot delete default sender');
+  });
+});
+
+describe('useSyncSenders', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authenticateStore();
+  });
+
+  it('calls POST /senders/sync and returns the sync result', async () => {
+    const { result } = renderHook(() => useSyncSenders(), {
+      wrapper: createQueryWrapper(),
+    });
+
+    result.current.mutate();
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockPost).toHaveBeenCalledWith('/senders/sync');
+    expect(result.current.data).toEqual({ created: 1, updated: 2, removed: 0 });
+  });
+
+  it('shows API error message on sync failure', async () => {
+    const { toast } = await import('sonner');
+
+    const apiError = new AxiosError('Server Error', '500', undefined, undefined, {
+      status: 500,
+      data: { status: 500, error: 'SendGrid unreachable' },
+      statusText: 'Server Error',
+      headers: {},
+      config: {} as never,
+    });
+    mockPost.mockRejectedValueOnce(apiError);
+
+    const { result } = renderHook(() => useSyncSenders(), {
+      wrapper: createQueryWrapper(),
+    });
+
+    result.current.mutate();
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(toast.error).toHaveBeenCalledWith('SendGrid unreachable');
+  });
+});

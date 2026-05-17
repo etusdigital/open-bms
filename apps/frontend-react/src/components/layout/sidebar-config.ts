@@ -5,6 +5,7 @@ import {
   Mail,
   Users,
   Server,
+  Send,
   ShieldCheck,
   ShieldAlert,
   Tag,
@@ -131,6 +132,12 @@ export const MENU_ITEMS: NavItem[] = [
         permission: 'audience:contacts_suppress',
       },
     ],
+  },
+  {
+    labelKey: 'sidebar.senders',
+    icon: Send,
+    route: '/senders',
+    permission: 'infra:view',
   },
   {
     labelKey: 'sidebar.pools',

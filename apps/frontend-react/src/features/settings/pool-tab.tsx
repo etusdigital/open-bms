@@ -13,7 +13,6 @@ import { poolGateway, type Pool } from './pool-gateway';
 import { poolSendgridGateway, type SendgridPoolOption } from './pool-sendgrid-gateway';
 import { accountSendgridGateway, type SendgridKeySource } from './email-providers/sendgrid-account-gateway';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function normalizeStoredIps(raw: Pool['ip']): string[] {
   if (!raw) return [];
@@ -38,9 +37,6 @@ export function PoolTab() {
 
   const [pool, setPool] = useState<Pool | null>(null);
   const [name, setName] = useState('');
-  const [senderEmail, setSenderEmail] = useState('');
-  const [senderName, setSenderName] = useState('');
-  const [senderReplyTo, setSenderReplyTo] = useState('');
   const [sendingLimit, setSendingLimit] = useState('1000');
 
   // SendGrid-backed selection: the user can no longer type a free-form pool
@@ -93,9 +89,6 @@ export function PoolTab() {
       if (target) {
         setPool(target);
         setName(target.name ?? '');
-        setSenderEmail(target.senderEmail ?? '');
-        setSenderName(target.senderName ?? '');
-        setSenderReplyTo(target.senderReplyTo ?? '');
         setSendingLimit(String(target.sendingLimit ?? 1000));
         const storedPoolName = target.poolName ?? '';
         setSelectedPool(storedPoolName);
@@ -149,8 +142,6 @@ export function PoolTab() {
     // and the form lets users save without one — the worker omits
     // ip_pool_name from the SendGrid payload and falls back to shared IPs.
     if (sendgridPools.length > 0 && !selectedPool) return t('settings.poolSendgridPoolRequired');
-    if (senderEmail && !EMAIL_RE.test(senderEmail)) return t('settings.poolSenderEmailInvalid');
-    if (senderReplyTo && !EMAIL_RE.test(senderReplyTo)) return t('settings.poolReplyToInvalid');
     if (sendingLimit) {
       const limit = Number(sendingLimit);
       if (!Number.isInteger(limit) || limit < 1) return t('settings.poolSendingLimitInvalid');
@@ -169,9 +160,6 @@ export function PoolTab() {
     const payload = {
       name: name.trim(),
       poolName: selectedPool,
-      ...(senderEmail.trim() && { senderEmail: senderEmail.trim().toLowerCase() }),
-      ...(senderName.trim() && { senderName: senderName.trim() }),
-      ...(senderReplyTo.trim() && { senderReplyTo: senderReplyTo.trim().toLowerCase() }),
       ...(sendingLimit && { sendingLimit: Number(sendingLimit) }),
       ip: JSON.stringify(ips),
       ...(pool ? {} : { accountId, isDefault: true }),
@@ -267,42 +255,9 @@ export function PoolTab() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="settings-pool-sender-email">{t('settings.poolSenderEmail')}</Label>
-          <Input
-            id="settings-pool-sender-email"
-            type="email"
-            value={senderEmail}
-            onChange={(e) => setSenderEmail(e.target.value)}
-            disabled={saving}
-            placeholder="noreply@empresa.com"
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="settings-pool-sender-name">{t('settings.poolSenderName')}</Label>
-          <Input
-            id="settings-pool-sender-name"
-            value={senderName}
-            onChange={(e) => setSenderName(e.target.value)}
-            disabled={saving}
-            placeholder="Empresa"
-          />
-        </div>
-      </div>
+      <p className="text-muted-foreground text-xs">{t('settings.poolIdentityMovedHelp')}</p>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="settings-pool-replyto">{t('settings.poolReplyTo')}</Label>
-          <Input
-            id="settings-pool-replyto"
-            type="email"
-            value={senderReplyTo}
-            onChange={(e) => setSenderReplyTo(e.target.value)}
-            disabled={saving}
-            placeholder="contato@empresa.com"
-          />
-        </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="settings-pool-limit">{t('settings.poolSendingLimit')}</Label>
           <Input

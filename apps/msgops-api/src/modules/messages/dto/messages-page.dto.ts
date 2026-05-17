@@ -21,6 +21,13 @@ export class MessagesPageDto extends PageDto implements LabelsFilterable {
   @JoiSchema(Joi.string().allow('').optional())
   public ipPool?: string;
 
+  // EVO-1281: the message-list "sender" filter now filters by sender identity
+  // (from_mail), not by IP pool. `ipPool` is left intact so nothing on the
+  // send path changes (decision #2).
+  @ApiPropertyOptional()
+  @JoiSchema(Joi.string().allow('', null).optional())
+  public senderEmail?: string;
+
   @ApiPropertyOptional()
   @JoiSchema(Joi.number().allow('', null).optional())
   public selectedAutomation?: number;

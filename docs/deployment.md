@@ -2,6 +2,34 @@
 
 Operational notes for running BMS Open Source in production / self-hosted setups. Companion to `getting-started.md` (which covers first-time local bring-up). This doc focuses on what changes between dev and prod, plus pipelines that need ongoing care.
 
+## Runbook: split Sender / IP Pool (EVO-1281)
+
+A migration `1779038987065-split-sender-from-pool` é **destrutiva e sem
+backfill**: cria a tabela `senders` e **remove** as colunas de identidade
+(`sender_email`, `sender_name`, `sender_replyto_email`) de `pools`. Decisão
+ratificada (Guilherme, 2026-05-15): **forward-fix only** — `down()` recria as
+colunas estruturalmente mas **não restaura dados**; não trate como rollback.
+
+Passos obrigatórios deste deploy, **nesta ordem**:
+
+1. Deploy do código.
+2. Rodar a migration (`TYPEORM_MIGRATIONS_RUN=true` no boot, ou manual).
+3. **Para cada conta**, com a SendGrid API key já configurada, chamar
+   `POST /senders/sync` (botão **Sincronizar** na nova tela _Senders_, ou via
+   API autenticada na conta). O sync materializa os verified senders da
+   SendGrid como registros `sender` editáveis.
+4. Validar: enviar uma mensagem de teste **sem `ippool`** e confirmar que o
+   `replyTo` resolve via `sender`.
+
+> **Janela operacional (esperada, não é falha):** entre o passo 2 e o passo 3,
+> todo envio **sem `ippool`** resolve `replyTo` via `sender` que ainda não
+> existe → cai no fallback `from.email`. O envio **não falha**; apenas o
+> reply-to configurado fica ausente até o sync. Por isso o passo 3 é
+> **obrigatório** no runbook, não opcional.
+
+O sync depende de `cls.get('accountId')` (request scope) — **não** pode ser
+exposto como cron/job sem `accountId` explícito.
+
 ## Pipeline de eventos analytics
 
 Como webhooks de provedores (SendGrid, Twilio, push, custom, internal) viram linhas em `BMS.events_logs_v2` no ClickHouse — e o que olhar quando algo travar.

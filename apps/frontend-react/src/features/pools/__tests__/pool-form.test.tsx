@@ -20,27 +20,26 @@ describe('PoolForm', () => {
     expect(screen.getByLabelText(/descrição/i)).toBeInTheDocument();
   });
 
-  it('renders sender configuration fields', () => {
+  // EVO-1281: sender identity moved out of the pool form — the pools
+  // feature is now IP-pool-only (no senderName/senderEmail/senderReplyTo).
+  it('does not render sender identity fields', () => {
     render(<PoolForm {...defaultProps} />);
-    expect(screen.getByLabelText(/sender name/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/sender email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/reply.to/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/sender name/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/sender email/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/reply.to/i)).not.toBeInTheDocument();
   });
 
   it('renders pool configuration fields when SendGrid has dedicated pools', () => {
     render(<PoolForm {...defaultProps} sendGridPools={[{ name: 'pool-a' }]} />);
-    // Both the sender-name input and the SendGrid pool selector use the "Sender Name" label after EVO-1022.
-    expect(screen.getAllByText(/sender name/i).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/nome do pool/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/daily limit/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/sending limit/i)).toBeInTheDocument();
   });
 
   it('replaces the pool dropdown with a Free-plan callout when SendGrid has no pools', () => {
     render(<PoolForm {...defaultProps} sendGridPools={[]} />);
-    // Only the sender-name input keeps the "Sender Name" label; the SendGrid-pool selector is replaced by the callout.
-    expect(screen.getAllByText(/sender name/i)).toHaveLength(1);
     expect(screen.getByText(/Free\/Essentials/i)).toBeInTheDocument();
-    // limits remain editable so the user can still save the sender pool
+    // limits remain editable so the user can still save the IP pool
     expect(screen.getByLabelText(/daily limit/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/sending limit/i)).toBeInTheDocument();
   });
@@ -58,9 +57,6 @@ describe('PoolForm', () => {
           name: 'Existing',
           description: '',
           poolName: 'existing-pool',
-          senderEmail: '',
-          senderName: '',
-          senderReplyTo: '',
           isDefault: false,
           ip: '',
           dailyLimit: '0',
@@ -79,9 +75,6 @@ describe('PoolForm', () => {
           name: 'Main Pool',
           description: 'Primary pool',
           poolName: 'main',
-          senderEmail: 'test@example.com',
-          senderName: 'Test Sender',
-          senderReplyTo: 'reply@example.com',
           isDefault: false,
           ip: '',
           dailyLimit: '1000',
@@ -91,8 +84,8 @@ describe('PoolForm', () => {
     );
     expect(screen.getByDisplayValue('Main Pool')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Primary pool')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Test Sender')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('test@example.com')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('1000')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('100')).toBeInTheDocument();
   });
 
   it('shows character counters for name and description', () => {

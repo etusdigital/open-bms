@@ -1,30 +1,33 @@
 import { BeforeUpdate, Column, CreateDateColumn, DeleteDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
-@Entity('pools')
-export class PoolEntity {
+@Entity('senders')
+export class SenderEntity {
   @PrimaryGeneratedColumn({ type: 'int', name: 'id' })
   id: number;
 
-  @Column('varchar', { name: 'name', length: 255 })
-  name: string;
+  @Column('varchar', { name: 'sender_email', length: 255 })
+  senderEmail: string;
 
-  @Column('text', { name: 'description' })
-  description?: string;
+  @Column('varchar', { name: 'sender_name', length: 60 })
+  senderName: string;
 
-  @Column('varchar', { name: 'pool_name', length: 255 })
-  poolName: string;
+  @Column('varchar', { name: 'sender_replyto_email', length: 255, nullable: true })
+  senderReplyTo: string;
 
-  @Column('json', { name: 'ip' })
-  ip: any;
+  @Column('int', { name: 'sending_limit', nullable: true })
+  sendingLimit: number;
 
   @Column('int', { name: 'account_id' })
   accountId: number;
 
-  @Column('int', { name: 'sending_limit' })
-  sendingLimit: number;
-
   @Column('boolean', { name: 'is_default', default: false })
   isDefault: boolean;
+
+  @Column('varchar', { name: 'sg_verified_sender_id', length: 255, nullable: true })
+  sgVerifiedSenderId: string;
+
+  @Column('timestamptz', { name: 'removed_at_source', nullable: true })
+  removedAtSource: Date;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

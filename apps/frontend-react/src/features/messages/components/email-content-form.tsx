@@ -13,8 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAppStore, selectIsSuperAdmin } from '@/stores/app-store';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { usePoolsForSelect, useTemplatesForSelect } from '../use-messages';
-import type { Pool } from '@/features/pools/types';
+import { useSendersForSelect, useTemplatesForSelect } from '../use-messages';
+import type { Sender } from '@/features/senders/types';
 import type { EmailFormValues } from '../message-schema';
 import { MESSAGE_SUBJECT_MAX } from '../message-schema';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -24,7 +24,7 @@ import { ConditionalEmailModal } from './conditional-email-modal';
 import { GenerateLinksModal } from './generate-links-modal';
 import { InboxPreview } from './inbox-preview';
 
-const EMPTY_POOLS: Pool[] = [];
+const EMPTY_SENDERS: Sender[] = [];
 
 interface EmailContentFormProps {
   editorRef: RefObject<EditorRef | null>;
@@ -35,8 +35,8 @@ interface EmailContentFormProps {
 export function EmailContentForm({ editorRef, designJson, templateUrl }: EmailContentFormProps) {
   const { t } = useTranslation();
   const form = useFormContext<EmailFormValues>();
-  const poolsQuery = usePoolsForSelect();
-  const pools = poolsQuery.data ?? EMPTY_POOLS;
+  const sendersQuery = useSendersForSelect();
+  const senders = sendersQuery.data ?? EMPTY_SENDERS;
   const templatesQuery = useTemplatesForSelect();
   const templates = templatesQuery.data ?? [];
   const isSuperAdmin = useAppStore(selectIsSuperAdmin);
@@ -84,51 +84,52 @@ export function EmailContentForm({ editorRef, designJson, templateUrl }: EmailCo
     }
   };
 
-  const applyPoolDefaults = useCallback(
-    (pool: Pool, opts: { preserveUserEdits?: boolean } = {}) => {
+  // EVO-1281: the From picker carries sender IDENTITY only. It must NOT touch
+  // `ippool` — IP pool routing is fully decoupled from identity (decision #2)
+  // and is selected independently. Deriving ippool from identity is exactly
+  // what caused EVO-1280.
+  const applySenderDefaults = useCallback(
+    (sender: Sender, opts: { preserveUserEdits?: boolean } = {}) => {
       const { preserveUserEdits = false } = opts;
       const { dirtyFields } = form.formState;
       const setOpts = preserveUserEdits ? { shouldDirty: false } : undefined;
 
-      form.setValue('ippool', pool.poolName, setOpts);
-
       if (!preserveUserEdits || !dirtyFields.fromName) {
-        form.setValue('fromName', pool.senderName ?? '', setOpts);
+        form.setValue('fromName', sender.senderName ?? '', setOpts);
       }
       if (!preserveUserEdits || !dirtyFields.fromMail) {
-        form.setValue('fromMail', pool.senderEmail ?? '', setOpts);
+        form.setValue('fromMail', sender.senderEmail ?? '', setOpts);
       }
       if (!preserveUserEdits || !dirtyFields.replyTo) {
-        form.setValue('replyTo', pool.senderReplyTo ?? '', setOpts);
+        form.setValue('replyTo', sender.senderReplyTo ?? '', setOpts);
       }
     },
     [form],
   );
 
-  const handlePoolChange = (poolId: string) => {
-    const pool = pools.find((p) => String(p.id) === poolId);
-    if (pool) applyPoolDefaults(pool, { preserveUserEdits: false });
+  const handleSenderChange = (senderId: string) => {
+    const sender = senders.find((s) => String(s.id) === senderId);
+    if (sender) applySenderDefaults(sender, { preserveUserEdits: false });
   };
 
-  // Resolve the current pool id from the poolName stored in form
-  const ippoolValue = form.watch('ippool');
+  // Resolve the current sender from the From email stored in the form. On
+  // edit/duplicate/deep-link the form arrives with fromMail set (ippool no
+  // longer participates in this match — decision #2 / AC9).
   const fromMailValue = form.watch('fromMail');
-  const currentPoolId = useMemo(() => {
-    // Match by poolName + senderEmail to handle pools with same poolName
-    const match =
-      pools.find((p) => p.poolName === ippoolValue && p.senderEmail === fromMailValue) ??
-      pools.find((p) => p.poolName === ippoolValue);
+  const currentSenderId = useMemo(() => {
+    const match = senders.find((s) => s.senderEmail === fromMailValue);
     return match ? String(match.id) : undefined;
-  }, [pools, ippoolValue, fromMailValue]);
+  }, [senders, fromMailValue]);
 
-  // Programmatic sync: when ippool is already set (edit / duplicate / deep-link)
-  // and pools resolve, fill sender fields without clobbering user edits.
+  // Programmatic sync: when fromMail is already set (edit / duplicate /
+  // deep-link) and senders resolve, fill identity fields without clobbering
+  // user edits.
   useEffect(() => {
-    if (!currentPoolId) return;
-    const pool = pools.find((p) => String(p.id) === currentPoolId);
-    if (!pool) return;
-    applyPoolDefaults(pool, { preserveUserEdits: true });
-  }, [currentPoolId, pools, applyPoolDefaults]);
+    if (!currentSenderId) return;
+    const sender = senders.find((s) => String(s.id) === currentSenderId);
+    if (!sender) return;
+    applySenderDefaults(sender, { preserveUserEdits: true });
+  }, [currentSenderId, senders, applySenderDefaults]);
 
   const insertEmoji = (
     emoji: EmojiClickData,
@@ -252,32 +253,27 @@ export function EmailContentForm({ editorRef, designJson, templateUrl }: EmailCo
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Left: form fields */}
         <div className="space-y-4">
-          {/* Pool selector — optional. When chosen, prefills the sender fields below. */}
-          {pools.length > 0 && (
-            <FormField
-              control={form.control}
-              name="ippool"
-              render={({ field: _field }) => (
-                <FormItem>
-                  <FormLabel>{t('messages.senderAddress')}</FormLabel>
-                  <Select onValueChange={handlePoolChange} value={currentPoolId}>
-                    <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder={t('messages.selectSender')} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {pools.map((pool) => (
-                        <SelectItem key={pool.id} value={String(pool.id)}>
-                          {pool.senderEmail}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          {/* Sender identity picker — optional. Prefills the From fields
+              below. It does NOT set `ippool`: identity and IP pool routing
+              are fully decoupled (EVO-1281, decision #2 / AC9). */}
+          {senders.length > 0 && (
+            <FormItem>
+              <FormLabel>{t('messages.senderAddress')}</FormLabel>
+              <Select onValueChange={handleSenderChange} value={currentSenderId}>
+                <FormControl>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={t('messages.selectSender')} />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {senders.map((sender) => (
+                    <SelectItem key={sender.id} value={String(sender.id)}>
+                      {sender.senderEmail}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormItem>
           )}
 
           {/* Sender Name + Sender Email side by side */}

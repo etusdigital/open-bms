@@ -5,11 +5,11 @@ import { PostmasterService } from './postmaster.service';
 import { PostmasterEntity } from 'src/entities/postmaster.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RedisModule } from '../../providers/redis.provider';
-import { PoolEntity } from 'src/entities/pool.entity';
+import { SenderEntity } from 'src/entities/sender.entity';
 @Module({
   imports: [
     HttpModule,
-    TypeOrmModule.forFeature([PostmasterEntity, PoolEntity]),
+    TypeOrmModule.forFeature([PostmasterEntity, SenderEntity]),
     RedisModule.register({
       host: process.env.REDIS_HOST,
       port: parseInt(process.env.REDIS_PORT),

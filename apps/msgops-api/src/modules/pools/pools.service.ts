@@ -8,7 +8,6 @@ import { PoolPageDto } from './pool-page.dto';
 import { NewPoolsDto } from './new-pool.dto';
 import { PaginationDto } from '../../dtos/pagination.dto';
 import { SendgridHandler } from './../../handlers/email/sendgrid/sendgrid.handler';
-import { hasEmojiCharacters } from '../../utils/utils.service';
 import { PostgresErrorCode } from 'src/shared.interfaces';
 import { ClsService } from 'nestjs-cls';
 
@@ -38,9 +37,6 @@ export class PoolsService {
   }
 
   async edit(poolDto: PoolsDto): Promise<PoolsDto> {
-    if (hasEmojiCharacters(poolDto.senderName)) {
-      throw new ForbiddenException('Invalid character in Sender Name field');
-    }
     const pool = await this.poolRepository.findOneOrFail({
       where: { id: poolDto.id, accountId: this.cls.get('accountId') },
     });
@@ -60,10 +56,6 @@ export class PoolsService {
 
   async create(poolDto: NewPoolsDto, accountId?: number): Promise<PoolsDto> {
     poolDto.accountId = accountId ? accountId : this.cls.get('accountId');
-
-    if (hasEmojiCharacters(poolDto.senderName)) {
-      throw new ForbiddenException('Invalid character in Sender Name field');
-    }
 
     try {
       const pool = this.poolRepository.create(poolDto);
@@ -136,10 +128,6 @@ export class PoolsService {
 
   async findOneByPool(poolName: string, accountId: number): Promise<PoolsDto> {
     return await this.poolRepository.findOne({ where: { poolName, accountId } });
-  }
-
-  async findOneBySenderEmail(senderEmail: string, accountId: number): Promise<PoolsDto> {
-    return await this.poolRepository.findOne({ where: { senderEmail, accountId } });
   }
 
   async getPoolsSendgrid() {

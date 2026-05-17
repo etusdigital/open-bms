@@ -4,9 +4,6 @@ export interface Pool {
   description?: string;
   poolName: string;
   ip?: string;
-  senderEmail?: string;
-  senderName?: string;
-  senderReplyTo?: string;
   isDefault?: boolean;
   dailyLimit?: string;
   sendingLimit?: string;

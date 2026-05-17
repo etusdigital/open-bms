@@ -11,7 +11,6 @@ import {
   poolFormSchema,
   POOL_NAME_MAX,
   POOL_DESCRIPTION_MAX,
-  POOL_SENDER_NAME_MAX,
   type PoolFormValues,
 } from './pool-schema';
 import type { SendGridPool } from './types';
@@ -34,9 +33,6 @@ export function PoolForm({ defaultValues, onSubmit, isPending, sendGridPools, se
       name: '',
       description: '',
       poolName: '',
-      senderEmail: '',
-      senderName: '',
-      senderReplyTo: '',
       isDefault: false,
       ip: '',
       dailyLimit: '0',
@@ -96,63 +92,6 @@ export function PoolForm({ defaultValues, onSubmit, isPending, sendGridPools, se
                 </FormItem>
               )}
             />
-          </div>
-
-          {/* Sender Configuration Section */}
-          <div className="space-y-4">
-            <h3 className="text-muted-foreground text-sm font-medium">{t('pools.senderConfig')}</h3>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="senderName"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex items-center justify-between">
-                      <FormLabel>{t('pools.senderName')}</FormLabel>
-                      <span className="text-muted-foreground text-xs">
-                        {t('validation.charCount', {
-                          count: field.value?.length ?? 0,
-                          max: POOL_SENDER_NAME_MAX,
-                        })}
-                      </span>
-                    </div>
-                    <FormControl>
-                      <Input {...field} maxLength={POOL_SENDER_NAME_MAX} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="senderEmail"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('pools.senderEmail')}</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="email" placeholder="no-reply@example.com" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="senderReplyTo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('pools.senderReplyTo')}</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="email" placeholder="reply@example.com" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
           </div>
 
           {/* Pool Configuration Section */}
