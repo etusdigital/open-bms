@@ -1,17 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { In } from 'typeorm';
 import { ImportContext, ImporterStep } from './importer.interface';
-import { CampaignEntity } from '../entities/campaign.entity';
 import { MessageEntity } from '../entities/message.entity';
 import { CampaignMessageEntity } from '../entities/campaign-message.entity';
 import { rawInsertPreservingPk, dbNameMap } from '../raw-insert.util';
 
-// F1: `messages` NÃO tem coluna campaign_id — o vínculo é a tabela de junção
-// `campaigns_messages` (PK composta campaign_id+message_id, com statistics/
-// winner/result_date NOT NULL). Iteramos as campanhas já importadas da conta,
-// resolvemos o id de origem (Enterprise) via mapping reverso, buscamos as
-// mensagens daquela campanha e inserimos a message (todas as colunas, mesmo
-// codebase) + o link. Chave natural da message = (account_id, name).
+// `messages` é M:N com `campaigns` pela tabela de junção `campaigns_messages`
+// (PK composta campaign_id+message_id). NÃO existe filtro por campanha na API
+// do Enterprise: `GET /messages?campaignId=X` tem o `campaignId` DESCARTADO
+// (MessagesPageDto não declara o campo e o PageDto base usa
+// `stripUnknown:true`) → a versão antiga deste importer, que iterava campanha
+// a campanha chamando `/messages?campaignId`, recebia a lista da conta INTEIRA
+// a cada campanha. Efeitos confirmados em produção: `progress.done` inflado
+// (nº de mensagens × nº de campanhas, ex.: 57×53=3021) e `campaigns_messages`
+// virando produto cartesiano (toda mensagem ligada a toda campanha).
+//
+// Abordagem correta, em duas fases:
+//   A) Pagina `/messages` UMA vez (account-wide) e insere as mensagens. Chave
+//      natural = (account_id, name) — `messages` tem @Unique(accountId,name)
+//      e os nomes são únicos por conta. Grava o mapping src.id→newId.
+//   B) Reconstrói `campaigns_messages` a partir da fonte real do vínculo: o
+//      array `campaignMessage` embutido em cada campanha de `/campaigns`,
+//      resolvendo campanha (camp.id) e mensagem (cm.messageId) via idMapper.
 @Injectable()
 export class MessagesImporter implements ImporterStep {
   readonly name = 'messages';
@@ -23,81 +33,107 @@ export class MessagesImporter implements ImporterStep {
     }
     const batchSize = parseInt(process.env.ENTERPRISE_IMPORT_BATCH_SIZE_MESSAGES || '500', 10);
 
-    const campRepo = ctx.dataSource.getRepository<CampaignEntity>(CampaignEntity);
     const msgRepo = ctx.dataSource.getRepository<MessageEntity>(MessageEntity);
     const meta = msgRepo.metadata;
     const columnProps = new Set(meta.columns.map((c) => c.propertyName));
     const pkProp = meta.primaryColumns[0]?.propertyName ?? 'id';
 
-    const campaigns = await campRepo.find({ where: { accountId: ctx.accountId } as any, select: ['id'] as any });
-
+    // -------- Fase A: mensagens da conta (uma passada paginada) --------
+    let page = 1;
     let totalDone = 0;
-    for (const camp of campaigns as any[]) {
-      const sourceCampaignId = await this.findSourceCampaignId(ctx, camp.id);
-      if (!sourceCampaignId) continue;
+    while (true) {
+      const resp = await ctx.client.listMessages({ page, itemsPerPage: batchSize });
+      if (!resp.results || resp.results.length === 0) break;
 
-      let page = 1;
-      while (true) {
-        const resp = await ctx.client.listMessages({ page, itemsPerPage: batchSize, campaignId: sourceCampaignId });
-        if (!resp.results || resp.results.length === 0) break;
+      // Dedup por nome dentro da página (chave natural = account_id+name).
+      const byName = new Map<string, any>();
+      for (const m of resp.results) {
+        const nm = m?.name ?? `msg-${m?.id}`;
+        if (!byName.has(nm)) byName.set(nm, { ...m, name: nm });
+      }
+      const names = [...byName.keys()];
 
-        const byName = new Map<string, any>();
-        for (const m of resp.results) {
-          const nm = m?.name ?? `msg-${m?.id}`;
-          if (!byName.has(nm)) byName.set(nm, { ...m, name: nm });
+      await ctx.dataSource.transaction(async (em) => {
+        const txMsg = em.getRepository<MessageEntity>(MessageEntity);
+
+        const existing = await txMsg.find({ where: { accountId: ctx.accountId, name: In(names) } as any });
+        const idByName = new Map<string, any>();
+        for (const e of existing as any[]) idByName.set(e.name, e[pkProp]);
+
+        const toInsert: Record<string, any>[] = [];
+        for (const [nm, m] of byName) {
+          if (idByName.has(nm)) continue;
+          const row: Record<string, any> = {};
+          for (const key of Object.keys(m)) if (columnProps.has(key)) row[key] = m[key];
+          if (ctx.scope === 'account') delete row[pkProp];
+          else if (m[pkProp] !== undefined) row[pkProp] = m[pkProp];
+          row.accountId = ctx.accountId;
+          toInsert.push(row);
         }
-        const names = [...byName.keys()];
-
-        await ctx.dataSource.transaction(async (em) => {
-          const txMsg = em.getRepository<MessageEntity>(MessageEntity);
-          const txCm = em.getRepository<CampaignMessageEntity>(CampaignMessageEntity);
-
-          const existing = await txMsg.find({ where: { accountId: ctx.accountId, name: In(names) } as any });
-          const idByName = new Map<string, any>();
-          for (const e of existing as any[]) idByName.set(e.name, e[pkProp]);
-
-          const toInsert: Record<string, any>[] = [];
-          for (const [nm, m] of byName) {
-            if (idByName.has(nm)) continue;
-            const row: Record<string, any> = {};
-            for (const key of Object.keys(m)) if (columnProps.has(key)) row[key] = m[key];
-            if (ctx.scope === 'account') delete row[pkProp];
-            else if (m[pkProp] !== undefined) row[pkProp] = m[pkProp];
-            row.accountId = ctx.accountId;
-            toInsert.push(row);
+        if (toInsert.length > 0) {
+          if (ctx.scope === 'instance') {
+            await rawInsertPreservingPk(em, 'messages', dbNameMap(txMsg.metadata), toInsert);
+          } else {
+            await txMsg
+              .createQueryBuilder()
+              .insert()
+              .values(toInsert as any)
+              .updateEntity(false)
+              .orIgnore()
+              .execute();
           }
-          if (toInsert.length > 0) {
-            if (ctx.scope === 'instance') {
-              await rawInsertPreservingPk(em, 'messages', dbNameMap(txMsg.metadata), toInsert);
-            } else {
-              await txMsg
-                .createQueryBuilder()
-                .insert()
-                .values(toInsert as any)
-                .updateEntity(false)
-                .orIgnore()
-                .execute();
-            }
+        }
+
+        // Relê tudo da página (pré-existentes + inseridas) e resolve src→newId
+        // pela chave natural (name).
+        const all = await txMsg.find({ where: { accountId: ctx.accountId, name: In(names) } as any });
+        for (const e of all as any[]) idByName.set(e.name, e[pkProp]);
+        for (const [nm, m] of byName) {
+          const newMsgId = idByName.get(nm);
+          if (newMsgId === undefined) continue;
+          if (ctx.scope === 'account' && m[pkProp] !== undefined && m[pkProp] !== null) {
+            await ctx.idMapper.record(ctx.jobId, this.name, m[pkProp], newMsgId);
           }
+        }
+      });
 
-          const all = await txMsg.find({ where: { accountId: ctx.accountId, name: In(names) } as any });
-          for (const e of all as any[]) idByName.set(e.name, e[pkProp]);
+      totalDone += byName.size;
+      await ctx.setCheckpoint(this.name, page, ctx.accountId);
+      await ctx.updateProgress(this.name, { total: resp.totalItems, done: totalDone, page });
+      if (resp.results.length < batchSize) break;
+      page++;
+    }
 
-          for (const [nm, m] of byName) {
-            const newMsgId = idByName.get(nm);
-            if (newMsgId === undefined) continue;
-            if (ctx.scope === 'account' && m[pkProp] !== undefined && m[pkProp] !== null) {
-              await ctx.idMapper.record(ctx.jobId, this.name, m[pkProp], newMsgId);
-            }
-            // Link campaigns_messages (statistics/winner/result_date NOT NULL —
-            // valores neutros; rollups de events_statistics estão fora do
-            // escopo do import — ver pipeline.ts).
+    if (totalDone === 0) {
+      await ctx.updateProgress(this.name, { skipped: true, reason: 'empty' });
+      return;
+    }
+
+    // -------- Fase B: vínculo campanha↔mensagem (M:N real) --------
+    // A relação verdadeira vem do `campaignMessage` embutido em cada campanha
+    // de `/campaigns` (não de `/messages?campaignId`, que não filtra).
+    // Idempotente: PK composta (campaign_id, message_id) + orIgnore.
+    let cpage = 1;
+    while (true) {
+      const cresp = await ctx.client.listCampaigns({ page: cpage, itemsPerPage: 500 });
+      if (!cresp.results || cresp.results.length === 0) break;
+
+      await ctx.dataSource.transaction(async (em) => {
+        const txCm = em.getRepository<CampaignMessageEntity>(CampaignMessageEntity);
+        for (const camp of cresp.results as any[]) {
+          const newCampaignId = ctx.idMapper.resolve(ctx.jobId, ctx.scope, 'campaigns', camp?.id);
+          if (newCampaignId == null) continue;
+          const links: any[] = Array.isArray(camp?.campaignMessage) ? camp.campaignMessage : [];
+          for (const cm of links) {
+            const srcMsgId = cm?.messageId ?? cm?.message?.id;
+            const newMsgId = ctx.idMapper.resolve(ctx.jobId, ctx.scope, this.name, srcMsgId);
+            if (newMsgId == null) continue;
             await txCm
               .createQueryBuilder()
               .insert()
               .values({
-                campaignId: camp.id,
-                messageId: newMsgId,
+                campaignId: Number(newCampaignId),
+                messageId: Number(newMsgId),
                 statistics: {},
                 winner: false,
                 resultDate: new Date(),
@@ -106,33 +142,11 @@ export class MessagesImporter implements ImporterStep {
               .orIgnore()
               .execute();
           }
-        });
+        }
+      });
 
-        totalDone += byName.size;
-        await ctx.setCheckpoint(this.name, page, ctx.accountId);
-        await ctx.updateProgress(this.name, { done: totalDone, page });
-        if (resp.results.length < batchSize) break;
-        page++;
-      }
+      if (cresp.results.length < 500) break;
+      cpage++;
     }
-
-    // Estado terminal (paridade com BaseImporter): se nenhuma campanha tinha
-    // mensagens (ou não há campanhas), nada foi emitido no loop → marca
-    // skipped:empty pra não ficar eternamente "pendente" na tela.
-    if (totalDone === 0) {
-      await ctx.updateProgress(this.name, { skipped: true, reason: 'empty' });
-    }
-  }
-
-  // Reverse lookup: new_id (camp.id no OSS) → source_id (Enterprise).
-  // scope=instance → identidade (ids preservados via SequenceAdvancer).
-  private async findSourceCampaignId(ctx: ImportContext, newId: number): Promise<number | null> {
-    if (ctx.scope === 'instance') return newId;
-    const rows: any[] = await ctx.dataSource.query(`SELECT source_id FROM enterprise_id_mappings WHERE job_id = $1 AND entity = 'campaigns' AND new_id = $2 LIMIT 1`, [
-      ctx.jobId,
-      String(newId),
-    ]);
-    const sourceId = rows?.[0]?.source_id;
-    return sourceId ? Number(sourceId) : null;
   }
 }
