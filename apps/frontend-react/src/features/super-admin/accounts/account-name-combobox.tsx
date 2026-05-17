@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Check, ChevronsUpDown, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -21,6 +22,7 @@ interface Props {
 // duas intenções num campo só — escolher da lista (mesclar) ou digitar um nome
 // novo (criar) — e avisa qual das duas vai acontecer.
 export function AccountNameCombobox({ id, value, onChange, disabled }: Props) {
+  const { t } = useTranslation();
   const { data: accounts, isLoading } = useSuperAdminAccountsAll();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -62,14 +64,18 @@ export function AccountNameCombobox({ id, value, onChange, disabled }: Props) {
             className="w-full justify-between font-normal"
           >
             <span className={cn('truncate', !value && 'text-muted-foreground')}>
-              {value || 'Selecione uma conta existente ou digite um nome novo'}
+              {value || t('superAdmin.accounts.import.comboboxPlaceholder')}
             </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
           <Command shouldFilter={false}>
-            <CommandInput placeholder="Buscar ou criar conta…" value={search} onValueChange={setSearch} />
+            <CommandInput
+              placeholder={t('superAdmin.accounts.import.comboboxSearchPlaceholder')}
+              value={search}
+              onValueChange={setSearch}
+            />
             <CommandList>
               {isLoading ? (
                 <div className="space-y-1.5 p-2">
@@ -79,22 +85,27 @@ export function AccountNameCombobox({ id, value, onChange, disabled }: Props) {
                 </div>
               ) : (
                 <>
-                  {!showCreate && <CommandEmpty>Nenhuma conta encontrada.</CommandEmpty>}
+                  {!showCreate && <CommandEmpty>{t('superAdmin.accounts.import.comboboxEmpty')}</CommandEmpty>}
                   {showCreate && (
-                    <CommandGroup heading="Criar">
+                    <CommandGroup heading={t('superAdmin.accounts.import.comboboxCreateGroup')}>
                       <CommandItem value={`__create__${trimmed}`} onSelect={() => select(trimmed)}>
                         <Plus className="mr-2 h-4 w-4" />
-                        Criar nova conta: <span className="ml-1 font-medium">“{trimmed}”</span>
+                        {t('superAdmin.accounts.import.comboboxCreate')}{' '}
+                        <span className="ml-1 font-medium">“{trimmed}”</span>
                       </CommandItem>
                     </CommandGroup>
                   )}
                   {filtered.length > 0 && (
-                    <CommandGroup heading="Contas existentes">
+                    <CommandGroup heading={t('superAdmin.accounts.import.comboboxExistingGroup')}>
                       {filtered.map((account) => (
                         <CommandItem key={account.id} value={account.name} onSelect={() => select(account.name)}>
                           <Check className={cn('mr-2 h-4 w-4', value === account.name ? 'opacity-100' : 'opacity-0')} />
                           <span className="truncate">{account.name}</span>
-                          {!account.isActive && <span className="text-muted-foreground ml-2 text-xs">(inativa)</span>}
+                          {!account.isActive && (
+                            <span className="text-muted-foreground ml-2 text-xs">
+                              {t('superAdmin.accounts.import.comboboxInactive')}
+                            </span>
+                          )}
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -109,12 +120,11 @@ export function AccountNameCombobox({ id, value, onChange, disabled }: Props) {
       {value.trim().length > 0 &&
         (existingMatch ? (
           <p className="text-muted-foreground text-xs">
-            A importação será feita <span className="font-medium">na conta existente</span> “{existingMatch.name}” — os
-            dados do Enterprise serão mesclados nela.
+            {t('superAdmin.accounts.import.hintExisting', { name: existingMatch.name })}
           </p>
         ) : (
           <p className="text-muted-foreground text-xs">
-            Uma <span className="font-medium">nova conta</span> “{value.trim()}” será criada para receber o import.
+            {t('superAdmin.accounts.import.hintNew', { name: value.trim() })}
           </p>
         ))}
     </div>
