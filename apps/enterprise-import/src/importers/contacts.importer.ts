@@ -26,6 +26,9 @@ export class ContactsImporter extends BaseImporter<ContactEntity> {
   protected readonly entity = ContactEntity;
   protected readonly batchSize = parseInt(process.env.ENTERPRISE_IMPORT_BATCH_SIZE_CONTACTS || '1000', 10);
   protected readonly naturalKey = ['uuid'];
+  // `/contacts` do Enterprise devolve `total: results.length` (tamanho da
+  // página, não o total geral) → não usar como denominador do progresso.
+  protected readonly reportsTotal = false;
 
   protected fetchPage(ctx: ImportContext, page: number): Promise<PagedResponse<ContactEntity>> {
     return ctx.client.listContacts({ page, itemsPerPage: this.batchSize });

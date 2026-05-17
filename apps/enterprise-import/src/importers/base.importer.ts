@@ -38,6 +38,11 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
   protected readonly fkRemap: Record<string, string> = {};
   // Grava src.id → newId no idMapper (necessário p/ remap de filhos).
   protected readonly recordsIdMapping: boolean = true;
+  // Se o endpoint da origem devolve um `totalItems` que é o TOTAL real (e não,
+  // p.ex., o tamanho da página). Quando false, o progresso não emite `total`
+  // (denominador) — evita barra com done≫total. Ex.: `/contacts` do Enterprise
+  // retorna `total: results.length` (tamanho da última página), não o geral.
+  protected readonly reportsTotal: boolean = true;
 
   constructor() {
     this.logger = new Logger(this.constructor.name);
@@ -145,7 +150,7 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
 
       totalDone += candidates.length;
       await ctx.setCheckpoint(this.name, page, ctx.accountId ?? undefined);
-      await ctx.updateProgress(this.name, { total: totalKnown, done: totalDone, page });
+      await ctx.updateProgress(this.name, { total: this.reportsTotal ? totalKnown : undefined, done: totalDone, page });
 
       if (resp.results.length < this.batchSize) break;
       page++;
@@ -159,7 +164,7 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
     // nada foi importado, marca skipped(empty) — exceto resume onde tudo já
     // existia (totalKnown>0), aí conta como concluído.
     if (totalDone === 0) {
-      if (totalKnown && totalKnown > 0) {
+      if (this.reportsTotal && totalKnown && totalKnown > 0) {
         await ctx.updateProgress(this.name, { total: totalKnown, done: totalKnown, page });
       } else {
         await ctx.updateProgress(this.name, { skipped: true, reason: 'empty' });
