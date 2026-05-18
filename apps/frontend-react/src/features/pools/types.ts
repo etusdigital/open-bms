@@ -5,8 +5,6 @@ export interface Pool {
   poolName: string;
   ip?: string;
   isDefault?: boolean;
-  dailyLimit?: string;
-  sendingLimit?: string;
   accountId?: number;
   createdAt?: string;
   updatedAt?: string;

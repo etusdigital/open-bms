@@ -20,9 +20,6 @@ export class PoolEntity {
   @Column('int', { name: 'account_id' })
   accountId: number;
 
-  @Column('int', { name: 'sending_limit' })
-  sendingLimit: number;
-
   @Column('boolean', { name: 'is_default', default: false })
   isDefault: boolean;
 

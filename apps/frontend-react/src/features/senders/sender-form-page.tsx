@@ -49,7 +49,6 @@ export function SenderFormPage({ senderId }: SenderFormPageProps) {
   const sender = senderQuery.data;
   const defaultValues: SenderFormValues = {
     senderReplyTo: sender.senderReplyTo ?? '',
-    sendingLimit: sender.sendingLimit != null ? String(sender.sendingLimit) : '0',
   };
 
   return (

@@ -36,13 +36,6 @@ export class PoolsController {
     return this.poolService.getPoolsSendgrid();
   }
 
-  @ApiOperation({ summary: 'Get sending limits from sendgrid' })
-  @RequirePermission('infra:pools_read')
-  @Get('/get_sending_limits')
-  async getSendingLimits() {
-    return this.poolService.getSendingLimits();
-  }
-
   @ApiOperation({ summary: 'Get pool by ID' })
   @RequirePermission('infra:pools_read')
   @Get('ips/sendgrid/:poolName')

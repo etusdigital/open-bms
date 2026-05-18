@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { UnsavedChangesDialog } from '@/components/unsaved-changes-dialog';
@@ -61,21 +61,6 @@ export function SenderForm({ senderName, senderEmail, defaultValues, onSubmit, i
                     <FormControl>
                       <Input {...field} type="email" placeholder="reply@example.com" />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="sendingLimit"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('senders.sendingLimit')}</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" min="0" />
-                    </FormControl>
-                    <FormDescription>{t('senders.limitHelp')}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -161,68 +161,6 @@ export class PoolsService {
     }
   }
 
-  async getSendingLimits() {
-    try {
-      const redisClient = await this.redisService.getClient();
-      const pools = await this.poolRepository
-        .createQueryBuilder('pools')
-        .where({ accountId: this.cls.get('accountId') })
-        .innerJoin('messages', 'messages', 'messages.ippool = pools.pool_name')
-        .getMany();
-
-      const sendgridLimit = 10;
-      const groupedPools = pools.reduce((chunckedArray, item, index) => {
-        const chunkIndex = Math.floor(index / sendgridLimit);
-        if (!chunckedArray[chunkIndex]) {
-          chunckedArray[chunkIndex] = [];
-        }
-
-        chunckedArray[chunkIndex].push(item);
-
-        return chunckedArray;
-      }, []);
-
-      const categoryStats = [];
-      const yesterDay = new Date();
-      yesterDay.setDate(yesterDay.getDate() - 1);
-
-      for (const group of groupedPools) {
-        const categories = group.map((item) => `pool_${item.poolName}`);
-        const stats = await this.sendGridHandler.getStatsByCategories(yesterDay, yesterDay, categories);
-
-        if (stats.length && stats[0].stats) {
-          stats[0].stats.map(async (item) => {
-            categoryStats.push({
-              name: item.name,
-              processed: item.metrics?.processed,
-            });
-          });
-        }
-      }
-
-      for (const category of categoryStats) {
-        const poolName = category.name.replace('pool_', '');
-        const pool = await this.poolRepository.findOneOrFail({
-          where: {
-            poolName: poolName,
-            accountId: this.cls.get('accountId'),
-          },
-        });
-
-        const newSendingLimit = parseInt(category.processed + category.processed * 0.2);
-
-        await this.poolRepository.update(pool.id, { sendingLimit: newSendingLimit });
-        await redisClient.set(`pool_${poolName}:sending_limit`, newSendingLimit);
-      }
-
-      await redisClient.set(`spark_post:sending_limit`, process.env.LIMIT_SPARKPOST || 200);
-      return categoryStats;
-    } catch (e) {
-      console.error(e);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
   async getPoolLimitDaily(poolName: string) {
     try {
       const redisClient = this.redisService.getClient();

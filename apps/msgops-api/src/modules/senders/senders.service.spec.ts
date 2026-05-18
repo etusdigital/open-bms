@@ -53,13 +53,12 @@ describe('SendersService', () => {
   });
 
   describe('edit', () => {
-    it('only mutates sendingLimit and senderReplyTo', async () => {
-      const existing: any = { id: 1, accountId: ACCOUNT_ID, senderEmail: 'keep@x.com', senderName: 'Keep', sendingLimit: 10, senderReplyTo: 'old@x.com' };
+    it('only mutates senderReplyTo (identity fields are SendGrid-owned; sendingLimit removed — D14)', async () => {
+      const existing: any = { id: 1, accountId: ACCOUNT_ID, senderEmail: 'keep@x.com', senderName: 'Keep', senderReplyTo: 'old@x.com' };
       repo.findOneOrFail.mockResolvedValue(existing);
-      await service.edit({ id: 1, sendingLimit: 500, senderReplyTo: 'new@x.com', senderEmail: 'HACK@x.com', senderName: 'HACK' });
+      await service.edit({ id: 1, senderReplyTo: 'new@x.com', senderEmail: 'HACK@x.com', senderName: 'HACK' } as any);
       expect(existing.senderEmail).toBe('keep@x.com');
       expect(existing.senderName).toBe('Keep');
-      expect(existing.sendingLimit).toBe(500);
       expect(existing.senderReplyTo).toBe('new@x.com');
     });
   });
@@ -83,7 +82,7 @@ describe('SendersService', () => {
       expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ senderEmail: 'b@x.com', senderReplyTo: null }));
     });
 
-    it('preserves local sendingLimit/senderReplyTo on re-sync (AC3)', async () => {
+    it('preserves local senderReplyTo on re-sync (AC3)', async () => {
       sendgrid.getVerifiedSenders.mockResolvedValue([{ id: 1, from_email: 'a@x.com', from_name: 'A', reply_to: 'remote@x.com' }]);
       const local: any = {
         id: 1,
@@ -91,7 +90,6 @@ describe('SendersService', () => {
         sgVerifiedSenderId: '1',
         senderEmail: 'a@x.com',
         senderName: 'A',
-        sendingLimit: 500,
         senderReplyTo: 'localedited@x.com',
         removedAtSource: null,
       };
@@ -100,7 +98,6 @@ describe('SendersService', () => {
       const result = await service.syncFromSendgrid();
 
       expect(result).toEqual({ created: 0, updated: 0, removed: 0 });
-      expect(local.sendingLimit).toBe(500);
       expect(local.senderReplyTo).toBe('localedited@x.com');
       expect(repo.save).not.toHaveBeenCalled();
     });

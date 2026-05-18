@@ -10,7 +10,6 @@ export class SplitSenderFromPool1779038987065 implements MigrationInterface {
         sender_email VARCHAR(255) NOT NULL,
         sender_name VARCHAR(60) NOT NULL,
         sender_replyto_email VARCHAR(255),
-        sending_limit INTEGER,
         account_id INTEGER NOT NULL,
         is_default BOOLEAN NOT NULL DEFAULT false,
         sg_verified_sender_id VARCHAR(255),
@@ -27,11 +26,15 @@ export class SplitSenderFromPool1779038987065 implements MigrationInterface {
       CREATE INDEX IF NOT EXISTS idx_senders_account_sg_id ON senders(account_id, sg_verified_sender_id)
     `);
 
+    // D14: sending_limit is an inert Enterprise residue, removed from the OSS
+    // (never enforced by any send path). Dropped here alongside the identity
+    // columns since both belong to the same EVO-1281 split PR.
     await queryRunner.query(`
       ALTER TABLE pools
         DROP COLUMN IF EXISTS sender_email,
         DROP COLUMN IF EXISTS sender_name,
-        DROP COLUMN IF EXISTS sender_replyto_email
+        DROP COLUMN IF EXISTS sender_replyto_email,
+        DROP COLUMN IF EXISTS sending_limit
     `);
   }
 
@@ -42,7 +45,8 @@ export class SplitSenderFromPool1779038987065 implements MigrationInterface {
       ALTER TABLE pools
         ADD COLUMN IF NOT EXISTS sender_email VARCHAR(255),
         ADD COLUMN IF NOT EXISTS sender_name VARCHAR(60),
-        ADD COLUMN IF NOT EXISTS sender_replyto_email VARCHAR(255)
+        ADD COLUMN IF NOT EXISTS sender_replyto_email VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS sending_limit INTEGER
     `);
     await queryRunner.query(`DROP TABLE IF EXISTS senders`);
   }

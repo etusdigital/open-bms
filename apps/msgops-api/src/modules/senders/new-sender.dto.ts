@@ -19,10 +19,6 @@ export class NewSenderDto {
   senderReplyTo?: string;
 
   @ApiPropertyOptional()
-  @JoiSchema(Joi.number().allow(null).optional())
-  sendingLimit?: number;
-
-  @ApiPropertyOptional()
   @JoiSchema(Joi.boolean().allow('', null).optional())
   isDefault?: boolean;
 

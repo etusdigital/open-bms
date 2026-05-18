@@ -32,16 +32,11 @@ describe('PoolForm', () => {
   it('renders pool configuration fields when SendGrid has dedicated pools', () => {
     render(<PoolForm {...defaultProps} sendGridPools={[{ name: 'pool-a' }]} />);
     expect(screen.getByText(/nome do pool/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/daily limit/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/sending limit/i)).toBeInTheDocument();
   });
 
   it('replaces the pool dropdown with a Free-plan callout when SendGrid has no pools', () => {
     render(<PoolForm {...defaultProps} sendGridPools={[]} />);
     expect(screen.getByText(/Free\/Essentials/i)).toBeInTheDocument();
-    // limits remain editable so the user can still save the IP pool
-    expect(screen.getByLabelText(/daily limit/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/sending limit/i)).toBeInTheDocument();
   });
 
   it('shows "Criar" button in create mode', () => {
@@ -59,8 +54,6 @@ describe('PoolForm', () => {
           poolName: 'existing-pool',
           isDefault: false,
           ip: '',
-          dailyLimit: '0',
-          sendingLimit: '0',
         }}
       />,
     );
@@ -77,15 +70,11 @@ describe('PoolForm', () => {
           poolName: 'main',
           isDefault: false,
           ip: '',
-          dailyLimit: '1000',
-          sendingLimit: '100',
         }}
       />,
     );
     expect(screen.getByDisplayValue('Main Pool')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Primary pool')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('1000')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('100')).toBeInTheDocument();
   });
 
   it('shows character counters for name and description', () => {

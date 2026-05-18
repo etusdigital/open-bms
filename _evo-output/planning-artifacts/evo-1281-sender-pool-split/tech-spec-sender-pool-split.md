@@ -4,7 +4,7 @@ slug: 'sender-pool-split'
 created: '2026-05-15'
 status: 'ready-for-dev'
 stepsCompleted: [1, 2, 3, 4]
-revisionNote: 'Adversarial review (R) — 8 findings processed. F1/F2/F6 (High/Med) addressed in T10/T13/T14; F4/F5/F8 in ACs/T5; F7 traced as not-affected (noise). D13 (F3 operational policy) ratified by Guilherme 2026-05-15 → status promoted to ready-for-dev.'
+revisionNote: 'Adversarial review (R) — 8 findings processed. F1/F2/F6 (High/Med) addressed in T10/T13/T14; F4/F5/F8 in ACs/T5; F7 traced as not-affected (noise). D13 (F3 operational policy) ratified by Guilherme 2026-05-15 → status promoted to ready-for-dev. D14 (PO via Guilherme, 2026-05-17): sendingLimit/dailyLimit removed from OSS (advanced/Enterprise) — scope change, see Technical Decisions #14; affected tasks/ACs need a re-pass before dev.'
 linearIssue: 'EVO-1281'
 featureBranch: 'guilhermegomes/evo-1281-sender-pool-split'
 tech_stack: ['NestJS', 'TypeORM', 'PostgreSQL', 'React + TanStack Query', 'Vitest', 'Jest', 'SendGrid v3 API']
@@ -125,13 +125,18 @@ editáveis (limite + reply-to locais). Send path passa a resolver reply-to via `
 3. Sem retrocompat / sem backfill — staging re-sincroniza da SendGrid.
 4. Sync one-way; idempotência por `sg_verified_sender_id` (preferencial) com fallback
    de match por `sender_email` quando o id ainda não existir localmente.
-5. `sending_limit` permanece **em ambas** as entidades (`sender` e `pool`).
-6. Re-sync: cria novos; **preserva** `sending_limit`/`sender_replyto_email` locais dos
+5. ~~`sending_limit` permanece **em ambas** as entidades (`sender` e `pool`).~~
+   **[SUPERSEDED por D14, 2026-05-17]** `sending_limit` é removido do OSS por
+   completo (entidades, migration, DTOs, UI).
+6. Re-sync: cria novos; **preserva** `sender_replyto_email` local dos
    existentes; ausentes na SendGrid recebem `removed_at_source = now()` (sem apagar).
+   (`sending_limit` deixou de existir — D14.)
 7. `POST /senders/sync` escopo de conta, usa `sendgrid_key` da conta logada.
 8. **[RATIFICADA — Guilherme, 2026-05-15]** `is_default` vai para `sender`
    (default sender de identidade) e **permanece também** em `pools` (default IP pool),
    coerente com a filosofia da decisão #5. Removível de um lado depois sem custo.
+   (Nota: #5 foi superseded por D14 apenas na parte de `sending_limit`; `is_default`
+   em ambas as entidades — conteúdo ratificado de #8 — permanece válido.)
 9. **[RATIFICADA — Guilherme, 2026-05-15]** Reusar as permissões existentes
    `infra:pools_read` (GET) e `infra:manage` (POST/PUT/DELETE/sync) para o controller
    de `senders`, evitando seeding/migração de RBAC no caminho crítico do launch.
@@ -144,9 +149,9 @@ editáveis (limite + reply-to locais). Send path passa a resolver reply-to via `
     label=`senderEmail`, via `/senders`), já que o usuário pensa em "remetente", não em
     IP pool. Alternativa: manter filtro por `ipPool` (value=`poolName`) com label
     genérico do pool. Decisão afeta a query de stats no backend — confirmar.
-12. **[NOTA]** A interface `Pool` do frontend tem `dailyLimit` que **não** existe na
-    `pool.entity.ts`. Tratado como atributo de **IP pool** (throughput do pool) →
-    **permanece em `pools`**, não migra para `sender`. Sinalizar se a intenção for outra.
+12. ~~**[NOTA]** A interface `Pool` do frontend tem `dailyLimit` que **não** existe na
+    `pool.entity.ts`.~~ **[OBSOLETA por D14, 2026-05-17]** `dailyLimit` era campo
+    fantasma (só frontend + `pools.dto.ts`); removido do OSS por completo.
 13. **[RATIFICADA — Guilherme, 2026-05-15 | F3 da adversarial review]** Janela
     operacional do split sem backfill: entre rodar a migration (derruba identidade de
     `pools`) e o operador clicar **Sincronizar**, todo envio **sem `ippool`** resolve
@@ -156,6 +161,22 @@ editáveis (limite + reply-to locais). Send path passa a resolver reply-to via `
     um **passo obrigatório do runbook de deploy** desta feature (deploy → migration →
     sync por conta → validar), documentado em `docs/`/handoff, e **não** tratar `down()`
     como rollback real (forward-fix only). Confirmar esta política operacional.
+
+14. **[RATIFICADA — PO, decisão repassada por Guilherme, 2026-05-17]** `sendingLimit`
+    e `dailyLimit` são **configurações avançadas (Enterprise) e saem do OSS** — resolve
+    o gap reportado no Linear (campo inerte desde o commit inicial; enforcement nunca
+    portado). **Altera o escopo do EVO-1281** (não silenciar — registrado no card):
+    - `sendingLimit`: remover de `senders` (entidade, **coluna `sending_limit` da
+      migration de split — L13**, `senders.service.ts:47`, DTO, form/schema/coluna) **e**
+      de `pools` (coluna da entidade, `pools.dto.ts`, form/schema, `pool-tab`,
+      `pool-gateway`); remover o auto-scaler morto `getSendingLimits()` +
+      rota `GET /pools/get_sending_limits` + writer Redis + env `LIMIT_SPARKPOST`.
+    - `dailyLimit`: campo **fantasma** (frontend de `pools` + `pools.dto.ts:39`; sem
+      coluna em `pool.entity.ts`) — remover do form/schema/types de `pools` e do DTO.
+    - **[RESOLVIDO — Guilherme, 2026-05-17]** o cleanup do `getSendingLimits()`
+      route/Redis/`LIMIT_SPARKPOST` **entra no mesmo PR do EVO-1281** (PR único).
+    - Substitui as decisões #5 e #8 na parte de `sending_limit`; #12 (nota `dailyLimit`)
+      fica obsoleta — `dailyLimit` deixa de existir.
 
 ## Implementation Plan
 
@@ -167,7 +188,7 @@ editáveis (limite + reply-to locais). Send path passa a resolver reply-to via `
 `apps/msgops-api/src/entities/sender.entity.ts` (novo). Espelhar exatamente o estilo de
 `pool.entity.ts`: `@Entity('senders')`; colunas `id` (PK int), `sender_email`
 varchar(255), `sender_name` varchar(60), `sender_replyto_email` varchar(255) nullable,
-`sending_limit` int nullable, `account_id` int, `is_default` boolean default false,
+`account_id` int, `is_default` boolean default false,
 `sg_verified_sender_id` varchar(255) nullable, `removed_at_source` timestamptz nullable;
 `created_at`/`updated_at`/`deleted_at` timestamptz; hook `@BeforeUpdate()`. Sem relações.
 Auto-discovery via glob — nenhum array a editar.
@@ -191,7 +212,7 @@ Registrar `SendersModule` no módulo raiz onde `PoolsModule` é importado (espel
 Espelhar `pools.service.ts`: scoping por `cls.get('accountId')`, soft-delete manual.
 Implementar `findOneBySenderEmail(senderEmail, accountId)` (mover semântica de
 `pools.service.ts:141-143` para `SenderEntity`). Update permite editar apenas
-`sending_limit` e `sender_replyto_email`.
+`sender_replyto_email` (D14: `sending_limit` removido).
 
 **T5 — `SendersService.syncFromSendgrid()` + `POST /senders/sync`**
 Controller: `@Post('/sync')` `@RequirePermission('infra:manage')` (decisão #9).
@@ -206,7 +227,7 @@ sendgridHandler.getVerifiedSenders()` (key resolvida por conta internamente);
 `sg_verified_sender_id` senão `sender_email`): se não existe → cria
 (`sg_verified_sender_id=id`, `sender_email=from_email`, `sender_name=from_name`,
 `sender_replyto_email=reply_to ?? null`, `account_id=accountId`); se existe →
-**não** sobrescreve `sending_limit`/`sender_replyto_email`, limpa `removed_at_source`
+**não** sobrescreve `sender_replyto_email`, limpa `removed_at_source`
 se estava setado. Locais sem correspondente remoto → `removed_at_source=now()` (não
 apagar). Retorna `{ created, updated, removed }` counts.
 
@@ -227,7 +248,7 @@ arquivo depende de campos de identidade em `pools`.
 `apps/frontend-react/src/features/senders/` espelhando `pools/`: `use-senders.ts`
 (TanStack, `GET/POST/PUT/DELETE /senders`, `POST /senders/sync`), `senders-page.tsx`
 com botão **Sincronizar** (chama sync, invalida query, toast `sonner`),
-`sender-form.tsx`/`sender-schema.ts` editando só `sendingLimit`/`senderReplyTo`,
+`sender-form.tsx`/`sender-schema.ts` editando só `senderReplyTo` (D14),
 `senders-columns.tsx`, `types.ts`.
 
 **T9 — Frontend: podar `pools` (identidade sai)**
@@ -318,9 +339,9 @@ local, When `POST /senders/sync`, Then 3 registros `sender` são criados com
 `{created:3,updated:0,removed:0}`.
 
 **AC3 — Re-sync preserva config local**
-Given um sender local com `sending_limit=500` e `sender_replyto_email` editado, When
-re-sincronizo e ele ainda existe na SendGrid, Then `sending_limit` e
-`sender_replyto_email` permanecem inalterados.
+Given um sender local com `sender_replyto_email` editado, When
+re-sincronizo e ele ainda existe na SendGrid, Then `sender_replyto_email`
+permanece inalterado. (D14: `sending_limit` não existe mais.)
 
 **AC4 — Sender removido na origem**
 Given um sender local cujo verified sender foi removido da SendGrid, When re-sincronizo,

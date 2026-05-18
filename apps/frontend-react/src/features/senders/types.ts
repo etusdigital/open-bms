@@ -3,7 +3,6 @@ export interface Sender {
   senderEmail: string;
   senderName: string;
   senderReplyTo?: string;
-  sendingLimit?: number;
   isDefault?: boolean;
   sgVerifiedSenderId?: string;
   removedAtSource?: string;

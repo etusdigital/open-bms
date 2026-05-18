@@ -37,7 +37,6 @@ export function PoolTab() {
 
   const [pool, setPool] = useState<Pool | null>(null);
   const [name, setName] = useState('');
-  const [sendingLimit, setSendingLimit] = useState('1000');
 
   // SendGrid-backed selection: the user can no longer type a free-form pool
   // name or arbitrary IPs — both come from the SendGrid account configured
@@ -89,7 +88,6 @@ export function PoolTab() {
       if (target) {
         setPool(target);
         setName(target.name ?? '');
-        setSendingLimit(String(target.sendingLimit ?? 1000));
         const storedPoolName = target.poolName ?? '';
         setSelectedPool(storedPoolName);
         setIps(normalizeStoredIps(target.ip));
@@ -142,10 +140,6 @@ export function PoolTab() {
     // and the form lets users save without one — the worker omits
     // ip_pool_name from the SendGrid payload and falls back to shared IPs.
     if (sendgridPools.length > 0 && !selectedPool) return t('settings.poolSendgridPoolRequired');
-    if (sendingLimit) {
-      const limit = Number(sendingLimit);
-      if (!Number.isInteger(limit) || limit < 1) return t('settings.poolSendingLimitInvalid');
-    }
     return null;
   }
 
@@ -160,7 +154,6 @@ export function PoolTab() {
     const payload = {
       name: name.trim(),
       poolName: selectedPool,
-      ...(sendingLimit && { sendingLimit: Number(sendingLimit) }),
       ip: JSON.stringify(ips),
       ...(pool ? {} : { accountId, isDefault: true }),
     };
@@ -256,21 +249,6 @@ export function PoolTab() {
       </div>
 
       <p className="text-muted-foreground text-xs">{t('settings.poolIdentityMovedHelp')}</p>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="settings-pool-limit">{t('settings.poolSendingLimit')}</Label>
-          <Input
-            id="settings-pool-limit"
-            type="number"
-            min={1}
-            value={sendingLimit}
-            onChange={(e) => setSendingLimit(e.target.value)}
-            disabled={saving}
-            placeholder="1000"
-          />
-        </div>
-      </div>
 
       <div className="flex flex-col gap-1.5">
         <Label>{t('settings.poolIps')}</Label>

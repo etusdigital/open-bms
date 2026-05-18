@@ -38,14 +38,6 @@ const staticColumns: ColumnDef<Sender, unknown>[] = [
     cell: ({ row }) => <span className="text-sm">{row.original.senderReplyTo || '—'}</span>,
   },
   {
-    accessorKey: 'sendingLimit',
-    header: 'senders.sendingLimit',
-    enableSorting: false,
-    cell: ({ row }) => (
-      <span className="font-mono text-xs">{row.original.sendingLimit ?? 0}</span>
-    ),
-  },
-  {
     accessorKey: 'isDefault',
     header: 'senders.isDefault',
     enableSorting: false,

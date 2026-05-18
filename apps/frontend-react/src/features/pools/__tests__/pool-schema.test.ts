@@ -9,8 +9,6 @@ describe('poolFormSchema', () => {
       poolName: 'main-pool',
       isDefault: true,
       ip: '192.168.1.1',
-      dailyLimit: '1000',
-      sendingLimit: '100',
     });
     expect(result.success).toBe(true);
   });

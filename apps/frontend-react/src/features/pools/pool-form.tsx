@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -35,8 +35,6 @@ export function PoolForm({ defaultValues, onSubmit, isPending, sendGridPools, se
       poolName: '',
       isDefault: false,
       ip: '',
-      dailyLimit: '0',
-      sendingLimit: '0',
     },
   });
 
@@ -133,38 +131,6 @@ export function PoolForm({ defaultValues, onSubmit, isPending, sendGridPools, se
                 )}
               />
             )}
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="dailyLimit"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('pools.dailyLimit')}</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" min="0" />
-                    </FormControl>
-                    <FormDescription>{t('pools.limitHelp')}</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="sendingLimit"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('pools.sendingLimit')}</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" min="0" />
-                    </FormControl>
-                    <FormDescription>{t('pools.limitHelp')}</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
           </div>
 
           <Button type="submit" disabled={isPending}>

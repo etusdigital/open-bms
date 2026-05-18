@@ -136,20 +136,18 @@ describe('useUpdateSender', () => {
     authenticateStore();
   });
 
-  it('calls PUT /senders/:id with only sendingLimit and senderReplyTo', async () => {
+  it('calls PUT /senders/:id with only senderReplyTo (D14: sendingLimit removed)', async () => {
     const { result } = renderHook(() => useUpdateSender(5), {
       wrapper: createQueryWrapper(),
     });
 
     result.current.mutate({
-      sendingLimit: '500',
       senderReplyTo: 'reply@test.com',
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(mockPut).toHaveBeenCalledWith('/senders/5', {
-      sendingLimit: '500',
       senderReplyTo: 'reply@test.com',
     });
   });
@@ -170,7 +168,7 @@ describe('useUpdateSender', () => {
       wrapper: createQueryWrapper(),
     });
 
-    result.current.mutate({ sendingLimit: '', senderReplyTo: 'bad' });
+    result.current.mutate({ senderReplyTo: 'bad' });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
 

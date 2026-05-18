@@ -59,7 +59,6 @@ export function useUpdateSender(id: number) {
   return useMutation({
     mutationFn: async (data: SenderFormValues) => {
       const { data: result } = await apiClient.put<Sender>(`/senders/${id}`, {
-        sendingLimit: data.sendingLimit,
         senderReplyTo: data.senderReplyTo,
       });
       return result;

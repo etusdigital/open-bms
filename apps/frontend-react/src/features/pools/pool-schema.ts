@@ -16,8 +16,6 @@ export const poolFormSchema = z.object({
   poolName: optionalString(100),
   isDefault: z.boolean().default(false),
   ip: optionalString(1000),
-  dailyLimit: optionalString(20),
-  sendingLimit: optionalString(20),
 });
 
 export type PoolFormValues = z.infer<typeof poolFormSchema>;

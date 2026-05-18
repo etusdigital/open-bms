@@ -111,8 +111,6 @@ describe('PoolFormPage', () => {
           poolName: 'main-pool',
           isDefault: false,
           ip: '',
-          dailyLimit: '1000',
-          sendingLimit: '100',
         },
         isLoading: false,
         error: null,
@@ -120,7 +118,6 @@ describe('PoolFormPage', () => {
       await renderFormPage(5);
       expect(screen.getByDisplayValue('Main Pool')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Primary pool')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('1000')).toBeInTheDocument();
     });
 
     it('shows save button instead of create', async () => {

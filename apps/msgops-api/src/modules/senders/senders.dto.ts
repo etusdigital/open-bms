@@ -23,10 +23,6 @@ export class SendersDto {
   senderReplyTo?: string;
 
   @ApiPropertyOptional()
-  @JoiSchema(Joi.number().allow(null).optional())
-  sendingLimit?: number;
-
-  @ApiPropertyOptional()
   @JoiSchema(Joi.number().optional())
   accountId?: number;
 

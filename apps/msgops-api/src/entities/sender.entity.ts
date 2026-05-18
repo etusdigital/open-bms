@@ -14,9 +14,6 @@ export class SenderEntity {
   @Column('varchar', { name: 'sender_replyto_email', length: 255, nullable: true })
   senderReplyTo: string;
 
-  @Column('int', { name: 'sending_limit', nullable: true })
-  sendingLimit: number;
-
   @Column('int', { name: 'account_id' })
   accountId: number;
 

@@ -33,8 +33,9 @@ export class SendersService {
   }
 
   /**
-   * Operators may only tune local config: sending_limit and sender_replyto_email.
+   * Operators may only tune local config: sender_replyto_email.
    * Identity fields (email/name) are owned by SendGrid and only mutated by sync.
+   * (sending_limit was removed from the OSS — D14.)
    */
   async edit(senderDto: SendersDto): Promise<SenderEntity> {
     const sender = await this.senderRepository.findOneOrFail({
@@ -42,9 +43,8 @@ export class SendersService {
     });
 
     try {
-      // T4: operators may only tune sending_limit and sender_replyto_email.
+      // T4/D14: operators may only tune sender_replyto_email.
       // is_default exists on the entity (decision #8) but is not editable here.
-      if (senderDto.sendingLimit !== undefined) sender.sendingLimit = senderDto.sendingLimit;
       if (senderDto.senderReplyTo !== undefined) sender.senderReplyTo = senderDto.senderReplyTo;
       await this.senderRepository.update(sender.id, sender);
       return sender;
@@ -129,7 +129,7 @@ export class SendersService {
    * One-way pull: SendGrid verified senders -> local `senders`.
    * Idempotency key is sg_verified_sender_id (decision #4); falls back to
    * sender_email only for local rows that still lack an id. Local config
-   * (sending_limit/sender_replyto_email) is never overwritten on re-sync
+   * (sender_replyto_email) is never overwritten on re-sync
    * (decisions #6/#10). Locals absent from SendGrid get removed_at_source set
    * (decision #6) — never hard-deleted.
    */
