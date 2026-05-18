@@ -14,6 +14,7 @@ import { EmailsTemplatesModule } from './modules/emails-templates/emails-templat
 import { AuditsModule } from './modules/audits/audits.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { PoolsModule } from './modules/pools/pools.module';
+import { SendersModule } from './modules/senders/senders.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { TagsModule } from './modules/tags/tags.module';
 import { CustomFieldsModule } from './modules/custom-fields/custom-fields.module';
@@ -55,6 +56,7 @@ import { SystemConfigCacheModule } from './providers/system-config-cache.module'
     AuditsModule,
     ContactsModule,
     PoolsModule,
+    SendersModule,
     TagsModule,
     CustomEventModule,
     CustomFieldsModule,

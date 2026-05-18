@@ -9,13 +9,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { DescriptionCell } from '@/components/data-table/description-cell';
 import type { Pool } from './types';
 
-function formatSender(pool: Pool): string {
-  if (pool.senderName && pool.senderEmail) {
-    return `${pool.senderName} - ${pool.senderEmail}`;
-  }
-  return pool.senderEmail || pool.senderName || '—';
-}
-
 const staticColumns: ColumnDef<Pool, unknown>[] = [
   {
     accessorKey: 'name',
@@ -33,13 +26,6 @@ const staticColumns: ColumnDef<Pool, unknown>[] = [
         <DescriptionCell description={row.original.description} />
       </div>
     ),
-  },
-  {
-    accessorKey: 'senderCompost',
-    id: 'sender',
-    header: 'pools.sender',
-    enableSorting: false,
-    cell: ({ row }) => <span className="text-sm">{formatSender(row.original)}</span>,
   },
   {
     accessorKey: 'poolName',

@@ -583,6 +583,10 @@ export class MessagesService {
         mensagesList.andWhere('messages.ippool = :ippool', { ippool: params.ipPool });
       }
 
+      if (typeString === 'email' && params.senderEmail) {
+        mensagesList.andWhere('messages.from_mail = :senderEmail', { senderEmail: params.senderEmail });
+      }
+
       if (params.selectedAutomation) {
         const idsMessage = await this.getAutomationsMenssage(params.selectedAutomation);
         if (idsMessage.length) {

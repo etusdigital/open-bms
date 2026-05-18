@@ -10,9 +10,9 @@ import { ClsService } from 'nestjs-cls';
 import { MessageDto } from '../messages/messages.dto';
 import { AccountConfigEntity } from 'src/entities/account-config.entity';
 import { PoolsService } from '../pools/pools.service';
+import { SendersService } from '../senders/senders.service';
 import { MessagesService } from '../messages/messages.service';
 import { AccountCacheService } from '../accounts/account-cache.service';
-import { PoolsDto } from '../pools/pools.dto';
 @Injectable()
 export class ServicesService {
   constructor(
@@ -21,6 +21,7 @@ export class ServicesService {
     private readonly contactService: ContactsService,
     private readonly messagesService: MessagesService,
     private readonly poolService: PoolsService,
+    private readonly sendersService: SendersService,
     private readonly cls: ClsService,
     private readonly accountCacheService: AccountCacheService,
   ) {}
@@ -49,21 +50,24 @@ export class ServicesService {
     }
 
     const ippool = sendEmailMessage.message.ippool;
-    let pool: PoolsDto;
+    let sender: { senderReplyTo?: string };
     if (ippool) {
-      pool = await this.poolService.findOneByPool(ippool, account.id);
+      // IP pool routing stays on the pool entity (decision #2). It is resolved
+      // independently of sender identity; a missing pool is fatal as before.
+      const pool = await this.poolService.findOneByPool(ippool, account.id);
       if (!pool) {
         throw new HttpException('Pool not found', HttpStatus.BAD_REQUEST);
       }
+      sender = await this.sendersService.findOneBySenderEmail(sendEmailMessage.message.from.email, account.id);
     } else {
-      // No explicit ippool: resolve the pool by sender email only to honor a
-      // configured senderReplyTo. We must NOT derive ippool from pool.name —
-      // that is the sender display name, not a valid SendGrid IP pool, and
-      // SendGrid rejects the whole send (EVO-1280). Missing pool is non-fatal.
-      pool = await this.poolService.findOneBySenderEmail(sendEmailMessage.message.from.email, account.id);
+      // No explicit ippool: resolve the sender by from.email to honor a
+      // configured senderReplyTo. Identity no longer lives on `pools`
+      // (EVO-1281 split); a missing sender is non-fatal — we fall back to
+      // from.email. We must NOT derive ippool from identity (EVO-1280).
+      sender = await this.sendersService.findOneBySenderEmail(sendEmailMessage.message.from.email, account.id);
     }
 
-    const replyTo = pool?.senderReplyTo || sendEmailMessage.message.from.email;
+    const replyTo = sender?.senderReplyTo || sendEmailMessage.message.from.email;
 
     if (sendEmailMessage.loadContactFromDatabase) {
       if (sendEmailMessage.contact.email) {

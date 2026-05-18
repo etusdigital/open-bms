@@ -56,13 +56,8 @@ export function PoolFormPage({ poolId }: PoolFormPageProps) {
           name: poolQuery.data.name,
           description: poolQuery.data.description ?? '',
           poolName: poolQuery.data.poolName,
-          senderEmail: poolQuery.data.senderEmail ?? '',
-          senderName: poolQuery.data.senderName ?? '',
-          senderReplyTo: poolQuery.data.senderReplyTo ?? '',
           isDefault: poolQuery.data.isDefault ?? false,
           ip: poolQuery.data.ip ?? '',
-          dailyLimit: poolQuery.data.dailyLimit ?? '0',
-          sendingLimit: poolQuery.data.sendingLimit ?? '0',
         }
       : undefined;
 

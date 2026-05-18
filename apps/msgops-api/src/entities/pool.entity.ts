@@ -20,18 +20,6 @@ export class PoolEntity {
   @Column('int', { name: 'account_id' })
   accountId: number;
 
-  @Column('int', { name: 'sending_limit' })
-  sendingLimit: number;
-
-  @Column('varchar', { name: 'sender_email', length: 255 })
-  senderEmail: string;
-
-  @Column('varchar', { name: 'sender_name', length: 60 })
-  senderName: string;
-
-  @Column('varchar', { name: 'sender_replyto_email', length: 255 })
-  senderReplyTo: string;
-
   @Column('boolean', { name: 'is_default', default: false })
   isDefault: boolean;
 

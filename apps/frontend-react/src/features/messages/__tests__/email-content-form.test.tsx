@@ -9,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { emailFormSchema, type EmailFormValues } from '../message-schema';
 import { EmailContentForm } from '../components/email-content-form';
 import * as useMessagesModule from '../use-messages';
-import type { Pool } from '@/features/pools/types';
+import type { Sender } from '@/features/senders/types';
 import type { EditorRef } from 'react-email-editor';
 
 const mockExportHtml = vi.fn();
@@ -37,11 +37,10 @@ vi.mock('../use-messages', async (importOriginal) => {
   const original = await importOriginal<Record<string, unknown>>();
   return {
     ...original,
-    usePoolsForSelect: vi.fn().mockReturnValue({
+    useSendersForSelect: vi.fn().mockReturnValue({
       data: [
         {
           id: 1,
-          poolName: 'default-pool',
           senderEmail: 'sender@test.com',
           senderName: 'Sender Name',
           senderReplyTo: 'reply@test.com',
@@ -49,13 +48,12 @@ vi.mock('../use-messages', async (importOriginal) => {
         },
         {
           id: 2,
-          poolName: 'secondary-pool',
           senderEmail: 'other@test.com',
           senderName: 'Other Sender',
           senderReplyTo: '',
           isDefault: false,
         },
-      ] as Pool[],
+      ] as Sender[],
       isLoading: false,
       isSuccess: true,
     }),
@@ -283,9 +281,12 @@ describe('EmailContentForm', () => {
     });
   });
 
-  describe('auto-fill (EVO-1022)', () => {
-    it('AC2 — fills sender fields from defaults when mounted with ippool already set (edit flow)', async () => {
-      await renderEmailContent({ defaultValues: { ippool: 'default-pool' } });
+  // EVO-1281 / AC9: identity is decoupled from the IP pool. The From picker
+  // resolves the active sender by matching `fromMail` against the sender
+  // list — it never touches `ippool`.
+  describe('sender auto-fill (EVO-1281 / AC9)', () => {
+    it('AC2 — fills identity fields when mounted with fromMail already set (edit flow)', async () => {
+      await renderEmailContent({ defaultValues: { fromMail: 'sender@test.com' } });
 
       await waitFor(() => {
         expect((screen.getByLabelText(/nome do remetente/i) as HTMLInputElement).value).toBe('Sender Name');
@@ -294,10 +295,10 @@ describe('EmailContentForm', () => {
       expect((screen.getByLabelText(/reply-to/i) as HTMLInputElement).value).toBe('reply@test.com');
     });
 
-    it('AC3 — preserves user-edited fromName when ippool changes programmatically', async () => {
+    it('AC3 — preserves user-edited fromName when the resolved sender changes', async () => {
       let formRef: UseFormReturn<EmailFormValues> | null = null;
       await renderEmailContent({
-        defaultValues: { ippool: 'default-pool' },
+        defaultValues: { fromMail: 'sender@test.com' },
         onForm: (f) => {
           formRef = f;
         },
@@ -314,9 +315,10 @@ describe('EmailContentForm', () => {
       });
       expect(fromNameInput.value).toBe('Marketing Etus');
 
-      // Programmatic pool change (e.g. deep-link, parent state) — should NOT clobber dirty fromName.
+      // Programmatic sender change (e.g. deep-link, parent state) via fromMail
+      // — should NOT clobber the dirty fromName.
       await act(async () => {
-        formRef!.setValue('ippool', 'secondary-pool');
+        formRef!.setValue('fromMail', 'other@test.com');
       });
 
       await waitFor(() => {
@@ -325,7 +327,7 @@ describe('EmailContentForm', () => {
       expect((screen.getByLabelText(/nome do remetente/i) as HTMLInputElement).value).toBe('Marketing Etus');
     });
 
-    it('AC4 — fills sender fields when ippool changes programmatically (deep-link / parent state)', async () => {
+    it('AC4 — fills identity fields when fromMail changes programmatically (deep-link / parent state)', async () => {
       let formRef: UseFormReturn<EmailFormValues> | null = null;
       await renderEmailContent({
         onForm: (f) => {
@@ -336,7 +338,7 @@ describe('EmailContentForm', () => {
       expect((screen.getByLabelText(/nome do remetente/i) as HTMLInputElement).value).toBe('');
 
       await act(async () => {
-        formRef!.setValue('ippool', 'default-pool');
+        formRef!.setValue('fromMail', 'sender@test.com');
       });
 
       await waitFor(() => {
@@ -345,14 +347,42 @@ describe('EmailContentForm', () => {
       expect((screen.getByLabelText(/email do remetente/i) as HTMLInputElement).value).toBe('sender@test.com');
     });
 
-    it('AC5 — hides the sender selector and skips auto-fill when no pools are available', async () => {
-      const mockedHook = vi.mocked(useMessagesModule.usePoolsForSelect);
+    it('AC9 — resolving a sender fills identity but never touches ippool', async () => {
+      let formRef: UseFormReturn<EmailFormValues> | null = null;
+      await renderEmailContent({
+        defaultValues: { fromMail: 'sender@test.com', ippool: '' },
+        onForm: (f) => {
+          formRef = f;
+        },
+      });
+
+      await waitFor(() => {
+        expect((screen.getByLabelText(/email do remetente/i) as HTMLInputElement).value).toBe('sender@test.com');
+      });
+      expect((screen.getByLabelText(/nome do remetente/i) as HTMLInputElement).value).toBe('Sender Name');
+
+      // Switch the resolved sender (same path the picker uses internally).
+      await act(async () => {
+        formRef!.setValue('fromMail', 'other@test.com');
+      });
+
+      await waitFor(() => {
+        expect((screen.getByLabelText(/nome do remetente/i) as HTMLInputElement).value).toBe('Other Sender');
+      });
+      // Identity is fully decoupled from IP pool routing — resolving a sender
+      // must never write `ippool` (EVO-1281 decision #2 / AC9 — the regression
+      // that caused EVO-1280).
+      expect(formRef!.getValues('ippool')).toBe('');
+    });
+
+    it('AC5 — hides the sender selector when no senders are available', async () => {
+      const mockedHook = vi.mocked(useMessagesModule.useSendersForSelect);
       const previousImpl = mockedHook.getMockImplementation();
       mockedHook.mockReturnValue({
         data: [],
         isLoading: false,
         isSuccess: true,
-      } as ReturnType<typeof useMessagesModule.usePoolsForSelect>);
+      } as ReturnType<typeof useMessagesModule.useSendersForSelect>);
       try {
         await renderEmailContent();
 

@@ -46,6 +46,11 @@ vi.mock('../use-messages', async (importOriginal) => {
       data: [],
       isLoading: false,
     }),
+    useSendersForSelect: vi.fn().mockReturnValue({
+      data: [],
+      isLoading: false,
+      isSuccess: true,
+    }),
     useSendTestEmail: vi.fn().mockReturnValue({
       mutate: vi.fn(),
       isPending: false,

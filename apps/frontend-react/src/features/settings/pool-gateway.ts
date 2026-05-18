@@ -7,10 +7,6 @@ export interface Pool {
   poolName: string;
   ip: string[] | string | null;
   accountId: number;
-  sendingLimit?: number;
-  senderEmail?: string;
-  senderName?: string;
-  senderReplyTo?: string;
   isDefault?: boolean;
 }
 
@@ -20,10 +16,6 @@ export interface PoolPayload {
   poolName: string;
   ip?: string;
   accountId?: number;
-  sendingLimit?: number;
-  senderEmail?: string;
-  senderName?: string;
-  senderReplyTo?: string;
   isDefault?: boolean;
 }
 

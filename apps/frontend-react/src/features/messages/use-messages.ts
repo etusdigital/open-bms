@@ -8,6 +8,7 @@ import { toPaginatedResponse, type PaginatedResponse, type RawPaginatedResponse 
 import type { ListSearchParams } from '@/hooks/use-list-search-params';
 import type { Message, MessageType, MessagePriority } from './types';
 import type { Pool } from '@/features/pools/types';
+import type { Sender } from '@/features/senders/types';
 import type { Label } from '@/features/labels/types';
 import type { Template } from '@/features/templates/types';
 import type { Automation } from '@/features/automations/types';
@@ -39,7 +40,7 @@ async function fetchMessagesList(
       type: messageType,
       ...(params.search && { title: params.search }),
       ...(params.sort && { sortBy: params.sort, order: params.order }),
-      ...(filters?.sender && { ipPool: filters.sender }),
+      ...(filters?.sender && { senderEmail: filters.sender }),
       ...(filters?.automationId && { selectedAutomation: filters.automationId }),
     },
     signal,
@@ -180,6 +181,23 @@ export function usePoolsForSelect() {
     queryKey: [...queryKeys.pools.all, 'select', { accountId }],
     queryFn: async ({ signal }) => {
       const { data } = await apiClient.get<RawPaginatedResponse<Pool>>('/pools', {
+        params: { page: 1, itemsPerPage: 1000 },
+        signal,
+      });
+      return data.results;
+    },
+    enabled: auth.status === 'authenticated',
+  });
+}
+
+export function useSendersForSelect() {
+  const auth = useAppStore((s) => s.auth);
+  const accountId = auth.status === 'authenticated' ? auth.account.id : 0;
+
+  return useQuery({
+    queryKey: [...queryKeys.senders.all, 'select', { accountId }],
+    queryFn: async ({ signal }) => {
+      const { data } = await apiClient.get<RawPaginatedResponse<Sender>>('/senders', {
         params: { page: 1, itemsPerPage: 1000 },
         signal,
       });

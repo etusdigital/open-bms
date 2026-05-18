@@ -13,8 +13,6 @@ const mockPool: Pool = {
   name: 'Main Pool',
   description: 'Primary sending pool',
   poolName: 'main-pool',
-  senderName: 'Test Sender',
-  senderEmail: 'test@example.com',
   isDefault: false,
   updatedAt: '2026-01-15T10:00:00Z',
 };
@@ -63,11 +61,6 @@ describe('usePoolsColumns', () => {
     await renderWithRouter(<ColumnsTable pools={[mockPool]} />);
     const link = screen.getByRole('link', { name: 'Main Pool' });
     expect(link).toHaveAttribute('href', '/pools/1');
-  });
-
-  it('renders sender info', async () => {
-    await renderWithRouter(<ColumnsTable pools={[mockPool]} />);
-    expect(screen.getByText('Test Sender - test@example.com')).toBeInTheDocument();
   });
 
   it('renders pool name in monospace', async () => {

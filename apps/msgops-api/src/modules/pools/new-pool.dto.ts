@@ -27,18 +27,6 @@ export class NewPoolsDto {
   accountId?: number;
 
   @ApiProperty()
-  @JoiSchema(Joi.string().optional())
-  senderEmail?: string;
-
-  @ApiProperty()
-  @JoiSchema(Joi.string().optional())
-  senderName?: string;
-
-  @ApiProperty()
-  @JoiSchema(Joi.string().optional())
-  senderReplyTo?: string;
-
-  @ApiProperty()
   @JoiSchema(Joi.boolean().allow('', null).optional())
   isDefault?: boolean;
 }

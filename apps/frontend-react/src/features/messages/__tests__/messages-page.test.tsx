@@ -15,7 +15,7 @@ vi.mock('../use-messages', () => ({
   useMessagesList: () => mockQueryReturn,
   useDeleteMessage: () => ({ mutate: mockDeleteMutate, isPending: false }),
   useDuplicateMessage: () => ({ mutate: mockDuplicateMutate, isPending: false }),
-  usePoolsForSelect: () => ({ data: [], isLoading: false }),
+  useSendersForSelect: () => ({ data: [], isLoading: false, isSuccess: true }),
   useAutomationsForSelect: () => ({ data: [], isLoading: false }),
 }));
 

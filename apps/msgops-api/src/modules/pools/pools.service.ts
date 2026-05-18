@@ -8,7 +8,6 @@ import { PoolPageDto } from './pool-page.dto';
 import { NewPoolsDto } from './new-pool.dto';
 import { PaginationDto } from '../../dtos/pagination.dto';
 import { SendgridHandler } from './../../handlers/email/sendgrid/sendgrid.handler';
-import { hasEmojiCharacters } from '../../utils/utils.service';
 import { PostgresErrorCode } from 'src/shared.interfaces';
 import { ClsService } from 'nestjs-cls';
 
@@ -38,9 +37,6 @@ export class PoolsService {
   }
 
   async edit(poolDto: PoolsDto): Promise<PoolsDto> {
-    if (hasEmojiCharacters(poolDto.senderName)) {
-      throw new ForbiddenException('Invalid character in Sender Name field');
-    }
     const pool = await this.poolRepository.findOneOrFail({
       where: { id: poolDto.id, accountId: this.cls.get('accountId') },
     });
@@ -60,10 +56,6 @@ export class PoolsService {
 
   async create(poolDto: NewPoolsDto, accountId?: number): Promise<PoolsDto> {
     poolDto.accountId = accountId ? accountId : this.cls.get('accountId');
-
-    if (hasEmojiCharacters(poolDto.senderName)) {
-      throw new ForbiddenException('Invalid character in Sender Name field');
-    }
 
     try {
       const pool = this.poolRepository.create(poolDto);
@@ -138,10 +130,6 @@ export class PoolsService {
     return await this.poolRepository.findOne({ where: { poolName, accountId } });
   }
 
-  async findOneBySenderEmail(senderEmail: string, accountId: number): Promise<PoolsDto> {
-    return await this.poolRepository.findOne({ where: { senderEmail, accountId } });
-  }
-
   async getPoolsSendgrid() {
     // SendGrid is optional in OSS. If the account has no key, or the key is
     // invalid / network is down, return an empty list so the operator-facing
@@ -170,68 +158,6 @@ export class PoolsService {
     } catch (e) {
       this.logger.warn(`SendGrid IP list unavailable: ${e?.response?.status ?? ''} ${e?.message ?? e}`);
       return [];
-    }
-  }
-
-  async getSendingLimits() {
-    try {
-      const redisClient = await this.redisService.getClient();
-      const pools = await this.poolRepository
-        .createQueryBuilder('pools')
-        .where({ accountId: this.cls.get('accountId') })
-        .innerJoin('messages', 'messages', 'messages.ippool = pools.pool_name')
-        .getMany();
-
-      const sendgridLimit = 10;
-      const groupedPools = pools.reduce((chunckedArray, item, index) => {
-        const chunkIndex = Math.floor(index / sendgridLimit);
-        if (!chunckedArray[chunkIndex]) {
-          chunckedArray[chunkIndex] = [];
-        }
-
-        chunckedArray[chunkIndex].push(item);
-
-        return chunckedArray;
-      }, []);
-
-      const categoryStats = [];
-      const yesterDay = new Date();
-      yesterDay.setDate(yesterDay.getDate() - 1);
-
-      for (const group of groupedPools) {
-        const categories = group.map((item) => `pool_${item.poolName}`);
-        const stats = await this.sendGridHandler.getStatsByCategories(yesterDay, yesterDay, categories);
-
-        if (stats.length && stats[0].stats) {
-          stats[0].stats.map(async (item) => {
-            categoryStats.push({
-              name: item.name,
-              processed: item.metrics?.processed,
-            });
-          });
-        }
-      }
-
-      for (const category of categoryStats) {
-        const poolName = category.name.replace('pool_', '');
-        const pool = await this.poolRepository.findOneOrFail({
-          where: {
-            poolName: poolName,
-            accountId: this.cls.get('accountId'),
-          },
-        });
-
-        const newSendingLimit = parseInt(category.processed + category.processed * 0.2);
-
-        await this.poolRepository.update(pool.id, { sendingLimit: newSendingLimit });
-        await redisClient.set(`pool_${poolName}:sending_limit`, newSendingLimit);
-      }
-
-      await redisClient.set(`spark_post:sending_limit`, process.env.LIMIT_SPARKPOST || 200);
-      return categoryStats;
-    } catch (e) {
-      console.error(e);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

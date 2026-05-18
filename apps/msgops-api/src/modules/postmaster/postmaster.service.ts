@@ -4,26 +4,26 @@ import { ClsService } from 'nestjs-cls';
 import { PostmasterEntity } from 'src/entities/postmaster.entity';
 import { Repository } from 'typeorm';
 import { PostmasterDto } from './dto/postmaster.dto';
-import { PoolEntity } from 'src/entities/pool.entity';
+import { SenderEntity } from 'src/entities/sender.entity';
 
 @Injectable()
 export class PostmasterService {
   constructor(
     @InjectRepository(PostmasterEntity)
     private readonly postmasterRepository: Repository<PostmasterEntity>,
-    @InjectRepository(PoolEntity)
-    private readonly poolsRepository: Repository<PoolEntity>,
+    @InjectRepository(SenderEntity)
+    private readonly sendersRepository: Repository<SenderEntity>,
     private readonly cls: ClsService,
   ) {}
 
   async getDomainValues(params?: PostmasterDto) {
     try {
-      const poolsQuery = await this.poolsRepository
-        .createQueryBuilder('pools')
+      const poolsQuery = await this.sendersRepository
+        .createQueryBuilder('senders')
         .select("DISTINCT substring(sender_email from '@(.*)$')", 'domain')
-        .where('pools.account_id = :accountId', { accountId: this.cls.get('accountId') })
+        .where('senders.account_id = :accountId', { accountId: this.cls.get('accountId') })
         .andWhere((qb) => {
-          const subQuery = qb.subQuery().select('1').from('postmaster', 'pm').where("pm.domain = substring(pools.senderEmail from '@(.*)$')").getQuery();
+          const subQuery = qb.subQuery().select('1').from('postmaster', 'pm').where("pm.domain = substring(senders.sender_email from '@(.*)$')").getQuery();
 
           return `EXISTS ${subQuery}`;
         })

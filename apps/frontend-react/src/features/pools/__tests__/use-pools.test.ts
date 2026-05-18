@@ -206,8 +206,6 @@ describe('useCreatePool', () => {
       senderReplyTo: '',
       isDefault: false,
       ip: '',
-      dailyLimit: '0',
-      sendingLimit: '0',
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -246,8 +244,6 @@ describe('useCreatePool', () => {
       senderReplyTo: '',
       isDefault: false,
       ip: '',
-      dailyLimit: '0',
-      sendingLimit: '0',
     });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
@@ -276,8 +272,6 @@ describe('useUpdatePool', () => {
       senderReplyTo: '',
       isDefault: false,
       ip: '',
-      dailyLimit: '0',
-      sendingLimit: '0',
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

@@ -20,7 +20,7 @@ import {
   useMessagesList,
   useDeleteMessage,
   useDuplicateMessage,
-  usePoolsForSelect,
+  useSendersForSelect,
   useAutomationsForSelect,
   type MessagesListFilters,
 } from './use-messages';
@@ -95,22 +95,23 @@ export default function MessagesPage({
   const deleteMessage = useDeleteMessage();
   const duplicateMessage = useDuplicateMessage();
 
-  // Fetch pools and automations for email filter selects
-  const poolsQuery = usePoolsForSelect();
+  // Fetch senders and automations for email filter selects
+  const sendersQuery = useSendersForSelect();
   const automationsQuery = useAutomationsForSelect();
 
-  // Build sender options from pools (value = poolName for ipPool param, label = senderEmail)
+  // EVO-1281: filter messages by sender identity (from_mail), not IP pool.
+  // value = senderEmail (sent as the `senderEmail` query param), label = senderEmail.
   const senderOptions = useMemo(() => {
-    const pools = poolsQuery.data ?? [];
+    const senders = sendersQuery.data ?? [];
     const seen = new Set<string>();
-    return pools
-      .filter((p) => {
-        if (!p.poolName || seen.has(p.poolName)) return false;
-        seen.add(p.poolName);
+    return senders
+      .filter((s) => {
+        if (!s.senderEmail || seen.has(s.senderEmail)) return false;
+        seen.add(s.senderEmail);
         return true;
       })
-      .map((p) => ({ value: p.poolName, label: p.senderEmail || p.poolName }));
-  }, [poolsQuery.data]);
+      .map((s) => ({ value: s.senderEmail, label: s.senderEmail }));
+  }, [sendersQuery.data]);
 
   const automationOptions = useMemo(() => {
     const automations = automationsQuery.data ?? [];

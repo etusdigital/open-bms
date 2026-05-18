@@ -31,26 +31,6 @@ export class PoolsDto {
   accountId?: number;
 
   @ApiProperty()
-  @JoiSchema(Joi.string().optional())
-  sendingLimit?: number;
-
-  @ApiProperty()
-  @JoiSchema(Joi.string().optional())
-  dailyLimit?: number;
-
-  @ApiProperty()
-  @JoiSchema(Joi.string().optional())
-  senderEmail?: string;
-
-  @ApiProperty()
-  @JoiSchema(Joi.string().optional())
-  senderName?: string;
-
-  @ApiProperty()
-  @JoiSchema(Joi.string().allow('', null).optional())
-  senderReplyTo?: string;
-
-  @ApiProperty()
   @JoiSchema(Joi.boolean().optional())
   isDefault?: boolean;
 

@@ -116,7 +116,8 @@ export function useSenderOptions() {
   return useQuery({
     queryKey: ['filter-senders', { accountId }],
     queryFn: async ({ signal }) => {
-      const { data } = await apiClient.get<FilterOption[]>('/pools', {
+      // EVO-1281: sender identity now lives on /senders, not /pools.
+      const { data } = await apiClient.get<FilterOption[]>('/senders', {
         params: { itemsPerPage: 100, page: 1 },
         signal,
       });

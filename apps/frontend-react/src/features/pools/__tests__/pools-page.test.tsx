@@ -62,8 +62,6 @@ describe('PoolsPage', () => {
             id: 1,
             name: 'Main Pool',
             poolName: 'main-pool',
-            senderName: 'Sender',
-            senderEmail: 'a@b.com',
             isDefault: true,
             updatedAt: '2026-01-01T00:00:00Z',
           },
@@ -71,8 +69,6 @@ describe('PoolsPage', () => {
             id: 2,
             name: 'Secondary',
             poolName: 'secondary',
-            senderName: '',
-            senderEmail: '',
             isDefault: false,
             updatedAt: '2026-01-02T00:00:00Z',
           },
@@ -94,7 +90,7 @@ describe('PoolsPage', () => {
     it('renders the page title', async () => {
       authenticateStore({ permissions: ['infra:view'] });
       await renderPage();
-      expect(screen.getByText(/senders/i)).toBeInTheDocument();
+      expect(screen.getByText(/pools de ip/i)).toBeInTheDocument();
     });
 
     it('renders pools in the table', async () => {

@@ -24,6 +24,7 @@ export const queryKeys = {
   labels: createEntityQueryKeys('labels'),
   customEvents: createEntityQueryKeys('custom-events'),
   pools: createEntityQueryKeys('pools'),
+  senders: createEntityQueryKeys('senders'),
   segments: createEntityQueryKeys('segments'),
   contacts: createEntityQueryKeys('contacts'),
   templates: createEntityQueryKeys('templates'),

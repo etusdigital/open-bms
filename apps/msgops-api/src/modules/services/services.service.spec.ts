@@ -5,6 +5,8 @@ import { EXCHANGES } from '@bms/messaging';
 import { AccountsService } from '../accounts/accounts.service';
 import { ContactsService } from '../contacts/contacts.service';
 import { PoolsService } from '../pools/pools.service';
+import { SendersService } from '../senders/senders.service';
+import { SenderEntity } from 'src/entities/sender.entity';
 import { ClsService } from 'nestjs-cls';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { EmailPriority, SendEmailMessageDto, TransactionalMessage } from './services.dto';
@@ -24,6 +26,7 @@ describe('ServicesService', () => {
   let accountService: jest.Mocked<AccountsService>;
   let contactService: jest.Mocked<ContactsService>;
   let poolService: jest.Mocked<PoolsService>;
+  let sendersService: jest.Mocked<SendersService>;
   let clsService: jest.Mocked<ClsService>;
   let messagesService: jest.Mocked<MessagesService>;
 
@@ -48,11 +51,22 @@ describe('ServicesService', () => {
     poolName: 'test-pool',
     ip: ['127.0.0.1'],
     accountId: 1,
-    sendingLimit: 1000,
+    isDefault: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    deletedAt: null,
+    callbeforeupdate: null,
+  };
+
+  const mockSender: SenderEntity = {
+    id: 1,
     senderEmail: 'test@example.com',
     senderName: 'Test Sender',
     senderReplyTo: 'test-reply@example.com',
+    accountId: 1,
     isDefault: false,
+    sgVerifiedSenderId: 'sg-1',
+    removedAtSource: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     deletedAt: null,
@@ -156,6 +170,9 @@ describe('ServicesService', () => {
 
     const mockPoolService = {
       findOneByPool: jest.fn(),
+    };
+
+    const mockSendersService = {
       findOneBySenderEmail: jest.fn(),
     };
 
@@ -192,6 +209,10 @@ describe('ServicesService', () => {
           useValue: mockPoolService,
         },
         {
+          provide: SendersService,
+          useValue: mockSendersService,
+        },
+        {
           provide: ClsService,
           useValue: mockClsService,
         },
@@ -211,6 +232,7 @@ describe('ServicesService', () => {
     accountService = module.get(AccountsService);
     contactService = module.get(ContactsService);
     poolService = module.get(PoolsService);
+    sendersService = module.get(SendersService);
     clsService = module.get(ClsService);
     messagesService = module.get(MessagesService);
     module.get(AccountCacheService);
@@ -219,7 +241,7 @@ describe('ServicesService', () => {
     clsService.get.mockReturnValue('test-account-id');
     accountService.findWithCleanConfigs.mockResolvedValue(mockAccount);
     poolService.findOneByPool.mockResolvedValue(mockPool);
-    poolService.findOneBySenderEmail.mockResolvedValue(mockPool);
+    sendersService.findOneBySenderEmail.mockResolvedValue(mockSender);
   });
 
   describe('sendEmail', () => {
@@ -274,22 +296,22 @@ describe('ServicesService', () => {
 
       expect(result).toEqual({ status: 'ok' });
       expect(poolService.findOneByPool).not.toHaveBeenCalled();
-      expect(poolService.findOneBySenderEmail).toHaveBeenCalledWith(mockEmailDto.message.from.email, mockAccount.id);
+      expect(sendersService.findOneBySenderEmail).toHaveBeenCalledWith(mockEmailDto.message.from.email, mockAccount.id);
       expect(eventPublisher.publish).toHaveBeenCalledWith(
         EXCHANGES.email,
         'email.send',
         expect.objectContaining({
           message: expect.objectContaining({
             ippool: undefined,
-            replyTo: mockPool.senderReplyTo,
+            replyTo: mockSender.senderReplyTo,
           }),
         }),
         expect.any(Object),
       );
     });
 
-    it('should fall back to sender email for replyTo when no sender pool is found', async () => {
-      poolService.findOneBySenderEmail.mockResolvedValue(null);
+    it('should fall back to sender email for replyTo when no sender is found', async () => {
+      sendersService.findOneBySenderEmail.mockResolvedValue(null);
 
       const result = await service.sendEmail(mockEmailDto);
 
@@ -319,7 +341,9 @@ describe('ServicesService', () => {
       await service.sendEmail(dtoWithIpPool);
 
       expect(poolService.findOneByPool).toHaveBeenCalledWith('test-pool', mockAccount.id);
-      expect(poolService.findOneBySenderEmail).not.toHaveBeenCalled();
+      // Identity (reply-to) is still resolved via the sender, decoupled from
+      // IP pool routing (EVO-1281 decision #2).
+      expect(sendersService.findOneBySenderEmail).toHaveBeenCalledWith(mockEmailDto.message.from.email, mockAccount.id);
     });
 
     it('should validate pool if provided', async () => {
