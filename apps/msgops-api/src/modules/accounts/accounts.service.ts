@@ -147,6 +147,25 @@ export class AccountsService {
     }
   }
 
+  // Idempotency helper for retried account provisioning (setup wizard / Enterprise
+  // import). `accounts.name` carries a column-level DB UNIQUE constraint (NOT
+  // partial on deleted_at), so a retry after a partial failure would otherwise
+  // hit 23505 ("already exists"). Callers reuse the leftover account instead of
+  // recreating it. `withDeleted` is required because the Enterprise import worker
+  // soft-deletes the orphan account when a job fails before any progress
+  // (cleanupOrphanAccount/F18) — that row still occupies the unique name.
+  async findByName(name: string, opts?: { withDeleted?: boolean }): Promise<AccountEntity | null> {
+    return this.accountRepository.findOne({ where: { name }, withDeleted: opts?.withDeleted ?? false });
+  }
+
+  // Un-delete a soft-deleted account so the unique name is usable again and the
+  // row is visible/active. Used by the retry-safe import/wizard paths to recover
+  // an orphan account instead of creating a duplicate (which would 23505).
+  async restoreAccount(id: number): Promise<void> {
+    await this.accountRepository.restore(id);
+    await this.accountRepository.update(id, { isActive: true });
+  }
+
   async findWithCleanConfigs(id: number) {
     const account = await this.accountRepository.findOneOrFail({ where: { id } });
     account.customFields = await this.customFieldRepository.find({ where: { accountId: id } });
@@ -203,7 +222,14 @@ export class AccountsService {
     }
   }
 
-  async create(accountDto: CreateAccountDto, userId: number): Promise<{ account: AccountEntity; dns?: any }> {
+  async create(accountDto: CreateAccountDto, userId: number, opts?: { skipDefaults?: boolean }): Promise<{ account: AccountEntity; dns?: any }> {
+    // skipDefaults is set by the Enterprise → OSS importer: the caller takes
+    // responsibility for custom fields, custom events, account_configs, and the
+    // billing scheduler — all replicated from Enterprise. The remaining side
+    // effects (main insert, users_accounts link, service-worker S3 upload) still
+    // run because they uphold app invariants (without users_accounts the UI
+    // breaks with "no accounts").
+    const skipDefaults = opts?.skipDefaults ?? false;
     try {
       const account = this.accountRepository.create(accountDto);
       const accountEntity = await this.accountRepository.save(account);
@@ -226,138 +252,142 @@ export class AccountsService {
         });
       }
 
-      accountDto.accountConfigs.push({
-        name: 'api_key_tracker',
-        value: createHash('md5').update(`bms-${account.id}-api_key_tracker`).digest('hex'),
-      });
+      if (!skipDefaults) {
+        accountDto.accountConfigs.push({
+          name: 'api_key_tracker',
+          value: createHash('md5').update(`bms-${account.id}-api_key_tracker`).digest('hex'),
+        });
 
-      accountDto.accountConfigs.push({
-        name: 'account_costs',
-        value: [
-          {
-            name: 'EMAIL',
-            unitCost: 0.0004,
-            margin: 20,
-          },
-          {
-            name: 'WEB_PUSH',
-            unitCost: 0.00002,
-            margin: 20,
-          },
-          {
-            name: 'SMS',
-            unitCost: 0.0415,
-            margin: 20,
-          },
-          {
-            name: 'WHATSAPP',
-            unitCost: 0.35,
-            margin: 20,
-          },
-          {
-            name: 'COUNT_CONTACTS',
-            unitCost: 0.0005,
-            margin: 20,
-          },
-          {
-            name: 'COUNT_IPS',
-            unitCost: 250.0,
-            margin: 20,
-          },
-          {
-            name: 'EMAIL_VALIDATE',
-            unitCost: 0.002,
-            margin: 20,
-          },
-        ],
-        isLoadConfig: false,
-      });
+        accountDto.accountConfigs.push({
+          name: 'account_costs',
+          value: [
+            {
+              name: 'EMAIL',
+              unitCost: 0.0004,
+              margin: 20,
+            },
+            {
+              name: 'WEB_PUSH',
+              unitCost: 0.00002,
+              margin: 20,
+            },
+            {
+              name: 'SMS',
+              unitCost: 0.0415,
+              margin: 20,
+            },
+            {
+              name: 'WHATSAPP',
+              unitCost: 0.35,
+              margin: 20,
+            },
+            {
+              name: 'COUNT_CONTACTS',
+              unitCost: 0.0005,
+              margin: 20,
+            },
+            {
+              name: 'COUNT_IPS',
+              unitCost: 250.0,
+              margin: 20,
+            },
+            {
+              name: 'EMAIL_VALIDATE',
+              unitCost: 0.002,
+              margin: 20,
+            },
+          ],
+          isLoadConfig: false,
+        });
+      }
 
-      if (accountDto.accountConfigs) {
+      if (accountDto.accountConfigs && accountDto.accountConfigs.length > 0) {
         await this.createOrUpdateAccountsConfigs(account.id, accountDto.accountConfigs);
       }
 
-      // create default custom-fields
-      accountDto.customFields = [
-        {
-          title: 'utm_campaign',
-          name: 'UTM_CAMPAIGN',
-        },
-        {
-          title: 'utm_content',
-          name: 'UTM_CONTENT',
-        },
-        {
-          title: 'utm_medium',
-          name: 'UTM_MEDIUM',
-        },
-        {
-          title: 'utm_source',
-          name: 'UTM_SOURCE',
-        },
-        {
-          title: 'utm_term',
-          name: 'UTM_TERM',
-        },
-        {
-          title: 'last-visited-url',
-          name: 'LAST-VISITED-URL',
-        },
-        {
-          title: 'retargeting-product-name',
-          name: 'RETARGETING-PRODUCT-NAME',
-        },
-        {
-          title: 'retargeting-target-url',
-          name: 'RETARGETING-TARGET-URL',
-        },
-        {
-          title: 'placement',
-          name: 'PLACEMENT',
-        },
-        {
-          title: 'user_agent',
-          name: 'USER_AGENT',
-        },
-        {
-          title: 'fbclid',
-          name: 'FBCLID',
-        },
-        {
-          title: 'gclid',
-          name: 'GCLID',
-        },
-        {
-          title: 'adgroup_id',
-          name: 'ADGROUP_ID',
-        },
-        {
-          title: 'adset_id',
-          name: 'ADSET_ID',
-        },
-        {
-          title: 'app',
-          name: 'APP',
-        },
-        {
-          title: 'campaign_id',
-          name: 'CAMPAIGN_ID',
-        },
-        {
-          title: 'conversion_device',
-          name: 'CONVERSION_DEVICE',
-        },
-      ];
+      if (!skipDefaults) {
+        // create default custom-fields
+        accountDto.customFields = [
+          {
+            title: 'utm_campaign',
+            name: 'UTM_CAMPAIGN',
+          },
+          {
+            title: 'utm_content',
+            name: 'UTM_CONTENT',
+          },
+          {
+            title: 'utm_medium',
+            name: 'UTM_MEDIUM',
+          },
+          {
+            title: 'utm_source',
+            name: 'UTM_SOURCE',
+          },
+          {
+            title: 'utm_term',
+            name: 'UTM_TERM',
+          },
+          {
+            title: 'last-visited-url',
+            name: 'LAST-VISITED-URL',
+          },
+          {
+            title: 'retargeting-product-name',
+            name: 'RETARGETING-PRODUCT-NAME',
+          },
+          {
+            title: 'retargeting-target-url',
+            name: 'RETARGETING-TARGET-URL',
+          },
+          {
+            title: 'placement',
+            name: 'PLACEMENT',
+          },
+          {
+            title: 'user_agent',
+            name: 'USER_AGENT',
+          },
+          {
+            title: 'fbclid',
+            name: 'FBCLID',
+          },
+          {
+            title: 'gclid',
+            name: 'GCLID',
+          },
+          {
+            title: 'adgroup_id',
+            name: 'ADGROUP_ID',
+          },
+          {
+            title: 'adset_id',
+            name: 'ADSET_ID',
+          },
+          {
+            title: 'app',
+            name: 'APP',
+          },
+          {
+            title: 'campaign_id',
+            name: 'CAMPAIGN_ID',
+          },
+          {
+            title: 'conversion_device',
+            name: 'CONVERSION_DEVICE',
+          },
+        ];
 
-      const customEvents = [
-        {
-          name: 'pageview',
-          isDefault: true,
-        },
-      ];
+        const customEvents = [
+          {
+            name: 'pageview',
+            isDefault: true,
+          },
+        ];
 
-      await this.createOrUpdateCustomFields(account.id, accountDto.customFields);
-      await this.createOrUpdateCustomEvents(account.id, customEvents);
+        await this.createOrUpdateCustomFields(account.id, accountDto.customFields);
+        await this.createOrUpdateCustomEvents(account.id, customEvents);
+      } // close: if (!skipDefaults) custom-fields/custom-events block
       await this.permissionsUserAccounts(account.id, userId, true);
 
       try {

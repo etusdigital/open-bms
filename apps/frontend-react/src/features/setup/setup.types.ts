@@ -2,6 +2,14 @@ export interface SetupStatus {
   configured: boolean;
   currentStep: number;
   baseUrl?: string;
+  // Backend feature flag — frontend hides the Enterprise step when false.
+  enterpriseImportEnabled?: boolean;
+  // Whether Enterprise import was already done/skipped (system_config). Source
+  // of truth for resume, since this step is UI-only with no backend step.
+  enterpriseImportDone?: boolean;
+  // Account created in step 1 (admin). When present, Step 2 offers importing
+  // into it (checkbox) instead of creating a new throwaway account.
+  step1Account?: { id: number; name: string };
 }
 
 export interface ServiceHealthResult {

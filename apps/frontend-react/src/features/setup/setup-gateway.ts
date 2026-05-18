@@ -48,6 +48,29 @@ export const setupGateway = {
   async submitS3(data: S3SetupData): Promise<void> {
     await http.post('/setup/s3', data);
   },
+
+  // Account-scoped wizard step. Creates a new account and imports into it;
+  // returns {jobId} for the UI to monitor progress.
+  async importEnterprise(
+    payload:
+      | { skip: true }
+      | {
+          baseUrl: string;
+          apiKey: string;
+          accountName?: string;
+          useStep1Account?: boolean;
+          enterpriseSourceAccountId?: number;
+        },
+  ): Promise<{ jobId?: string }> {
+    const res = await http.post<{ jobId?: string }>('/setup/import-enterprise', payload);
+    return res.data;
+  },
+
+  // Resets the import environment (stops the queue, deletes import jobs/accounts).
+  // Called when (re)opening Step 2 to always start from scratch. Idempotent.
+  async resetEnterpriseImport(): Promise<void> {
+    await http.post('/setup/import-enterprise/reset', {});
+  },
 };
 
 // Exported for tests that want to assert the underlying instance's config.

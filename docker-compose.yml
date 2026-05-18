@@ -93,6 +93,8 @@ x-backend-env: &backend-env
 x-infra-deps: &infra-deps
   postgres:
     condition: service_healthy
+  postgres-init:
+    condition: service_completed_successfully
   redis:
     condition: service_healthy
   rabbitmq:
@@ -126,6 +128,32 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # One-shot init: ensures the `msgops` database exists before any backend
+  # service connects. The postgres:16-alpine image only runs POSTGRES_DB on a
+  # FRESH volume — after a manual `DROP DATABASE msgops` (volume kept) a plain
+  # `make down && make up` would never recreate it, and a TypeORM migration
+  # cannot fix this (a migration runs *inside* the msgops connection — it
+  # can't create the database it connects to). This connects to the default
+  # `postgres` maintenance db and creates `msgops` if absent. Idempotent:
+  # a no-op on a fresh volume (POSTGRES_DB already created it) and on every
+  # subsequent boot where the db is present.
+  postgres-init:
+    image: postgres:16-alpine
+    container_name: postgres-init
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: postgres
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        psql -h postgres -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='msgops'" | grep -q 1 \
+          || psql -h postgres -U postgres -c "CREATE DATABASE msgops"
+        echo "postgres-init: database msgops ready"
+    restart: 'no'
 
   redis:
     image: redis:7-alpine
@@ -353,6 +381,20 @@ services:
     environment:
       <<: *backend-env
       PORT: '3000'
+    depends_on: *infra-deps
+
+  enterprise-import:
+    build:
+      context: .
+      dockerfile: apps/enterprise-import/Dockerfile
+    container_name: enterprise-import
+    <<: *restart-policy
+    env_file:
+      - path: apps/enterprise-import/.env
+        required: false
+    environment:
+      <<: *backend-env
+      PORT: '3001'
     depends_on: *infra-deps
 
   campaign-events-tracker:

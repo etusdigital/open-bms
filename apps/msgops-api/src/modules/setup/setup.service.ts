@@ -1,8 +1,8 @@
-import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inject, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { existsSync } from 'fs';
 import { geoIpEnvFilePath, writeGeoIpEnvFile } from '../../lib/geoip-config-file';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import * as nodemailer from 'nodemailer';
 import * as amqplib from 'amqplib';
 import { S3Client, HeadBucketCommand } from '@aws-sdk/client-s3';
@@ -28,6 +28,9 @@ import { enforceTestRateLimit } from '../../lib/test-rate-limit';
 import { SystemConfigCacheProvider } from '../../providers/system-config-cache.provider';
 import { S3SystemSettings } from '../../lib/integrations-config-file';
 import { S3_KEY } from '../admin-integrations/s3/admin-s3.service';
+import { EnterpriseImportService } from '../enterprise-import/enterprise-import.service';
+import { assertSafeEnterpriseBaseUrl } from '../enterprise-import/enterprise-import-url.util';
+import { ImportEnterpriseSetupDto } from './dtos/import-enterprise.dto';
 
 const WIZARD_KEY = 'setup_wizard_step';
 const SMTP_KEY = 'smtp_settings';
@@ -66,6 +69,7 @@ export class SetupService implements OnModuleInit {
     private readonly redisService: RedisService,
     private readonly clickhouse: ClickhouseProvider,
     private readonly cache: SystemConfigCacheProvider,
+    private readonly enterpriseImport: EnterpriseImportService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -84,24 +88,45 @@ export class SetupService implements OnModuleInit {
     }
   }
 
-  async getStatus(): Promise<{ configured: boolean; currentStep: number; baseUrl?: string }> {
+  async getStatus(): Promise<{
+    configured: boolean;
+    currentStep: number;
+    baseUrl?: string;
+    enterpriseImportEnabled: boolean;
+    enterpriseImportDone: boolean;
+    step1Account?: { id: number; name: string };
+  }> {
+    const enterpriseImportEnabled = process.env.ENTERPRISE_IMPORT_ENABLED === 'true';
+    // The Enterprise step has no backend step of its own, so this flag is the
+    // source of truth for resume logic to know whether it was done/skipped.
+    const enterpriseImportDone = !!(await this.systemConfigRepo.findOne({ where: { key: 'enterprise_import_done' } }));
+
     const state = await this.readWizard();
-    if (state?.completed) return { configured: true, currentStep: 6 };
+    if (state?.completed) return { configured: true, currentStep: 6, enterpriseImportEnabled, enterpriseImportDone };
 
     const superAdminRole = await this.roleRepo.findOne({ where: { code: ROLE_CODES.SUPER_ADMIN } });
     if (superAdminRole) {
       const adminCount = await this.userRepo.count({ where: { globalRoleId: superAdminRole.id } });
-      if (adminCount === 0) return { configured: false, currentStep: 1 };
+      if (adminCount === 0) return { configured: false, currentStep: 1, enterpriseImportEnabled, enterpriseImportDone };
     }
 
-    if (!state) return { configured: false, currentStep: 1 };
+    if (!state) return { configured: false, currentStep: 1, enterpriseImportEnabled, enterpriseImportDone };
 
     // Expose the step-3 baseUrl so Step4Sendgrid can pre-fill the webhook URL
     // without a second round-trip.
     const domainCfg = await this.systemConfigRepo.findOne({ where: { key: DOMAIN_KEY } });
     const baseUrl: string | undefined = (domainCfg?.value as any)?.baseUrl;
 
-    return { configured: false, currentStep: state.currentStep || 1, ...(baseUrl && { baseUrl }) };
+    const step1Account = await this.resolveStep1Account(state.adminUserId);
+
+    return {
+      configured: false,
+      currentStep: state.currentStep || 1,
+      enterpriseImportEnabled,
+      enterpriseImportDone,
+      ...(baseUrl && { baseUrl }),
+      ...(step1Account && { step1Account }),
+    };
   }
 
   async advanceStep(dto: AdvanceStepDto, requesterIp?: string): Promise<void> {
@@ -211,8 +236,6 @@ export class SetupService implements OnModuleInit {
 
       const userRepo = em.getRepository(UserEntity);
       const roleRepo = em.getRepository(RoleEntity);
-      const accountRepo = em.getRepository(AccountEntity);
-      const userAccountRepo = em.getRepository(UserAccountEntity);
       const systemConfigRepo = em.getRepository(SystemConfigEntity);
 
       const existing = await userRepo.findOne({ where: { email } });
@@ -251,39 +274,71 @@ export class SetupService implements OnModuleInit {
         }
       }
 
-      // Ensure the admin has at least one Account linked as master_user. Without this, the
-      // app falls into the "Nenhuma conta atribuída" broken state. Idempotent: if a
-      // users_accounts row already exists for this admin, skip both account and link.
-      const existingLink = await userAccountRepo.findOne({ where: { userId: adminUserId } });
-      if (!existingLink) {
-        const account = accountRepo.create({
+      await this.ensureAdminAccount(em, adminUserId, accountName);
+
+      await this.upsertWizardTx(systemConfigRepo, { currentStep: 2, adminUserId });
+    });
+  }
+
+  // Idempotent (no-op if a users_accounts link exists). Also called by the
+  // post-reset recreation: accounts.name is column-level UNIQUE (not partial on
+  // deleted_at), so withDeleted+restore reclaims a soft-deleted orphan whose
+  // name is still taken.
+  private async ensureAdminAccount(em: EntityManager, adminUserId: number, accountName: string): Promise<void> {
+    const accountRepo = em.getRepository(AccountEntity);
+    const userAccountRepo = em.getRepository(UserAccountEntity);
+    const accountConfigRepo = em.getRepository(AccountConfigEntity);
+
+    const existingLink = await userAccountRepo.findOne({ where: { userId: adminUserId } });
+    if (existingLink) return;
+
+    const existingAccount = await accountRepo.findOne({ where: { name: accountName }, withDeleted: true });
+    if (existingAccount?.deletedAt) {
+      await accountRepo.restore(existingAccount.id);
+      await accountRepo.update(existingAccount.id, { isActive: true });
+    }
+    const savedAccount =
+      existingAccount ??
+      (await accountRepo.save(
+        accountRepo.create({
           name: accountName,
           groupId: 1,
           isActive: true,
           isInternal: false,
-        });
-        const savedAccount = await accountRepo.save(account);
-        await userAccountRepo.save(
-          userAccountRepo.create({
-            userId: adminUserId,
-            accountId: savedAccount.id,
-            isMasterUser: true,
-          }),
-        );
+        }),
+      ));
+    await userAccountRepo.save(
+      userAccountRepo.create({
+        userId: adminUserId,
+        accountId: savedAccount.id,
+        isMasterUser: true,
+      }),
+    );
 
-        const accountConfigRepo = em.getRepository(AccountConfigEntity);
-        await accountConfigRepo.save([
-          accountConfigRepo.create({
-            accountId: savedAccount.id,
-            name: 'api_key_tracker',
-            value: createHash('md5').update(`bms-${savedAccount.id}-api_key_tracker`).digest('hex'),
-            isLoadConfig: true,
-          }),
-        ]);
-      }
+    // accounts_configs has UNIQUE (account_id, name), so only create the
+    // api_key_tracker if absent (a reused account may already have it).
+    const existingTracker = await accountConfigRepo.findOne({ where: { accountId: savedAccount.id, name: 'api_key_tracker' } });
+    if (!existingTracker) {
+      await accountConfigRepo.save([
+        accountConfigRepo.create({
+          accountId: savedAccount.id,
+          name: 'api_key_tracker',
+          value: createHash('md5').update(`bms-${savedAccount.id}-api_key_tracker`).digest('hex'),
+          isLoadConfig: true,
+        }),
+      ]);
+    }
+  }
 
-      await this.upsertWizardTx(systemConfigRepo, { currentStep: 2, adminUserId });
-    });
+  // Resolves the step 1 account (the wizard admin's master_user link).
+  // Returns null if step 1 has not run or the admin has no linked account.
+  private async resolveStep1Account(adminUserId?: number): Promise<{ id: number; name: string } | null> {
+    if (!adminUserId) return null;
+    const link = await this.userAccountRepo.findOne({ where: { userId: adminUserId }, order: { isMasterUser: 'DESC' } });
+    if (!link) return null;
+    const account = await this.accountRepo.findOne({ where: { id: link.accountId }, withDeleted: true });
+    if (!account) return null;
+    return { id: account.id, name: account.name };
   }
 
   private async step2(data: Step2Data): Promise<void> {
@@ -351,6 +406,100 @@ export class SetupService implements OnModuleInit {
     } catch (err: any) {
       this.logger.warn(`[GeoIP] could not write env file: ${err?.message} — sidecar will fall back to env vars`);
     }
+  }
+
+  // Gates: feature-flag (404 if disabled), wizard not yet completed, per-IP
+  // rate-limit, and anti-SSRF baseUrl validation before enqueuing the worker.
+  async importEnterprise(dto: ImportEnterpriseSetupDto, requesterIp?: string): Promise<{ jobId?: string }> {
+    if (process.env.ENTERPRISE_IMPORT_ENABLED !== 'true') {
+      throw new NotFoundException();
+    }
+    await this.ensureNotConfigured();
+    enforceTestRateLimit(this.testProviderHits, `enterprise-import:${requesterIp || 'unknown'}`, 'Enterprise import');
+
+    if (dto?.skip === true) {
+      const value = { imported: false, skippedAt: new Date().toISOString() };
+      await this.systemConfigRepo.save(this.systemConfigRepo.create({ key: 'enterprise_import_done', value }));
+      return {};
+    }
+
+    if (!dto?.baseUrl || !dto?.apiKey) {
+      throw new BadRequestException('Informe baseUrl e apiKey, ou marque skip=true');
+    }
+    const safeBaseUrl = assertSafeEnterpriseBaseUrl(dto.baseUrl);
+
+    const state = await this.readWizard();
+    const adminUserId = state?.adminUserId;
+    if (!adminUserId) {
+      throw new BadRequestException('Crie o administrador (passo anterior) antes de importar do Enterprise.');
+    }
+    // accountId is always resolved server-side; the client never supplies it.
+    let accountId: number;
+    let jobId: string;
+    let reusedStep1Account = false;
+    if (dto.useStep1Account) {
+      const step1 = await this.resolveStep1Account(adminUserId);
+      if (!step1) {
+        throw new BadRequestException('Conta do passo 1 não encontrada. Conclua o passo 1 (criar admin) antes de reusar a conta.');
+      }
+      reusedStep1Account = true;
+      ({ accountId, jobId } = await this.enterpriseImport.createAccountImportForExistingAccount(
+        step1.id,
+        { enterpriseBaseUrl: safeBaseUrl, enterpriseApiKey: dto.apiKey, enterpriseSourceAccountId: dto.enterpriseSourceAccountId },
+        adminUserId,
+      ));
+    } else {
+      const accountName = dto.accountName?.trim() || 'Importado do Enterprise';
+      ({ accountId, jobId } = await this.enterpriseImport.createAccountImport(
+        {
+          accountData: { name: accountName } as any,
+          enterpriseBaseUrl: safeBaseUrl,
+          enterpriseApiKey: dto.apiKey,
+          enterpriseSourceAccountId: dto.enterpriseSourceAccountId,
+        } as any,
+        adminUserId,
+      ));
+    }
+    const value = { imported: true, scope: 'account', importedAt: new Date().toISOString(), sourceUrl: safeBaseUrl, accountId, jobId, reusedStep1Account };
+    await this.systemConfigRepo.save(this.systemConfigRepo.create({ key: 'enterprise_import_done', value }));
+    return { jobId };
+  }
+
+  // Stops/removes the BullMQ queue and deletes the import footprint (jobs +
+  // created accounts + children). Gated: 404 if feature off; ForbiddenException
+  // via ensureNotConfigured once setup is complete (live tenant must not be
+  // wiped). Idempotent: reopening with nothing to delete is a no-op.
+  async resetEnterpriseImport(): Promise<{ ok: true; accountsDeleted: number; jobsDeleted: number }> {
+    if (process.env.ENTERPRISE_IMPORT_ENABLED !== 'true') {
+      throw new NotFoundException();
+    }
+    await this.ensureNotConfigured();
+
+    // Include the accountId from enterprise_import_done: the job may be gone
+    // while the account remains.
+    const doneCfg = await this.systemConfigRepo.findOne({ where: { key: 'enterprise_import_done' } });
+    const extraId = Number((doneCfg?.value as any)?.accountId);
+    const extraAccountIds = Number.isInteger(extraId) && extraId > 0 ? [extraId] : [];
+
+    // Capture the step 1 account before the reset: if the import reused it,
+    // resetForSetup deletes it (referenced by jobs/extraAccountIds) and the
+    // name is lost afterwards.
+    const state = await this.readWizard();
+    const step1Before = await this.resolveStep1Account(state?.adminUserId);
+
+    const result = await this.enterpriseImport.resetForSetup(extraAccountIds);
+
+    if (doneCfg) await this.systemConfigRepo.delete({ key: 'enterprise_import_done' });
+
+    // Recreate the step 1 account if the reset deleted it (reuse case).
+    // Idempotent: with a throwaway account the admin link survives and
+    // ensureAdminAccount is a no-op. Without this the admin would have no
+    // account.
+    if (state?.adminUserId && step1Before) {
+      await this.dataSource.transaction((em) => this.ensureAdminAccount(em, state.adminUserId as number, step1Before.name));
+    }
+
+    return { ok: true, ...result };
   }
 
   async getGeoIpSettings(): Promise<GeoIpSettingsDto | null> {

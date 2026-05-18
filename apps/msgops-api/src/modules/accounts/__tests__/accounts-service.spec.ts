@@ -222,3 +222,93 @@ describe('AccountsService — updateAccountConfig — default_email_provider cro
     expect(accountConfigRepository.update).toHaveBeenCalled();
   });
 });
+
+// skipDefaults bypasses default custom fields/events, the billing scheduler,
+// and account_configs (api_key_tracker, account_costs). Only the main insert,
+// users_account link, and the S3 upload attempt remain.
+describe('AccountsService.create — skipDefaults', () => {
+  let service: AccountsService;
+  let accountRepository: any;
+  let accountConfigRepository: any;
+  let customFieldRepository: any;
+  let customEventRepository: any;
+  let userAccountRepository: any;
+  let storage: any;
+  let scheduler: any;
+
+  beforeEach(async () => {
+    accountRepository = {
+      create: jest.fn((dto) => ({ ...dto })),
+      save: jest.fn(async (acc) => ({ ...acc, id: 123 })),
+    };
+    accountConfigRepository = { createQueryBuilder: jest.fn() };
+    customFieldRepository = { createQueryBuilder: jest.fn() };
+    customEventRepository = { createQueryBuilder: jest.fn() };
+    userAccountRepository = {
+      createQueryBuilder: jest.fn(() => ({
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({}),
+      })),
+    };
+    storage = {
+      getAssetsUrl: jest.fn().mockResolvedValue(null),
+      getDefaultBucket: jest.fn().mockResolvedValue(null),
+      genericUpload: jest.fn(),
+    };
+    scheduler = { create: jest.fn() };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AccountsService,
+        { provide: getRepositoryToken(AccountEntity), useValue: accountRepository },
+        { provide: getRepositoryToken(CustomFieldsEntity), useValue: customFieldRepository },
+        { provide: getRepositoryToken(CustomEventEntity), useValue: customEventRepository },
+        { provide: getRepositoryToken(AccountConfigEntity), useValue: accountConfigRepository },
+        { provide: getRepositoryToken(UserAccountEntity), useValue: userAccountRepository },
+        { provide: getRepositoryToken(AccountApiKeyEntity), useValue: {} },
+        { provide: getRepositoryToken(RoleEntity), useValue: {} },
+        { provide: RedisService, useValue: {} },
+        { provide: SendgridHandler, useValue: {} },
+        { provide: S3StorageProvider, useValue: storage },
+        { provide: SchedulerService, useValue: scheduler },
+        { provide: ClsService, useValue: { get: jest.fn() } },
+        { provide: HttpService, useValue: {} },
+        { provide: EvolutionHandler, useValue: {} },
+        { provide: AccountCacheService, useValue: { invalidateAccountCacheAsync: jest.fn() } },
+      ],
+    }).compile();
+
+    service = module.get<AccountsService>(AccountsService);
+  });
+
+  it('with skipDefaults:true does not insert custom fields, custom events, nor call the scheduler', async () => {
+    const customFieldsSpy = jest.spyOn(service as any, 'createOrUpdateCustomFields').mockResolvedValue({});
+    const customEventsSpy = jest.spyOn(service as any, 'createOrUpdateCustomEvents').mockResolvedValue({});
+    const accountConfigsSpy = jest.spyOn(service as any, 'createOrUpdateAccountsConfigs').mockResolvedValue({});
+    const permissionsSpy = jest.spyOn(service as any, 'permissionsUserAccounts').mockResolvedValue({});
+
+    await service.create({ name: 'X' } as any, 1, { skipDefaults: true });
+
+    expect(accountRepository.save).toHaveBeenCalled();
+    expect(permissionsSpy).toHaveBeenCalled(); // user-account link always happens
+    expect(customFieldsSpy).not.toHaveBeenCalled();
+    expect(customEventsSpy).not.toHaveBeenCalled();
+    expect(accountConfigsSpy).not.toHaveBeenCalled();
+    expect(scheduler.create).not.toHaveBeenCalled();
+  });
+
+  it('default behavior (no opts) preserves default inserts', async () => {
+    const customFieldsSpy = jest.spyOn(service as any, 'createOrUpdateCustomFields').mockResolvedValue({});
+    const customEventsSpy = jest.spyOn(service as any, 'createOrUpdateCustomEvents').mockResolvedValue({});
+    const accountConfigsSpy = jest.spyOn(service as any, 'createOrUpdateAccountsConfigs').mockResolvedValue({});
+    jest.spyOn(service as any, 'permissionsUserAccounts').mockResolvedValue({});
+
+    await service.create({ name: 'X' } as any, 1);
+
+    expect(customFieldsSpy).toHaveBeenCalled();
+    expect(customEventsSpy).toHaveBeenCalled();
+    expect(accountConfigsSpy).toHaveBeenCalled();
+  });
+});

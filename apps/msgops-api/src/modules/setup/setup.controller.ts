@@ -9,6 +9,7 @@ import { TestSendgridDto } from './dtos/test-sendgrid.dto';
 import { GeoIpSettingsDto } from './dtos/geoip-settings.dto';
 import { AdminS3Service } from '../admin-integrations/s3/admin-s3.service';
 import { S3SettingsDto } from '../admin-integrations/s3/dtos/s3-settings.dto';
+import { ImportEnterpriseSetupDto } from './dtos/import-enterprise.dto';
 
 @Controller('setup')
 export class SetupController {
@@ -65,5 +66,21 @@ export class SetupController {
   @PublicRoute()
   saveS3(@Body() dto: S3SettingsDto) {
     return this.s3Service.saveSettings(dto);
+  }
+
+  // PublicRoute because the wizard runs before the super-admin is logged in;
+  // a manual gate in setupService rejects once the wizard is complete.
+  @Post('import-enterprise')
+  @PublicRoute()
+  importEnterprise(@Body() dto: ImportEnterpriseSetupDto, @IpAddress() ip?: string) {
+    return this.setupService.importEnterprise(dto, ip);
+  }
+
+  // PublicRoute (wizard runs before login); manual gate in the service
+  // rejects once setup is complete.
+  @Post('import-enterprise/reset')
+  @PublicRoute()
+  resetImportEnterprise() {
+    return this.setupService.resetEnterpriseImport();
   }
 }

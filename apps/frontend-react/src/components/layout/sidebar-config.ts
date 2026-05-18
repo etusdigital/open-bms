@@ -156,6 +156,11 @@ export const MENU_ITEMS: NavItem[] = [
         superAdminOnly: true,
       },
       {
+        labelKey: 'sidebar.superAdminImportEnterprise',
+        route: '/super-admin/accounts/import-enterprise',
+        superAdminOnly: true,
+      },
+      {
         labelKey: 'sidebar.superAdminUsers',
         route: '/super-admin/users',
         superAdminOnly: true,

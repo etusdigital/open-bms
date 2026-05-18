@@ -19,6 +19,17 @@ export const SCHEDULER_JOB_OPTS = {
   removeOnFail: { age: 7 * 24 * 3600, count: 1000 },
 };
 
+// Enterprise → OSS import 1:1 com o worker app `apps/enterprise-import`.
+// Sem prefixo `bms-` por convenção do spec — alinhado ao nome do app.
+export const QUEUE_ENTERPRISE_IMPORT = 'enterprise-import';
+
+export const JOB_OPTS_ENTERPRISE_IMPORT = {
+  attempts: 5,
+  backoff: { type: 'exponential' as const, delay: 5000 },
+  removeOnComplete: { age: 24 * 3600, count: 1000 },
+  removeOnFail: { age: 7 * 24 * 3600, count: 1000 },
+};
+
 export interface SchedulerJobPayload {
   url: string;
   body?: string;
