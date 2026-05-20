@@ -63,6 +63,24 @@ describe('CampaignsService — channel permission enforcement', () => {
       const { service } = buildService({ value: 'not-json' });
       await expect(service.assertChannelEnabled('email', 10)).rejects.toBeInstanceOf(ForbiddenException);
     });
+
+    it('fails closed when accountId is missing — never widens the lookup beyond the account', async () => {
+      const { service, accountConfigsProvider } = buildService(activeRow());
+      await expect(service.assertChannelEnabled('email', undefined as unknown as number)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(accountConfigsProvider.getByAccountId).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('duplicateCampaign — channel gating', () => {
+    it('rejects with ForbiddenException (not a masked 500) when the source channel is disabled', async () => {
+      const { service } = buildService(inactiveRow());
+      (service as any).campaignRepository = {
+        findOneOrFail: jest.fn().mockResolvedValue({ id: 1, messageType: 'email', campaignMessage: [], accountId: 10 }),
+      };
+      // The gate throws a ForbiddenException; duplicateCampaign's catch must
+      // re-throw HTTP errors instead of masking them as a generic 500.
+      await expect(service.duplicateCampaign(1)).rejects.toBeInstanceOf(ForbiddenException);
+    });
   });
 
   describe('update — channel gating', () => {

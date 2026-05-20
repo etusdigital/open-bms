@@ -84,6 +84,12 @@ export class CampaignsService {
     if (!messageType) return;
     const configName = CampaignsService.CHANNEL_SETTINGS_CONFIG[messageType];
     if (!configName) return; // unknown messageType — not a gated channel
+    // Fail closed: a gated channel with no resolvable account must be rejected,
+    // never silently passed — a missing accountId would otherwise widen the
+    // account-config lookup beyond this account.
+    if (!accountId) {
+      throw new ForbiddenException('Account context is required to validate channel access');
+    }
     const config = await this.accountConfigsProvider.getByAccountId(accountId, configName);
     let isActive = false;
     if (config?.value) {
@@ -683,6 +689,9 @@ export class CampaignsService {
       const campaign = await this.campaignRepository.findOneOrFail({
         where: { id, accountId: this.cls.get('accountId') },
       });
+      // Channel gating (EVO-1410): duplicating produces a new campaign, so it
+      // must respect the same channel permission as POST /campaigns.
+      await this.assertChannelEnabled(campaign.messageType, this.cls.get('accountId'));
       delete campaign.id;
       delete campaign.createdAt;
       delete campaign.updatedAt;
@@ -724,6 +733,9 @@ export class CampaignsService {
 
       return newCampaign;
     } catch (e) {
+      // Preserve intentional HTTP errors (e.g. the channel-gating
+      // ForbiddenException) instead of masking them as a generic 500.
+      if (e instanceof HttpException) throw e;
       console.error(e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }

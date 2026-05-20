@@ -424,7 +424,9 @@ export default function SettingsStep({
             {CHANNELS.map((channel) => {
               const Icon = ICON_MAP[channel.icon];
               const isActive = isChannelActive(accountConfigs, channel.value);
-              const isSelected = isActive && messageType === channel.value;
+              // Keep the visual selection even for an inactive channel, so a legacy
+              // campaign on a since-disabled channel still shows which channel it uses.
+              const isSelected = messageType === channel.value;
 
               const btn = (
                 <button
