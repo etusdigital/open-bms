@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithRouter } from '@/test-utils/render-with-router';
 import '@/lib/i18n';
@@ -65,16 +64,15 @@ async function scheduleCellText(campaign: CampaignWithStats): Promise<string> {
 describe('useCampaignsColumns — scheduleTo column', () => {
   it('renders date AND time for a scheduled campaign (EVO-1411)', async () => {
     const scheduleTo = '2026-05-19T14:30:00.000Z';
+    const date = new Date(scheduleTo);
     const text = await scheduleCellText({ ...baseCampaign, scheduleTo });
 
     // Must include a time portion (HH:MM) — the bug was date-only output.
     expect(text).toMatch(/\d{1,2}:\d{2}/);
-    // Must still carry the date — not be reduced to just a time.
-    expect(text).not.toBe(new Date(scheduleTo).toLocaleTimeString());
-    // Output must respect the user's locale (default-locale formatter).
-    expect(text).toBe(
-      new Date(scheduleTo).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }),
-    );
+    // Cell composes a date AND a time, each in the user's locale — checked
+    // against independent sub-formatters so the test isn't a mirror of the impl.
+    expect(text).toContain(date.toLocaleDateString(undefined, { dateStyle: 'short' }));
+    expect(text).toContain(date.toLocaleTimeString(undefined, { timeStyle: 'short' }));
   });
 
   it('renders an em dash when scheduleTo is absent', async () => {

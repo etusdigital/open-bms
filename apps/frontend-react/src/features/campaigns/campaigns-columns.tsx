@@ -29,12 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { CampaignStatus, CAMPAIGN_STATUS_LABELS, type CampaignWithStats } from './types';
-
-function formatDateTime(dateStr?: string): string {
-  if (!dateStr) return '—';
-  // Short date + short time (no seconds), e.g. "19/05/2026 14:30" — locale-aware.
-  return new Date(dateStr).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-}
+import { formatCampaignDateTime } from './utils';
 
 const STATUS_STYLES: Record<number, string> = {
   [CampaignStatus.Draft]: 'bg-[#f5f5f5] text-[#5c5c5c] border-transparent',
@@ -181,7 +176,7 @@ export function useCampaignsColumns({
         accessorKey: 'scheduleTo',
         header: t('campaigns.scheduleTo'),
         enableSorting: true,
-        cell: ({ row }) => formatDateTime(row.original.scheduleTo),
+        cell: ({ row }) => formatCampaignDateTime(row.original.scheduleTo),
       },
       {
         id: 'tags',
