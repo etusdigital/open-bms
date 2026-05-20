@@ -154,6 +154,30 @@ describe('getEventTime', () => {
     const result = getEventTime(item);
     expect(result).not.toBe('—');
   });
+
+  it('renders the event time in the account timezone', () => {
+    // 01:00 UTC is 22:00 of the previous day in America/Sao_Paulo (GMT-3)
+    const item = { type: 'message', time: '2026-05-20T01:00:00Z' } as HistoryItem;
+    const result = getEventTime(item, { timezone: 'America/Sao_Paulo', locale: 'pt-BR' });
+    expect(result).toContain('19/05/2026');
+    expect(result).toContain('22:00');
+  });
+
+  it('keeps the date unshifted when the account timezone is UTC', () => {
+    // Same instant under UTC stays on the 20th — no offset applied
+    const item = { type: 'message', time: '2026-05-20T01:00:00Z' } as HistoryItem;
+    const result = getEventTime(item, { timezone: 'UTC', locale: 'pt-BR' });
+    expect(result).toContain('20/05/2026');
+    expect(result).toContain('01:00');
+  });
+
+  it('renders custom_event time in the account timezone', () => {
+    // custom_event rows carry their timestamp in `time`, like message rows
+    const item = { type: 'custom_event', event_id: 7, time: '2026-05-20T01:00:00Z' } as HistoryItem;
+    const result = getEventTime(item, { timezone: 'America/Sao_Paulo', locale: 'pt-BR' });
+    expect(result).toContain('19/05/2026');
+    expect(result).toContain('22:00');
+  });
 });
 
 describe('getEventLabel', () => {

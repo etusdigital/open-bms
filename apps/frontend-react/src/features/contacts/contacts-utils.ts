@@ -64,10 +64,8 @@ export function getStatusInfo(contact: Contact): {
   return { label: 'inactive', variant: 'outline' };
 }
 
-export function getEventTime(item: HistoryItem): string {
-  const raw = item.time ?? item.created_at;
-  if (!raw) return '—';
-  return new Date(raw).toLocaleString();
+export function getEventTime(item: HistoryItem, options?: { timezone?: string; locale?: string }): string {
+  return formatDateTimeTz(item.time ?? item.created_at, options);
 }
 
 export function getEventLabel(item: HistoryItem): string {
