@@ -30,9 +30,10 @@ import {
 import { cn } from '@/lib/utils';
 import { CampaignStatus, CAMPAIGN_STATUS_LABELS, type CampaignWithStats } from './types';
 
-function formatDate(dateStr?: string): string {
+function formatDateTime(dateStr?: string): string {
   if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString();
+  // Short date + short time (no seconds), e.g. "19/05/2026 14:30" — locale-aware.
+  return new Date(dateStr).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
 }
 
 const STATUS_STYLES: Record<number, string> = {
@@ -180,7 +181,7 @@ export function useCampaignsColumns({
         accessorKey: 'scheduleTo',
         header: t('campaigns.scheduleTo'),
         enableSorting: true,
-        cell: ({ row }) => formatDate(row.original.scheduleTo),
+        cell: ({ row }) => formatDateTime(row.original.scheduleTo),
       },
       {
         id: 'tags',
