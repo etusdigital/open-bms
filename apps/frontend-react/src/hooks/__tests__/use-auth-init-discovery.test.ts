@@ -54,7 +54,7 @@ const scopedResponse = {
   userAccount: discoveryAccounts,
 };
 
-const configsResponse = [{ name: 'timezone', value: 'UTC' }];
+const configsResponse = [{ name: 'time_zone', value: 'UTC' }];
 
 const mockGet = vi.fn();
 const mockPost = vi.fn();

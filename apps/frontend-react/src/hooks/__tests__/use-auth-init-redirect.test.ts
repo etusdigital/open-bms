@@ -28,7 +28,7 @@ const meResponse = {
   ],
 };
 
-const configsResponse = [{ name: 'timezone', value: 'America/Sao_Paulo' }];
+const configsResponse = [{ name: 'time_zone', value: 'America/New_York' }];
 
 // Mock api-client — differentiate by URL
 vi.mock('@/lib/api-client', () => ({
@@ -85,7 +85,7 @@ describe('useAuthInit', () => {
       const auth = useAppStore.getState().auth;
       expect(auth.status).toBe('authenticated');
       if (auth.status === 'authenticated') {
-        expect(auth.timezone).toBe('America/Sao_Paulo');
+        expect(auth.timezone).toBe('America/New_York');
       }
     });
   });

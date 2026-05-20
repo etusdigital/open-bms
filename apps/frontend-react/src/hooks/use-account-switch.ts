@@ -46,7 +46,8 @@ export function useAccountSwitch() {
 
         const me = meRes.data;
         const configs = configsRes.data;
-        const timezone = configs.find((c) => c.name === 'timezone')?.value || 'America/Sao_Paulo';
+        // Account timezone is stored under the `time_zone` config key (see accounts.service.ts).
+        const timezone = configs.find((c) => c.name === 'time_zone')?.value || 'America/Sao_Paulo';
         const currentUa = me.userAccount.find((ua) => ua.accountId === userAccount.accountId);
 
         useAppStore.getState().setAuthenticated({
