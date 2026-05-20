@@ -419,43 +419,59 @@ export default function SettingsStep({
       {/* Channel Cards */}
       <div>
         <h4 className="mb-3 text-sm font-medium">{t('campaigns.channelLabel')}</h4>
-        <div className="grid grid-cols-5 gap-3" data-testid="channel-cards">
-          {CHANNELS.map((channel) => {
-            const Icon = ICON_MAP[channel.icon];
-            const isSelected = messageType === channel.value;
-            const isActive = isChannelActive(accountConfigs, channel.value);
+        <TooltipProvider>
+          <div className="grid grid-cols-5 gap-3" data-testid="channel-cards">
+            {CHANNELS.map((channel) => {
+              const Icon = ICON_MAP[channel.icon];
+              const isActive = isChannelActive(accountConfigs, channel.value);
+              const isSelected = isActive && messageType === channel.value;
 
-            const btn = (
-              <button
-                key={channel.value}
-                type="button"
-                disabled={!isActive}
-                className={cn(
-                  'flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors',
-                  !isActive && 'cursor-not-allowed opacity-40',
-                  isSelected
-                    ? 'border-primary bg-primary/5 text-primary'
-                    : isActive
-                      ? 'border-border hover:border-primary/50'
-                      : 'border-border',
-                )}
-                onClick={() => {
-                  if (!isActive) return;
-                  form.setValue('messageType', channel.value);
-                  if (channel.value !== 'email' && (campaignType === 'testAB' || campaignType === 'split')) {
-                    form.setValue('type', 'simple');
-                  }
-                }}
-                data-testid={`channel-${channel.value}`}
-              >
-                <Icon className="h-6 w-6" />
-                <span className="text-xs font-medium">{t(channel.labelKey as never)}</span>
-              </button>
-            );
+              const btn = (
+                <button
+                  key={channel.value}
+                  type="button"
+                  disabled={!isActive}
+                  data-selected={isSelected}
+                  className={cn(
+                    'flex w-full flex-col items-center gap-2 rounded-lg border p-4 transition-colors',
+                    !isActive && 'cursor-not-allowed opacity-40',
+                    isSelected
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : isActive
+                        ? 'border-border hover:border-primary/50'
+                        : 'border-border',
+                  )}
+                  onClick={() => {
+                    if (!isActive) return;
+                    form.setValue('messageType', channel.value);
+                    if (channel.value !== 'email' && (campaignType === 'testAB' || campaignType === 'split')) {
+                      form.setValue('type', 'simple');
+                    }
+                  }}
+                  data-testid={`channel-${channel.value}`}
+                >
+                  <Icon className="h-6 w-6" />
+                  <span className="text-xs font-medium">{t(channel.labelKey as never)}</span>
+                </button>
+              );
 
-            return btn;
-          })}
-        </div>
+              // Disabled channels get a tooltip explaining why they are unavailable.
+              // The button is wrapped in a span so the tooltip still fires while disabled.
+              if (!isActive) {
+                return (
+                  <Tooltip key={channel.value}>
+                    <TooltipTrigger asChild>
+                      <span className="flex">{btn}</span>
+                    </TooltipTrigger>
+                    <TooltipContent>{t('campaigns.channelNoAccess')}</TooltipContent>
+                  </Tooltip>
+                );
+              }
+
+              return btn;
+            })}
+          </div>
+        </TooltipProvider>
       </div>
 
       {/* Campaign Type Cards */}

@@ -555,34 +555,42 @@ describe('CampaignForm', () => {
       });
       await renderForm();
 
+      // SMS is the only active channel, so it must be the selected default —
+      // email must not be pre-selected while disabled.
+      expect(screen.getByTestId('channel-sms')).toHaveAttribute('data-selected', 'true');
+      expect(screen.getByTestId('channel-email')).toHaveAttribute('data-selected', 'false');
+      expect(screen.getByTestId('channel-email')).toBeDisabled();
+
+      // The active default lets the wizard advance.
       fireEvent.change(screen.getByTestId('campaign-title'), {
         target: { value: 'SMS Campaign' },
       });
-      fireEvent.click(screen.getByRole('button', { name: /próximo/i }));
-
-      // Advancing proves the default messageType resolved to the active SMS
-      // channel — a default of 'email' would be blocked by the step-0 guard.
+      expect(screen.getByTestId('next-button')).toBeEnabled();
+      fireEvent.click(screen.getByTestId('next-button'));
       await waitFor(() => {
         expect(screen.getByTestId('audience-step')).toBeInTheDocument();
       });
     });
 
-    it('blocks advancing past settings when no channel is active', async () => {
+    it('disables the nav buttons when no channel is active — no pre-selected channel', async () => {
       authenticateStore({ accountConfigs: [channelConfig('email_settings', false)] });
       await renderForm();
+
+      // No channel is active, so none is selected and the step cannot be left.
+      expect(screen.getByTestId('channel-email')).toHaveAttribute('data-selected', 'false');
+      expect(screen.getByTestId('next-button')).toBeDisabled();
+      expect(screen.getByTestId('save-and-exit')).toBeDisabled();
 
       fireEvent.change(screen.getByTestId('campaign-title'), {
         target: { value: 'Blocked Campaign' },
       });
-      fireEvent.click(screen.getByRole('button', { name: /próximo/i }));
-
+      fireEvent.click(screen.getByTestId('next-button'));
       await new Promise((r) => setTimeout(r, 100));
-      // Still on the settings step — the inactive-channel guard blocked the step.
       expect(screen.getByTestId('campaign-title')).toBeInTheDocument();
       expect(screen.queryByTestId('audience-step')).not.toBeInTheDocument();
     });
 
-    it('blocks advancing when editing a campaign whose channel was since disabled', async () => {
+    it('disables the Next button when editing a campaign whose channel was since disabled', async () => {
       authenticateStore({
         accountConfigs: [channelConfig('email_settings', false), channelConfig('sms_settings', true)],
       });
@@ -590,11 +598,25 @@ describe('CampaignForm', () => {
         defaultValues: { title: 'Legacy Email Campaign', messageType: 'email' as const },
       });
 
-      fireEvent.click(screen.getByRole('button', { name: /próximo/i }));
-
+      expect(screen.getByTestId('next-button')).toBeDisabled();
+      fireEvent.click(screen.getByTestId('next-button'));
       await new Promise((r) => setTimeout(r, 100));
       expect(screen.getByTestId('campaign-title')).toBeInTheDocument();
       expect(screen.queryByTestId('audience-step')).not.toBeInTheDocument();
+    });
+
+    it('wraps disabled channel cards in a tooltip trigger', async () => {
+      authenticateStore({
+        accountConfigs: [channelConfig('email_settings', true), channelConfig('sms_settings', false)],
+      });
+      await renderForm();
+
+      // Disabled SMS card is wrapped in the tooltip-trigger <span>; the active
+      // email card is rendered as a bare grid child.
+      const smsParent = screen.getByTestId('channel-sms').parentElement;
+      expect(smsParent?.tagName).toBe('SPAN');
+      expect(smsParent).toHaveAttribute('data-state');
+      expect(screen.getByTestId('channel-email').parentElement?.tagName).not.toBe('SPAN');
     });
   });
 });

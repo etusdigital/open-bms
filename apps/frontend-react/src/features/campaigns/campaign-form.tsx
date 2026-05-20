@@ -148,18 +148,19 @@ export default function CampaignForm({
     prevCampaignType.current = campaignType;
   }, [campaignType, form]);
 
+  // Step 0 cannot be left unless the selected channel is active for the account.
+  // The picker disables inactive channels and messageType defaults to undefined
+  // when no channel is available — so the nav buttons are simply disabled rather
+  // than surfacing an error.
+  const selectedChannelActive = !!messageType && !!accountChannels[MESSAGE_TYPE_CHANNEL_KEY[messageType]];
+  const blockSettingsStep = currentStep === 0 && !selectedChannelActive;
+
   const handleNext = async () => {
     if (currentStep === 0) {
       const valid = await form.trigger(['title', 'description', 'type', 'messageType']);
       if (!valid) return;
-      // Defense in depth: the channel picker disables inactive channels, but the
-      // selected messageType (e.g. a default or a previously-saved channel that
-      // was since disabled) must still map to an active account channel.
-      const selectedMessageType = form.getValues('messageType');
-      if (!accountChannels[MESSAGE_TYPE_CHANNEL_KEY[selectedMessageType]]) {
-        toast.error(t('campaigns.channelNoAccess'));
-        return;
-      }
+      // Safety net behind the disabled button: never advance with an inactive channel.
+      if (!selectedChannelActive) return;
     }
     setCurrentStep((prev) => Math.min(prev + 1, stepsConfig.length - 1));
   };
@@ -285,7 +286,7 @@ export default function CampaignForm({
                 type="button"
                 variant="outline"
                 onClick={handleSaveDraft}
-                disabled={isPending}
+                disabled={isPending || blockSettingsStep}
                 data-testid="save-and-exit"
               >
                 {t('campaigns.saveAndExit')}
@@ -301,7 +302,7 @@ export default function CampaignForm({
                 {isPending ? t('common.loading') : isEditing ? t('common.save') : t('common.create')}
               </Button>
             ) : (
-              <Button type="button" onClick={handleNext}>
+              <Button type="button" onClick={handleNext} disabled={blockSettingsStep} data-testid="next-button">
                 {t('campaigns.next')}
               </Button>
             )}

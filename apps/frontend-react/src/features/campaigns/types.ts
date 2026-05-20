@@ -17,9 +17,13 @@ export const MESSAGE_TYPE_CHANNEL_KEY: Record<CampaignMessageType, keyof Account
 /** Channel resolution order used when picking a default messageType. */
 export const CHANNEL_PRIORITY: CampaignMessageType[] = ['email', 'sms', 'web-push', 'mobile-push', 'whatsapp'];
 
-/** Returns the first channel active for the account, falling back to 'email' when none are. */
-export function firstActiveChannel(channels: AccountChannels): CampaignMessageType {
-  return CHANNEL_PRIORITY.find((c) => channels[MESSAGE_TYPE_CHANNEL_KEY[c]]) ?? 'email';
+/**
+ * Returns the first channel active for the account, or `undefined` when none
+ * are — so the campaign form leaves messageType unselected instead of defaulting
+ * to a disabled channel.
+ */
+export function firstActiveChannel(channels: AccountChannels): CampaignMessageType | undefined {
+  return CHANNEL_PRIORITY.find((c) => channels[MESSAGE_TYPE_CHANNEL_KEY[c]]);
 }
 
 export enum CampaignStatus {
