@@ -161,6 +161,42 @@ describe('CampaignFormPage', () => {
     expect(screen.queryByTestId('run-segment-toggle')).not.toBeInTheDocument();
   });
 
+  describe('EVO-1413: scheduled campaign date hydration', () => {
+    it('hydrates the schedule datetime input from a full ISO (with Z) value', async () => {
+      mockCampaignQuery = {
+        data: {
+          id: 7,
+          title: 'Scheduled Campaign',
+          description: 'desc',
+          type: 'simple',
+          messageType: 'email',
+          sendToAll: true,
+          sendAfterCreate: false,
+          scheduleTo: '2026-06-01T15:00:00.000Z',
+        },
+        isLoading: false,
+        error: null,
+      };
+      await renderFormPage(7);
+
+      // Advance to the schedule step (settings → audience → content → schedule).
+      for (let i = 0; i < 3; i++) {
+        fireEvent.click(screen.getByRole('button', { name: /próximo/i }));
+        await waitFor(() => {
+          expect(screen.getByTestId('step-indicator')).toBeInTheDocument();
+        });
+      }
+      await waitFor(() => {
+        expect(screen.getByTestId('schedule-step')).toBeInTheDocument();
+      });
+
+      // The datetime-local input renders empty when fed a `Z`/seconds value;
+      // hydration must truncate it to "YYYY-MM-DDTHH:mm".
+      const input = screen.getByTestId('schedule-datetime') as HTMLInputElement;
+      expect(input.value).toBe('2026-06-01T15:00');
+    });
+  });
+
   describe('Etapa 5: 409 conflict handling', () => {
     it('does not navigate on 409 error and calls mutation only once', async () => {
       mockCreateMutate.mockImplementation((_data: any, opts: any) => {
