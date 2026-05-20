@@ -52,7 +52,10 @@ export const campaignFormSchema = z
     name: z.string().optional().default(''),
     description: optionalString(CAMPAIGN_DESCRIPTION_MAX),
     type: z.enum(['simple', 'testAB', 'split', 'recurring']).default('simple'),
-    messageType: z.enum(['email', 'sms', 'web-push', 'mobile-push', 'whatsapp']).default('email'),
+    // No default: the form picks the default channel from the account's active
+    // channels (firstActiveChannel). A hardcoded default would reintroduce the
+    // EVO-1410 bug of selecting a disabled 'email' channel.
+    messageType: z.enum(['email', 'sms', 'web-push', 'mobile-push', 'whatsapp']),
     sendToAll: z.boolean().default(false),
     sendAfterCreate: z.boolean().default(false),
     runSegment: z.boolean().default(false),

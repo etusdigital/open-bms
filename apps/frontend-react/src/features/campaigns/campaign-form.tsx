@@ -13,8 +13,10 @@ import ScheduleStep from './steps/schedule-step';
 import RecurringStep from './steps/recurring-step';
 import ReviewStep from './steps/review-step';
 import { campaignFormSchema, type CampaignFormValues } from './campaign-schema';
-import { CampaignStatus } from './types';
+import { CampaignStatus, MESSAGE_TYPE_CHANNEL_KEY, firstActiveChannel } from './types';
 import { toast } from 'sonner';
+import { useShallow } from 'zustand/react/shallow';
+import { useAppStore, selectAccountChannels } from '@/stores/app-store';
 
 interface CampaignFormProps {
   defaultValues?: Partial<CampaignFormValues>;
@@ -39,6 +41,7 @@ export default function CampaignForm({
 }: CampaignFormProps) {
   const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
+  const accountChannels = useAppStore(useShallow(selectAccountChannels));
   const isEditing = defaultValues !== undefined;
   const defaultStatus = (defaultValues as any)?.status as number | undefined;
   const isEditingDraft = isEditing && defaultStatus === CampaignStatus.Draft;
@@ -65,7 +68,9 @@ export default function CampaignForm({
       name: '',
       description: '',
       type: 'simple',
-      messageType: 'email',
+      // Default to a channel actually enabled for the account — never a disabled
+      // 'email'. An explicit defaultValues.messageType (edit mode) overrides this.
+      messageType: firstActiveChannel(accountChannels),
       sendToAll: false,
       sendAfterCreate: false,
       runSegment: false,
@@ -143,10 +148,29 @@ export default function CampaignForm({
     prevCampaignType.current = campaignType;
   }, [campaignType, form]);
 
+  // Re-sync the default channel if account channels resolve after the first
+  // render — react-hook-form reads defaultValues only once. Create mode only;
+  // edit mode always carries an explicit messageType from defaultValues.
+  useEffect(() => {
+    if (isEditing || messageType) return;
+    const active = firstActiveChannel(accountChannels);
+    if (active) form.setValue('messageType', active);
+  }, [accountChannels, messageType, isEditing, form]);
+
+  // Channel gating (EVO-1410): creating a campaign requires an active channel,
+  // so step 0's nav buttons are disabled until one is selected. Editing an
+  // existing campaign is always allowed — the picker disables inactive channels
+  // so the user can never switch to one, and a legacy campaign whose channel
+  // was since disabled must stay editable.
+  const selectedChannelActive = !!messageType && !!accountChannels[MESSAGE_TYPE_CHANNEL_KEY[messageType]];
+  const blockSettingsStep = currentStep === 0 && !isEditing && !selectedChannelActive;
+
   const handleNext = async () => {
     if (currentStep === 0) {
       const valid = await form.trigger(['title', 'description', 'type', 'messageType']);
       if (!valid) return;
+      // Safety net behind the disabled button.
+      if (blockSettingsStep) return;
     }
     setCurrentStep((prev) => Math.min(prev + 1, stepsConfig.length - 1));
   };
@@ -272,7 +296,7 @@ export default function CampaignForm({
                 type="button"
                 variant="outline"
                 onClick={handleSaveDraft}
-                disabled={isPending}
+                disabled={isPending || blockSettingsStep}
                 data-testid="save-and-exit"
               >
                 {t('campaigns.saveAndExit')}
@@ -288,7 +312,7 @@ export default function CampaignForm({
                 {isPending ? t('common.loading') : isEditing ? t('common.save') : t('common.create')}
               </Button>
             ) : (
-              <Button type="button" onClick={handleNext}>
+              <Button type="button" onClick={handleNext} disabled={blockSettingsStep} data-testid="next-button">
                 {t('campaigns.next')}
               </Button>
             )}

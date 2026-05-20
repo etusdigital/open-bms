@@ -27,6 +27,7 @@ import { SlackProvider } from 'src/providers/slack.provider';
 import { LabelsContentsEntity } from 'src/entities/labels-contents.entity';
 import { LabelsEntity } from 'src/entities/labels.entity';
 import { LabelsService } from '../labels/labels.service';
+import { AccountConfigsProvider } from '../../providers/account-configs.provider';
 
 @Injectable()
 export class CampaignsService {
@@ -55,9 +56,52 @@ export class CampaignsService {
     private readonly labelsRepository: Repository<LabelsEntity>,
     private readonly cls: ClsService,
     private readonly labelsService: LabelsService,
+    private readonly accountConfigsProvider: AccountConfigsProvider,
   ) {
     this.ajv = new Ajv({ allErrors: true });
     ajvErrors(this.ajv);
+  }
+
+  /** Maps a campaign messageType to the account config row that gates its channel. */
+  private static readonly CHANNEL_SETTINGS_CONFIG: Record<string, string> = {
+    [CampaignsMessageType.EMAIL]: 'email_settings',
+    [CampaignsMessageType.SMS]: 'sms_settings',
+    [CampaignsMessageType.WEB_PUSH]: 'webpush_settings',
+    [CampaignsMessageType.MOBILE_PUSH]: 'mobilepush_settings',
+    [CampaignsMessageType.WHATSAPP]: 'whatsapp_settings',
+  };
+
+  /**
+   * Defense in depth: rejects campaigns whose channel is not enabled for the
+   * account. Mirrors the frontend `selectAccountChannels` / `isChannelActive`
+   * gating so the API cannot be bypassed by a direct POST/PUT.
+   *
+   * Public so `CampaignsController` can gate `POST /campaigns` without the
+   * gating leaking into the shared `createOne` primitive (the Enterprise→OSS
+   * batch import reuses `createOne` and must not be channel-gated).
+   */
+  async assertChannelEnabled(messageType: string | undefined, accountId: number): Promise<void> {
+    if (!messageType) return;
+    const configName = CampaignsService.CHANNEL_SETTINGS_CONFIG[messageType];
+    if (!configName) return; // unknown messageType — not a gated channel
+    // Fail closed: a gated channel with no resolvable account must be rejected,
+    // never silently passed — a missing accountId would otherwise widen the
+    // account-config lookup beyond this account.
+    if (!accountId) {
+      throw new ForbiddenException('Account context is required to validate channel access');
+    }
+    const config = await this.accountConfigsProvider.getByAccountId(accountId, configName);
+    let isActive = false;
+    if (config?.value) {
+      try {
+        isActive = !!JSON.parse(config.value).isActive;
+      } catch {
+        isActive = false;
+      }
+    }
+    if (!isActive) {
+      throw new ForbiddenException(`The ${messageType} channel is not enabled for this account`);
+    }
   }
 
   async findAll(params: CampaignFilterDto): Promise<PaginationDto<CampaignDto>> {
@@ -238,6 +282,9 @@ export class CampaignsService {
       campaignDto = validationResult.result;
     }
 
+    // NOTE: channel gating for POST /campaigns lives in CampaignsController.
+    // createOne is a shared primitive (also used by the Enterprise→OSS batch
+    // import) and must stay un-gated.
     campaignDto = this.formattedCampaignDate(campaignDto);
     await this.checkDuplicateAudience(campaignDto);
     campaignDto.name = this.cls.get('isInternalAccount') && !isTriggerCampaign ? replaceSpecialChars(campaignDto.name.trim()) : replaceSpecialChars(campaignDto.title.trim());
@@ -345,6 +392,13 @@ export class CampaignsService {
         accountId: this.cls.get('accountId'),
       },
     });
+
+    // Channel gating (EVO-1410): only block when the campaign is being moved to
+    // a *different* channel that is not enabled. Editing other fields of a
+    // campaign already on a (possibly since-disabled) channel stays allowed.
+    if (campaignDto.messageType && campaignDto.messageType !== campaign.messageType) {
+      await this.assertChannelEnabled(campaignDto.messageType, this.cls.get('accountId'));
+    }
     let oldEventType = '';
     let oldTriggerId = 0;
     if (isTriggerCampaign) {
@@ -635,6 +689,9 @@ export class CampaignsService {
       const campaign = await this.campaignRepository.findOneOrFail({
         where: { id, accountId: this.cls.get('accountId') },
       });
+      // Channel gating (EVO-1410): duplicating produces a new campaign, so it
+      // must respect the same channel permission as POST /campaigns.
+      await this.assertChannelEnabled(campaign.messageType, this.cls.get('accountId'));
       delete campaign.id;
       delete campaign.createdAt;
       delete campaign.updatedAt;
@@ -676,6 +733,9 @@ export class CampaignsService {
 
       return newCampaign;
     } catch (e) {
+      // Preserve intentional HTTP errors (e.g. the channel-gating
+      // ForbiddenException) instead of masking them as a generic 500.
+      if (e instanceof HttpException) throw e;
       console.error(e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }

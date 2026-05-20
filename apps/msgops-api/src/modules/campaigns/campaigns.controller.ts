@@ -99,6 +99,10 @@ export class CampaignsController {
     if (campaignDto.type !== CampaignsType.TRIGGER && isInternal && !campaignDto.name) {
       throw new ForbiddenException('Campaign name is required');
     }
+    // Defense in depth: reject campaigns on a channel not enabled for the account.
+    // Gating lives here (not in the shared createOne primitive) so the
+    // Enterprise→OSS batch import, which reuses createOne, stays un-gated.
+    await this.campaignService.assertChannelEnabled(campaignDto.messageType, this.cls.get('accountId'));
     return await this.campaignService.createOne(campaignDto);
   }
 

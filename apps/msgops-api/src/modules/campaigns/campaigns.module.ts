@@ -14,6 +14,8 @@ import { ContactDeviceEntity } from 'src/entities/contact-device.entity';
 import { CampaignContactEntity } from 'src/entities/campaign-contact.entity';
 import { TagEntity } from 'src/entities/tag.entity';
 import { AccountEntity } from 'src/entities/account.entity';
+import { AccountConfigEntity } from '../../entities/account-config.entity';
+import { AccountConfigsProvider } from '../../providers/account-configs.provider';
 import { SlackProvider } from 'src/providers/slack.provider';
 import { LabelsIntegrationModule } from '../labels/labels-integration.module';
 
@@ -22,7 +24,7 @@ import { LabelsIntegrationModule } from '../labels/labels-integration.module';
     HttpModule,
     GlockModule,
     LabelsIntegrationModule,
-    TypeOrmModule.forFeature([CampaignEntity, CampaignMessageEntity, ContactEntity, ContactDeviceEntity, CampaignContactEntity, TagEntity, AccountEntity]),
+    TypeOrmModule.forFeature([CampaignEntity, CampaignMessageEntity, ContactEntity, ContactDeviceEntity, CampaignContactEntity, TagEntity, AccountEntity, AccountConfigEntity]),
     RedisModule.register({
       host: process.env.REDIS_HOST,
       port: parseInt(process.env.REDIS_PORT),
@@ -31,6 +33,6 @@ import { LabelsIntegrationModule } from '../labels/labels-integration.module';
   ],
   controllers: [CampaignsController],
   exports: [CampaignsService],
-  providers: [CampaignsService, UtilsService, S3StorageProvider, SlackProvider],
+  providers: [CampaignsService, UtilsService, S3StorageProvider, SlackProvider, AccountConfigsProvider],
 })
 export class CampaignModule {}

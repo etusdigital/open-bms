@@ -43,6 +43,13 @@ vi.mock('../use-campaigns', () => ({
 const mockOnSubmit = vi.fn();
 const mockOnCancel = vi.fn();
 
+/** Builds an active/inactive account config row for a given channel settings name. */
+function channelConfig(name: string, isActive: boolean) {
+  return { accountId: 10, name, value: JSON.stringify({ isActive }), isLoadConfig: false };
+}
+
+const emailEnabled = [channelConfig('email_settings', true)];
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });
@@ -64,7 +71,7 @@ async function renderForm(props?: { defaultValues?: Record<string, unknown>; isI
 describe('CampaignForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    authenticateStore();
+    authenticateStore({ accountConfigs: emailEnabled });
     mockValidateNameResult = { data: true };
   });
 
@@ -536,6 +543,82 @@ describe('CampaignForm', () => {
       await waitFor(() => {
         expect(mockOnSubmit).toHaveBeenCalledTimes(1);
       });
+    });
+  });
+
+  // EVO-1410: channel permission must be enforced in the campaign flow, not
+  // just by disabling picker cards.
+  describe('Etapa 7: channel permission gating', () => {
+    it('defaults messageType to the first active channel when email is disabled', async () => {
+      authenticateStore({
+        accountConfigs: [channelConfig('email_settings', false), channelConfig('sms_settings', true)],
+      });
+      await renderForm();
+
+      // SMS is the only active channel, so it must be the selected default —
+      // email must not be pre-selected while disabled.
+      expect(screen.getByTestId('channel-sms')).toHaveAttribute('data-selected', 'true');
+      expect(screen.getByTestId('channel-email')).toHaveAttribute('data-selected', 'false');
+      expect(screen.getByTestId('channel-email')).toBeDisabled();
+
+      // The active default lets the wizard advance.
+      fireEvent.change(screen.getByTestId('campaign-title'), {
+        target: { value: 'SMS Campaign' },
+      });
+      expect(screen.getByTestId('next-button')).toBeEnabled();
+      fireEvent.click(screen.getByTestId('next-button'));
+      await waitFor(() => {
+        expect(screen.getByTestId('audience-step')).toBeInTheDocument();
+      });
+    });
+
+    it('disables the nav buttons when no channel is active — no pre-selected channel', async () => {
+      authenticateStore({ accountConfigs: [channelConfig('email_settings', false)] });
+      await renderForm();
+
+      // No channel is active, so none is selected and the step cannot be left.
+      expect(screen.getByTestId('channel-email')).toHaveAttribute('data-selected', 'false');
+      expect(screen.getByTestId('next-button')).toBeDisabled();
+      expect(screen.getByTestId('save-and-exit')).toBeDisabled();
+
+      fireEvent.change(screen.getByTestId('campaign-title'), {
+        target: { value: 'Blocked Campaign' },
+      });
+      // Clicking the disabled button must not advance the wizard.
+      fireEvent.click(screen.getByTestId('next-button'));
+      expect(screen.getByTestId('campaign-title')).toBeInTheDocument();
+      expect(screen.queryByTestId('audience-step')).not.toBeInTheDocument();
+    });
+
+    it('allows editing a campaign whose channel was since disabled', async () => {
+      authenticateStore({
+        accountConfigs: [channelConfig('email_settings', false), channelConfig('sms_settings', true)],
+      });
+      await renderForm({
+        defaultValues: { title: 'Legacy Email Campaign', messageType: 'email' as const },
+      });
+
+      // Edit mode: the campaign keeps its now-disabled channel and stays
+      // editable — gating only blocks creating on an inactive channel.
+      expect(screen.getByTestId('next-button')).toBeEnabled();
+      fireEvent.click(screen.getByTestId('next-button'));
+      await waitFor(() => {
+        expect(screen.getByTestId('audience-step')).toBeInTheDocument();
+      });
+    });
+
+    it('wraps disabled channel cards in a tooltip trigger', async () => {
+      authenticateStore({
+        accountConfigs: [channelConfig('email_settings', true), channelConfig('sms_settings', false)],
+      });
+      await renderForm();
+
+      // Disabled SMS card is wrapped in the tooltip-trigger <span>; the active
+      // email card is rendered as a bare grid child.
+      const smsParent = screen.getByTestId('channel-sms').parentElement;
+      expect(smsParent?.tagName).toBe('SPAN');
+      expect(smsParent).toHaveAttribute('data-state');
+      expect(screen.getByTestId('channel-email').parentElement?.tagName).not.toBe('SPAN');
     });
   });
 });
