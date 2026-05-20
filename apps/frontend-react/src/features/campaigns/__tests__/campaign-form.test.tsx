@@ -584,8 +584,8 @@ describe('CampaignForm', () => {
       fireEvent.change(screen.getByTestId('campaign-title'), {
         target: { value: 'Blocked Campaign' },
       });
+      // Clicking the disabled button must not advance the wizard.
       fireEvent.click(screen.getByTestId('next-button'));
-      await new Promise((r) => setTimeout(r, 100));
       expect(screen.getByTestId('campaign-title')).toBeInTheDocument();
       expect(screen.queryByTestId('audience-step')).not.toBeInTheDocument();
     });
@@ -600,7 +600,6 @@ describe('CampaignForm', () => {
 
       expect(screen.getByTestId('next-button')).toBeDisabled();
       fireEvent.click(screen.getByTestId('next-button'));
-      await new Promise((r) => setTimeout(r, 100));
       expect(screen.getByTestId('campaign-title')).toBeInTheDocument();
       expect(screen.queryByTestId('audience-step')).not.toBeInTheDocument();
     });

@@ -148,6 +148,15 @@ export default function CampaignForm({
     prevCampaignType.current = campaignType;
   }, [campaignType, form]);
 
+  // Re-sync the default channel if account channels resolve after the first
+  // render — react-hook-form reads defaultValues only once. Create mode only;
+  // edit mode always carries an explicit messageType from defaultValues.
+  useEffect(() => {
+    if (isEditing || messageType) return;
+    const active = firstActiveChannel(accountChannels);
+    if (active) form.setValue('messageType', active);
+  }, [accountChannels, messageType, isEditing, form]);
+
   // Step 0 cannot be left unless the selected channel is active for the account.
   // The picker disables inactive channels and messageType defaults to undefined
   // when no channel is available — so the nav buttons are simply disabled rather

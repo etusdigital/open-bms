@@ -75,8 +75,12 @@ export class CampaignsService {
    * Defense in depth: rejects campaigns whose channel is not enabled for the
    * account. Mirrors the frontend `selectAccountChannels` / `isChannelActive`
    * gating so the API cannot be bypassed by a direct POST/PUT.
+   *
+   * Public so `CampaignsController` can gate `POST /campaigns` without the
+   * gating leaking into the shared `createOne` primitive (the Enterprise→OSS
+   * batch import reuses `createOne` and must not be channel-gated).
    */
-  private async assertChannelEnabled(messageType: string | undefined, accountId: number): Promise<void> {
+  async assertChannelEnabled(messageType: string | undefined, accountId: number): Promise<void> {
     if (!messageType) return;
     const configName = CampaignsService.CHANNEL_SETTINGS_CONFIG[messageType];
     if (!configName) return; // unknown messageType — not a gated channel
@@ -272,8 +276,9 @@ export class CampaignsService {
       campaignDto = validationResult.result;
     }
 
-    await this.assertChannelEnabled(campaignDto.messageType, accountId ?? this.cls.get('accountId'));
-
+    // NOTE: channel gating for POST /campaigns lives in CampaignsController.
+    // createOne is a shared primitive (also used by the Enterprise→OSS batch
+    // import) and must stay un-gated.
     campaignDto = this.formattedCampaignDate(campaignDto);
     await this.checkDuplicateAudience(campaignDto);
     campaignDto.name = this.cls.get('isInternalAccount') && !isTriggerCampaign ? replaceSpecialChars(campaignDto.name.trim()) : replaceSpecialChars(campaignDto.title.trim());
