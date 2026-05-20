@@ -29,11 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { CampaignStatus, CAMPAIGN_STATUS_LABELS, type CampaignWithStats } from './types';
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString();
-}
+import { formatCampaignDateTime } from './utils';
 
 const STATUS_STYLES: Record<number, string> = {
   [CampaignStatus.Draft]: 'bg-[#f5f5f5] text-[#5c5c5c] border-transparent',
@@ -180,7 +176,7 @@ export function useCampaignsColumns({
         accessorKey: 'scheduleTo',
         header: t('campaigns.scheduleTo'),
         enableSorting: true,
-        cell: ({ row }) => formatDate(row.original.scheduleTo),
+        cell: ({ row }) => formatCampaignDateTime(row.original.scheduleTo),
       },
       {
         id: 'tags',

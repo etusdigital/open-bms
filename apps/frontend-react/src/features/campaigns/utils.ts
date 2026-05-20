@@ -40,3 +40,13 @@ export function formatCampaignTime(isoString: string | undefined): string {
   if (isNaN(date.getTime())) return isoString;
   return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
+
+// Short date + short time (no seconds), e.g. "19/05/2026 14:30".
+// Locale-aware (runtime locale) to match the campaigns table convention,
+// where the empty placeholder is an em dash like the sibling stat columns.
+export function formatCampaignDateTime(isoString: string | undefined): string {
+  if (!isoString) return '—';
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return isoString;
+  return date.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+}
