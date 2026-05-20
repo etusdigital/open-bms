@@ -43,6 +43,13 @@ vi.mock('../use-campaigns', () => ({
 const mockOnSubmit = vi.fn();
 const mockOnCancel = vi.fn();
 
+/** Builds an active/inactive account config row for a given channel settings name. */
+function channelConfig(name: string, isActive: boolean) {
+  return { accountId: 10, name, value: JSON.stringify({ isActive }), isLoadConfig: false };
+}
+
+const emailEnabled = [channelConfig('email_settings', true)];
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });
@@ -64,7 +71,7 @@ async function renderForm(props?: { defaultValues?: Record<string, unknown>; isI
 describe('CampaignForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    authenticateStore();
+    authenticateStore({ accountConfigs: emailEnabled });
     mockValidateNameResult = { data: true };
   });
 
@@ -536,6 +543,58 @@ describe('CampaignForm', () => {
       await waitFor(() => {
         expect(mockOnSubmit).toHaveBeenCalledTimes(1);
       });
+    });
+  });
+
+  // EVO-1410: channel permission must be enforced in the campaign flow, not
+  // just by disabling picker cards.
+  describe('Etapa 7: channel permission gating', () => {
+    it('defaults messageType to the first active channel when email is disabled', async () => {
+      authenticateStore({
+        accountConfigs: [channelConfig('email_settings', false), channelConfig('sms_settings', true)],
+      });
+      await renderForm();
+
+      fireEvent.change(screen.getByTestId('campaign-title'), {
+        target: { value: 'SMS Campaign' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /próximo/i }));
+
+      // Advancing proves the default messageType resolved to the active SMS
+      // channel — a default of 'email' would be blocked by the step-0 guard.
+      await waitFor(() => {
+        expect(screen.getByTestId('audience-step')).toBeInTheDocument();
+      });
+    });
+
+    it('blocks advancing past settings when no channel is active', async () => {
+      authenticateStore({ accountConfigs: [channelConfig('email_settings', false)] });
+      await renderForm();
+
+      fireEvent.change(screen.getByTestId('campaign-title'), {
+        target: { value: 'Blocked Campaign' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /próximo/i }));
+
+      await new Promise((r) => setTimeout(r, 100));
+      // Still on the settings step — the inactive-channel guard blocked the step.
+      expect(screen.getByTestId('campaign-title')).toBeInTheDocument();
+      expect(screen.queryByTestId('audience-step')).not.toBeInTheDocument();
+    });
+
+    it('blocks advancing when editing a campaign whose channel was since disabled', async () => {
+      authenticateStore({
+        accountConfigs: [channelConfig('email_settings', false), channelConfig('sms_settings', true)],
+      });
+      await renderForm({
+        defaultValues: { title: 'Legacy Email Campaign', messageType: 'email' as const },
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /próximo/i }));
+
+      await new Promise((r) => setTimeout(r, 100));
+      expect(screen.getByTestId('campaign-title')).toBeInTheDocument();
+      expect(screen.queryByTestId('audience-step')).not.toBeInTheDocument();
     });
   });
 });

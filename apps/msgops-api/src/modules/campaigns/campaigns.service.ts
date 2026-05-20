@@ -27,6 +27,7 @@ import { SlackProvider } from 'src/providers/slack.provider';
 import { LabelsContentsEntity } from 'src/entities/labels-contents.entity';
 import { LabelsEntity } from 'src/entities/labels.entity';
 import { LabelsService } from '../labels/labels.service';
+import { AccountConfigsProvider } from '../../providers/account-configs.provider';
 
 @Injectable()
 export class CampaignsService {
@@ -55,9 +56,42 @@ export class CampaignsService {
     private readonly labelsRepository: Repository<LabelsEntity>,
     private readonly cls: ClsService,
     private readonly labelsService: LabelsService,
+    private readonly accountConfigsProvider: AccountConfigsProvider,
   ) {
     this.ajv = new Ajv({ allErrors: true });
     ajvErrors(this.ajv);
+  }
+
+  /** Maps a campaign messageType to the account config row that gates its channel. */
+  private static readonly CHANNEL_SETTINGS_CONFIG: Record<string, string> = {
+    [CampaignsMessageType.EMAIL]: 'email_settings',
+    [CampaignsMessageType.SMS]: 'sms_settings',
+    [CampaignsMessageType.WEB_PUSH]: 'webpush_settings',
+    [CampaignsMessageType.MOBILE_PUSH]: 'mobilepush_settings',
+    [CampaignsMessageType.WHATSAPP]: 'whatsapp_settings',
+  };
+
+  /**
+   * Defense in depth: rejects campaigns whose channel is not enabled for the
+   * account. Mirrors the frontend `selectAccountChannels` / `isChannelActive`
+   * gating so the API cannot be bypassed by a direct POST/PUT.
+   */
+  private async assertChannelEnabled(messageType: string | undefined, accountId: number): Promise<void> {
+    if (!messageType) return;
+    const configName = CampaignsService.CHANNEL_SETTINGS_CONFIG[messageType];
+    if (!configName) return; // unknown messageType — not a gated channel
+    const config = await this.accountConfigsProvider.getByAccountId(accountId, configName);
+    let isActive = false;
+    if (config?.value) {
+      try {
+        isActive = !!JSON.parse(config.value).isActive;
+      } catch {
+        isActive = false;
+      }
+    }
+    if (!isActive) {
+      throw new ForbiddenException(`The ${messageType} channel is not enabled for this account`);
+    }
   }
 
   async findAll(params: CampaignFilterDto): Promise<PaginationDto<CampaignDto>> {
@@ -238,6 +272,8 @@ export class CampaignsService {
       campaignDto = validationResult.result;
     }
 
+    await this.assertChannelEnabled(campaignDto.messageType, accountId ?? this.cls.get('accountId'));
+
     campaignDto = this.formattedCampaignDate(campaignDto);
     await this.checkDuplicateAudience(campaignDto);
     campaignDto.name = this.cls.get('isInternalAccount') && !isTriggerCampaign ? replaceSpecialChars(campaignDto.name.trim()) : replaceSpecialChars(campaignDto.title.trim());
@@ -334,6 +370,8 @@ export class CampaignsService {
       }
       campaignDto = validationResult.result;
     }
+
+    await this.assertChannelEnabled(campaignDto.messageType, this.cls.get('accountId'));
 
     campaignDto = this.formattedCampaignDate(campaignDto);
     await this.checkDuplicateAudience(campaignDto);

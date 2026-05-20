@@ -1,8 +1,26 @@
 import type { Message } from '@/features/messages/types';
+import type { AccountChannels } from '@/types';
 
 export type CampaignType = 'simple' | 'testAB' | 'split' | 'recurring';
 
 export type CampaignMessageType = 'email' | 'sms' | 'web-push' | 'mobile-push' | 'whatsapp';
+
+/** Maps a campaign messageType to the account channel flag that gates its availability. */
+export const MESSAGE_TYPE_CHANNEL_KEY: Record<CampaignMessageType, keyof AccountChannels> = {
+  email: 'email',
+  sms: 'sms',
+  'web-push': 'webPush',
+  'mobile-push': 'mobilePush',
+  whatsapp: 'whatsapp',
+};
+
+/** Channel resolution order used when picking a default messageType. */
+export const CHANNEL_PRIORITY: CampaignMessageType[] = ['email', 'sms', 'web-push', 'mobile-push', 'whatsapp'];
+
+/** Returns the first channel active for the account, falling back to 'email' when none are. */
+export function firstActiveChannel(channels: AccountChannels): CampaignMessageType {
+  return CHANNEL_PRIORITY.find((c) => channels[MESSAGE_TYPE_CHANNEL_KEY[c]]) ?? 'email';
+}
 
 export enum CampaignStatus {
   Draft = 0,

@@ -53,6 +53,10 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });
 
+// EVO-1410: the campaign form gates steps by active account channels, so the
+// email channel must be enabled for the wizard to advance past step 0.
+const emailEnabled = [{ accountId: 10, name: 'email_settings', value: '{"isActive":true}', isLoadConfig: false }];
+
 async function renderFormPage(campaignId?: number) {
   return renderWithRouter(
     <QueryClientProvider client={queryClient}>
@@ -66,7 +70,7 @@ async function renderFormPage(campaignId?: number) {
 describe('CampaignFormPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    authenticateStore();
+    authenticateStore({ accountConfigs: emailEnabled });
     mockCampaignQuery = {
       data: undefined,
       isLoading: false,
@@ -122,7 +126,7 @@ describe('CampaignFormPage', () => {
   });
 
   it('passes isSuperAdmin to CampaignForm when effectiveRole is super_admin', async () => {
-    authenticateStore({ effectiveRole: 'super_admin' });
+    authenticateStore({ effectiveRole: 'super_admin', accountConfigs: emailEnabled });
     await renderFormPage();
 
     // Advance to audience step to check if "Run Segment" toggle is visible
@@ -141,7 +145,7 @@ describe('CampaignFormPage', () => {
   });
 
   it('hides Run Segment toggle when user is not super admin', async () => {
-    authenticateStore({ effectiveRole: 'user' });
+    authenticateStore({ effectiveRole: 'user', accountConfigs: emailEnabled });
     await renderFormPage();
 
     const { fireEvent, waitFor } = await import('@testing-library/react');

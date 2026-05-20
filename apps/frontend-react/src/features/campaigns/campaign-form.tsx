@@ -13,8 +13,10 @@ import ScheduleStep from './steps/schedule-step';
 import RecurringStep from './steps/recurring-step';
 import ReviewStep from './steps/review-step';
 import { campaignFormSchema, type CampaignFormValues } from './campaign-schema';
-import { CampaignStatus } from './types';
+import { CampaignStatus, MESSAGE_TYPE_CHANNEL_KEY, firstActiveChannel } from './types';
 import { toast } from 'sonner';
+import { useShallow } from 'zustand/react/shallow';
+import { useAppStore, selectAccountChannels } from '@/stores/app-store';
 
 interface CampaignFormProps {
   defaultValues?: Partial<CampaignFormValues>;
@@ -39,6 +41,7 @@ export default function CampaignForm({
 }: CampaignFormProps) {
   const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
+  const accountChannels = useAppStore(useShallow(selectAccountChannels));
   const isEditing = defaultValues !== undefined;
   const defaultStatus = (defaultValues as any)?.status as number | undefined;
   const isEditingDraft = isEditing && defaultStatus === CampaignStatus.Draft;
@@ -65,7 +68,9 @@ export default function CampaignForm({
       name: '',
       description: '',
       type: 'simple',
-      messageType: 'email',
+      // Default to a channel actually enabled for the account — never a disabled
+      // 'email'. An explicit defaultValues.messageType (edit mode) overrides this.
+      messageType: firstActiveChannel(accountChannels),
       sendToAll: false,
       sendAfterCreate: false,
       runSegment: false,
@@ -147,6 +152,14 @@ export default function CampaignForm({
     if (currentStep === 0) {
       const valid = await form.trigger(['title', 'description', 'type', 'messageType']);
       if (!valid) return;
+      // Defense in depth: the channel picker disables inactive channels, but the
+      // selected messageType (e.g. a default or a previously-saved channel that
+      // was since disabled) must still map to an active account channel.
+      const selectedMessageType = form.getValues('messageType');
+      if (!accountChannels[MESSAGE_TYPE_CHANNEL_KEY[selectedMessageType]]) {
+        toast.error(t('campaigns.channelNoAccess'));
+        return;
+      }
     }
     setCurrentStep((prev) => Math.min(prev + 1, stepsConfig.length - 1));
   };
