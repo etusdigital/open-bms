@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import i18n from '@/lib/i18n';
+import { useAppStore } from '@/stores/app-store';
 import { useContactHistory } from '../use-contact-history';
 import { getEventTime, getEventLabel } from '../contacts-utils';
 import type { HistoryItem } from '../types';
@@ -56,6 +58,10 @@ interface ContactHistoryCardProps {
 
 export const ContactHistoryCard = memo(function ContactHistoryCard({ contactId }: ContactHistoryCardProps) {
   const { t } = useTranslation();
+  const auth = useAppStore((s) => s.auth);
+  const timezone = auth.status === 'authenticated' ? auth.timezone : undefined;
+  const locale = i18n.language || navigator.language;
+  const fmtOpts = useMemo(() => ({ timezone, locale }), [timezone, locale]);
   const [activityType, setActivityType] = useState('all');
   const [channel, setChannel] = useState('all');
   const [datePreset, setDatePreset] = useState('all');
@@ -214,7 +220,7 @@ export const ContactHistoryCard = memo(function ContactHistoryCard({ contactId }
                     )}
                   </div>
                   <p className="mt-1 font-medium">{getEventLabel(item)}</p>
-                  <p className="text-muted-foreground text-xs">{getEventTime(item)}</p>
+                  <p className="text-muted-foreground text-xs">{getEventTime(item, fmtOpts)}</p>
                 </div>
               </div>
             ))}
