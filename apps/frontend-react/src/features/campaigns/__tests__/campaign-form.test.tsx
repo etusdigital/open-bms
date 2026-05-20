@@ -590,7 +590,7 @@ describe('CampaignForm', () => {
       expect(screen.queryByTestId('audience-step')).not.toBeInTheDocument();
     });
 
-    it('disables the Next button when editing a campaign whose channel was since disabled', async () => {
+    it('allows editing a campaign whose channel was since disabled', async () => {
       authenticateStore({
         accountConfigs: [channelConfig('email_settings', false), channelConfig('sms_settings', true)],
       });
@@ -598,10 +598,13 @@ describe('CampaignForm', () => {
         defaultValues: { title: 'Legacy Email Campaign', messageType: 'email' as const },
       });
 
-      expect(screen.getByTestId('next-button')).toBeDisabled();
+      // Edit mode: the campaign keeps its now-disabled channel and stays
+      // editable — gating only blocks creating on an inactive channel.
+      expect(screen.getByTestId('next-button')).toBeEnabled();
       fireEvent.click(screen.getByTestId('next-button'));
-      expect(screen.getByTestId('campaign-title')).toBeInTheDocument();
-      expect(screen.queryByTestId('audience-step')).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByTestId('audience-step')).toBeInTheDocument();
+      });
     });
 
     it('wraps disabled channel cards in a tooltip trigger', async () => {

@@ -376,8 +376,6 @@ export class CampaignsService {
       campaignDto = validationResult.result;
     }
 
-    await this.assertChannelEnabled(campaignDto.messageType, this.cls.get('accountId'));
-
     campaignDto = this.formattedCampaignDate(campaignDto);
     await this.checkDuplicateAudience(campaignDto);
     campaignDto.name = this.cls.get('isInternalAccount') && !isTriggerCampaign ? replaceSpecialChars(campaignDto.name.trim()) : replaceSpecialChars(campaignDto.title.trim());
@@ -388,6 +386,13 @@ export class CampaignsService {
         accountId: this.cls.get('accountId'),
       },
     });
+
+    // Channel gating (EVO-1410): only block when the campaign is being moved to
+    // a *different* channel that is not enabled. Editing other fields of a
+    // campaign already on a (possibly since-disabled) channel stays allowed.
+    if (campaignDto.messageType && campaignDto.messageType !== campaign.messageType) {
+      await this.assertChannelEnabled(campaignDto.messageType, this.cls.get('accountId'));
+    }
     let oldEventType = '';
     let oldTriggerId = 0;
     if (isTriggerCampaign) {

@@ -157,19 +157,20 @@ export default function CampaignForm({
     if (active) form.setValue('messageType', active);
   }, [accountChannels, messageType, isEditing, form]);
 
-  // Step 0 cannot be left unless the selected channel is active for the account.
-  // The picker disables inactive channels and messageType defaults to undefined
-  // when no channel is available — so the nav buttons are simply disabled rather
-  // than surfacing an error.
+  // Channel gating (EVO-1410): creating a campaign requires an active channel,
+  // so step 0's nav buttons are disabled until one is selected. Editing an
+  // existing campaign is always allowed — the picker disables inactive channels
+  // so the user can never switch to one, and a legacy campaign whose channel
+  // was since disabled must stay editable.
   const selectedChannelActive = !!messageType && !!accountChannels[MESSAGE_TYPE_CHANNEL_KEY[messageType]];
-  const blockSettingsStep = currentStep === 0 && !selectedChannelActive;
+  const blockSettingsStep = currentStep === 0 && !isEditing && !selectedChannelActive;
 
   const handleNext = async () => {
     if (currentStep === 0) {
       const valid = await form.trigger(['title', 'description', 'type', 'messageType']);
       if (!valid) return;
-      // Safety net behind the disabled button: never advance with an inactive channel.
-      if (!selectedChannelActive) return;
+      // Safety net behind the disabled button.
+      if (blockSettingsStep) return;
     }
     setCurrentStep((prev) => Math.min(prev + 1, stepsConfig.length - 1));
   };

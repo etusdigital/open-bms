@@ -65,11 +65,43 @@ describe('CampaignsService — channel permission enforcement', () => {
     });
   });
 
-  describe('update', () => {
-    it('rejects updating an email campaign when the email channel is disabled', async () => {
-      const { service } = buildService(inactiveRow());
-      const dto = { title: 'Promo', type: 'simple', messageType: 'email', id: 1 } as CampaignDto;
+  describe('update — channel gating', () => {
+    // update() runs formattedCampaignDate + checkDuplicateAudience + findOneOrFail
+    // before the channel gate; stub those so the test can reach the gate.
+    function buildUpdateService(opts: { channelActive: boolean; persistedMessageType: string }) {
+      const { service, accountConfigsProvider, cls } = buildService({
+        value: JSON.stringify({ isActive: opts.channelActive }),
+      });
+      (service as any).formattedCampaignDate = (dto: CampaignDto) => dto;
+      (service as any).checkDuplicateAudience = jest.fn().mockResolvedValue(undefined);
+      (service as any).campaignRepository = {
+        findOneOrFail: jest.fn().mockResolvedValue({ id: 1, messageType: opts.persistedMessageType, accountId: 10 }),
+      };
+      return { service, accountConfigsProvider, cls };
+    }
+
+    it('rejects when the campaign is moved to a different, disabled channel', async () => {
+      const { service } = buildUpdateService({ channelActive: false, persistedMessageType: 'sms' });
+      const dto = { id: 1, title: 'Promo', type: 'simple', messageType: 'email' } as CampaignDto;
       await expect(service.update(dto)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('does not gate the channel when messageType is unchanged — a legacy campaign on a since-disabled channel stays editable', async () => {
+      const { service } = buildUpdateService({ channelActive: false, persistedMessageType: 'email' });
+      const assertSpy = jest.spyOn(service, 'assertChannelEnabled');
+      const dto = { id: 1, title: 'Promo', type: 'simple', messageType: 'email' } as CampaignDto;
+      // update() continues past the gate and fails later on unmocked deps — the
+      // gate decision is what this test asserts.
+      await service.update(dto).catch(() => undefined);
+      expect(assertSpy).not.toHaveBeenCalled();
+    });
+
+    it('does not gate the channel when the update omits messageType', async () => {
+      const { service } = buildUpdateService({ channelActive: false, persistedMessageType: 'email' });
+      const assertSpy = jest.spyOn(service, 'assertChannelEnabled');
+      const dto = { id: 1, title: 'Promo', type: 'simple' } as CampaignDto;
+      await service.update(dto).catch(() => undefined);
+      expect(assertSpy).not.toHaveBeenCalled();
     });
   });
 });
