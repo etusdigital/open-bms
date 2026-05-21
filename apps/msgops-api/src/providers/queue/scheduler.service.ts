@@ -80,17 +80,47 @@ export class SchedulerService {
     return true;
   }
 
-  // callRunTask MUST throw SchedulerJobNotFoundError when the job is missing.
-  // The legacy `client.runTask` threw gRPC NOT_FOUND in that case, and at
-  // least one caller (automations.service.ts#stopTestAb) depends on the throw
-  // as control-flow to fall back to finishTestabStep. Returning false would
-  // silently strand the test A/B step.
+  // callRunTask MUST throw SchedulerJobNotFoundError when the job cannot be
+  // run via the scheduler — either because it is missing, or because it
+  // exists but has already finished (completed/failed) and is therefore no
+  // longer promotable. The legacy `client.runTask` threw gRPC NOT_FOUND for
+  // the missing case, and at least one caller (automations.service.ts#
+  // stopTestAb) depends on the throw as control-flow to fall back to
+  // finishTestabStep. Callers that want a fresh run (e.g. tags.service.ts#
+  // runSegment) catch this error and enqueue a new immediate job.
+  //
+  // `job.promote()` only works on a delayed job — calling it on a finished
+  // job throws a generic "not in the delayed state" Error that would
+  // otherwise surface as an HTTP 500 (EVO-1428). We check the state up
+  // front, and also guard the promote() call itself against the race where
+  // the job leaves the delayed state between the check and the promote, so
+  // both cases collapse onto the SchedulerJobNotFoundError path.
   async callRunTask(name: string, queue: string): Promise<true> {
     const targetQueue = this.queues[resolveQueueName(queue)];
     const job = (await targetQueue.getJob(name)) ?? (await this.findJobAcrossQueues(name));
     if (!job) throw new SchedulerJobNotFoundError(name);
-    await job.promote();
-    return true;
+
+    const state = await job.getState();
+    if (state === 'delayed') {
+      try {
+        await job.promote();
+        return true;
+      } catch (e) {
+        // Lost the race: a worker picked the job up (or its delay elapsed)
+        // between getState() and promote(), so promote() threw the generic
+        // "not in the delayed state" Error. Re-read the state to decide.
+        if ((await job.getState()) !== 'delayed') throw new SchedulerJobNotFoundError(name);
+        throw e;
+      }
+    }
+    // Already queued to run (waiting/active/prioritized) — the run the
+    // caller is asking for is effectively already happening; promoting
+    // would throw, so treat it as a successful no-op.
+    if (state === 'waiting' || state === 'waiting-children' || state === 'active' || state === 'prioritized') {
+      return true;
+    }
+    // Finished (completed/failed) or unknown — no longer promotable.
+    throw new SchedulerJobNotFoundError(name);
   }
 
   private async findJobAcrossQueues(name: string) {
