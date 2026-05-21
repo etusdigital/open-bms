@@ -9,11 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { DescriptionCell } from '@/components/data-table/description-cell';
 import type { Segment, SegmentStatus } from './types';
 import type { ColumnVisibility } from './use-column-visibility';
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString();
-}
+import { formatDateTime } from '@/lib/datetime';
 
 function formatCount(count?: number): string {
   if (count === undefined || count === null) return '—';
@@ -101,13 +97,13 @@ export function useSegmentsColumns({
         accessorKey: 'updatedAt',
         header: t('segments.columns.lastEdition'),
         enableSorting: true,
-        cell: ({ row }) => formatDate(row.original.updatedAt),
+        cell: ({ row }) => formatDateTime(row.original.updatedAt),
       },
       {
         accessorKey: 'lastRunDate',
         header: t('segments.lastRunDate'),
         enableSorting: true,
-        cell: ({ row }) => formatDate(row.original.lastRunDate),
+        cell: ({ row }) => formatDateTime(row.original.lastRunDate),
       },
       {
         accessorKey: 'lastCount',

@@ -6,11 +6,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Template } from './types';
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString();
-}
+import { formatDateTime } from '@/lib/datetime';
 
 const staticColumns: ColumnDef<Template, unknown>[] = [
   {
@@ -31,7 +27,7 @@ const staticColumns: ColumnDef<Template, unknown>[] = [
     accessorKey: 'updatedAt',
     header: 'templates.updatedAt',
     enableSorting: true,
-    cell: ({ row }) => formatDate(row.original.updatedAt),
+    cell: ({ row }) => formatDateTime(row.original.updatedAt),
   },
 ];
 

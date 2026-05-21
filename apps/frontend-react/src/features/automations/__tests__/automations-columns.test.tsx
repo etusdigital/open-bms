@@ -135,6 +135,12 @@ describe('useAutomationsColumns', () => {
       expect(screen.queryByText('—')).not.toBeInTheDocument();
     });
 
+    it('renders date with a time component (dd/mm/yyyy hh:MM)', async () => {
+      await renderWithRouter(createElement(TableRenderer, { data: [mockAutomation] }));
+      // EVO-1409: grids must show date + time, not date-only
+      expect(screen.getByText(/\d{1,2}:\d{2}/)).toBeInTheDocument();
+    });
+
     it('falls back to createdAt when updatedAt is missing', async () => {
       await renderWithRouter(createElement(TableRenderer, { data: [mockInactiveAutomation] }));
       expect(screen.queryByText('���')).not.toBeInTheDocument();

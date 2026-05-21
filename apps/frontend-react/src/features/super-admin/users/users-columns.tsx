@@ -8,11 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { SuperAdminUser } from './types';
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString();
-}
+import { formatDateTime } from '@/lib/datetime';
 
 interface UseSuperAdminUsersColumnsOptions {
   onDelete: (user: SuperAdminUser) => void;
@@ -87,7 +83,7 @@ export function useSuperAdminUsersColumns({
       {
         accessorKey: 'createdAt',
         header: t('common.createdAt'),
-        cell: ({ row }) => formatDate(row.original.createdAt),
+        cell: ({ row }) => formatDateTime(row.original.createdAt),
       },
       {
         id: 'actions',

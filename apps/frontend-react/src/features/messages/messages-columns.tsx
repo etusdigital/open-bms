@@ -7,11 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MessageStatusBadge } from './components/message-status-badge';
 import type { Message, MessageType, MessageStatus } from './types';
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString();
-}
+import { formatDateTime } from '@/lib/datetime';
 
 function getEditRoute(messageType: MessageType): string {
   switch (messageType) {
@@ -127,7 +123,7 @@ export function useMessagesColumns({
       accessorKey: 'updatedAt',
       header: t('messages.updatedAt'),
       enableSorting: true,
-      cell: ({ row }) => formatDate(row.original.updatedAt),
+      cell: ({ row }) => formatDateTime(row.original.updatedAt),
     });
 
     columns.push({

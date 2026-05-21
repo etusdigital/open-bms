@@ -1,13 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  formatDate,
-  formatDateTz,
-  formatDateTimeTz,
-  getContactName,
-  getStatusInfo,
-  getEventTime,
-  getEventLabel,
-} from '../contacts-utils';
+import { getContactName, getStatusInfo, getEventTime, getEventLabel } from '../contacts-utils';
 import type { Contact, HistoryItem } from '../types';
 
 const baseContact: Contact = {
@@ -15,67 +7,6 @@ const baseContact: Contact = {
   email: 'john@example.com',
   isActive: true,
 };
-
-describe('formatDate', () => {
-  it('returns dash for undefined', () => {
-    expect(formatDate(undefined)).toBe('—');
-  });
-
-  it('formats a valid date string', () => {
-    const result = formatDate('2026-01-15T10:00:00Z');
-    expect(result).toBeTruthy();
-    expect(result).not.toBe('—');
-  });
-});
-
-describe('formatDateTz', () => {
-  it('returns dash for undefined', () => {
-    expect(formatDateTz(undefined)).toBe('—');
-  });
-
-  it('returns dash for invalid date', () => {
-    expect(formatDateTz('not-a-date')).toBe('—');
-  });
-
-  it('formats with explicit timezone and locale', () => {
-    const result = formatDateTz('2026-03-15T12:00:00Z', {
-      timezone: 'America/Sao_Paulo',
-      locale: 'pt-BR',
-    });
-    expect(result).toContain('2026');
-    expect(result).toContain('03');
-    expect(result).toContain('15');
-  });
-
-  it('formats with UTC timezone', () => {
-    const result = formatDateTz('2026-01-01T00:00:00Z', {
-      timezone: 'UTC',
-      locale: 'en-US',
-    });
-    expect(result).toContain('2026');
-    expect(result).toContain('01');
-  });
-});
-
-describe('formatDateTimeTz', () => {
-  it('returns dash for undefined', () => {
-    expect(formatDateTimeTz(undefined)).toBe('—');
-  });
-
-  it('returns dash for invalid date', () => {
-    expect(formatDateTimeTz('invalid')).toBe('—');
-  });
-
-  it('includes time in output', () => {
-    const result = formatDateTimeTz('2026-03-15T14:30:00Z', {
-      timezone: 'UTC',
-      locale: 'en-US',
-    });
-    expect(result).toContain('2026');
-    // Should contain time component
-    expect(result).toMatch(/\d{1,2}:\d{2}/);
-  });
-});
 
 describe('getContactName', () => {
   it('returns full name when both parts exist', () => {

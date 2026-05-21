@@ -12,7 +12,8 @@ import { queryKeys } from '@/lib/query-keys';
 import { extractApiErrorMessage } from '@/lib/api-error';
 import { toast } from 'sonner';
 import i18n from '@/lib/i18n';
-import { formatDate } from '../contacts-utils';
+import { formatDateTime } from '@/lib/datetime';
+import { useAppStore } from '@/stores/app-store';
 import type { CustomFieldValue } from '../types';
 
 interface ContactCustomFieldsCardProps {
@@ -26,8 +27,14 @@ export const ContactCustomFieldsCard = memo(function ContactCustomFieldsCard({
   accountId,
   customFields,
 }: ContactCustomFieldsCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n: i18nHook } = useTranslation();
   const queryClient = useQueryClient();
+  const auth = useAppStore((s) => s.auth);
+  const timezone = auth.status === 'authenticated' ? auth.timezone : undefined;
+  const fmtOpts = useMemo(
+    () => ({ timezone, locale: i18nHook.language || navigator.language }),
+    [timezone, i18nHook.language],
+  );
   const [search, setSearch] = useState('');
   const [editField, setEditField] = useState<CustomFieldValue | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -103,7 +110,7 @@ export const ContactCustomFieldsCard = memo(function ContactCustomFieldsCard({
                       <p className="text-muted-foreground text-xs">{field.title}</p>
                       <p className="truncate">{field.value || '—'}</p>
                       {field.updatedAt && (
-                        <p className="text-muted-foreground text-[10px]">{formatDate(field.updatedAt)}</p>
+                        <p className="text-muted-foreground text-[10px]">{formatDateTime(field.updatedAt, fmtOpts)}</p>
                       )}
                     </div>
                     <Button variant="ghost" size="icon-xs" onClick={() => handleEdit(field)}>

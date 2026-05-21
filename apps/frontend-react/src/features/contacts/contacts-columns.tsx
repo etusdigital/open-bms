@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAppStore } from '@/stores/app-store';
+import { formatDateTime } from '@/lib/datetime';
 import type { Contact } from './types';
-import { formatDateTimeTz, getStatusInfo } from './contacts-utils';
+import { getStatusInfo } from './contacts-utils';
 
 export const selectColumn: ColumnDef<Contact, unknown> = {
   id: 'select',
@@ -145,7 +146,7 @@ export function useContactsColumns({ onDelete, canDelete }: UseContactsColumnsOp
         accessorKey: 'createdAt',
         header: t('contacts.createdAt'),
         enableSorting: true,
-        cell: ({ row }) => <span className="text-xs">{formatDateTimeTz(row.original.createdAt, fmtOpts)}</span>,
+        cell: ({ row }) => <span className="text-xs">{formatDateTime(row.original.createdAt, fmtOpts)}</span>,
       },
       {
         id: 'lastInteraction',
@@ -154,7 +155,7 @@ export function useContactsColumns({ onDelete, canDelete }: UseContactsColumnsOp
         cell: ({ row }) => {
           const dateStr = getLastInteractionDate(row.original);
           return (
-            <span className="text-muted-foreground text-xs">{dateStr ? formatDateTimeTz(dateStr, fmtOpts) : '—'}</span>
+            <span className="text-muted-foreground text-xs">{dateStr ? formatDateTime(dateStr, fmtOpts) : '—'}</span>
           );
         },
       },

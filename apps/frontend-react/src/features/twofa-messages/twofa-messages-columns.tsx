@@ -5,11 +5,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Message } from '@/features/messages/types';
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString();
-}
+import { formatDateTime } from '@/lib/datetime';
 
 interface UseTwoFAMessagesColumnsOptions {
   onDelete: (message: Message) => void;
@@ -38,7 +34,7 @@ export function useTwoFAMessagesColumns({
         accessorKey: 'updatedAt',
         header: t('twofaMessages.updatedAt'),
         enableSorting: true,
-        cell: ({ row }) => formatDate(row.original.updatedAt),
+        cell: ({ row }) => formatDateTime(row.original.updatedAt),
       },
       {
         id: 'actions',

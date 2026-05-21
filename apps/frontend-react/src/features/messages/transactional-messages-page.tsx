@@ -15,6 +15,7 @@ import { useListSearchParams, type ListSearchParams } from '@/hooks/use-list-sea
 import { usePermissions } from '@/hooks/use-permissions';
 import { useMessagesList, useDeleteMessage, useDuplicateMessage } from './use-messages';
 import { TRANSACTIONAL_TYPES, baseMessageType, type Message, type MessageType, type AnyMessageType } from './types';
+import { formatDateTime } from '@/lib/datetime';
 
 const EMPTY_ARRAY: Message[] = [];
 
@@ -26,11 +27,6 @@ const CHANNEL_ICONS: Record<MessageType, typeof Mail> = {
   'mobile-push': Smartphone,
   whatsapp: Phone,
 };
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString();
-}
 
 interface TransactionalMessagesPageProps {
   searchParams: ListSearchParams;
@@ -117,7 +113,7 @@ export default function TransactionalMessagesPage({ searchParams }: Transactiona
         accessorKey: 'updatedAt',
         header: t('messages.updatedAt'),
         enableSorting: true,
-        cell: ({ row }) => formatDate(row.original.updatedAt),
+        cell: ({ row }) => formatDateTime(row.original.updatedAt),
       },
       {
         id: 'actions',

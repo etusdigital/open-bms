@@ -6,12 +6,8 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatDateTime } from '@/lib/datetime';
 import type { Automation } from './types';
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString();
-}
 
 interface UseAutomationsColumnsOptions {
   onDelete: (automation: Automation) => void;
@@ -63,7 +59,7 @@ export function useAutomationsColumns({
         accessorKey: 'updatedAt',
         header: t('automations.updatedAt'),
         enableSorting: true,
-        cell: ({ row }) => formatDate(row.original.updatedAt ?? row.original.createdAt),
+        cell: ({ row }) => formatDateTime(row.original.updatedAt ?? row.original.createdAt),
       },
       {
         id: 'actions',

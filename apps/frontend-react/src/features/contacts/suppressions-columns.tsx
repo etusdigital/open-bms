@@ -6,13 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { SuppressedContact } from './types';
 import type { SuppressionType } from './use-suppressions';
+import { formatDateTime } from '@/lib/datetime';
 
 const columnHelper = createColumnHelper<SuppressedContact>();
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleString();
-}
 
 const selectColumn: ColumnDef<SuppressedContact, unknown> = {
   id: 'select',
@@ -56,7 +52,7 @@ export function useSuppressionsColumns(
         columnHelper.accessor((row) => (type === 'unsubscribed' ? row.unsubscribedAt : row.blockedAt), {
           id: 'date',
           header: t('contacts.suppressionDate'),
-          cell: (info) => <span className="text-muted-foreground text-sm">{formatDate(info.getValue())}</span>,
+          cell: (info) => <span className="text-muted-foreground text-sm">{formatDateTime(info.getValue())}</span>,
         }),
         columnHelper.display({
           id: 'actions',
