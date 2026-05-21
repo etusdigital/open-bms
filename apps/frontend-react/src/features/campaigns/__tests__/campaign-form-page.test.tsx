@@ -172,7 +172,9 @@ describe('CampaignFormPage', () => {
           messageType: 'email',
           sendToAll: true,
           sendAfterCreate: false,
-          scheduleTo: '2026-06-01T15:00:00.000Z',
+          // A campaign scheduled for 15:00 in America/Sao_Paulo is stored as
+          // the UTC instant 18:00Z by the API.
+          scheduleTo: '2026-06-01T18:00:00.000Z',
         },
         isLoading: false,
         error: null,
@@ -191,7 +193,8 @@ describe('CampaignFormPage', () => {
       });
 
       // The datetime-local input renders empty when fed a `Z`/seconds value;
-      // hydration must truncate it to "YYYY-MM-DDTHH:mm".
+      // hydration must reconstruct it as the local "YYYY-MM-DDTHH:mm" wall-clock
+      // (18:00Z → 15:00 in America/Sao_Paulo, the pinned test timezone).
       const input = screen.getByTestId('schedule-datetime') as HTMLInputElement;
       expect(input.value).toBe('2026-06-01T15:00');
     });

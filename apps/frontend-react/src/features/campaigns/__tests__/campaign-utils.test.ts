@@ -40,8 +40,18 @@ describe('isoToDatetimeLocal', () => {
     expect(isoToDatetimeLocal('')).toBe('');
   });
 
-  it('truncates a full ISO string (with Z) to datetime-local format', () => {
-    expect(isoToDatetimeLocal('2026-06-01T15:00:00.000Z')).toBe('2026-06-01T15:00');
+  it('reconstructs a full ISO string (UTC instant) into local datetime-local format', () => {
+    // 18:00 UTC is 15:00 in America/Sao_Paulo (the pinned test timezone).
+    // A verbatim truncate would wrongly yield "2026-06-01T18:00".
+    expect(isoToDatetimeLocal('2026-06-01T18:00:00.000Z')).toBe('2026-06-01T15:00');
+  });
+
+  it('produces a value that maps back to the same instant as the ISO', () => {
+    const iso = '2026-06-01T18:00:00.000Z';
+    const local = isoToDatetimeLocal(iso);
+    expect(local).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    // The naive local string, parsed in the local timezone, is the same instant.
+    expect(new Date(local).getTime()).toBe(new Date(iso).getTime());
   });
 
   it('is idempotent on an already-truncated datetime-local string', () => {
