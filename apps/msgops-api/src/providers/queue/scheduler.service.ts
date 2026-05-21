@@ -92,7 +92,9 @@ export class SchedulerService {
   // `job.promote()` only works on a delayed job — calling it on a finished
   // job throws a generic "not in the delayed state" Error that would
   // otherwise surface as an HTTP 500 (EVO-1428). We check the state up
-  // front so both cases collapse onto the SchedulerJobNotFoundError path.
+  // front, and also guard the promote() call itself against the race where
+  // the job leaves the delayed state between the check and the promote, so
+  // both cases collapse onto the SchedulerJobNotFoundError path.
   async callRunTask(name: string, queue: string): Promise<true> {
     const targetQueue = this.queues[resolveQueueName(queue)];
     const job = (await targetQueue.getJob(name)) ?? (await this.findJobAcrossQueues(name));
@@ -100,8 +102,16 @@ export class SchedulerService {
 
     const state = await job.getState();
     if (state === 'delayed') {
-      await job.promote();
-      return true;
+      try {
+        await job.promote();
+        return true;
+      } catch (e) {
+        // Lost the race: a worker picked the job up (or its delay elapsed)
+        // between getState() and promote(), so promote() threw the generic
+        // "not in the delayed state" Error. Re-read the state to decide.
+        if ((await job.getState()) !== 'delayed') throw new SchedulerJobNotFoundError(name);
+        throw e;
+      }
     }
     // Already queued to run (waiting/active/prioritized) — the run the
     // caller is asking for is effectively already happening; promoting

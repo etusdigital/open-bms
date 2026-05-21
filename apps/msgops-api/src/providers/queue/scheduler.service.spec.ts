@@ -121,12 +121,35 @@ describe('SchedulerService', () => {
       expect(promote).not.toHaveBeenCalled();
     });
 
-    it('returns true without promoting when the job is already queued to run', async () => {
+    it('throws SchedulerJobNotFoundError when the job exists but already failed (EVO-1428)', async () => {
       const promote = jest.fn();
-      usageQueue.getJob.mockResolvedValue({ promote, getState: jest.fn().mockResolvedValue('active') });
+      usageQueue.getJob.mockResolvedValue({ promote, getState: jest.fn().mockResolvedValue('failed') });
+      await expect(service.callRunTask('failed-job', 'bms-scheduler-bms-usage')).rejects.toBeInstanceOf(SchedulerJobNotFoundError);
+      expect(promote).not.toHaveBeenCalled();
+    });
+
+    it.each(['waiting', 'waiting-children', 'active', 'prioritized'])('returns true without promoting when the job is already queued to run (%s)', async (state) => {
+      const promote = jest.fn();
+      usageQueue.getJob.mockResolvedValue({ promote, getState: jest.fn().mockResolvedValue(state) });
       const result = await service.callRunTask('running', 'bms-scheduler-bms-usage');
       expect(result).toBe(true);
       expect(promote).not.toHaveBeenCalled();
+    });
+
+    it('throws SchedulerJobNotFoundError when promote() loses the race and the job left the delayed state (EVO-1428)', async () => {
+      const promote = jest.fn().mockRejectedValue(new Error('Job is not in the delayed state'));
+      const getState = jest.fn().mockResolvedValueOnce('delayed').mockResolvedValueOnce('active');
+      usageQueue.getJob.mockResolvedValue({ promote, getState });
+      await expect(service.callRunTask('raced', 'bms-scheduler-bms-usage')).rejects.toBeInstanceOf(SchedulerJobNotFoundError);
+      expect(promote).toHaveBeenCalled();
+    });
+
+    it('rethrows the original error when promote() fails while the job is still delayed', async () => {
+      const failure = new Error('redis connection lost');
+      const promote = jest.fn().mockRejectedValue(failure);
+      const getState = jest.fn().mockResolvedValue('delayed');
+      usageQueue.getJob.mockResolvedValue({ promote, getState });
+      await expect(service.callRunTask('flaky', 'bms-scheduler-bms-usage')).rejects.toBe(failure);
     });
   });
 });
