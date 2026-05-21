@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from '@tanstack/react-router';
 import { ArrowLeft, Pencil } from 'lucide-react';
@@ -11,7 +11,6 @@ import { ContactEditDialog } from './contact-edit-dialog';
 import type { ContactEditValues } from './contact-schema';
 import { getContactName, getStatusInfo } from './contacts-utils';
 import { formatDateTime } from '@/lib/datetime';
-import i18n from '@/lib/i18n';
 import { ContactTagsCard } from './components/contact-tags-card';
 import { ContactCustomFieldsCard } from './components/contact-custom-fields-card';
 import { ContactChannelsCard } from './components/contact-channels-card';
@@ -23,13 +22,14 @@ interface ContactDetailPageProps {
 }
 
 export function ContactDetailPage({ contactUuid }: ContactDetailPageProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const auth = useAppStore((s) => s.auth);
   const accountId = auth.status === 'authenticated' ? auth.account.id : 0;
-  const fmtOpts = {
-    timezone: auth.status === 'authenticated' ? auth.timezone : undefined,
-    locale: i18n.language || navigator.language,
-  };
+  const timezone = auth.status === 'authenticated' ? auth.timezone : undefined;
+  const fmtOpts = useMemo(
+    () => ({ timezone, locale: i18n.language || navigator.language }),
+    [timezone, i18n.language],
+  );
   const contactQuery = useContact(contactUuid);
   const updateMutation = useUpdateContact(contactUuid);
 

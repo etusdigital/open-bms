@@ -41,6 +41,9 @@ export function formatDateTime(dateStr?: string | null, options?: DateFormatOpti
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    // Force a 24h clock so the AC format `hh:MM` holds even under locales
+    // (e.g. en-US) that would otherwise render a 12h AM/PM time.
+    hourCycle: 'h23',
     timeZone: r.tz,
   });
 }

@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDateTime } from '@/lib/datetime';
-import i18n from '@/lib/i18n';
 import { useAppStore } from '@/stores/app-store';
 import type { Contact } from '../types';
 
@@ -100,12 +99,12 @@ interface ContactChannelsCardProps {
 }
 
 export const ContactChannelsCard = memo(function ContactChannelsCard({ contact }: ContactChannelsCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const auth = useAppStore((s) => s.auth);
   const timezone = auth.status === 'authenticated' ? auth.timezone : undefined;
   const fmtOpts = useMemo(
     () => ({ timezone, locale: i18n.language || navigator.language }),
-    [timezone],
+    [timezone, i18n.language],
   );
   const rows = getChannelRows(contact, t as never);
 

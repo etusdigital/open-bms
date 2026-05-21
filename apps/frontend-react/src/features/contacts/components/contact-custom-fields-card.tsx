@@ -27,13 +27,13 @@ export const ContactCustomFieldsCard = memo(function ContactCustomFieldsCard({
   accountId,
   customFields,
 }: ContactCustomFieldsCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n: i18nHook } = useTranslation();
   const queryClient = useQueryClient();
   const auth = useAppStore((s) => s.auth);
   const timezone = auth.status === 'authenticated' ? auth.timezone : undefined;
   const fmtOpts = useMemo(
-    () => ({ timezone, locale: i18n.language || navigator.language }),
-    [timezone],
+    () => ({ timezone, locale: i18nHook.language || navigator.language }),
+    [timezone, i18nHook.language],
   );
   const [search, setSearch] = useState('');
   const [editField, setEditField] = useState<CustomFieldValue | null>(null);
