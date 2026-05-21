@@ -7,6 +7,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // Pin the test timezone to the production server's (msgops-api runs
+    // TZ=America/Sao_Paulo). Date-handling tests — e.g. scheduled-campaign
+    // hydration (EVO-1413) — must be deterministic and exercise a non-UTC
+    // offset so timezone bugs surface instead of coincidentally passing.
+    env: { TZ: 'America/Sao_Paulo' },
     setupFiles: ['@retention/test-config/vitest-setup', './tests/setup.ts'],
     css: false,
     // v8 coverage instrumentation plus concurrent turbo task execution

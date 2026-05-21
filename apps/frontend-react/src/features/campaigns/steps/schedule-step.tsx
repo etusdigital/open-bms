@@ -156,7 +156,19 @@ export default function ScheduleStep({ form, isCampaignRule = false }: ScheduleS
                   <FormLabel>{t('campaigns.dateSendCampaign')}</FormLabel>
                   <FormControl>
                     {isCampaignRule ? (
-                      <Input type="time" {...field} data-testid="schedule-time" />
+                      // Campaign-rule schedules carry a time-of-day only. If the
+                      // hydrated value is a full "YYYY-MM-DDTHH:mm" string, extract
+                      // the "HH:mm" portion the time input expects (EVO-1413).
+                      <Input
+                        type="time"
+                        {...field}
+                        value={
+                          field.value && field.value.length > 5
+                            ? field.value.slice(11, 16)
+                            : (field.value ?? '')
+                        }
+                        data-testid="schedule-time"
+                      />
                     ) : (
                       <Input type="datetime-local" {...field} data-testid="schedule-datetime" />
                     )}

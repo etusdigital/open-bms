@@ -6,6 +6,7 @@ import { useAppStore, selectIsSuperAdmin } from '@/stores/app-store';
 import CampaignForm from './campaign-form';
 import ProcessCampaign from './process-campaign';
 import { useCampaign, useCreateCampaign, useUpdateCampaign } from './use-campaigns';
+import { isoToDatetimeLocal } from './utils';
 import { CampaignStatus, type Campaign } from './types';
 import type { CampaignFormValues } from './campaign-schema';
 
@@ -99,7 +100,7 @@ export default function CampaignFormPage({ campaignId }: CampaignFormPageProps) 
           sendAfterCreate: campaignQuery.data.sendAfterCreate ?? false,
           runSegment: campaignQuery.data.runSegment ?? false,
           isRateLimit: campaignQuery.data.isRateLimit ?? true,
-          scheduleTo: campaignQuery.data.scheduleTo ?? '',
+          scheduleTo: isoToDatetimeLocal(campaignQuery.data.scheduleTo),
           spreadSending: campaignQuery.data.spreadSending ?? 60,
           steps: campaignQuery.data.steps ?? [],
           campaignMessage: (campaignQuery.data.campaignMessage ?? []).map((item: any) => ({
@@ -109,8 +110,8 @@ export default function CampaignFormPage({ campaignId }: CampaignFormPageProps) 
           labels: extractLabels(campaignQuery.data),
           labelContent: campaignQuery.data.labelContent ?? [],
           recurrenceSettings: campaignQuery.data.recurrenceSettings ?? undefined,
-          testabScheduleTo: campaignQuery.data.testabScheduleTo ?? '',
-          testabScheduleEnd: campaignQuery.data.testabScheduleEnd ?? '',
+          testabScheduleTo: isoToDatetimeLocal(campaignQuery.data.testabScheduleTo),
+          testabScheduleEnd: isoToDatetimeLocal(campaignQuery.data.testabScheduleEnd),
           testabAudiencePercent: campaignQuery.data.testabAudiencePercent ?? 10,
           testabCriteria: campaignQuery.data.testabCriteria ?? 'open',
           testabSentAfterTest: campaignQuery.data.testabSentAfterTest ?? true,
