@@ -9,7 +9,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useContact, useUpdateContact } from './use-contacts';
 import { ContactEditDialog } from './contact-edit-dialog';
 import type { ContactEditValues } from './contact-schema';
-import { formatDate, getContactName, getStatusInfo } from './contacts-utils';
+import { getContactName, getStatusInfo } from './contacts-utils';
+import { formatDateTime } from '@/lib/datetime';
+import i18n from '@/lib/i18n';
 import { ContactTagsCard } from './components/contact-tags-card';
 import { ContactCustomFieldsCard } from './components/contact-custom-fields-card';
 import { ContactChannelsCard } from './components/contact-channels-card';
@@ -24,6 +26,10 @@ export function ContactDetailPage({ contactUuid }: ContactDetailPageProps) {
   const { t } = useTranslation();
   const auth = useAppStore((s) => s.auth);
   const accountId = auth.status === 'authenticated' ? auth.account.id : 0;
+  const fmtOpts = {
+    timezone: auth.status === 'authenticated' ? auth.timezone : undefined,
+    locale: i18n.language || navigator.language,
+  };
   const contactQuery = useContact(contactUuid);
   const updateMutation = useUpdateContact(contactUuid);
 
@@ -140,7 +146,7 @@ export function ContactDetailPage({ contactUuid }: ContactDetailPageProps) {
                 </div>
                 <div className="grid grid-cols-3 gap-1">
                   <dt className="text-muted-foreground">{t('contacts.createdAt')}</dt>
-                  <dd className="col-span-2">{formatDate(contact.createdAt)}</dd>
+                  <dd className="col-span-2">{formatDateTime(contact.createdAt, fmtOpts)}</dd>
                 </div>
               </dl>
             </CardContent>

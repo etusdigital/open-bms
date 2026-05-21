@@ -1,10 +1,12 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Mail, Bell, Smartphone, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { formatDate } from '../contacts-utils';
+import { formatDateTime } from '@/lib/datetime';
+import i18n from '@/lib/i18n';
+import { useAppStore } from '@/stores/app-store';
 import type { Contact } from '../types';
 
 type ChannelStatus = 'deliverable' | 'unsubscribed' | 'bounced' | 'blocked' | 'inactive';
@@ -99,6 +101,12 @@ interface ContactChannelsCardProps {
 
 export const ContactChannelsCard = memo(function ContactChannelsCard({ contact }: ContactChannelsCardProps) {
   const { t } = useTranslation();
+  const auth = useAppStore((s) => s.auth);
+  const timezone = auth.status === 'authenticated' ? auth.timezone : undefined;
+  const fmtOpts = useMemo(
+    () => ({ timezone, locale: i18n.language || navigator.language }),
+    [timezone],
+  );
   const rows = getChannelRows(contact, t as never);
 
   const statusLabels: Record<ChannelStatus, string> = {
@@ -152,9 +160,9 @@ export const ContactChannelsCard = memo(function ContactChannelsCard({ contact }
                     {statusLabels[ch.status]}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-xs">{formatDate(ch.lastSent)}</TableCell>
-                <TableCell className="text-xs">{formatDate(ch.lastOpen)}</TableCell>
-                <TableCell className="text-xs">{formatDate(ch.lastClick)}</TableCell>
+                <TableCell className="text-xs">{formatDateTime(ch.lastSent, fmtOpts)}</TableCell>
+                <TableCell className="text-xs">{formatDateTime(ch.lastOpen, fmtOpts)}</TableCell>
+                <TableCell className="text-xs">{formatDateTime(ch.lastClick, fmtOpts)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

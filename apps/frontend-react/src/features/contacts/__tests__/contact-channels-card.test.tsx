@@ -111,4 +111,14 @@ describe('ContactChannelsCard', () => {
       expect(screen.getByText('WhatsApp')).toBeInTheDocument();
     });
   });
+
+  describe('date columns', () => {
+    it('renders channel dates with a time component (dd/mm/yyyy hh:MM)', async () => {
+      // EVO-1409: detail screens must show date + time, not date-only
+      await renderWithRouter(
+        <ContactChannelsCard contact={{ ...baseContact, lastSent: '2026-04-01T13:45:00Z' }} />,
+      );
+      expect(screen.getByText(/\d{1,2}:\d{2}/)).toBeInTheDocument();
+    });
+  });
 });
