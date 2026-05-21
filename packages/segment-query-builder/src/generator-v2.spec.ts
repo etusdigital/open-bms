@@ -65,4 +65,28 @@ describe('generateSegmentQueryV2', () => {
     expect(out.externalQuerySteps![0].query).toContain('HAVING SUM(total) >= 5');
     expect(out.query).toContain('DROP TABLE table_segment0_200;');
   });
+
+  it('defaults the HAVING operator to >= when conditional_times_value is missing (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'interation',
+            event_type: 'email',
+            event: 'last_click_date',
+            conditional_interation: 'yes',
+            time: '7',
+            message: { id: 99 },
+            custom_times_value: 5,
+            // conditional_times_value intentionally omitted (segment created before the UI captured it)
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV2(tag, dto, { timeZone, siblingAccounts });
+
+    expect(out.externalQuerySteps![0].query).toContain('HAVING SUM(total) >= 5');
+    expect(out.externalQuerySteps![0].query).not.toContain('undefined');
+  });
 });

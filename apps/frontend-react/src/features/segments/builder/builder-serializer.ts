@@ -208,6 +208,16 @@ function serializeStep(step: StepData): VueLegacyStep {
     output.conditional = step.stepConnector;
   }
 
+  // Default the times-comparison operator. The operator <Select> displays
+  // '>=' but only writes conditional_times_value to state when the user
+  // changes it — a step left at the default would serialize without the
+  // operator, producing an invalid `HAVING COUNT(...) undefined N` query
+  // in the segment builder (EVO-1423). Only relevant when a repeated-count
+  // condition is set (custom_times_value > 1).
+  if (Number(output.custom_times_value) > 1 && output.conditional_times_value == null) {
+    output.conditional_times_value = '>=';
+  }
+
   // Post-process interaction steps: convert action keys → DB fields, denormalize period
   if (step.type === 'interation') {
     normalizeInteractionOnSerialize(output);

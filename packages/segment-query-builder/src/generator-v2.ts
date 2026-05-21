@@ -30,6 +30,15 @@ export function generateSegmentQueryV2(tag: TagLike, segmentDto: SegmentDtoLike,
     const tagsCard: any[] = [];
 
     for (const step of steps) {
+      // `conditional_times_value` holds the comparison operator for the
+      // `HAVING COUNT(...)` / `HAVING SUM(...)` clauses below. Segments
+      // created before the UI captured this field omit it entirely, which
+      // used to interpolate a literal `undefined` into the SQL and crash
+      // the ClickHouse query (EVO-1423). Default to `>=` ("happened at
+      // least N times") and whitelist the operator so only known-safe
+      // tokens reach the SQL.
+      const timesOperator = ['>=', '>', '=', '<=', '<'].includes(step.conditional_times_value) ? step.conditional_times_value : '>=';
+
       if (!isConditionalCard) {
         if (step.type === 'conditionalCard') {
           query += ` ${step.value}`;
@@ -72,7 +81,7 @@ export function generateSegmentQueryV2(tag: TagLike, segmentDto: SegmentDtoLike,
                             AND url ${step.page_view_filter} ${valueFilter}`;
             if (step.custom_times_value > 1) {
               queryPageViewCH += ` GROUP BY contact_id
-                                HAVING COUNT(contact_id) ${step.conditional_times_value} ${parseInt(step.custom_times_value, 10)} `;
+                                HAVING COUNT(contact_id) ${timesOperator} ${parseInt(step.custom_times_value, 10)} `;
             }
             query += ` ct.id ${conditionalPageView} (select contact_id from ${subTableNamePageView})`;
             subQueys++;
@@ -120,7 +129,7 @@ export function generateSegmentQueryV2(tag: TagLike, segmentDto: SegmentDtoLike,
                             ${step.event_type == 'email' ? ` AND event_type = 'email' ` : ''}
                             ${step.conditional_interation != 'yes' ? ' AND contact_id IS NOT NULL' : ''}
                             GROUP BY email
-                            HAVING SUM(total) ${step.conditional_times_value} ${parseInt(step.custom_times_value, 10)}`;
+                            HAVING SUM(total) ${timesOperator} ${parseInt(step.custom_times_value, 10)}`;
 
             externalQuerySteps.push({
               tableName: subTableName,
@@ -217,7 +226,7 @@ export function generateSegmentQueryV2(tag: TagLike, segmentDto: SegmentDtoLike,
           }
           if (step.custom_times_value) {
             queryCustomEvent += ` GROUP BY contact_id
-                            HAVING COUNT(contact_id) ${step.conditional_times_value} ${parseInt(step.custom_times_value, 10)} `;
+                            HAVING COUNT(contact_id) ${timesOperator} ${parseInt(step.custom_times_value, 10)} `;
           }
 
           query += ` ct.id ${step.conditional_event_type} (select contact_id from ${subTableNameCustomEvent})`;
@@ -242,7 +251,7 @@ export function generateSegmentQueryV2(tag: TagLike, segmentDto: SegmentDtoLike,
             query += ` AND status = '${step.event}'`;
           }
           query += ` GROUP BY contact_id
-                        HAVING COUNT(contact_id) ${step.conditional_times_value} ${parseInt(step.custom_times_value, 10)} `;
+                        HAVING COUNT(contact_id) ${timesOperator} ${parseInt(step.custom_times_value, 10)} `;
           query += `)`;
           break;
       }
