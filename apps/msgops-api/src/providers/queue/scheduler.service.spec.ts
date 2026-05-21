@@ -106,12 +106,27 @@ describe('SchedulerService', () => {
       await expect(service.callRunTask('gone', 'bms-scheduler-bms-usage')).rejects.toBeInstanceOf(SchedulerJobNotFoundError);
     });
 
-    it('promotes the job and returns true when found', async () => {
+    it('promotes the job and returns true when found in delayed state', async () => {
       const promote = jest.fn().mockResolvedValue(undefined);
-      usageQueue.getJob.mockResolvedValue({ promote });
+      usageQueue.getJob.mockResolvedValue({ promote, getState: jest.fn().mockResolvedValue('delayed') });
       const result = await service.callRunTask('here', 'bms-scheduler-bms-usage');
       expect(promote).toHaveBeenCalled();
       expect(result).toBe(true);
+    });
+
+    it('throws SchedulerJobNotFoundError when the job exists but already finished (EVO-1428)', async () => {
+      const promote = jest.fn();
+      usageQueue.getJob.mockResolvedValue({ promote, getState: jest.fn().mockResolvedValue('completed') });
+      await expect(service.callRunTask('done', 'bms-scheduler-bms-usage')).rejects.toBeInstanceOf(SchedulerJobNotFoundError);
+      expect(promote).not.toHaveBeenCalled();
+    });
+
+    it('returns true without promoting when the job is already queued to run', async () => {
+      const promote = jest.fn();
+      usageQueue.getJob.mockResolvedValue({ promote, getState: jest.fn().mockResolvedValue('active') });
+      const result = await service.callRunTask('running', 'bms-scheduler-bms-usage');
+      expect(result).toBe(true);
+      expect(promote).not.toHaveBeenCalled();
     });
   });
 });
