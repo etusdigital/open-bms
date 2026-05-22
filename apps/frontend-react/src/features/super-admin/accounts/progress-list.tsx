@@ -1,20 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Progress } from '@/components/ui/progress';
 import type { ImportProgressEntry, ImportStatus } from './import-gateway';
-
-// Kept in sync with the worker pipeline (apps/enterprise-import pipeline.ts).
-// Maps the progress entity key → i18n key under superAdmin.accounts.import.entities.
-const ENTITY_I18N: Record<string, string> = {
-  tags: 'tags',
-  'custom-fields': 'customFields',
-  labels: 'labels',
-  'email-templates': 'emailTemplates',
-  contacts: 'contacts',
-  'custom-events': 'customEvents',
-  automations: 'automations',
-  campaigns: 'campaigns',
-  messages: 'messages',
-};
+import { ENTITY_I18N } from './import-progress';
 
 function pct(entry: ImportProgressEntry): number {
   if (!entry.total || entry.total === 0) return 0;

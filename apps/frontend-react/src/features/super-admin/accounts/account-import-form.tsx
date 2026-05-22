@@ -11,11 +11,13 @@ import { useAccountImport } from './use-account-import';
 import { accountImportSchema, type AccountImportFormValues } from './account-import-schema';
 import { AccountNameCombobox } from './account-name-combobox';
 import { ImportStatusView } from './import-status-view';
+import { useActiveImportStore } from './active-import-store';
 
 export function AccountImportForm() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const importMutation = useAccountImport();
+  const setActiveImport = useActiveImportStore((s) => s.setActiveImport);
   // Inline progress: after starting the job we show ImportStatusView here
   // instead of navigating away. The /import-enterprise/$jobId route is kept for
   // deep-link back-compat, but the form flow no longer leaves the page.
@@ -35,6 +37,7 @@ export function AccountImportForm() {
       });
       toast.success(t('superAdmin.accounts.import.startedToast'));
       setJobId(newJobId);
+      setActiveImport(newJobId); // drives the global progress toast across navigation
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? t('superAdmin.accounts.import.startErrorToast'));
     }

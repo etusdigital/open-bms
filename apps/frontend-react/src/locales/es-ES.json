@@ -2170,7 +2170,15 @@
           "customEvents": "Eventos personalizados",
           "automations": "Automatizaciones",
           "campaigns": "Campañas",
-          "messages": "Mensajes"
+          "messages": "Mensajes",
+          "contactTags": "Contactos × Etiquetas",
+          "contactCustomFields": "Contactos × Campos personalizados"
+        },
+        "toast": {
+          "running": "Importando del Enterprise",
+          "completed": "Importación completada",
+          "failed": "La importación falló",
+          "view": "Ver"
         }
       }
     },

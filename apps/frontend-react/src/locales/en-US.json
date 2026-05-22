@@ -2174,7 +2174,15 @@
           "customEvents": "Custom events",
           "automations": "Automations",
           "campaigns": "Campaigns",
-          "messages": "Messages"
+          "messages": "Messages",
+          "contactTags": "Contacts × Tags",
+          "contactCustomFields": "Contacts × Custom fields"
+        },
+        "toast": {
+          "running": "Importing from Enterprise",
+          "completed": "Import completed",
+          "failed": "Import failed",
+          "view": "View"
         }
       }
     },
