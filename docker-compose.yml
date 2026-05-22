@@ -234,6 +234,14 @@ services:
       CLICKHOUSE_PASSWORD: ''
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: '1'
       CLICKHOUSE_SKIP_USER_SETUP: '1'
+      # Consumed by the 02-events-rabbitmq.sh init script to wire the
+      # RabbitMQ-engine table. The script reads RABBITMQ_USER/RABBITMQ_PASSWORD;
+      # map them from this compose's RABBITMQ_DEFAULT_* names so ClickHouse uses
+      # the same credentials as every other service. Without these the script
+      # falls back to guest/guest and the analytics pipeline never authenticates.
+      RABBITMQ_HOST_PORT: rabbitmq:5672
+      RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
     ulimits:
       nofile:
         soft: 262144
