@@ -80,6 +80,12 @@ describe('SchedulerService', () => {
       await expect(service.create(11, new Date(), baseUrl as unknown as string, 'bms-scheduler-segment')).rejects.toThrow(/missing baseUrl/);
       expect(segmentQueue.add).not.toHaveBeenCalled();
     });
+
+    it('throws on a baseUrl built from an undefined env var without enqueuing a doomed job (EVO-1433)', async () => {
+      // e.g. `${process.env.BRIUS_HOSTURL}/automations/finish-testab` when BRIUS_HOSTURL is unset
+      await expect(service.create(11, new Date(), 'undefined/automations/finish-testab', 'bms-scheduler-segment')).rejects.toThrow(/invalid dispatch URL/);
+      expect(segmentQueue.add).not.toHaveBeenCalled();
+    });
   });
 
   describe('delete', () => {

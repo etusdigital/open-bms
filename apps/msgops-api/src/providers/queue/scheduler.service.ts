@@ -60,8 +60,20 @@ export class SchedulerService {
     const jobName = `${queue}:${idSegment}:${crypto.randomBytes(6).toString('hex')}`;
     const delayMs = Math.max(0, new Date(scheduleTo).getTime() - Date.now());
 
+    const url = `${baseUrl}/${id}`;
+    // Validate the fully-assembled dispatch URL. The `!baseUrl` guard above
+    // misses the case where a caller interpolates an undefined env var into
+    // baseUrl (e.g. `${process.env.BRIUS_HOSTURL}/...` → "undefined/..."): a
+    // truthy string that still produces an unfetchable URL. Catching it here
+    // covers every call site, not just the bare-baseUrl one (EVO-1433).
+    try {
+      new URL(url);
+    } catch {
+      throw new Error(`SchedulerService.create: invalid dispatch URL "${url}" for queue "${queue}" — check the endpoint env var.`);
+    }
+
     const payload: SchedulerJobPayload = {
-      url: `${baseUrl}/${id}`,
+      url,
       body,
       taskQueue: queue,
     };
