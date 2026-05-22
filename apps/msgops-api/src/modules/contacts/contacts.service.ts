@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PostgresErrorCode } from 'src/shared.interfaces';
 import { ContactEntity } from './../../entities/contact.entity';
-import { Repository, In, UpdateQueryBuilder, SelectQueryBuilder } from 'typeorm';
+import { Repository, In, UpdateQueryBuilder, SelectQueryBuilder, EntityManager } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RedisService } from '../../providers/redis.provider';
 import { ContactDto } from './contacts.dto';
@@ -18,6 +18,7 @@ import { SuppressionEntity } from 'src/entities/suppression.entity';
 import { ClsService } from 'nestjs-cls';
 import { ContactDeviceEntity } from 'src/entities/contact-device.entity';
 import { CustomEventService } from '../custom-events/custom-events.service';
+import { replaceSpecialChars } from '../../utils/utils.service';
 import dayjs from 'dayjs';
 import { AccountEntity } from 'src/entities/account.entity';
 import { SuppressedsPageDto } from './dto/suppressedsPage.dto';
@@ -673,6 +674,12 @@ export class ContactsService {
   }
 
   async findByProperty(options: { email?: string; id?: number; uuid?: string; isCompleted?: boolean }): Promise<ContactEntity> {
+    // Without an identifier the `where` would collapse to just `{ accountId }`
+    // and `.getOne()` would return an arbitrary contact of the account — which
+    // could make create() silently update the wrong contact. Require one.
+    if (!options.email && !options.id && !options.uuid) {
+      return null;
+    }
     try {
       const contact = await this.contactRepository
         .createQueryBuilder('contacts')
@@ -695,15 +702,160 @@ export class ContactsService {
     }
   }
 
+  // Resolves tag names to TagEntity rows, scoped to the account. Tag names are
+  // stored inconsistently — manual tags are lowercased by TagEntity
+  // @BeforeInsert, but segment tags keep their original casing (createSegment
+  // re-applies the raw name via update(), which skips @BeforeInsert). So the
+  // lookup must be case-insensitive on both sides. Throws NotFoundException if
+  // any name has no matching tag — never creates tags implicitly.
+  private async resolveTagsByName(names: string[], accountId: number, manager?: EntityManager): Promise<TagEntity[]> {
+    const normalized = (names ?? []).map((n) => n?.trim().toLowerCase()).filter((n): n is string => !!n);
+    if (!normalized.length) return [];
+
+    const uniqueNames = [...new Set(normalized)];
+
+    const repo = (manager ?? this.contactTagRepository.manager).getRepository(TagEntity);
+    const tags = await repo
+      .createQueryBuilder('tag')
+      .where('tag.account_id = :accountId', { accountId })
+      .andWhere('LOWER(tag.name) IN (:...names)', { names: uniqueNames })
+      .getMany();
+
+    const foundNames = new Set(tags.map((t) => t.name.toLowerCase()));
+    const missing = uniqueNames.filter((n) => !foundNames.has(n));
+    if (missing.length) {
+      throw new NotFoundException(`Tag(s) not found: ${missing.join(', ')}`);
+    }
+    return tags;
+  }
+
+  // Idempotently links a contact to the given tags within the transaction.
+  // Concurrency: two requests for the same (contact, tag) would both pass an
+  // in-memory existence check and double-insert. The migration
+  // 1779950000000-add-contacts-tags-unique installs UNIQUE
+  // (account_id, contact_id, tag_id); we rely on ON CONFLICT DO NOTHING and
+  // trust RETURNING to surface only the rows that actually landed — that set
+  // drives the publish, so a losing racer doesn't fire a duplicate event.
+  private async attachTags(manager: EntityManager, accountId: number, contactId: number, tags: TagEntity[]): Promise<Array<{ contactId: number; tagId: number }>> {
+    if (!tags.length) return [];
+    const tagIds = tags.map((t) => t.id);
+    const ctRepo = manager.getRepository(ContactTagEntity);
+
+    const inserted = await ctRepo
+      .createQueryBuilder()
+      .insert()
+      .into(ContactTagEntity)
+      .values(tagIds.map((tagId) => ({ contactId, tagId, accountId })))
+      .orIgnore()
+      .returning(['tagId'])
+      .execute();
+
+    const insertedTagIds = (inserted.raw as Array<{ tag_id: number }>).map((r) => r.tag_id);
+    return insertedTagIds.map((tagId) => ({ contactId, tagId }));
+  }
+
+  // Two body shapes flow in: `tagName: "x"` (Pet's integrations) and
+  // `tagNames: [...]` (frontend). Merge to a single de-duplicated list so the
+  // rest of the pipeline only has to think about one input.
+  private mergeTagInputs(tagName?: string, tagNames?: string[]): string[] {
+    const all = [...(tagNames ?? []), ...(tagName ? [tagName] : [])].map((n) => n?.trim()).filter((n): n is string => !!n);
+    return [...new Set(all)];
+  }
+
+  // Resolves the inbound customFields map to existing custom_fields rows for
+  // the account. Names are matched against custom_fields.name after applying
+  // the same normalization @BeforeInsert uses on the column
+  // (`replaceSpecialChars(title).toUpperCase()`), so callers can pass either
+  // `utm_medium` or `UTM_MEDIUM` and hit the same row. Missing names -> 404
+  // (no implicit creation, same policy as resolveTagsByName).
+  //
+  // contact_id is bound later in attachCustomFields — the resolve step runs
+  // before the contact save so a 404 aborts the transaction without writing.
+  private async resolveCustomFieldDefs(
+    customFields: Record<string, string> | undefined,
+    accountId: number,
+    manager: EntityManager,
+  ): Promise<Array<{ customFieldId: number; value: string }>> {
+    if (!customFields || !Object.keys(customFields).length) return [];
+
+    // Map normalized canonical name -> first (raw, value) pair the caller sent.
+    // Duplicate keys with conflicting casing collapse to the first occurrence.
+    const byCanonical = new Map<string, { rawKey: string; value: string }>();
+    for (const [rawKey, value] of Object.entries(customFields)) {
+      const canonical = (replaceSpecialChars(rawKey) ?? '').toUpperCase();
+      if (!canonical) continue;
+      if (!byCanonical.has(canonical)) byCanonical.set(canonical, { rawKey, value: value ?? '' });
+    }
+    if (!byCanonical.size) return [];
+
+    const canonicalNames = [...byCanonical.keys()];
+    const repo = manager.getRepository(CustomFieldsEntity);
+    const defs = await repo.createQueryBuilder('cf').where('cf.account_id = :accountId', { accountId }).andWhere('cf.name IN (:...names)', { names: canonicalNames }).getMany();
+
+    const defByName = new Map(defs.map((d) => [d.name, d]));
+    const missing = canonicalNames
+      .filter((c) => !defByName.has(c))
+      // Report the raw (caller-provided) name so the error is grep-able.
+      .map((c) => byCanonical.get(c)!.rawKey);
+    if (missing.length) {
+      throw new NotFoundException(`Custom field(s) not found: ${missing.join(', ')}`);
+    }
+
+    return canonicalNames.map((c) => ({
+      customFieldId: defByName.get(c)!.id,
+      value: String(byCanonical.get(c)!.value),
+    }));
+  }
+
+  // Upserts the (contact, custom_field) rows. The unique constraint on
+  // (account_id, contact_id, custom_field_id) — installed by
+  // 1778883600000-add-contacts-custom-fields-unique — backs the ON CONFLICT.
+  private async attachCustomFields(manager: EntityManager, accountId: number, contactId: number, defs: Array<{ customFieldId: number; value: string }>): Promise<void> {
+    if (!defs.length) return;
+    const rows = defs.map((d) => ({ accountId, contactId, customFieldId: d.customFieldId, value: d.value }));
+    await manager.getRepository(ContactCustomFieldEntity).createQueryBuilder().insert().values(rows).orUpdate(['value'], ['account_id', 'contact_id', 'custom_field_id']).execute();
+  }
+
   async update(contactDto: ContactDto, contactRepository: ContactEntity): Promise<ContactDto> {
+    const accountId = this.cls.get<number>('accountId');
+    if (!accountId) {
+      throw new HttpException('Account context is required.', HttpStatus.BAD_REQUEST);
+    }
+    // Build a plain patch from the dto so the write doesn't trip on non-column
+    // fields (fullName/maskedEmail set in @AfterLoad, tagNames, tagName,
+    // customFields) or eager relations (contactTag, customFields,
+    // contactAutomation, contactDevices) that ContactEntity carries when loaded.
+    //
+    // tagNames/customFields are *additive-only* on update: extra inputs link
+    // new tags and upsert new/changed custom-field values; omitting them
+    // leaves existing rows untouched. Clearing is out of scope for this
+    // endpoint.
+    const { id: _id, tagNames, tagName, customFields, ...patch } = contactDto;
+    const mergedTagNames = this.mergeTagInputs(tagName, tagNames);
     try {
-      // Build a plain patch from the dto so TypeORM's UPDATE doesn't trip on
-      // non-column fields (fullName/maskedEmail set in @AfterLoad) or eager
-      // relations (contactTag, customFields, contactAutomation, contactDevices)
-      // that ContactEntity carries when loaded.
-      const { id: _id, ...patch } = contactDto;
-      await this.contactRepository.update(contactRepository.id, patch as Partial<ContactEntity>);
-      return { ...contactRepository, ...patch };
+      const newPairs = await this.contactRepository.manager.transaction(async (manager) => {
+        // Resolve first — a 404 here aborts the transaction before any write.
+        const tags = await this.resolveTagsByName(mergedTagNames, accountId, manager);
+        const cfDefs = await this.resolveCustomFieldDefs(customFields, accountId, manager);
+        const contactRepo = manager.getRepository(ContactEntity);
+        // Round-trip through create()+save() so @BeforeUpdate (setUserDetails)
+        // fires and keeps email_provider/hashed_email in sync when email
+        // changes. repository.update() bypasses entity listeners.
+        const merged = contactRepo.create({ ...contactRepository, ...patch });
+        await contactRepo.save(merged);
+        await this.attachCustomFields(manager, accountId, contactRepository.id, cfDefs);
+        return this.attachTags(manager, accountId, contactRepository.id, tags);
+      });
+
+      // Publish after commit, only for new pairs — never for a reverted write.
+      if (newPairs.length) {
+        await this.publishTagEvents('add', accountId, await this.buildTagEventPairs(accountId, newPairs));
+      }
+      // Cast: ContactEntity.customFields is the eager relation array, while
+      // ContactDto.customFields is the inbound map — same name, different types.
+      // The merged object never carries the relation through, so the cast is
+      // safe.
+      return { ...contactRepository, ...patch } as unknown as ContactDto;
     } catch (e) {
       if (e?.code === PostgresErrorCode.UniqueViolation) {
         throw new ConflictException('A contact with that email already exists in this account');
@@ -751,18 +903,44 @@ export class ContactsService {
   }
 
   async create(contactDto: ContactDto): Promise<ContactDto> {
-    const accountId = this.cls.get('accountId');
+    const accountId = this.cls.get<number>('accountId');
     if (!accountId) {
       throw new HttpException('Account context is required.', HttpStatus.BAD_REQUEST);
     }
+    // tagName/tagNames/customFields are not columns on contacts — keep them
+    // out of the contact write and route them through dedicated resolvers.
+    const { tagNames, tagName, customFields, ...contactFields } = contactDto;
+    const mergedTagNames = this.mergeTagInputs(tagName, tagNames);
     try {
-      // create() instantiates a ContactEntity so the @BeforeInsert
-      // listener (setUserDetails) fires — a plain object literal would
-      // bypass it, leaving email_provider/hashed_email unset.
-      const contact = this.contactRepository.create({ ...contactDto, accountId });
-      return this.contactRepository.save(contact);
+      const { saved, newPairs } = await this.contactRepository.manager.transaction(async (manager) => {
+        // Resolve tags and custom-field defs first — a 404 in either aborts
+        // the transaction before the contact write lands.
+        const tags = await this.resolveTagsByName(mergedTagNames, accountId, manager);
+        const cfDefs = await this.resolveCustomFieldDefs(customFields, accountId, manager);
+
+        const contactRepo = manager.getRepository(ContactEntity);
+        // create() instantiates a ContactEntity so the @BeforeInsert
+        // listener (setUserDetails) fires — a plain object literal would
+        // bypass it, leaving email_provider/hashed_email unset.
+        const contact = contactRepo.create({ ...contactFields, accountId });
+        const saved = await contactRepo.save(contact);
+
+        await this.attachCustomFields(manager, accountId, saved.id, cfDefs);
+        const newPairs = await this.attachTags(manager, accountId, saved.id, tags);
+        return { saved, newPairs };
+      });
+
+      // Publish after commit, only for new pairs — never for a reverted write.
+      if (newPairs.length) {
+        await this.publishTagEvents('add', accountId, await this.buildTagEventPairs(accountId, newPairs));
+      }
+      // Cast: see update() — ContactEntity.customFields is the eager relation.
+      return saved as unknown as ContactDto;
     } catch (e) {
-      console.error(e);
+      // Preserve typed errors (e.g. NotFoundException from tag resolution)
+      // instead of masking them as a generic 500.
+      if (e instanceof HttpException) throw e;
+      this.logger.error('Failed to create contact', e?.stack || e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

@@ -32,6 +32,11 @@ import { IpAddress } from 'src/decorators/ip_address.decorator';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CronRoute } from '../authz/cron-route.decorator';
 import { ClsService } from 'nestjs-cls';
+import { JoiPipe } from 'nestjs-joi';
+
+// Stateless — built once and reused to validate the create() body explicitly,
+// since the global JoiPipe can't resolve a schema for the union @Body() type.
+const contactDtoPipe = new JoiPipe(ContactDto);
 
 @Controller('contacts')
 @ApiBearerAuth()
@@ -204,12 +209,38 @@ export class ContactsController {
   @ApiOperation({ summary: 'Create or edit a new contact' })
   @RequirePermission('audience:contacts_view')
   @Post('/')
-  async create(@Body() data: ContactDto | PubSubMessage): Promise<ContactDto> {
-    const contactDto = 'subscription' in (data as PubSubMessage) ? this.formatterUtils.parseBatch(data as PubSubMessage) : (data as ContactDto);
+  async create(@Body() data: ContactDto | PubSubMessage | { contact: ContactDto; tagName?: string; tagNames?: string[] }): Promise<ContactDto> {
+    const unwrapped = 'subscription' in (data as PubSubMessage) ? this.formatterUtils.parseBatch(data as PubSubMessage) : data;
 
-    const contact = await this.contactsService.findByProperty({ email: contactDto.email });
+    // The endpoint accepts two body shapes:
+    //   (a) flat ContactDto    — { email, ..., tagNames?: [...] }
+    //   (b) wrapped envelope   — { contact: {...}, tagName?: "x" }
+    // Pet's external integrations use (b) with a singular `tagName`; the
+    // frontend already calls (a). Merge any envelope-level tag fields into
+    // the inner contact so a single DTO schema covers both.
+    const rawDto: ContactDto =
+      unwrapped && typeof unwrapped === 'object' && 'contact' in unwrapped && unwrapped.contact && typeof unwrapped.contact === 'object'
+        ? ({
+            ...((unwrapped as any).contact ?? {}),
+            tagName: (unwrapped as any).tagName ?? (unwrapped as any).contact?.tagName,
+            tagNames: (unwrapped as any).tagNames ?? (unwrapped as any).contact?.tagNames,
+          } as ContactDto)
+        : (unwrapped as ContactDto);
+
+    // @Body() is a union type, so the global JoiPipe can't resolve a single
+    // schema and skips validation — a malformed payload would otherwise reach
+    // the service raw and surface as a 500. Validate explicitly: type errors
+    // -> 400, unknown keys are stripped via @JoiSchemaOptions({ stripUnknown })
+    // on ContactDto, leaving an emailless object that the create-path guard
+    // below rejects with 400.
+    const contactDto = contactDtoPipe.transform(rawDto, { type: 'body' }) as ContactDto;
+
+    const contact = contactDto.email ? await this.contactsService.findByProperty({ email: contactDto.email }) : null;
     if (contact) {
       return await this.contactsService.update(contactDto, contact);
+    }
+    if (!contactDto.email) {
+      throw new BadRequestException('email is required to create a contact');
     }
     return await this.contactsService.create(contactDto);
   }
