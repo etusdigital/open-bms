@@ -15,9 +15,9 @@ import { CustomEventModule } from '../custom-events/custom-events.module';
 import { SuppressionEntity } from 'src/entities/suppression.entity';
 import { AccountEntity } from 'src/entities/account.entity';
 import { ContactAutomationEntity } from 'src/entities/contact-automation.entity';
-import { EventsLogEntity } from 'src/entities/events-log.entity';
 import { AuditEntity } from 'src/entities/audit.entity';
 import { AuditService } from 'src/utils/audits/audit.service';
+import { ClickhouseProvider } from '../../providers/clickhouse.provider';
 
 @Module({
   imports: [
@@ -32,11 +32,10 @@ import { AuditService } from 'src/utils/audits/audit.service';
       ContactCustomFieldEntity,
       ContactDeviceEntity,
       ContactAutomationEntity,
-      EventsLogEntity,
       AuditEntity,
     ]),
   ],
-  providers: [ContactsService, FormatterUtils, CustomFieldsService, UtilsService, AuditService],
+  providers: [ContactsService, FormatterUtils, CustomFieldsService, UtilsService, AuditService, ClickhouseProvider],
   exports: [ContactsService],
   controllers: [ContactsController],
 })

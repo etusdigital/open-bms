@@ -22,8 +22,8 @@ import dayjs from 'dayjs';
 import { AccountEntity } from 'src/entities/account.entity';
 import { SuppressedsPageDto } from './dto/suppressedsPage.dto';
 import { ContactAutomationEntity } from 'src/entities/contact-automation.entity';
-import { EventsLogEntity } from 'src/entities/events-log.entity';
 import { AuditService } from './../../utils/audits/audit.service';
+import { ClickhouseProvider } from '../../providers/clickhouse.provider';
 import { maskEmail } from '../../utils/masking/email-masker';
 import { EventPublisherService } from '../../providers/messaging/event-publisher.service';
 import { EXCHANGES } from '@bms/messaging';
@@ -40,8 +40,6 @@ export class ContactsService {
     private readonly contactRepository: Repository<ContactEntity>,
     @InjectRepository(ContactAutomationEntity)
     private readonly contactAutomationRepository: Repository<ContactAutomationEntity>,
-    @InjectRepository(EventsLogEntity)
-    private readonly eventLogRepository: Repository<EventsLogEntity>,
     @InjectRepository(ContactTagEntity)
     private readonly contactTagRepository: Repository<ContactTagEntity>,
     @InjectRepository(ContactCustomFieldEntity)
@@ -59,6 +57,7 @@ export class ContactsService {
     private readonly auditService: AuditService,
     private readonly cls: ClsService,
     private readonly eventPublisher: EventPublisherService,
+    private readonly clickhouseProvider: ClickhouseProvider,
   ) {}
 
   // TODO(perf): N contacts × M tags becomes N×M serial publishes. Fine for the
@@ -1449,91 +1448,11 @@ export class ContactsService {
         automations = await contactsAutomationsQuery.getRawMany();
       }
 
-      const shouldFetchEvents = !params.activities?.length || params.activities.includes('message') || params.activities.includes('custom_event');
+      const activities = ContactsService.toArray(params.activities);
+      const shouldFetchEvents = !activities.length || activities.includes('message') || activities.includes('custom_event');
 
       if (shouldFetchEvents) {
-        const eventsQuery = this.eventLogRepository
-          .createQueryBuilder('el')
-          .select([
-            'el.*',
-            `CASE 
-              WHEN el.message_type = 'custom_events' THEN ce.name 
-              ELSE m.title 
-            END as message_title`,
-            `CASE 
-              WHEN el.message_type = 'custom_events' THEN ce.properties 
-              ELSE NULL 
-            END as event_properties`,
-            `CASE 
-              WHEN el.message_type = 'custom_events' THEN 'custom_event' 
-              ELSE 'message'
-            END as type`,
-            `CASE 
-              WHEN el.message_type IS NULL AND m.type IS NOT NULL THEN m.type
-              ELSE el.message_type
-            END as message_type`,
-          ])
-          .leftJoin('messages', 'm', 'el.message_id = m.id AND (el.message_type != :customEvents OR el.message_type is null)', { customEvents: 'custom_events' })
-          .leftJoin('custom_events', 'ce', 'el.event_id = ce.id AND el.message_type = :customEvents', { customEvents: 'custom_events' })
-          .where('el.account_id = :accountId', { accountId: this.cls.get('accountId') })
-          .andWhere('el.contact_id = :contactId', { contactId: id })
-          .orderBy('el.time', 'DESC')
-          .limit(params.itemsPerPage)
-          .offset((params.page - 1) * params.itemsPerPage);
-
-        if (params.startDate && params.endDate) {
-          eventsQuery.andWhere('el.time BETWEEN :startDate AND :endDate', {
-            startDate: params.startDate,
-            endDate: params.endDate,
-          });
-        }
-
-        if (params.activities?.length) {
-          const activityConditions = [];
-
-          if (params.activities.includes('custom_event')) {
-            activityConditions.push("el.message_type = 'custom_events'");
-          }
-
-          if (params.activities.includes('message')) {
-            activityConditions.push("el.message_type != 'custom_events'");
-          }
-
-          if (activityConditions.length) {
-            eventsQuery.andWhere(`(${activityConditions.join(' OR ')})`);
-          }
-        }
-
-        if (params.channels?.length) {
-          eventsQuery.andWhere('el.message_type IN (:...channels)', {
-            channels: params.channels.map((channel) => {
-              switch (channel) {
-                case 'email':
-                  return 'email';
-                case 'wpp':
-                  return 'whatsapp';
-                case 'web-push':
-                  return 'web-push';
-                case 'mobile-push':
-                  return 'mobile-push';
-                case 'sms':
-                  return 'sms';
-                default:
-                  return channel;
-              }
-            }),
-          });
-        }
-
-        try {
-          events = await eventsQuery.getRawMany();
-        } catch (e) {
-          // events_logs lives in ClickHouse (events_logs_v2), not Postgres. Until the
-          // cross-DB hydration is wired up, degrade to automations-only instead of 500ing
-          // the contact edit page.
-          this.logger.warn(`Contact event history unavailable: ${e?.message ?? e}`);
-          events = [];
-        }
+        events = await this.fetchContactEventsFromClickhouse(id, params, activities);
       }
 
       const combinedData = [...automations, ...events];
@@ -1549,6 +1468,130 @@ export class ContactsService {
       console.error(e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  /** Normalize a query-string param that may arrive as a single string or an array. */
+  private static toArray(value: string | string[] | undefined): string[] {
+    if (!value) return [];
+    return Array.isArray(value) ? value : [value];
+  }
+
+  /**
+   * ClickhHouse stores `DateTime64(3, 'UTC')` and the JSON driver renders it as
+   * `YYYY-MM-DD HH:MM:SS.sss` with no offset. `new Date()` on the frontend would
+   * read that as local time, so normalize it to an ISO-8601 UTC string here.
+   */
+  private static chTimeToIso(value: unknown): string | null {
+    if (!value) return null;
+    const s = String(value);
+    const withT = s.includes('T') ? s : s.replace(' ', 'T');
+    const withZ = /[Zz]$|[+-]\d\d:?\d\d$/.test(withT) ? withT : `${withT}Z`;
+    const date = new Date(withZ);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
+  /**
+   * Fetches message / custom_event history for a contact from the ClickHouse
+   * `events_logs_v2` table (the events do NOT live in Postgres — see EVO-1427).
+   *
+   * ClickHouse cannot join the Postgres `messages` / `custom_events` tables, so
+   * titles and properties are hydrated in a second Postgres round-trip. Any
+   * failure propagates to the caller's catch block: a missing data source must
+   * surface as an error, not be masked as an empty history.
+   */
+  private async fetchContactEventsFromClickhouse(contactId: number, params: ContactsPageDto, activities: string[]): Promise<any[]> {
+    const accountId = Number(this.cls.get('accountId'));
+    const safeContactId = Number(contactId);
+    const itemsPerPage = Number(params.itemsPerPage) || 10;
+    const page = Number(params.page) || 1;
+    const offset = (page - 1) * itemsPerPage;
+
+    const escape = (v: string) => v.replace(/'/g, "''");
+    const where: string[] = [`account_id = ${accountId}`, `contact_id = ${safeContactId}`];
+
+    if (params.startDate && params.endDate) {
+      const startDate = dayjs(params.startDate).format('YYYY-MM-DD');
+      const endDate = dayjs(params.endDate).format('YYYY-MM-DD');
+      // `time_date` is part of the table's ORDER BY key — filtering on it lets
+      // ClickHouse prune partitions instead of scanning the full account history.
+      where.push(`time_date BETWEEN '${escape(startDate)}' AND '${escape(endDate)}'`);
+    }
+
+    if (activities.length) {
+      const activityConditions: string[] = [];
+      if (activities.includes('custom_event')) {
+        activityConditions.push("message_type = 'custom_events'");
+      }
+      if (activities.includes('message')) {
+        activityConditions.push("message_type != 'custom_events'");
+      }
+      if (activityConditions.length) {
+        where.push(`(${activityConditions.join(' OR ')})`);
+      }
+    }
+
+    const channels = ContactsService.toArray(params.channels);
+    if (channels.length) {
+      const mapped = channels.map((channel) => {
+        switch (channel) {
+          case 'wpp':
+            return 'whatsapp';
+          default:
+            return channel;
+        }
+      });
+      where.push(`message_type IN (${mapped.map((c) => `'${escape(c)}'`).join(', ')})`);
+    }
+
+    const sql = `
+      SELECT *
+      FROM events_logs_v2
+      WHERE ${where.join(' AND ')}
+      ORDER BY time DESC
+      LIMIT ${itemsPerPage} OFFSET ${offset}
+    `;
+
+    const rows = await this.clickhouseProvider.runQuery(sql);
+    if (!rows.length) {
+      return [];
+    }
+
+    // Hydrate message titles / custom-event names from Postgres (cross-DB join).
+    const messageIds = [...new Set(rows.filter((r) => r.message_type !== 'custom_events' && Number(r.message_id) > 0).map((r) => Number(r.message_id)))];
+    const eventIds = [...new Set(rows.filter((r) => r.message_type === 'custom_events' && Number(r.event_id) > 0).map((r) => Number(r.event_id)))];
+
+    const messagesById = new Map<number, { title: string; type: string }>();
+    if (messageIds.length) {
+      const messageRows = await this.contactRepository.manager.query('SELECT id, title, type FROM messages WHERE id = ANY($1)', [messageIds]);
+      for (const m of messageRows) {
+        messagesById.set(Number(m.id), { title: m.title, type: m.type });
+      }
+    }
+
+    const customEventsById = new Map<number, { name: string; properties: any }>();
+    if (eventIds.length) {
+      const eventRows = await this.contactRepository.manager.query('SELECT id, name, properties FROM custom_events WHERE id = ANY($1)', [eventIds]);
+      for (const ce of eventRows) {
+        customEventsById.set(Number(ce.id), { name: ce.name, properties: ce.properties });
+      }
+    }
+
+    return rows.map((row) => {
+      const isCustomEvent = row.message_type === 'custom_events';
+      const message = isCustomEvent ? undefined : messagesById.get(Number(row.message_id));
+      const customEvent = isCustomEvent ? customEventsById.get(Number(row.event_id)) : undefined;
+
+      return {
+        ...row,
+        time: ContactsService.chTimeToIso(row.time) ?? row.time,
+        message_title: isCustomEvent ? (customEvent?.name ?? null) : (message?.title ?? null),
+        event_properties: isCustomEvent ? (customEvent?.properties ?? null) : null,
+        type: isCustomEvent ? 'custom_event' : 'message',
+        // ClickHouse defaults `message_type` to '' (the old Postgres column was
+        // nullable); when blank, fall back to the message's own type.
+        message_type: !row.message_type && message?.type ? message.type : row.message_type,
+      };
+    });
   }
 
   /**
