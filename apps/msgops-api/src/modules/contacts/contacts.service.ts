@@ -1423,51 +1423,72 @@ export class ContactsService {
 
   async findContactHistory(id: number, params: ContactsPageDto): Promise<PaginationDto<any>> {
     try {
-      let automations = [];
-      let events = [];
+      const itemsPerPage = Number(params.itemsPerPage) || 10;
+      const page = Number(params.page) || 1;
+      // Automations (Postgres) and events (ClickHouse) are two independently
+      // paginated sources merged into one timeline. To assemble a correct page of
+      // the *merged* list we fetch enough rows from each to cover everything up to
+      // the requested page, merge, sort by recency, then slice the page out.
+      const fetchLimit = page * itemsPerPage;
 
-      const shouldFetchAutomations = !params.activities?.length || params.activities.includes('automation');
-
-      if (shouldFetchAutomations) {
-        const contactsAutomationsQuery = this.contactAutomationRepository
-          .createQueryBuilder('ca')
-          .select(['ca.*', "'automation' as type"])
-          .where('ca.account_id = :accountId', { accountId: this.cls.get('accountId') })
-          .andWhere('ca.contact_id = :contactId', { contactId: id })
-          .orderBy('ca.created_at', 'DESC')
-          .limit(params.itemsPerPage)
-          .offset((params.page - 1) * params.itemsPerPage);
-
-        if (params.startDate && params.endDate) {
-          contactsAutomationsQuery.andWhere('ca.created_at BETWEEN :startDate AND :endDate', {
-            startDate: params.startDate,
-            endDate: params.endDate,
-          });
-        }
-
-        automations = await contactsAutomationsQuery.getRawMany();
-      }
+      let automations: any[] = [];
+      let automationsTotal = 0;
+      let events: any[] = [];
+      let eventsTotal = 0;
 
       const activities = ContactsService.toArray(params.activities);
+      const shouldFetchAutomations = !activities.length || activities.includes('automation');
       const shouldFetchEvents = !activities.length || activities.includes('message') || activities.includes('custom_event');
 
-      if (shouldFetchEvents) {
-        events = await this.fetchContactEventsFromClickhouse(id, params, activities);
+      if (shouldFetchAutomations) {
+        const buildAutomationsQuery = () => {
+          const qb = this.contactAutomationRepository
+            .createQueryBuilder('ca')
+            .where('ca.account_id = :accountId', { accountId: this.cls.get('accountId') })
+            .andWhere('ca.contact_id = :contactId', { contactId: id });
+
+          if (params.startDate && params.endDate) {
+            qb.andWhere('ca.created_at BETWEEN :startDate AND :endDate', {
+              startDate: params.startDate,
+              endDate: params.endDate,
+            });
+          }
+          return qb;
+        };
+
+        automationsTotal = await buildAutomationsQuery().getCount();
+        automations = await buildAutomationsQuery().select(['ca.*', "'automation' as type"]).orderBy('ca.created_at', 'DESC').limit(fetchLimit).getRawMany();
       }
 
-      const combinedData = [...automations, ...events];
-      const total = combinedData.length;
+      if (shouldFetchEvents) {
+        const eventsResult = await this.fetchContactEventsFromClickhouse(id, params, activities, fetchLimit);
+        events = eventsResult.events;
+        eventsTotal = eventsResult.total;
+      }
+
+      // Merge both sources into a single timeline ordered by recency. Automation
+      // rows carry `created_at`; ClickHouse event rows carry `time`.
+      const combinedData = [...automations, ...events]
+        .sort((a, b) => ContactsService.historyTimestamp(b) - ContactsService.historyTimestamp(a))
+        .slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
       return new PaginationDto<any>({
         results: combinedData,
-        total,
-        page: params.page,
-        itemsPerPage: params.itemsPerPage,
+        total: automationsTotal + eventsTotal,
+        page,
+        itemsPerPage,
       });
     } catch (e) {
       console.error(e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  /** Sortable epoch-ms for a history row, regardless of which source it came from. */
+  private static historyTimestamp(item: any): number {
+    const raw = item?.time ?? item?.created_at;
+    const ts = raw ? new Date(raw).getTime() : NaN;
+    return Number.isNaN(ts) ? 0 : ts;
   }
 
   /** Normalize a query-string param that may arrive as a single string or an array. */
@@ -1498,23 +1519,28 @@ export class ContactsService {
    * titles and properties are hydrated in a second Postgres round-trip. Any
    * failure propagates to the caller's catch block: a missing data source must
    * surface as an error, not be masked as an empty history.
+   *
+   * Returns the most recent `limit` rows plus the overall match count, so the
+   * caller can paginate the merged automations + events timeline correctly.
    */
-  private async fetchContactEventsFromClickhouse(contactId: number, params: ContactsPageDto, activities: string[]): Promise<any[]> {
+  private async fetchContactEventsFromClickhouse(contactId: number, params: ContactsPageDto, activities: string[], limit: number): Promise<{ events: any[]; total: number }> {
     const accountId = Number(this.cls.get('accountId'));
     const safeContactId = Number(contactId);
-    const itemsPerPage = Number(params.itemsPerPage) || 10;
-    const page = Number(params.page) || 1;
-    const offset = (page - 1) * itemsPerPage;
+    const safeLimit = Number(limit) || 10;
 
-    const escape = (v: string) => v.replace(/'/g, "''");
+    // ClickHouse string literals treat backslash as an escape character, so both
+    // backslashes and single quotes must be neutralized.
+    const escape = (v: string) => v.replace(/\\/g, '\\\\').replace(/'/g, "''");
     const where: string[] = [`account_id = ${accountId}`, `contact_id = ${safeContactId}`];
 
     if (params.startDate && params.endDate) {
-      const startDate = dayjs(params.startDate).format('YYYY-MM-DD');
-      const endDate = dayjs(params.endDate).format('YYYY-MM-DD');
-      // `time_date` is part of the table's ORDER BY key — filtering on it lets
-      // ClickHouse prune partitions instead of scanning the full account history.
-      where.push(`time_date BETWEEN '${escape(startDate)}' AND '${escape(endDate)}'`);
+      const start = dayjs(params.startDate);
+      const end = dayjs(params.endDate);
+      // Bound `time_date` (part of the table's ORDER BY key) so ClickHouse prunes
+      // partitions, and `time` so the window matches the timestamp-precision
+      // filter used by the automations branch in findContactHistory().
+      where.push(`time_date BETWEEN '${escape(start.format('YYYY-MM-DD'))}' AND '${escape(end.format('YYYY-MM-DD'))}'`);
+      where.push(`time BETWEEN '${escape(start.format('YYYY-MM-DD HH:mm:ss'))}' AND '${escape(end.format('YYYY-MM-DD HH:mm:ss'))}'`);
     }
 
     if (activities.length) {
@@ -1543,17 +1569,26 @@ export class ContactsService {
       where.push(`message_type IN (${mapped.map((c) => `'${escape(c)}'`).join(', ')})`);
     }
 
-    const sql = `
-      SELECT *
-      FROM events_logs_v2
-      WHERE ${where.join(' AND ')}
-      ORDER BY time DESC
-      LIMIT ${itemsPerPage} OFFSET ${offset}
-    `;
+    const whereSql = where.join(' AND ');
+    // Project only the columns the history endpoint needs — avoids leaking
+    // internal/PII columns (`email`, `ip`, `uuid`, `user_agent`, `properties`…).
+    const columns = 'time, message_type, event, message_id, event_id, contact_id, automation_id, campaign_id';
 
-    const rows = await this.clickhouseProvider.runQuery(sql);
+    const countRows = await this.clickhouseProvider.runQuery(`SELECT count() AS total FROM events_logs_v2 WHERE ${whereSql}`);
+    const total = Number(countRows[0]?.total) || 0;
+    if (!total) {
+      return { events: [], total: 0 };
+    }
+
+    const rows = await this.clickhouseProvider.runQuery(`
+      SELECT ${columns}
+      FROM events_logs_v2
+      WHERE ${whereSql}
+      ORDER BY time DESC
+      LIMIT ${safeLimit}
+    `);
     if (!rows.length) {
-      return [];
+      return { events: [], total };
     }
 
     // Hydrate message titles / custom-event names from Postgres (cross-DB join).
@@ -1576,7 +1611,7 @@ export class ContactsService {
       }
     }
 
-    return rows.map((row) => {
+    const events = rows.map((row) => {
       const isCustomEvent = row.message_type === 'custom_events';
       const message = isCustomEvent ? undefined : messagesById.get(Number(row.message_id));
       const customEvent = isCustomEvent ? customEventsById.get(Number(row.event_id)) : undefined;
@@ -1592,6 +1627,8 @@ export class ContactsService {
         message_type: !row.message_type && message?.type ? message.type : row.message_type,
       };
     });
+
+    return { events, total };
   }
 
   /**

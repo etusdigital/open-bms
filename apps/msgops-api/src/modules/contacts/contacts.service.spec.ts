@@ -83,35 +83,54 @@ describe('ContactsService', () => {
 
     function buildService(
       overrides: {
+        // ClickHouse event rows returned by the data query; the count query is
+        // derived from this list automatically (count() => rows.length).
+        rows?: any[];
+        // Raw automation rows returned by the Postgres query builder.
+        automations?: any[];
         runQuery?: jest.Mock;
         managerQuery?: jest.Mock;
       } = {},
     ) {
-      const clickhouseProvider = { runQuery: overrides.runQuery ?? jest.fn().mockResolvedValue([]) };
+      const rows = overrides.rows ?? [];
+      const runQuery = overrides.runQuery ?? jest.fn((sql: string) => Promise.resolve(/count\(\)/.test(sql) ? [{ total: rows.length }] : rows));
+      const clickhouseProvider = { runQuery };
       const contactRepository = {
         manager: { query: overrides.managerQuery ?? jest.fn().mockResolvedValue([]) },
       };
+      // Chainable query-builder stub for the Postgres automations branch.
+      const automationsQb: any = {};
+      for (const m of ['where', 'andWhere', 'select', 'orderBy', 'limit']) {
+        automationsQb[m] = jest.fn().mockReturnValue(automationsQb);
+      }
+      automationsQb.getCount = jest.fn().mockResolvedValue((overrides.automations ?? []).length);
+      automationsQb.getRawMany = jest.fn().mockResolvedValue(overrides.automations ?? []);
+      const contactAutomationRepository = { createQueryBuilder: jest.fn().mockReturnValue(automationsQb) };
       const cls = { get: jest.fn().mockReturnValue(accountId) };
       const service = Object.create(ContactsService.prototype) as ContactsService;
       (service as any).clickhouseProvider = clickhouseProvider;
       (service as any).contactRepository = contactRepository;
+      (service as any).contactAutomationRepository = contactAutomationRepository;
       (service as any).cls = cls;
       (service as any).logger = { warn: jest.fn(), error: jest.fn() };
-      return { service, clickhouseProvider, contactRepository };
+      return { service, clickhouseProvider, contactRepository, runQuery };
     }
 
     const baseParams = { page: 1, itemsPerPage: 10 } as any;
 
     it('reads message events from ClickHouse and hydrates the title from Postgres', async () => {
-      const runQuery = jest.fn().mockResolvedValue([{ message_type: 'email', message_id: 5, event_id: 0, event: 'open', time: '2026-05-22 14:42:50.539', contact_id: contactId }]);
       const managerQuery = jest.fn().mockResolvedValue([{ id: 5, title: 'Welcome', type: 'email' }]);
-      const { service } = buildService({ runQuery, managerQuery });
+      const { service, runQuery } = buildService({
+        rows: [{ message_type: 'email', message_id: 5, event_id: 0, event: 'open', time: '2026-05-22 14:42:50.539', contact_id: contactId }],
+        managerQuery,
+      });
 
       const result = await service.findContactHistory(contactId, { ...baseParams, activities: ['message'] });
 
       expect(runQuery).toHaveBeenCalledWith(expect.stringContaining('events_logs_v2'));
       expect(managerQuery).toHaveBeenCalledWith(expect.stringContaining('FROM messages'), [[5]]);
       expect(result.results).toHaveLength(1);
+      expect(result.totalItems).toBe(1);
       expect(result.results[0]).toMatchObject({
         type: 'message',
         message_title: 'Welcome',
@@ -121,11 +140,11 @@ describe('ContactsService', () => {
     });
 
     it('hydrates custom_event name and properties from Postgres', async () => {
-      const runQuery = jest
-        .fn()
-        .mockResolvedValue([{ message_type: 'custom_events', message_id: 0, event_id: 9, event: 'signup', time: '2026-05-22 10:00:00.000', contact_id: contactId }]);
       const managerQuery = jest.fn().mockResolvedValue([{ id: 9, name: 'Signup', properties: { plan: 'pro' } }]);
-      const { service } = buildService({ runQuery, managerQuery });
+      const { service } = buildService({
+        rows: [{ message_type: 'custom_events', message_id: 0, event_id: 9, event: 'signup', time: '2026-05-22 10:00:00.000', contact_id: contactId }],
+        managerQuery,
+      });
 
       const result = await service.findContactHistory(contactId, { ...baseParams, activities: ['custom_event'] });
 
@@ -138,9 +157,11 @@ describe('ContactsService', () => {
     });
 
     it('falls back to the message type when ClickHouse message_type is blank', async () => {
-      const runQuery = jest.fn().mockResolvedValue([{ message_type: '', message_id: 5, event_id: 0, event: 'sent', time: '2026-05-22 09:00:00.000', contact_id: contactId }]);
       const managerQuery = jest.fn().mockResolvedValue([{ id: 5, title: 'Promo', type: 'sms' }]);
-      const { service } = buildService({ runQuery, managerQuery });
+      const { service } = buildService({
+        rows: [{ message_type: '', message_id: 5, event_id: 0, event: 'sent', time: '2026-05-22 09:00:00.000', contact_id: contactId }],
+        managerQuery,
+      });
 
       const result = await service.findContactHistory(contactId, { ...baseParams, activities: ['message'] });
 
@@ -148,8 +169,7 @@ describe('ContactsService', () => {
     });
 
     it('applies the channel filter in the ClickHouse query (mapping wpp → whatsapp)', async () => {
-      const runQuery = jest.fn().mockResolvedValue([]);
-      const { service } = buildService({ runQuery });
+      const { service, runQuery } = buildService();
 
       await service.findContactHistory(contactId, { ...baseParams, activities: ['message'], channels: ['email', 'wpp'] });
 
@@ -157,12 +177,47 @@ describe('ContactsService', () => {
     });
 
     it('applies the activity-type filter in the ClickHouse query', async () => {
-      const runQuery = jest.fn().mockResolvedValue([]);
-      const { service } = buildService({ runQuery });
+      const { service, runQuery } = buildService();
 
       await service.findContactHistory(contactId, { ...baseParams, activities: ['custom_event'] });
 
       expect(runQuery).toHaveBeenCalledWith(expect.stringContaining("message_type = 'custom_events'"));
+    });
+
+    it('reports the overall match count and caps a page at itemsPerPage', async () => {
+      // 25 events match; page 1 of 10 must return 10 rows but total = 25.
+      const rows = Array.from({ length: 25 }, (_, i) => ({
+        message_type: 'email',
+        message_id: 0,
+        event_id: 0,
+        event: 'open',
+        time: `2026-05-22 10:00:${String(i).padStart(2, '0')}.000`,
+        contact_id: contactId,
+      }));
+      const { service } = buildService({ rows });
+
+      const result = await service.findContactHistory(contactId, { page: 1, itemsPerPage: 10, activities: ['message'] } as any);
+
+      expect(result.totalItems).toBe(25);
+      expect(result.results).toHaveLength(10);
+      // Newest first.
+      expect(result.results[0].time > result.results[9].time).toBe(true);
+    });
+
+    it('interleaves automations and events into a single timeline ordered by recency', async () => {
+      const { service } = buildService({
+        automations: [{ type: 'automation', created_at: '2026-05-22T12:00:00.000Z', automation_id: 1 }],
+        rows: [
+          { message_type: 'email', message_id: 0, event_id: 0, event: 'open', time: '2026-05-22 14:00:00.000', contact_id: contactId },
+          { message_type: 'email', message_id: 0, event_id: 0, event: 'sent', time: '2026-05-22 09:00:00.000', contact_id: contactId },
+        ],
+      });
+
+      const result = await service.findContactHistory(contactId, { page: 1, itemsPerPage: 10 } as any);
+
+      expect(result.totalItems).toBe(3);
+      expect(result.results.map((r: any) => r.type)).toEqual(['message', 'automation', 'message']);
+      expect(result.results[1]).toMatchObject({ type: 'automation', automation_id: 1 });
     });
 
     it('propagates a ClickHouse failure instead of masking it as an empty history', async () => {
