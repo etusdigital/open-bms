@@ -10,10 +10,11 @@ class FakeRepo {
   constructor(
     private cols: string[],
     private pk = 'id',
+    private dbNames: Record<string, string> = {},
   ) {}
   get metadata() {
     return {
-      columns: this.cols.map((propertyName) => ({ propertyName, databaseName: propertyName })),
+      columns: this.cols.map((propertyName) => ({ propertyName, databaseName: this.dbNames[propertyName] ?? propertyName })),
       primaryColumns: [{ propertyName: this.pk }],
       tableName: 'tags',
     };
@@ -127,6 +128,20 @@ describe('BaseImporter', () => {
     const bySrc = new Map(rec.map((r) => [r.src, r.nid]));
     expect(bySrc.get(500)).toBe(repo.rows.find((r) => r.name === 'b').id);
     expect(bySrc.get(400)).toBe(repo.rows.find((r) => r.name === 'a').id);
+  });
+
+  it('maps snake_case source keys (databaseName) onto camelCase columns', async () => {
+    // The /contacts list serializes raw snake_case; ensure those land in their
+    // columns instead of being dropped (the firstName/lastName regression).
+    const repo = new FakeRepo(['id', 'accountId', 'name', 'firstName'], 'id', { accountId: 'account_id', firstName: 'first_name' });
+    const imp = new TestImporter();
+    imp.pages = [{ results: [{ id: 1, account_id: 7, name: 'x', first_name: 'Ana' }], page: 1 }];
+
+    await imp.run(makeCtx(repo, 'account'));
+
+    expect(repo.rows).toHaveLength(1);
+    expect(repo.rows[0].firstName).toBe('Ana'); // snake_case first_name -> firstName
+    expect(repo.rows[0].accountId).toBe(99); // still forced to the ctx account
   });
 
   it('is idempotent: reprocessing the same page does not duplicate', async () => {

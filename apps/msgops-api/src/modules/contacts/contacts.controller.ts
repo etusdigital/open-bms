@@ -165,12 +165,16 @@ export class ContactsController {
     return this.contactsService.updateContactsEvents();
   }
 
+  // `:id` accepts a numeric id OR a uuid; findOneByIdentifier detects which.
+  // Calling findOneById directly treated a uuid as an integer id -> Postgres
+  // "invalid input syntax for type integer" -> 500 when the frontend opened a
+  // contact by uuid (e.g. imported contacts).
   @ApiOperation({ summary: 'Get a contact by ID or UUID' })
   @UseInterceptors(ClassSerializerInterceptor)
   @RequirePermission('audience:contacts_view')
   @Get('/:id')
-  async findOneById(@Param('id') id: number): Promise<ContactEntity> {
-    return this.contactsService.findOneById(id);
+  async findOneById(@Param('id') id: string): Promise<ContactEntity> {
+    return this.contactsService.findOneByIdentifier(String(id));
   }
 
   @ApiOperation({ summary: 'Get a contact history' })
