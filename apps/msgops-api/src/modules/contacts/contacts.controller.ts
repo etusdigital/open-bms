@@ -57,6 +57,17 @@ export class ContactsController {
     return await this.contactsService.findAllPaginated(params, false, currentUser, userAgent, ipAddress);
   }
 
+  // Two-segment path on purpose: a single-segment `/contacts/<x>` collides with
+  // `/contacts/:id` on older deployments (500 instead of 404), which would make
+  // the import worker fail the whole job instead of gracefully skipping when the
+  // endpoint is absent. See EnterpriseSession.listContactCustomFields.
+  @ApiOperation({ summary: 'Paginated contact custom-field values (bulk feed for Enterprise import)' })
+  @RequirePermission('audience:contacts_view')
+  @Get('/custom-fields/values')
+  async findCustomFieldValues(@Query() params: ContactsPageDto): Promise<any> {
+    return this.contactsService.findCustomFieldValuesPaginated(params);
+  }
+
   @ApiOperation({ summary: 'Get all suppressed contacts' })
   @UseInterceptors(ClassSerializerInterceptor)
   @RequirePermission('audience:contacts_view')

@@ -76,6 +76,8 @@ import { IdMapperService } from '../src/id-mapper.service';
 import { TagsImporter } from '../src/importers/tags.importer';
 import { ContactTagsImporter } from '../src/importers/contact-tags.importer';
 import { ContactTagEntity } from '../src/entities/contact-tag.entity';
+import { ContactCustomFieldsImporter } from '../src/importers/contact-custom-fields.importer';
+import { ContactCustomFieldEntity } from '../src/entities/contact-custom-field.entity';
 import { ImportContext } from '../src/importers/importer.interface';
 
 import { EnterpriseImportJobEntity } from '../src/entities/enterprise-import-job.entity';
@@ -136,7 +138,7 @@ d('enterprise-import integration (testcontainers + Enterprise mock)', () => {
     });
     await ds.initialize();
     // Create only the tables under test, from the real metadata.
-    for (const e of [EnterpriseImportJobEntity, EnterpriseIdMappingEntity, AccountEntity, TagEntity, ContactTagEntity]) {
+    for (const e of [EnterpriseImportJobEntity, EnterpriseIdMappingEntity, AccountEntity, TagEntity, ContactTagEntity, ContactCustomFieldEntity]) {
       await createTableFromMetadata(ds, e);
     }
 
@@ -156,6 +158,18 @@ d('enterprise-import integration (testcontainers + Enterprise mock)', () => {
         const results = page === 1 ? all : [];
         res.writeHead(200, { 'content-type': 'application/json' });
         return res.end(JSON.stringify({ results, page, totalItems: all.length }));
+      }
+      if (url.pathname === '/contacts/custom-fields/values') {
+        // Bulk join feed: rows in SOURCE ids. Field 999 is unmapped on purpose.
+        const all = [
+          { contactId: 10, customFieldId: 100, value: 'Acme', time: null, number: null },
+          { contactId: 10, customFieldId: 200, value: '42', time: null, number: 42 },
+          { contactId: 20, customFieldId: 100, value: 'Globex', time: null, number: null },
+          { contactId: 20, customFieldId: 999, value: 'dropped', time: null, number: null },
+        ];
+        const results = page === 1 ? all : [];
+        res.writeHead(200, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ results, page }));
       }
       if (url.pathname === '/contacts') {
         // Mirrors findAllPaginated: each contact carries `tags`, an object
@@ -182,6 +196,7 @@ d('enterprise-import integration (testcontainers + Enterprise mock)', () => {
     mode = 'ok';
     await ds.getRepository(TagEntity).clear();
     await ds.query('DELETE FROM contacts_tags');
+    await ds.query('DELETE FROM contacts_custom_fields');
     await ds.query('DELETE FROM enterprise_id_mappings');
     await ds.query('DELETE FROM enterprise_import_jobs');
   });
@@ -278,6 +293,51 @@ d('enterprise-import integration (testcontainers + Enterprise mock)', () => {
       { contactId: 10, tagId: 101, accountId: 1 },
       { contactId: 10, tagId: 102, accountId: 1 },
       { contactId: 20, tagId: 101, accountId: 1 },
+    ]);
+  });
+
+  it('8. contact_custom_fields account-scope: remaps ids and persists value/number against the real DDL', async () => {
+    const c = ctx('account', 'j8');
+    await c.idMapper.record('j8', 'contacts', 10, 1001);
+    await c.idMapper.record('j8', 'contacts', 20, 1002);
+    await c.idMapper.record('j8', 'custom-fields', 100, 700);
+    await c.idMapper.record('j8', 'custom-fields', 200, 800);
+
+    await new ContactCustomFieldsImporter().run(c);
+
+    const rows = (await ds.getRepository(ContactCustomFieldEntity).find()).sort((a, b) => a.contactId - b.contactId || a.customFieldId - b.customFieldId);
+    expect(
+      rows.map((r) => ({ contactId: r.contactId, customFieldId: r.customFieldId, value: r.value, number: r.number === null ? null : Number(r.number), accountId: r.accountId })),
+    ).toEqual([
+      { contactId: 1001, customFieldId: 700, value: 'Acme', number: null, accountId: 1 },
+      { contactId: 1001, customFieldId: 800, value: '42', number: 42, accountId: 1 },
+      { contactId: 1002, customFieldId: 700, value: 'Globex', number: null, accountId: 1 },
+    ]);
+  });
+
+  it('9. contact_custom_fields is idempotent: re-running does not duplicate', async () => {
+    const seed = async () => {
+      const c = ctx('account', 'j9');
+      await c.idMapper.record('j9', 'contacts', 10, 1001);
+      await c.idMapper.record('j9', 'contacts', 20, 1002);
+      await c.idMapper.record('j9', 'custom-fields', 100, 700);
+      await c.idMapper.record('j9', 'custom-fields', 200, 800);
+      return c;
+    };
+    await new ContactCustomFieldsImporter().run(await seed());
+    await new ContactCustomFieldsImporter().run(await seed());
+    expect(await ds.getRepository(ContactCustomFieldEntity).count()).toBe(3);
+  });
+
+  it('10. contact_custom_fields instance-scope: preserves source ids', async () => {
+    await new ContactCustomFieldsImporter().run(ctx('instance', 'j10'));
+    const rows = (await ds.getRepository(ContactCustomFieldEntity).find()).sort((a, b) => a.contactId - b.contactId || a.customFieldId - b.customFieldId);
+    // field 999 is preserved too (instance-scope does not remap/skip).
+    expect(rows.map((r) => ({ contactId: r.contactId, customFieldId: r.customFieldId }))).toEqual([
+      { contactId: 10, customFieldId: 100 },
+      { contactId: 10, customFieldId: 200 },
+      { contactId: 20, customFieldId: 100 },
+      { contactId: 20, customFieldId: 999 },
     ]);
   });
 });

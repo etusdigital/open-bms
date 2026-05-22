@@ -55,6 +55,19 @@ export class EnterpriseSession {
     return this.paged('/custom-fields', params);
   }
 
+  // Bulk contact<->custom-field VALUES (contacts_custom_fields rows). Distinct
+  // from listCustomFields, which returns the field definitions.
+  //
+  // The path is TWO segments on purpose: a single-segment `/contacts/<x>` would
+  // collide with `/contacts/:id` on an Enterprise not yet redeployed with this
+  // endpoint, returning a 500 (findOneById parses "x" as an int) that defeats
+  // tolerate404 and would fail the whole job in a retry loop. A two-segment
+  // path matches no `:id` route, so older versions return a clean 404, which
+  // tolerate404 turns into an empty page -> the step is skipped, not fatal.
+  listContactCustomFields(params: PageParams): Promise<PagedResponse<any>> {
+    return this.paged('/contacts/custom-fields/values', params, true);
+  }
+
   listLabels(params: PageParams): Promise<PagedResponse<any>> {
     return this.paged('/labels', params);
   }
