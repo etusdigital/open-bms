@@ -239,6 +239,11 @@ export class AppService {
           )
         : null;
 
+      this.trackerService.logInfo(
+        `[Segment] generated query - tagId=${segment.id} accountId=${segment.accountId}`,
+        JSON.stringify({ query, externalQuerySteps: formattedExternalSteps }),
+      );
+
       const dataInsertAndDelete = await this.msgopsService.processSegment(
         segment.id,
         segment.accountId,
