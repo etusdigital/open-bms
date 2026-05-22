@@ -85,6 +85,10 @@ x-backend-env: &backend-env
   CAMPAIGN_TRIGGER_ENDPOINT: ${CAMPAIGN_TRIGGER_ENDPOINT:-http://campaign-packer:3000/create-contacts-send}
   CAMPAIGN_TEST_AB_ENDPOINT: ${CAMPAIGN_TEST_AB_ENDPOINT:-http://campaign-packer:3000/create-test}
   CAMPAIGN_RESULT_TEST_AB_ENDPOINT: ${CAMPAIGN_RESULT_TEST_AB_ENDPOINT:-http://campaign-packer:3000/result-test}
+  # tag-process loopback for scheduled segment recalculation. Without this,
+  # tags.service.ts builds `undefined/<id>` and every SegmentProcessor dispatch
+  # fails with "Failed to parse URL" — segments never get a count (EVO-1433).
+  TAG_PROCESS_ENDPOINT: ${TAG_PROCESS_ENDPOINT:-http://tag-process:3000/process-segment}
   # message-trigger queue topics — call sites look up by env var, not constant.
   TOPIC_NAME_MESSAGE_TRIGGER: ${TOPIC_NAME_MESSAGE_TRIGGER:-message-trigger}
   TOPIC_NAME_SEND_EMAIL: ${TOPIC_NAME_SEND_EMAIL:-send-email}
