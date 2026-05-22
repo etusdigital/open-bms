@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PostgresErrorCode } from 'src/shared.interfaces';
 import { ContactEntity } from './../../entities/contact.entity';
-import { Repository, In, UpdateQueryBuilder, SelectQueryBuilder } from 'typeorm';
+import { Repository, In, UpdateQueryBuilder, SelectQueryBuilder, EntityManager } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RedisService } from '../../providers/redis.provider';
 import { ContactDto } from './contacts.dto';
@@ -673,6 +673,12 @@ export class ContactsService {
   }
 
   async findByProperty(options: { email?: string; id?: number; uuid?: string; isCompleted?: boolean }): Promise<ContactEntity> {
+    // Without an identifier the `where` would collapse to just `{ accountId }`
+    // and `.getOne()` would return an arbitrary contact of the account — which
+    // could make create() silently update the wrong contact. Require one.
+    if (!options.email && !options.id && !options.uuid) {
+      return null;
+    }
     try {
       const contact = await this.contactRepository
         .createQueryBuilder('contacts')
@@ -695,14 +701,80 @@ export class ContactsService {
     }
   }
 
+  // Resolves tag names to TagEntity rows, scoped to the account. Tag names are
+  // stored inconsistently — manual tags are lowercased by TagEntity
+  // @BeforeInsert, but segment tags keep their original casing (createSegment
+  // re-applies the raw name via update(), which skips @BeforeInsert). So the
+  // lookup must be case-insensitive on both sides. Throws NotFoundException if
+  // any name has no matching tag — never creates tags implicitly.
+  private async resolveTagsByName(names: string[], accountId: number, manager?: EntityManager): Promise<TagEntity[]> {
+    const normalized = (names ?? []).map((n) => n?.trim().toLowerCase()).filter((n): n is string => !!n);
+    if (!normalized.length) return [];
+
+    const uniqueNames = [...new Set(normalized)];
+
+    const repo = (manager ?? this.contactTagRepository.manager).getRepository(TagEntity);
+    const tags = await repo
+      .createQueryBuilder('tag')
+      .where('tag.account_id = :accountId', { accountId })
+      .andWhere('LOWER(tag.name) IN (:...names)', { names: uniqueNames })
+      .getMany();
+
+    const foundNames = new Set(tags.map((t) => t.name.toLowerCase()));
+    const missing = uniqueNames.filter((n) => !foundNames.has(n));
+    if (missing.length) {
+      throw new NotFoundException(`Tag(s) not found: ${missing.join(', ')}`);
+    }
+    return tags;
+  }
+
+  // Idempotently links a contact to the given tags within the transaction.
+  // contacts_tags has no unique constraint, so existing (contact, tag) pairs are
+  // filtered in-memory before insert. Returns only the newly inserted pairs.
+  private async attachTags(manager: EntityManager, accountId: number, contactId: number, tags: TagEntity[]): Promise<Array<{ contactId: number; tagId: number }>> {
+    if (!tags.length) return [];
+    const tagIds = tags.map((t) => t.id);
+    const ctRepo = manager.getRepository(ContactTagEntity);
+
+    const existing = await ctRepo
+      .createQueryBuilder('ct')
+      .select(['ct.tagId'])
+      .where('ct.account_id = :accountId AND ct.contact_id = :contactId AND ct.tag_id IN (:...tagIds)', { accountId, contactId, tagIds })
+      .getMany();
+    const existingTagIds = new Set(existing.map((row) => row.tagId));
+
+    const newTagIds = tagIds.filter((id) => !existingTagIds.has(id));
+    if (!newTagIds.length) return [];
+
+    await ctRepo
+      .createQueryBuilder()
+      .insert()
+      .into('contacts_tags')
+      .values(newTagIds.map((tagId) => ({ contactId, tagId, accountId })))
+      .execute();
+
+    return newTagIds.map((tagId) => ({ contactId, tagId }));
+  }
+
   async update(contactDto: ContactDto, contactRepository: ContactEntity): Promise<ContactDto> {
+    const accountId = this.cls.get<number>('accountId');
+    // Build a plain patch from the dto so TypeORM's UPDATE doesn't trip on
+    // non-column fields (fullName/maskedEmail set in @AfterLoad, tagNames) or
+    // eager relations (contactTag, customFields, contactAutomation,
+    // contactDevices) that ContactEntity carries when loaded.
+    const { id: _id, tagNames, ...patch } = contactDto;
     try {
-      // Build a plain patch from the dto so TypeORM's UPDATE doesn't trip on
-      // non-column fields (fullName/maskedEmail set in @AfterLoad) or eager
-      // relations (contactTag, customFields, contactAutomation, contactDevices)
-      // that ContactEntity carries when loaded.
-      const { id: _id, ...patch } = contactDto;
-      await this.contactRepository.update(contactRepository.id, patch as Partial<ContactEntity>);
+      const newPairs = await this.contactRepository.manager.transaction(async (manager) => {
+        // Resolve first — a 404 here aborts the transaction before any write.
+        const tags = await this.resolveTagsByName(tagNames ?? [], accountId, manager);
+        await manager.getRepository(ContactEntity).update(contactRepository.id, patch as Partial<ContactEntity>);
+        return this.attachTags(manager, accountId, contactRepository.id, tags);
+      });
+
+      // Publish after commit, only for new pairs — never for a reverted write.
+      if (newPairs.length) {
+        await this.publishTagEvents('add', accountId, await this.buildTagEventPairs(accountId, newPairs));
+      }
       return { ...contactRepository, ...patch };
     } catch (e) {
       if (e?.code === PostgresErrorCode.UniqueViolation) {
@@ -751,18 +823,38 @@ export class ContactsService {
   }
 
   async create(contactDto: ContactDto): Promise<ContactDto> {
-    const accountId = this.cls.get('accountId');
+    const accountId = this.cls.get<number>('accountId');
     if (!accountId) {
       throw new HttpException('Account context is required.', HttpStatus.BAD_REQUEST);
     }
+    // tagNames is not a column — keep it out of the contact write.
+    const { tagNames, ...contactFields } = contactDto;
     try {
-      // create() instantiates a ContactEntity so the @BeforeInsert
-      // listener (setUserDetails) fires — a plain object literal would
-      // bypass it, leaving email_provider/hashed_email unset.
-      const contact = this.contactRepository.create({ ...contactDto, accountId });
-      return this.contactRepository.save(contact);
+      const { saved, newPairs } = await this.contactRepository.manager.transaction(async (manager) => {
+        // Resolve first — a 404 here aborts the transaction before any write.
+        const tags = await this.resolveTagsByName(tagNames ?? [], accountId, manager);
+
+        const contactRepo = manager.getRepository(ContactEntity);
+        // create() instantiates a ContactEntity so the @BeforeInsert
+        // listener (setUserDetails) fires — a plain object literal would
+        // bypass it, leaving email_provider/hashed_email unset.
+        const contact = contactRepo.create({ ...contactFields, accountId });
+        const saved = await contactRepo.save(contact);
+
+        const newPairs = await this.attachTags(manager, accountId, saved.id, tags);
+        return { saved, newPairs };
+      });
+
+      // Publish after commit, only for new pairs — never for a reverted write.
+      if (newPairs.length) {
+        await this.publishTagEvents('add', accountId, await this.buildTagEventPairs(accountId, newPairs));
+      }
+      return saved;
     } catch (e) {
-      console.error(e);
+      // Preserve typed errors (e.g. NotFoundException from tag resolution)
+      // instead of masking them as a generic 500.
+      if (e instanceof HttpException) throw e;
+      this.logger.error('Failed to create contact', e?.stack || e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

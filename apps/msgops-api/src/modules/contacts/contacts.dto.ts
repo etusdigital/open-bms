@@ -105,4 +105,10 @@ export class ContactDto {
 
   @JoiSchema(Joi.string().allow(null).optional())
   lastVerticalType?: string;
+
+  // Optional tag names to assign on create/update. Resolved to tag ids
+  // (account-scoped) and linked in the same transaction as the contact write.
+  // Not a column — destructured out before the contact is persisted.
+  @JoiSchema(Joi.array().items(Joi.string().trim().min(1).max(40)).max(50).optional())
+  tagNames?: string[];
 }

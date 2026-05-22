@@ -32,6 +32,11 @@ import { IpAddress } from 'src/decorators/ip_address.decorator';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CronRoute } from '../authz/cron-route.decorator';
 import { ClsService } from 'nestjs-cls';
+import { JoiPipe } from 'nestjs-joi';
+
+// Stateless — built once and reused to validate the create() body explicitly,
+// since the global JoiPipe can't resolve a schema for the union @Body() type.
+const contactDtoPipe = new JoiPipe(ContactDto);
 
 @Controller('contacts')
 @ApiBearerAuth()
@@ -205,11 +210,22 @@ export class ContactsController {
   @RequirePermission('audience:contacts_view')
   @Post('/')
   async create(@Body() data: ContactDto | PubSubMessage): Promise<ContactDto> {
-    const contactDto = 'subscription' in (data as PubSubMessage) ? this.formatterUtils.parseBatch(data as PubSubMessage) : (data as ContactDto);
+    const rawDto = 'subscription' in (data as PubSubMessage) ? this.formatterUtils.parseBatch(data as PubSubMessage) : (data as ContactDto);
 
-    const contact = await this.contactsService.findByProperty({ email: contactDto.email });
+    // @Body() is a union type (ContactDto | PubSubMessage), so the global
+    // JoiPipe can't resolve a single schema and skips validation — a malformed
+    // payload would otherwise reach the service raw and surface as a 500.
+    // Validate explicitly against the concrete DTO: type errors -> 400, and
+    // unknown keys (e.g. a nested `{ contact: {...} }`) are stripped, leaving
+    // an emailless object that the create-path guard below rejects with 400.
+    const contactDto = contactDtoPipe.transform(rawDto, { type: 'body' }) as ContactDto;
+
+    const contact = contactDto.email ? await this.contactsService.findByProperty({ email: contactDto.email }) : null;
     if (contact) {
       return await this.contactsService.update(contactDto, contact);
+    }
+    if (!contactDto.email) {
+      throw new BadRequestException('email is required to create a contact');
     }
     return await this.contactsService.create(contactDto);
   }

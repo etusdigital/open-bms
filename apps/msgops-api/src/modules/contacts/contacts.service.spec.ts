@@ -1,5 +1,8 @@
 import { HttpException, NotFoundException } from '@nestjs/common';
 import { ContactsService } from './contacts.service';
+import { ContactEntity } from '../../entities/contact.entity';
+import { ContactTagEntity } from '../../entities/contact-tag.entity';
+import { TagEntity } from '../../entities/tag.entity';
 
 describe('ContactsService', () => {
   describe('deleteOne', () => {
@@ -225,6 +228,170 @@ describe('ContactsService', () => {
       const { service } = buildService({ runQuery });
 
       await expect(service.findContactHistory(contactId, { ...baseParams, activities: ['message'] })).rejects.toBeInstanceOf(HttpException);
+    });
+  });
+
+  describe('findByProperty', () => {
+    const accountId = 42;
+
+    function buildService(getOneResult: any = null) {
+      const qb = {
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(getOneResult),
+      };
+      const contactRepository = { createQueryBuilder: jest.fn().mockReturnValue(qb) };
+      const cls = { get: jest.fn().mockReturnValue(accountId) };
+      const service = Object.create(ContactsService.prototype) as ContactsService;
+      (service as any).contactRepository = contactRepository;
+      (service as any).cls = cls;
+      return { service, contactRepository, qb };
+    }
+
+    it('returns null without touching the database when no identifier is given', async () => {
+      const { service, contactRepository } = buildService();
+
+      await expect(service.findByProperty({})).resolves.toBeNull();
+      expect(contactRepository.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it('queries the contact when an email is given', async () => {
+      const { service, qb } = buildService({ id: 7 });
+
+      const result = await service.findByProperty({ email: 'A@B.com' });
+
+      expect(qb.where).toHaveBeenCalledWith(expect.objectContaining({ accountId, email: 'a@b.com' }));
+      expect(result).toEqual({ id: 7 });
+    });
+  });
+
+  describe('resolveTagsByName', () => {
+    const accountId = 42;
+
+    function buildService(tagRows: any[]) {
+      const qb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(tagRows),
+      };
+      const tagRepo = { createQueryBuilder: jest.fn().mockReturnValue(qb) };
+      const manager = { getRepository: jest.fn().mockReturnValue(tagRepo) };
+      const service = Object.create(ContactsService.prototype) as ContactsService;
+      return { service, manager, qb };
+    }
+
+    const resolve = (service: ContactsService, names: string[], manager: any) => (service as any).resolveTagsByName(names, accountId, manager) as Promise<any[]>;
+
+    it('returns [] for empty names without querying', async () => {
+      const { service, manager } = buildService([]);
+
+      await expect(resolve(service, [], manager)).resolves.toEqual([]);
+      expect(manager.getRepository).not.toHaveBeenCalled();
+    });
+
+    it('returns the resolved tag entities when every name matches', async () => {
+      const { service, manager } = buildService([{ id: 9, name: 'api-contact' }]);
+
+      await expect(resolve(service, ['api-contact'], manager)).resolves.toEqual([{ id: 9, name: 'api-contact' }]);
+    });
+
+    it('matches case-insensitively (segment tags keep their original casing)', async () => {
+      // Stored tag name is mixed-case; the request passes a different casing.
+      const { service, manager, qb } = buildService([{ id: 3, name: 'Segmento1' }]);
+
+      await expect(resolve(service, ['SEGMENTO1'], manager)).resolves.toHaveLength(1);
+      expect(qb.andWhere).toHaveBeenCalledWith('LOWER(tag.name) IN (:...names)', { names: ['segmento1'] });
+    });
+
+    it('throws NotFoundException when a name does not resolve', async () => {
+      const { service, manager } = buildService([]);
+
+      await expect(resolve(service, ['missing'], manager)).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('create with tagNames', () => {
+    const accountId = 42;
+
+    function buildService({ existingPairs = [], tagRows }: { existingPairs?: any[]; tagRows?: any[] } = {}) {
+      const tagQb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(tagRows ?? [{ id: 9, name: 'api-contact' }]),
+      };
+      const tagRepo = { createQueryBuilder: jest.fn().mockReturnValue(tagQb) };
+      const savedContact = { id: 7, email: 'a@b.com', uuid: 'u' };
+      const contactRepo = {
+        create: jest.fn((entity) => entity),
+        save: jest.fn().mockResolvedValue(savedContact),
+      };
+      // contacts_tags query builder — supports both the existing-pairs select
+      // chain and the insert chain.
+      const ctQb = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(existingPairs),
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({}),
+      };
+      const ctRepo = { createQueryBuilder: jest.fn().mockReturnValue(ctQb) };
+      const manager = {
+        getRepository: jest.fn((entity: any) => {
+          if (entity === TagEntity) return tagRepo;
+          if (entity === ContactEntity) return contactRepo;
+          if (entity === ContactTagEntity) return ctRepo;
+          throw new Error(`unexpected entity in test: ${entity}`);
+        }),
+      };
+      const transaction = jest.fn((cb: any) => cb(manager));
+      const contactRepository = { manager: { transaction } };
+      const cls = { get: jest.fn().mockReturnValue(accountId) };
+      const service = Object.create(ContactsService.prototype) as ContactsService;
+      (service as any).contactRepository = contactRepository;
+      (service as any).cls = cls;
+      (service as any).logger = { error: jest.fn(), warn: jest.fn() };
+      const publishTagEvents = jest.fn().mockResolvedValue(undefined);
+      (service as any).publishTagEvents = publishTagEvents;
+      (service as any).buildTagEventPairs = jest.fn().mockResolvedValue([{ contact: { id: 7 }, tagName: 'api-contact' }]);
+      return { service, contactRepo, ctQb, publishTagEvents };
+    }
+
+    it('AC1: creates the contact, links the tag, publishes an add event', async () => {
+      const { service, ctQb, publishTagEvents } = buildService();
+
+      const result = await service.create({ email: 'a@b.com', tagNames: ['api-contact'] } as any);
+
+      expect(ctQb.values).toHaveBeenCalledWith([{ contactId: 7, tagId: 9, accountId }]);
+      expect(ctQb.execute).toHaveBeenCalled();
+      expect(publishTagEvents).toHaveBeenCalledWith('add', accountId, expect.anything());
+      expect(result).toMatchObject({ id: 7 });
+    });
+
+    it('AC3: without tagNames behaves as before — no tag link, no event', async () => {
+      const { service, ctQb, publishTagEvents } = buildService();
+
+      await service.create({ email: 'a@b.com' } as any);
+
+      expect(ctQb.values).not.toHaveBeenCalled();
+      expect(publishTagEvents).not.toHaveBeenCalled();
+    });
+
+    it('AC4: tag already linked — no duplicate insert, no redundant event', async () => {
+      const { service, ctQb, publishTagEvents } = buildService({ existingPairs: [{ tagId: 9 }] });
+
+      await service.create({ email: 'a@b.com', tagNames: ['api-contact'] } as any);
+
+      expect(ctQb.insert).not.toHaveBeenCalled();
+      expect(publishTagEvents).not.toHaveBeenCalled();
+    });
+
+    it('AC2: unknown tag name throws NotFoundException and persists nothing', async () => {
+      const { service, contactRepo, publishTagEvents } = buildService({ tagRows: [] });
+
+      await expect(service.create({ email: 'a@b.com', tagNames: ['missing'] } as any)).rejects.toBeInstanceOf(NotFoundException);
+      expect(contactRepo.save).not.toHaveBeenCalled();
+      expect(publishTagEvents).not.toHaveBeenCalled();
     });
   });
 });
