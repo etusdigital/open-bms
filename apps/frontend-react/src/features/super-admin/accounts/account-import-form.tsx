@@ -7,6 +7,10 @@ import { toast } from 'sonner';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown } from 'lucide-react';
+import { StepSelector } from './step-selector';
+import { selectedStepsPayload } from './step-selection';
 import { useAccountImport } from './use-account-import';
 import { accountImportSchema, type AccountImportFormValues } from './account-import-schema';
 import { AccountNameCombobox } from './account-name-combobox';
@@ -18,6 +22,9 @@ export function AccountImportForm() {
   const navigate = useNavigate();
   const importMutation = useAccountImport();
   const setActiveImport = useActiveImportStore((s) => s.setActiveImport);
+  // Explicit step picks for selective (re-)import. Empty = full import.
+  const [selectedSteps, setSelectedSteps] = useState<string[]>([]);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   // Inline progress: after starting the job we show ImportStatusView here
   // instead of navigating away. The /import-enterprise/$jobId route is kept for
   // deep-link back-compat, but the form flow no longer leaves the page.
@@ -34,6 +41,7 @@ export function AccountImportForm() {
         accountData: { name: values.accountName },
         enterpriseBaseUrl: values.enterpriseBaseUrl,
         enterpriseApiKey: values.enterpriseApiKey,
+        selectedSteps: selectedStepsPayload(selectedSteps), // undefined = full import
       });
       toast.success(t('superAdmin.accounts.import.startedToast'));
       setJobId(newJobId);
@@ -117,6 +125,17 @@ export function AccountImportForm() {
             </FormItem>
           )}
         />
+        <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen} className="rounded-md border p-3">
+          <CollapsibleTrigger className="flex w-full items-center justify-between text-sm font-medium">
+            {t('superAdmin.accounts.import.selective.title')}
+            <ChevronDown className={`size-4 transition-transform ${advancedOpen ? 'rotate-180' : ''}`} />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-3">
+            <p className="text-muted-foreground mb-3 text-xs">{t('superAdmin.accounts.import.selective.help')}</p>
+            <StepSelector value={selectedSteps} onChange={setSelectedSteps} disabled={importMutation.isPending} />
+          </CollapsibleContent>
+        </Collapsible>
+
         <Button type="submit" disabled={importMutation.isPending}>
           {importMutation.isPending
             ? t('superAdmin.accounts.import.submitting')

@@ -2183,6 +2183,11 @@
           "completed": "Import completed",
           "failed": "Import failed",
           "view": "View"
+        },
+        "selective": {
+          "title": "Selective import (advanced)",
+          "help": "Leave everything unchecked to import all. Check items for a targeted re-import — related items are auto-included and locked. Updates existing records and brings new ones.",
+          "required": "included by dependency"
         }
       }
     },
