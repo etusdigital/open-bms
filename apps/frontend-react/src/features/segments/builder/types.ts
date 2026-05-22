@@ -200,12 +200,17 @@ export function createDefaultStep(stepType: StepType): StepData {
   const id = crypto.randomUUID();
   switch (stepType) {
     case 'interation':
+      // Seed the times-comparison operator alongside its count. The operator
+      // <Select> shows '>=' by default but only writes to state on change —
+      // a step left untouched would serialize without it and crash the
+      // ClickHouse query with `HAVING COUNT(...) undefined N` (EVO-1423).
       return {
         id,
         type: 'interation',
         event_type: 'email',
         conditional_interation: 'yes',
         custom_times_value: 1,
+        conditional_times_value: '>=',
       };
     case 'custom_field':
       return { id, type: 'custom_field' };
@@ -214,9 +219,9 @@ export function createDefaultStep(stepType: StepType): StepData {
     case 'tag':
       return { id, type: 'tag', conditional_tag: 'in', tag_id: [], tag_info: [] };
     case 'automation_state':
-      return { id, type: 'automation_state', event: 'entered', custom_times_value: 0 };
+      return { id, type: 'automation_state', event: 'entered', custom_times_value: 0, conditional_times_value: '>=' };
     case 'custom_event':
-      return { id, type: 'custom_event', conditional_event_type: 'in', custom_times_value: 1 };
+      return { id, type: 'custom_event', conditional_event_type: 'in', custom_times_value: 1, conditional_times_value: '>=' };
     case 'lead':
       return { id, type: 'lead', conditional_lead_field: '=' };
   }

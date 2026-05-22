@@ -116,6 +116,108 @@ describe('generateSegmentQueryV1', () => {
     expect(out.externalQuerySteps![0].query).not.toContain('undefined');
   });
 
+  it('defaults the HAVING operator for custom_event steps when conditional_times_value is missing (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'custom_event',
+            event: { name: 'purchase' },
+            conditional_event_type: 'in',
+            conditional_event_filter: '>',
+            time: '30',
+            custom_times_value: 2,
+            // conditional_times_value omitted
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+    const customEvent = out.externalQuerySteps!.find((s) => s.tableName.includes('custom_event'))!;
+
+    expect(customEvent.query).toContain('HAVING COUNT(contact_id) >= 2');
+    expect(customEvent.query).not.toContain('undefined');
+  });
+
+  it('defaults the HAVING operator for automation_state steps when conditional_times_value is missing (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          { type: 'automation_state', event: 'entered', time: 30, custom_times_value: 0 },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.query).toContain('HAVING COUNT(contact_id) >= 0');
+    expect(out.query).not.toContain('undefined');
+  });
+
+  it('defaults the HAVING count to 1 when custom_times_value is also missing (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          // automation_state emits HAVING unconditionally — no count field present
+          { type: 'automation_state', event: 'entered', time: 30 },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.query).toContain('HAVING COUNT(contact_id) >= 1');
+    expect(out.query).not.toContain('NaN');
+  });
+
+  it('preserves a valid non-default operator (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'interation',
+            event_type: 'email',
+            event: 'last_open_date',
+            conditional_interation: 'yes',
+            time: '30',
+            message: { id: 42 },
+            custom_times_value: 3,
+            conditional_times_value: '<',
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.externalQuerySteps![0].query).toContain('HAVING COUNT(contact_id) < 3');
+  });
+
+  it('coerces an unknown/unsafe operator to >= (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'interation',
+            event_type: 'email',
+            event: 'last_open_date',
+            conditional_interation: 'yes',
+            time: '30',
+            message: { id: 42 },
+            custom_times_value: 3,
+            conditional_times_value: 'OR 1=1 --',
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.externalQuerySteps![0].query).toContain('HAVING COUNT(contact_id) >= 3');
+    expect(out.externalQuerySteps![0].query).not.toContain('OR 1=1');
+  });
+
   it('appends INTERSECT/EXCEPT clauses for tag steps', () => {
     const dto: SegmentDtoLike = {
       steps: [

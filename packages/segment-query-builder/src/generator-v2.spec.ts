@@ -89,4 +89,66 @@ describe('generateSegmentQueryV2', () => {
     expect(out.externalQuerySteps![0].query).toContain('HAVING SUM(total) >= 5');
     expect(out.externalQuerySteps![0].query).not.toContain('undefined');
   });
+
+  it('defaults the HAVING operator for automation_state steps when conditional_times_value is missing (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          { type: 'automation_state', event: 'entered', time: 30, custom_times_value: 0 },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV2(tag, dto, { timeZone, siblingAccounts });
+
+    expect(out.query).toContain('HAVING COUNT(contact_id) >= 0');
+    expect(out.query).not.toContain('undefined');
+  });
+
+  it('preserves a valid non-default operator (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'interation',
+            event_type: 'email',
+            event: 'last_click_date',
+            conditional_interation: 'yes',
+            time: '7',
+            message: { id: 99 },
+            custom_times_value: 5,
+            conditional_times_value: '<',
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV2(tag, dto, { timeZone, siblingAccounts });
+
+    expect(out.externalQuerySteps![0].query).toContain('HAVING SUM(total) < 5');
+  });
+
+  it('coerces an unknown/unsafe operator to >= (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'interation',
+            event_type: 'email',
+            event: 'last_click_date',
+            conditional_interation: 'yes',
+            time: '7',
+            message: { id: 99 },
+            custom_times_value: 5,
+            conditional_times_value: 'OR 1=1 --',
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV2(tag, dto, { timeZone, siblingAccounts });
+
+    expect(out.externalQuerySteps![0].query).toContain('HAVING SUM(total) >= 5');
+    expect(out.externalQuerySteps![0].query).not.toContain('OR 1=1');
+  });
 });

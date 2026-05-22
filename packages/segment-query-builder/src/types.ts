@@ -8,6 +8,13 @@ export enum FieldsType {
   number = 'number',
 }
 
+// Whitelist of comparison operators allowed in `HAVING COUNT(...)` /
+// `HAVING SUM(...)` clauses. Mirrors `COMPARISON_OPERATORS` in the
+// frontend builder (`segments/builder/constants.ts`). Any value outside
+// this set is coerced to `>=` so only known-safe tokens reach the SQL
+// (EVO-1423).
+export const TIMES_OPERATORS = ['>=', '>', '=', '<=', '<'] as const;
+
 export enum InterationEmailTypes {
   OPEN = 'last_open_date',
   CLICK = 'last_click_date',
