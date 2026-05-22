@@ -75,6 +75,11 @@ describe('SchedulerService', () => {
       expect(result).toHaveLength(1);
       expect(result[0].name).toMatch(/^bms-scheduler-campaign-trigger:42:[0-9a-f]{12}$/);
     });
+
+    it.each([undefined, ''])('throws on a missing baseUrl (%p) without enqueuing a doomed job (EVO-1433)', async (baseUrl) => {
+      await expect(service.create(11, new Date(), baseUrl as unknown as string, 'bms-scheduler-segment')).rejects.toThrow(/missing baseUrl/);
+      expect(segmentQueue.add).not.toHaveBeenCalled();
+    });
   });
 
   describe('delete', () => {

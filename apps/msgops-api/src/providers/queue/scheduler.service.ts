@@ -45,6 +45,15 @@ export class SchedulerService {
   }
 
   async create(id: number | string, scheduleTo: Date, baseUrl: string, queue: string, body?: string): Promise<[{ name: string }]> {
+    // Fail fast on a missing endpoint env var. Otherwise `${baseUrl}/${id}`
+    // becomes the literal string "undefined/<id>", the job is enqueued, and
+    // every dispatch attempt dies with "Failed to parse URL" deep inside a
+    // BullMQ retry — a silent misconfiguration that strands segments with a
+    // NULL last_count (EVO-1433).
+    if (!baseUrl) {
+      throw new Error(`SchedulerService.create: missing baseUrl for queue "${queue}" — check the endpoint env var.`);
+    }
+
     // Empty-string ids come from the legacy automations testab path. Falling
     // back to a random anon-* keeps job ids unique and human-readable.
     const idSegment = id === '' || id == null ? `anon-${crypto.randomBytes(4).toString('hex')}` : String(id);
