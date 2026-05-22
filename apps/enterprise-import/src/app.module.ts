@@ -12,6 +12,7 @@ import { CustomFieldsImporter } from './importers/custom-fields.importer';
 import { LabelsImporter } from './importers/labels.importer';
 import { EmailTemplatesImporter } from './importers/email-templates.importer';
 import { ContactsImporter } from './importers/contacts.importer';
+import { ContactTagsImporter } from './importers/contact-tags.importer';
 import { CustomEventsImporter } from './importers/custom-events.importer';
 import { AutomationsImporter } from './importers/automations.importer';
 import { CampaignsImporter } from './importers/campaigns.importer';
@@ -26,6 +27,7 @@ import { EnterpriseIdMappingEntity } from './entities/enterprise-id-mapping.enti
 import { AccountEntity } from './entities/account.entity';
 import { AccountConfigEntity } from './entities/account-config.entity';
 import { ContactEntity } from './entities/contact.entity';
+import { ContactTagEntity } from './entities/contact-tag.entity';
 import { TagEntity } from './entities/tag.entity';
 import { CustomFieldsEntity } from './entities/custom-fields.entity';
 import { LabelsEntity } from './entities/labels.entity';
@@ -45,6 +47,7 @@ const ENTITIES = [
   AccountEntity,
   AccountConfigEntity,
   ContactEntity,
+  ContactTagEntity,
   TagEntity,
   CustomFieldsEntity,
   LabelsEntity,
@@ -95,6 +98,7 @@ const ENTITIES = [
     LabelsImporter,
     EmailTemplatesImporter,
     ContactsImporter,
+    ContactTagsImporter,
     CustomEventsImporter,
     AutomationsImporter,
     CampaignsImporter,

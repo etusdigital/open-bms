@@ -5,6 +5,7 @@ import { CustomFieldsImporter } from './importers/custom-fields.importer';
 import { LabelsImporter } from './importers/labels.importer';
 import { EmailTemplatesImporter } from './importers/email-templates.importer';
 import { ContactsImporter } from './importers/contacts.importer';
+import { ContactTagsImporter } from './importers/contact-tags.importer';
 import { CustomEventsImporter } from './importers/custom-events.importer';
 import { AutomationsImporter } from './importers/automations.importer';
 import { CampaignsImporter } from './importers/campaigns.importer';
@@ -26,10 +27,13 @@ export class ImportPipeline {
     emailTemplates: EmailTemplatesImporter,
     customEvents: CustomEventsImporter,
     contacts: ContactsImporter,
+    contactTags: ContactTagsImporter,
     automations: AutomationsImporter,
     campaigns: CampaignsImporter,
     messages: MessagesImporter,
   ) {
-    this.steps = [tags, customFields, labels, emailTemplates, customEvents, contacts, automations, campaigns, messages];
+    // contactTags must run after both tags and contacts so their src->newId
+    // mappings exist when the join rows are resolved.
+    this.steps = [tags, customFields, labels, emailTemplates, customEvents, contacts, contactTags, automations, campaigns, messages];
   }
 }
