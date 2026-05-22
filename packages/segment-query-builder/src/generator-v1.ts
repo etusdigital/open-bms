@@ -1,5 +1,5 @@
 import { parseEventType } from './parse-event-type';
-import { ExternalQueryStep, FieldsType, GenerateDepsV1, GenerateResult, SegmentDtoLike, TagLike } from './types';
+import { ExternalQueryStep, FieldsType, GenerateDepsV1, GenerateResult, SegmentDtoLike, TagLike, TIMES_OPERATORS } from './types';
 
 // V1 segment query generator. Builds an `INSERT INTO segment_process` SQL
 // statement and accumulates ClickHouse subqueries (against `events_logs_v2`)
@@ -31,7 +31,13 @@ export function generateSegmentQueryV1(tag: TagLike, segmentDto: SegmentDtoLike,
       // literal `undefined` into the SQL and crash the ClickHouse query
       // (EVO-1423). Default to `>=` ("happened at least N times") and
       // whitelist the operator so only known-safe tokens reach the SQL.
-      const timesOperator = ['>=', '>', '=', '<=', '<'].includes(step.conditional_times_value) ? step.conditional_times_value : '>=';
+      const timesOperator = TIMES_OPERATORS.includes(step.conditional_times_value) ? step.conditional_times_value : '>=';
+      // Companion count for the same `HAVING` clauses. `parseInt` yields
+      // `NaN` if `custom_times_value` is missing — which would re-introduce
+      // an invalid `HAVING COUNT(...) >= NaN` query at the unconditional
+      // sites (`automation_state`). Fall back to 1 ("at least once").
+      const parsedTimesCount = parseInt(step.custom_times_value, 10);
+      const timesCount = Number.isFinite(parsedTimesCount) ? parsedTimesCount : 1;
 
       if (!isConditionalCard) {
         if (step.type === 'conditionalCard') {
@@ -75,7 +81,7 @@ export function generateSegmentQueryV1(tag: TagLike, segmentDto: SegmentDtoLike,
               AND url ${step.page_view_filter} ${valueFilter}`;
             if (step.custom_times_value > 1) {
               queryPageViewCH += ` GROUP BY contact_id
-                HAVING COUNT(contact_id) ${timesOperator} ${parseInt(step.custom_times_value, 10)} `;
+                HAVING COUNT(contact_id) ${timesOperator} ${timesCount} `;
             }
             query += ` ct.id ${conditionalPageView} (select contact_id from ${subTableNamePageView})`;
             subQueys++;
@@ -133,7 +139,7 @@ export function generateSegmentQueryV1(tag: TagLike, segmentDto: SegmentDtoLike,
                   ${step.event_type == 'email' ? ` AND message_type = 'email' ` : ''}
                   ${step.conditional_interation != 'yes' ? ' AND contact_id IS NOT NULL' : ''}
                   GROUP BY contact_id
-                  HAVING COUNT(contact_id) ${timesOperator} ${parseInt(step.custom_times_value, 10)}`;
+                  HAVING COUNT(contact_id) ${timesOperator} ${timesCount}`;
 
               externalQuerySteps.push({
                 tableName: subTableName,
@@ -229,7 +235,7 @@ export function generateSegmentQueryV1(tag: TagLike, segmentDto: SegmentDtoLike,
           }
           if (step.custom_times_value) {
             queryCustomEvent += ` GROUP BY contact_id
-              HAVING COUNT(contact_id) ${timesOperator} ${parseInt(step.custom_times_value, 10)} `;
+              HAVING COUNT(contact_id) ${timesOperator} ${timesCount} `;
           }
 
           query += ` ct.id ${step.conditional_event_type} (select contact_id from ${subTableNameCustomEvent})`;
@@ -260,7 +266,7 @@ export function generateSegmentQueryV1(tag: TagLike, segmentDto: SegmentDtoLike,
             query += ` AND status = '${step.event}'`;
           }
           query += ` GROUP BY contact_id
-            HAVING COUNT(contact_id) ${timesOperator} ${parseInt(step.custom_times_value, 10)} `;
+            HAVING COUNT(contact_id) ${timesOperator} ${timesCount} `;
           query += `)`;
           break;
       }

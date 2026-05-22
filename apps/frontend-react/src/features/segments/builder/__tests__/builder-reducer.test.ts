@@ -179,6 +179,17 @@ describe('builderReducer', () => {
       expect(next.cards[0].steps[0].id).toBeTruthy();
     });
 
+    it.each(['interation', 'custom_event', 'automation_state'] as const)(
+      'seeds conditional_times_value to >= on a new %s step (EVO-1423)',
+      (stepType) => {
+        const card = makeCard({ id: 'card-1' });
+        const state = stateWithCards(card);
+
+        const next = dispatch(state, { type: 'ADD_STEP', cardId: 'card-1', stepType });
+        expect((next.cards[0].steps[0] as { conditional_times_value?: string }).conditional_times_value).toBe('>=');
+      },
+    );
+
     it('sets stepConnector on subsequent steps', () => {
       const step = makeInteractionStep({ id: 'step-1' });
       const card = makeCard({ id: 'card-1', steps: [step] });
