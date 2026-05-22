@@ -3,6 +3,8 @@ import { ContactsService } from './contacts.service';
 import { ContactEntity } from '../../entities/contact.entity';
 import { ContactTagEntity } from '../../entities/contact-tag.entity';
 import { TagEntity } from '../../entities/tag.entity';
+import { ContactCustomFieldEntity } from '../../entities/contact-custom-field.entity';
+import { CustomFieldsEntity } from '../../entities/custom-fields.entity';
 
 describe('ContactsService', () => {
   describe('deleteOne', () => {
@@ -312,7 +314,7 @@ describe('ContactsService', () => {
   describe('create with tagNames', () => {
     const accountId = 42;
 
-    function buildService({ existingPairs = [], tagRows }: { existingPairs?: any[]; tagRows?: any[] } = {}) {
+    function buildService({ insertedTagIds, tagRows, customFieldDefs }: { insertedTagIds?: number[]; tagRows?: any[]; customFieldDefs?: any[] } = {}) {
       const tagQb = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -324,23 +326,40 @@ describe('ContactsService', () => {
         create: jest.fn((entity) => entity),
         save: jest.fn().mockResolvedValue(savedContact),
       };
-      // contacts_tags query builder — supports both the existing-pairs select
-      // chain and the insert chain.
+      // contacts_tags query builder — insert chain with ON CONFLICT DO NOTHING
+      // (orIgnore) and RETURNING tag_id. `raw` holds rows that actually landed.
+      const rawReturning = (insertedTagIds ?? [9]).map((id) => ({ tag_id: id }));
       const ctQb = {
-        select: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue(existingPairs),
         insert: jest.fn().mockReturnThis(),
         into: jest.fn().mockReturnThis(),
         values: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({}),
+        orIgnore: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ raw: rawReturning }),
       };
       const ctRepo = { createQueryBuilder: jest.fn().mockReturnValue(ctQb) };
+      // custom_fields lookup
+      const cfDefsQb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(customFieldDefs ?? []),
+      };
+      const cfDefsRepo = { createQueryBuilder: jest.fn().mockReturnValue(cfDefsQb) };
+      // contacts_custom_fields upsert
+      const ccfQb = {
+        insert: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({}),
+      };
+      const ccfRepo = { createQueryBuilder: jest.fn().mockReturnValue(ccfQb) };
       const manager = {
         getRepository: jest.fn((entity: any) => {
           if (entity === TagEntity) return tagRepo;
           if (entity === ContactEntity) return contactRepo;
           if (entity === ContactTagEntity) return ctRepo;
+          if (entity === CustomFieldsEntity) return cfDefsRepo;
+          if (entity === ContactCustomFieldEntity) return ccfRepo;
           throw new Error(`unexpected entity in test: ${entity}`);
         }),
       };
@@ -354,7 +373,7 @@ describe('ContactsService', () => {
       const publishTagEvents = jest.fn().mockResolvedValue(undefined);
       (service as any).publishTagEvents = publishTagEvents;
       (service as any).buildTagEventPairs = jest.fn().mockResolvedValue([{ contact: { id: 7 }, tagName: 'api-contact' }]);
-      return { service, contactRepo, ctQb, publishTagEvents };
+      return { service, contactRepo, ctQb, ccfQb, cfDefsQb, publishTagEvents };
     }
 
     it('AC1: creates the contact, links the tag, publishes an add event', async () => {
@@ -377,12 +396,13 @@ describe('ContactsService', () => {
       expect(publishTagEvents).not.toHaveBeenCalled();
     });
 
-    it('AC4: tag already linked — no duplicate insert, no redundant event', async () => {
-      const { service, ctQb, publishTagEvents } = buildService({ existingPairs: [{ tagId: 9 }] });
+    it('AC4: tag already linked — ON CONFLICT skips the insert, no redundant event', async () => {
+      // The unique constraint catches the conflict; RETURNING comes back empty.
+      const { service, ctQb, publishTagEvents } = buildService({ insertedTagIds: [] });
 
       await service.create({ email: 'a@b.com', tagNames: ['api-contact'] } as any);
 
-      expect(ctQb.insert).not.toHaveBeenCalled();
+      expect(ctQb.execute).toHaveBeenCalled();
       expect(publishTagEvents).not.toHaveBeenCalled();
     });
 
@@ -392,6 +412,60 @@ describe('ContactsService', () => {
       await expect(service.create({ email: 'a@b.com', tagNames: ['missing'] } as any)).rejects.toBeInstanceOf(NotFoundException);
       expect(contactRepo.save).not.toHaveBeenCalled();
       expect(publishTagEvents).not.toHaveBeenCalled();
+    });
+
+    it("AC5: singular `tagName` (Pet's envelope) normalizes to the same insert as the array form", async () => {
+      const { service, ctQb, publishTagEvents } = buildService();
+
+      await service.create({ email: 'a@b.com', tagName: 'api-contact' } as any);
+
+      expect(ctQb.values).toHaveBeenCalledWith([{ contactId: 7, tagId: 9, accountId }]);
+      expect(publishTagEvents).toHaveBeenCalledWith('add', accountId, expect.anything());
+    });
+
+    it('AC6: `tagName` + `tagNames` together dedupe to one insert', async () => {
+      const { service, ctQb } = buildService();
+
+      await service.create({ email: 'a@b.com', tagName: 'api-contact', tagNames: ['api-contact'] } as any);
+
+      expect(ctQb.values).toHaveBeenCalledWith([{ contactId: 7, tagId: 9, accountId }]);
+    });
+
+    it('AC7: customFields resolve case-insensitively and upsert as (account, contact, custom_field) rows', async () => {
+      const defs = [
+        { id: 11, name: 'UTM_MEDIUM' },
+        { id: 12, name: 'NEGATIVADO' },
+      ];
+      const { service, ccfQb, cfDefsQb } = buildService({ customFieldDefs: defs });
+
+      await service.create({
+        email: 'a@b.com',
+        customFields: { utm_medium: 'cpc', negativado: 'nao' },
+      } as any);
+
+      // Lookup uses the canonical (uppercased) names.
+      expect(cfDefsQb.andWhere).toHaveBeenCalledWith('cf.name IN (:...names)', { names: ['UTM_MEDIUM', 'NEGATIVADO'] });
+      expect(ccfQb.values).toHaveBeenCalledWith([
+        { accountId, contactId: 7, customFieldId: 11, value: 'cpc' },
+        { accountId, contactId: 7, customFieldId: 12, value: 'nao' },
+      ]);
+      expect(ccfQb.orUpdate).toHaveBeenCalledWith(['value'], ['account_id', 'contact_id', 'custom_field_id']);
+    });
+
+    it('AC8: unknown custom field name throws NotFoundException and persists nothing', async () => {
+      // Only UTM_MEDIUM is registered; the request also references an unknown key.
+      const { service, contactRepo, ccfQb } = buildService({ customFieldDefs: [{ id: 11, name: 'UTM_MEDIUM' }] });
+
+      await expect(
+        service.create({
+          email: 'a@b.com',
+          customFields: { utm_medium: 'cpc', unknown_field: 'x' },
+        } as any),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      // Transaction rolled back — contact write must not have landed, no upsert either.
+      expect(contactRepo.save).not.toHaveBeenCalled();
+      expect(ccfQb.values).not.toHaveBeenCalled();
     });
   });
 });

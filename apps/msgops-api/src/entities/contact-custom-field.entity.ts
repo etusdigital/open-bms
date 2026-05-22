@@ -10,6 +10,16 @@ export class ContactCustomFieldEntity {
   @PrimaryColumn('int', { name: 'custom_field_id' })
   customFieldId: number;
 
+  // account_id was previously only referenced via @JoinColumn on the relations
+  // below, so TypeORM silently dropped it from INSERT payloads — every write
+  // that passed `accountId` ended up with `account_id = NULL`. The EVO-1278
+  // migration tightened the column to NOT NULL, turning that latent bug into a
+  // guaranteed 500. Declaring it as @PrimaryColumn matches the unique key
+  // (account_id, contact_id, custom_field_id) and makes
+  // QueryBuilder.values({ accountId }) actually map to the column.
+  @PrimaryColumn('int', { name: 'account_id' })
+  accountId: number;
+
   @Column('text', { name: 'value' })
   value: string;
 
