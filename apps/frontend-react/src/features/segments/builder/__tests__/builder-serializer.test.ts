@@ -353,6 +353,53 @@ describe('builder-serializer', () => {
       expect(result[0][0]).not.toHaveProperty('time_custom');
     });
 
+    it('defaults conditional_times_value to >= when custom_times_value > 1 (EVO-1423)', () => {
+      const cards: BuilderCard[] = [
+        {
+          id: 'card-1',
+          steps: [
+            {
+              id: 's1',
+              type: 'interation',
+              event_type: 'email',
+              event: 'open',
+              conditional_interation: 'yes',
+              time: 7,
+              message: 'any',
+              custom_times_value: 3,
+              // conditional_times_value omitted — user left the operator <Select> at its default
+            },
+          ],
+        },
+      ];
+
+      const result = serializeSteps(cards);
+      expect(result[0][0].conditional_times_value).toBe('>=');
+    });
+
+    it('does not add conditional_times_value when custom_times_value is 1', () => {
+      const cards: BuilderCard[] = [
+        {
+          id: 'card-1',
+          steps: [
+            {
+              id: 's1',
+              type: 'interation',
+              event_type: 'email',
+              event: 'open',
+              conditional_interation: 'yes',
+              time: 7,
+              message: 'any',
+              custom_times_value: 1,
+            },
+          ],
+        },
+      ];
+
+      const result = serializeSteps(cards);
+      expect(result[0][0]).not.toHaveProperty('conditional_times_value');
+    });
+
     it('converts positive action key back to DB field on serialize', () => {
       const cards: BuilderCard[] = [
         {

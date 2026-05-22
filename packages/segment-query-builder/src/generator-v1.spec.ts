@@ -92,6 +92,30 @@ describe('generateSegmentQueryV1', () => {
     expect(out.query).toContain('DROP TABLE table_segment0_100;');
   });
 
+  it('defaults the HAVING operator to >= when conditional_times_value is missing (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'interation',
+            event_type: 'email',
+            event: 'last_open_date',
+            conditional_interation: 'yes',
+            time: '7',
+            message: 'any',
+            custom_times_value: 3,
+            // conditional_times_value intentionally omitted (segment created before the UI captured it)
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.externalQuerySteps![0].query).toContain('HAVING COUNT(contact_id) >= 3');
+    expect(out.externalQuerySteps![0].query).not.toContain('undefined');
+  });
+
   it('appends INTERSECT/EXCEPT clauses for tag steps', () => {
     const dto: SegmentDtoLike = {
       steps: [
