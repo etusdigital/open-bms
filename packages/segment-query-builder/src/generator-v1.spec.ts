@@ -13,6 +13,27 @@ describe('generateSegmentQueryV1', () => {
     expect(out.externalQuerySteps).toBeNull();
   });
 
+  it('renders an email_provider step with the persisted operator', () => {
+    const dto: SegmentDtoLike = {
+      steps: [[{ type: 'user_field', user_field_key: 'email_provider', user_field_value: 'Gmail', conditional_user_field: '!=' }]],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.query).toContain("email_provider != 'Gmail'");
+  });
+
+  it('defaults email_provider to `=` when conditional_user_field is missing', () => {
+    // Steps saved by the React builder with the operator dropdown left
+    // untouched omit `conditional_user_field` — must not leak `undefined`.
+    const dto: SegmentDtoLike = {
+      steps: [[{ type: 'user_field', user_field_key: 'email_provider', user_field_value: 'Gmail' }]],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.query).toContain("email_provider = 'Gmail'");
+    expect(out.query).not.toContain('undefined');
+  });
+
   it('renders a custom_field step inline with no external query', () => {
     const dto: SegmentDtoLike = {
       steps: [

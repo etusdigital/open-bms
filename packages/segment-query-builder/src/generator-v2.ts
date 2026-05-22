@@ -1,5 +1,14 @@
 import { parseEventType } from './parse-event-type';
-import { ExternalQueryStep, FieldsType, GenerateDepsV2, GenerateResult, SegmentDtoLike, TagLike, TIMES_OPERATORS } from './types';
+import {
+  ExternalQueryStep,
+  FieldsType,
+  GenerateDepsV2,
+  GenerateResult,
+  SegmentDtoLike,
+  TagLike,
+  TIMES_OPERATORS,
+  EQUALITY_OPERATORS,
+} from './types';
 
 // V2 segment query generator. Targets `user_events_daily_v3` (newer
 // ClickHouse rollup) and joins via `email` instead of `contact_id`. Reads
@@ -174,7 +183,8 @@ export function generateSegmentQueryV2(tag: TagLike, segmentDto: SegmentDtoLike,
           }
 
           if (step.user_field_key === 'email_provider') {
-            query += ` ${step.user_field_key} ${step.conditional_user_field} '${step.user_field_value}'`;
+            const providerOperator = EQUALITY_OPERATORS.includes(step.conditional_user_field) ? step.conditional_user_field : '=';
+            query += ` ${step.user_field_key} ${providerOperator} '${step.user_field_value}'`;
             break;
           }
 

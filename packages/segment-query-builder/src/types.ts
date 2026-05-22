@@ -15,6 +15,14 @@ export enum FieldsType {
 // (EVO-1423).
 export const TIMES_OPERATORS = ['>=', '>', '=', '<=', '<'] as const;
 
+// Whitelist for `user_field` equality filters (e.g. email_provider).
+// Mirrors `EQUAL_NOT_EQUAL_OPERATORS` in the frontend builder. The React
+// builder only persists `conditional_user_field` when the operator
+// dropdown is actively changed; an untouched step omits it entirely.
+// Any value outside this set is coerced to `=` so a missing/invalid
+// operator never injects literal `undefined` into the SQL.
+export const EQUALITY_OPERATORS = ['=', '!='] as const;
+
 export enum InterationEmailTypes {
   OPEN = 'last_open_date',
   CLICK = 'last_click_date',

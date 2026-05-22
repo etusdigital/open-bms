@@ -34,10 +34,13 @@ export const UserFieldStep = memo(function UserFieldStep({ data, cardId }: UserF
   };
 
   const handleFieldChange = (value: string) => {
-    // Reset filter values when field changes
+    // Reset filter values when field changes. `email_provider` is seeded
+    // with the `=` operator so a step left with the dropdown untouched
+    // still persists `conditional_user_field` — otherwise the segment
+    // query builder injects literal `undefined` into the SQL.
     update({
       user_field_key: value,
-      conditional_user_field: null,
+      conditional_user_field: value === 'email_provider' ? '=' : null,
       user_field_value: null,
     });
   };

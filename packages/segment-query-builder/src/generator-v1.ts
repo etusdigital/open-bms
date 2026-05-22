@@ -1,5 +1,14 @@
 import { parseEventType } from './parse-event-type';
-import { ExternalQueryStep, FieldsType, GenerateDepsV1, GenerateResult, SegmentDtoLike, TagLike, TIMES_OPERATORS } from './types';
+import {
+  ExternalQueryStep,
+  FieldsType,
+  GenerateDepsV1,
+  GenerateResult,
+  SegmentDtoLike,
+  TagLike,
+  TIMES_OPERATORS,
+  EQUALITY_OPERATORS,
+} from './types';
 
 // V1 segment query generator. Builds an `INSERT INTO segment_process` SQL
 // statement and accumulates ClickHouse subqueries (against `events_logs_v2`)
@@ -178,7 +187,8 @@ export function generateSegmentQueryV1(tag: TagLike, segmentDto: SegmentDtoLike,
           }
 
           if (step.user_field_key === 'email_provider') {
-            query += ` ${step.user_field_key} ${step.conditional_user_field} '${step.user_field_value}'`;
+            const providerOperator = EQUALITY_OPERATORS.includes(step.conditional_user_field) ? step.conditional_user_field : '=';
+            query += ` ${step.user_field_key} ${providerOperator} '${step.user_field_value}'`;
             break;
           }
 
