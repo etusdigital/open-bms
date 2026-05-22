@@ -756,7 +756,11 @@ export class ContactsService {
       throw new HttpException('Account context is required.', HttpStatus.BAD_REQUEST);
     }
     try {
-      return this.contactRepository.save({ ...contactDto, accountId });
+      // create() instantiates a ContactEntity so the @BeforeInsert
+      // listener (setUserDetails) fires — a plain object literal would
+      // bypass it, leaving email_provider/hashed_email unset.
+      const contact = this.contactRepository.create({ ...contactDto, accountId });
+      return this.contactRepository.save(contact);
     } catch (e) {
       console.error(e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
@@ -963,11 +967,14 @@ export class ContactsService {
     for (const { contact, customFields } of parsed) {
       const existingContact = contact.email ? existingByEmail.get(contact.email.toLowerCase()) : null;
 
-      const saved = await this.contactRepository.save({
+      // create() instantiates a ContactEntity so the @BeforeInsert /
+      // @BeforeUpdate listener fires for both new and existing contacts.
+      const contactEntity = this.contactRepository.create({
         ...(existingContact ?? { accountId, isActive: true, isValid: true }),
         ...contact,
         accountId,
-      } as ContactEntity);
+      });
+      const saved = await this.contactRepository.save(contactEntity);
 
       const cfRows: Partial<ContactCustomFieldEntity>[] = [];
       for (const [name, value] of Object.entries(customFields)) {

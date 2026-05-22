@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn, OneToMany, BeforeInsert, AfterInsert, AfterLoad } from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn, OneToMany, BeforeInsert, BeforeUpdate, AfterInsert, AfterLoad } from 'typeorm';
 import { createHash } from 'crypto';
 import { ContactTagEntity } from './contact-tag.entity';
 import { ContactCustomFieldEntity } from './contact-custom-field.entity';
@@ -205,7 +205,12 @@ export class ContactEntity {
   })
   contactDevices?: ContactDeviceEntity[];
 
+  // Runs on both insert and update so the email-derived fields
+  // (email_provider, hashed_email) are never left stale. `hasPhone` is
+  // guarded: on a partial update where `phone` is not loaded, leaving it
+  // alone avoids clobbering the persisted value to false.
   @BeforeInsert()
+  @BeforeUpdate()
   setUserDetails() {
     if (this.email) {
       this.email = this.email.toLowerCase();
@@ -214,7 +219,9 @@ export class ContactEntity {
       this.hasEmail = true;
     }
 
-    this.hasPhone = !!this.phone;
+    if (this.phone !== undefined) {
+      this.hasPhone = !!this.phone;
+    }
   }
 
   @AfterInsert()
