@@ -20,8 +20,8 @@ import { ContactCustomFieldEntity } from '../entities/contact-custom-field.entit
 // Idempotency/resume: the unique constraint on (contact_id, custom_field_id)
 // was dropped (migration 1708357825013), so existing (contact, field) pairs are
 // pre-filtered in-memory per page. The step owns the `contact_custom_fields`
-// checkpoint; reprocessing a page never duplicates. Existing values are not
-// overwritten (import is insert-once).
+// checkpoint; reprocessing a page never duplicates. Existing pairs are upserted
+// (value/time/number refreshed) so a re-import reflects changed field values.
 @Injectable()
 export class ContactCustomFieldsImporter implements ImporterStep {
   readonly name = 'contact_custom_fields';
@@ -70,6 +70,12 @@ export class ContactCustomFieldsImporter implements ImporterStep {
           const toInsert = rows.filter((r) => !existingPairs.has(`${r.contactId}:${r.customFieldId}`)).map((r) => ({ ...r, accountId: ctx.accountId as number }));
           if (toInsert.length > 0) {
             await txRepo.createQueryBuilder().insert().values(toInsert).updateEntity(false).orIgnore().execute();
+          }
+          // Upsert: refresh value/time/number for pairs that already exist so a
+          // re-import reflects changed field values (not just new links).
+          for (const r of rows) {
+            if (!existingPairs.has(`${r.contactId}:${r.customFieldId}`)) continue;
+            await txRepo.update({ contactId: r.contactId, customFieldId: r.customFieldId, accountId: ctx.accountId as number }, { value: r.value, time: r.time, number: r.number });
           }
         });
       }

@@ -43,6 +43,12 @@ class FakeRepo {
     };
     return qb;
   }
+  update(criteria: any, patch: any) {
+    for (const row of this.rows) {
+      if (Object.entries(criteria).every(([k, v]) => row[k] === v)) Object.assign(row, patch);
+    }
+    return Promise.resolve();
+  }
 }
 
 class TestImporter extends BaseImporter<any> {
@@ -142,6 +148,21 @@ describe('BaseImporter', () => {
     expect(repo.rows).toHaveLength(1);
     expect(repo.rows[0].firstName).toBe('Ana'); // snake_case first_name -> firstName
     expect(repo.rows[0].accountId).toBe(99); // still forced to the ctx account
+  });
+
+  it('account-scope upsert: re-importing an existing row updates its columns (no duplicate)', async () => {
+    const repo = new FakeRepo(['id', 'accountId', 'name', 'extra']);
+    const imp1 = new TestImporter();
+    imp1.pages = [{ results: [{ id: 1, name: 'x', extra: 'A' }], page: 1 }];
+    await imp1.run(makeCtx(repo, 'account'));
+    expect(repo.rows).toHaveLength(1);
+    expect(repo.rows[0].extra).toBe('A');
+
+    const imp2 = new TestImporter();
+    imp2.pages = [{ results: [{ id: 1, name: 'x', extra: 'B' }], page: 1 }];
+    await imp2.run(makeCtx(repo, 'account'));
+    expect(repo.rows).toHaveLength(1); // matched by natural key, not duplicated
+    expect(repo.rows[0].extra).toBe('B'); // refreshed from source
   });
 
   it('is idempotent: reprocessing the same page does not duplicate', async () => {

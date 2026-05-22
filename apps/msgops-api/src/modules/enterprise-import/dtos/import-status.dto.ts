@@ -19,6 +19,7 @@ export interface ImportStatusDto {
   enterpriseBaseUrl: string;
   progress: Record<string, ImportProgressEntry>;
   checkpoint: { entity?: string; page?: number; accountId?: number };
+  selectedSteps: string[] | null;
   error: string | null;
   createdBy: number | null;
   createdAt: Date;

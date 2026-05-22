@@ -19,6 +19,7 @@ export interface ImportStatusResponse {
   enterpriseBaseUrl: string;
   progress: Record<string, ImportProgressEntry>;
   checkpoint: { entity?: string; page?: number; accountId?: number };
+  selectedSteps: string[] | null;
   error: string | null;
   createdBy: number | null;
   createdAt: string;
@@ -31,6 +32,9 @@ export interface CreateImportInput {
   accountData: { name: string; description?: string; isActive?: boolean; isInternal?: boolean };
   enterpriseBaseUrl: string;
   enterpriseApiKey: string;
+  // Selective re-import: only these pipeline steps run (parents auto-included
+  // server-side). Omit for a full import.
+  selectedSteps?: string[];
 }
 
 export const importGateway = {

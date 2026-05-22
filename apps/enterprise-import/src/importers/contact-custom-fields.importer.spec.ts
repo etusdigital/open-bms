@@ -24,6 +24,12 @@ class FakeRepo {
     };
     return qb;
   }
+  update(criteria: any, patch: any) {
+    for (const row of this.rows) {
+      if (Object.entries(criteria).every(([k, v]) => (row as any)[k] === v)) Object.assign(row, patch);
+    }
+    return Promise.resolve();
+  }
 }
 
 jest.mock('typeorm', () => ({
@@ -124,14 +130,14 @@ describe('ContactCustomFieldsImporter', () => {
     expect(repo.rows).toEqual([{ contactId: 42, customFieldId: 7, value: 'x', time: null, number: null, accountId: 99 }]);
   });
 
-  it('is idempotent: pre-existing pairs are not re-inserted', async () => {
+  it('upsert: pre-existing pairs are updated (not duplicated), new ones inserted', async () => {
     const repo = new FakeRepo();
     repo.rows.push({ contactId: 1, customFieldId: 500, accountId: 99, value: 'old', time: null, number: null });
     const imp = new ContactCustomFieldsImporter();
     const pages = [
       {
         results: [
-          { contactId: 10, customFieldId: 100, value: 'new-but-existing' },
+          { contactId: 10, customFieldId: 100, value: 'refreshed' },
           { contactId: 10, customFieldId: 200, value: 'fresh' },
         ],
         page: 1,
@@ -141,9 +147,10 @@ describe('ContactCustomFieldsImporter', () => {
 
     await imp.run(makeCtx(repo, 'account', pages, idMap));
 
-    // existing (1,500) untouched (value not overwritten); only (1,600) added
+    // existing (1,500) refreshed in place (value 'old' -> 'refreshed'), no dup;
+    // (1,600) inserted new.
     expect(repo.rows).toEqual([
-      { contactId: 1, customFieldId: 500, accountId: 99, value: 'old', time: null, number: null },
+      { contactId: 1, customFieldId: 500, accountId: 99, value: 'refreshed', time: null, number: null },
       { contactId: 1, customFieldId: 600, value: 'fresh', time: null, number: null, accountId: 99 },
     ]);
   });

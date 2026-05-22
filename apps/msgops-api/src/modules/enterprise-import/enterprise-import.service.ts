@@ -67,7 +67,7 @@ export class EnterpriseImportService {
     return this.resolveJobAndEnqueue(
       account.id,
       safeBaseUrl,
-      { enterpriseApiKey: dto.enterpriseApiKey, enterpriseSourceAccountId: dto.enterpriseSourceAccountId },
+      { enterpriseApiKey: dto.enterpriseApiKey, enterpriseSourceAccountId: dto.enterpriseSourceAccountId, selectedSteps: dto.selectedSteps },
       userId,
       reusedAccount,
     );
@@ -104,7 +104,7 @@ export class EnterpriseImportService {
   private async resolveJobAndEnqueue(
     accountId: number,
     safeBaseUrl: string,
-    params: { enterpriseApiKey: string; enterpriseSourceAccountId?: number | null },
+    params: { enterpriseApiKey: string; enterpriseSourceAccountId?: number | null; selectedSteps?: string[] | null },
     userId: number,
     reusedAccount: boolean,
   ): Promise<{ accountId: number; jobId: string }> {
@@ -122,6 +122,7 @@ export class EnterpriseImportService {
       lastJob.enterpriseSourceAccountId = params.enterpriseSourceAccountId ?? lastJob.enterpriseSourceAccountId ?? null;
       lastJob.enterpriseBaseUrl = safeBaseUrl;
       lastJob.encryptedApiKey = encryptApiKey(params.enterpriseApiKey);
+      lastJob.selectedSteps = params.selectedSteps ?? lastJob.selectedSteps ?? null;
       lastJob.status = 'pending';
       lastJob.error = null;
       lastJob.createdBy = lastJob.createdBy ?? userId ?? null;
@@ -137,6 +138,7 @@ export class EnterpriseImportService {
       scope: 'account',
       enterpriseBaseUrl: safeBaseUrl,
       encryptedApiKey: encryptApiKey(params.enterpriseApiKey),
+      selectedSteps: params.selectedSteps ?? null,
       status: 'pending',
       progress: {},
       checkpoint: {},
@@ -282,6 +284,7 @@ export class EnterpriseImportService {
       enterpriseBaseUrl: job.enterpriseBaseUrl,
       progress: job.progress ?? {},
       checkpoint: job.checkpoint ?? {},
+      selectedSteps: job.selectedSteps ?? null,
       error: job.error,
       createdBy: job.createdBy,
       createdAt: job.createdAt,

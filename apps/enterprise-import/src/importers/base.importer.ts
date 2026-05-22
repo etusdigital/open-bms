@@ -120,6 +120,25 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
           }
         }
 
+        // Account-scope upsert: refresh already-existing rows from the source so
+        // a (selective) re-import updates changed data — names, flags, etc. —
+        // instead of silently skipping it. Matched by natural key; the OSS id
+        // and original created_at are preserved. (Instance-scope is insert-once:
+        // it only runs against an empty OSS.)
+        if (ctx.scope === 'account' && existing.length > 0) {
+          const existingByNk = new Map(existing.map((e: any) => [String(e[nkProp]), e]));
+          for (const c of candidates) {
+            const existingRow = existingByNk.get(c.nk);
+            if (!existingRow) continue;
+            const patch: Record<string, any> = { ...c.row };
+            delete patch[pkProp]; // never change the OSS id
+            delete patch.createdAt; // preserve the original creation timestamp
+            delete patch.updatedAt; // let @UpdateDateColumn set it
+            if (Object.keys(patch).length === 0) continue;
+            await txRepo.update({ [pkProp]: existingRow[pkProp] } as any, patch as any);
+          }
+        }
+
         // Re-read all page rows (preexisting + just inserted) and resolve
         // src->newId by natural key (not positional).
         if (this.recordsIdMapping && ctx.scope === 'account') {

@@ -12,6 +12,7 @@ import { ImportContext } from './importers/importer.interface';
 import { EnterpriseApi4xxError } from './enterprise-client/errors';
 import { rawInsertPreservingPk, dbNameMap } from './raw-insert.util';
 
+import { expandSelectedSteps } from './step-dependencies';
 import { decryptApiKey } from './utils/api-key-encryption.util';
 import { EnterpriseImportJobEntity } from './entities/enterprise-import-job.entity';
 import { AccountEntity } from './entities/account.entity';
@@ -145,8 +146,12 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
     // In instance-scope the checkpoint stores accountId (watermark), not entity.
     const checkpointEntity = ctx.scope === 'account' ? fresh?.checkpoint?.entity : undefined;
     let skipUntil = checkpointEntity ?? null;
+    // Selective re-import: run only the chosen steps (already expanded to
+    // include required parents). null = run the full pipeline.
+    const selected = expandSelectedSteps(fresh?.selectedSteps);
 
     for (const step of this.pipeline.steps) {
+      if (selected && !selected.has(step.name)) continue;
       if (skipUntil && step.name !== skipUntil) continue;
       if (skipUntil && step.name === skipUntil) skipUntil = null;
       await step.run(ctx);
