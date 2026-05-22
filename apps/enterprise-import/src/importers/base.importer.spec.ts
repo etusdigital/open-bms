@@ -10,10 +10,11 @@ class FakeRepo {
   constructor(
     private cols: string[],
     private pk = 'id',
+    private dbNames: Record<string, string> = {},
   ) {}
   get metadata() {
     return {
-      columns: this.cols.map((propertyName) => ({ propertyName, databaseName: propertyName })),
+      columns: this.cols.map((propertyName) => ({ propertyName, databaseName: this.dbNames[propertyName] ?? propertyName })),
       primaryColumns: [{ propertyName: this.pk }],
       tableName: 'tags',
     };
@@ -41,6 +42,12 @@ class FakeRepo {
       },
     };
     return qb;
+  }
+  update(criteria: any, patch: any) {
+    for (const row of this.rows) {
+      if (Object.entries(criteria).every(([k, v]) => row[k] === v)) Object.assign(row, patch);
+    }
+    return Promise.resolve();
   }
 }
 
@@ -127,6 +134,35 @@ describe('BaseImporter', () => {
     const bySrc = new Map(rec.map((r) => [r.src, r.nid]));
     expect(bySrc.get(500)).toBe(repo.rows.find((r) => r.name === 'b').id);
     expect(bySrc.get(400)).toBe(repo.rows.find((r) => r.name === 'a').id);
+  });
+
+  it('maps snake_case source keys (databaseName) onto camelCase columns', async () => {
+    // The /contacts list serializes raw snake_case; ensure those land in their
+    // columns instead of being dropped (the firstName/lastName regression).
+    const repo = new FakeRepo(['id', 'accountId', 'name', 'firstName'], 'id', { accountId: 'account_id', firstName: 'first_name' });
+    const imp = new TestImporter();
+    imp.pages = [{ results: [{ id: 1, account_id: 7, name: 'x', first_name: 'Ana' }], page: 1 }];
+
+    await imp.run(makeCtx(repo, 'account'));
+
+    expect(repo.rows).toHaveLength(1);
+    expect(repo.rows[0].firstName).toBe('Ana'); // snake_case first_name -> firstName
+    expect(repo.rows[0].accountId).toBe(99); // still forced to the ctx account
+  });
+
+  it('account-scope upsert: re-importing an existing row updates its columns (no duplicate)', async () => {
+    const repo = new FakeRepo(['id', 'accountId', 'name', 'extra']);
+    const imp1 = new TestImporter();
+    imp1.pages = [{ results: [{ id: 1, name: 'x', extra: 'A' }], page: 1 }];
+    await imp1.run(makeCtx(repo, 'account'));
+    expect(repo.rows).toHaveLength(1);
+    expect(repo.rows[0].extra).toBe('A');
+
+    const imp2 = new TestImporter();
+    imp2.pages = [{ results: [{ id: 1, name: 'x', extra: 'B' }], page: 1 }];
+    await imp2.run(makeCtx(repo, 'account'));
+    expect(repo.rows).toHaveLength(1); // matched by natural key, not duplicated
+    expect(repo.rows[0].extra).toBe('B'); // refreshed from source
   });
 
   it('is idempotent: reprocessing the same page does not duplicate', async () => {

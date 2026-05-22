@@ -58,6 +58,11 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
     const meta = repo.metadata;
     const columnProps = new Set(meta.columns.map((c) => c.propertyName));
     const dbNameByProp = new Map(meta.columns.map((c) => [c.propertyName, c.databaseName]));
+    // Reverse map so snake_case source keys (databaseName) also land in their
+    // column. The /contacts list serializes raw snake_case (first_name, ...),
+    // unlike other endpoints that emit camelCase property names; without this,
+    // every multi-word column (firstName/lastName/emailProvider/...) is dropped.
+    const propByDbName = new Map(meta.columns.map((c) => [c.databaseName, c.propertyName]));
     const tableName = meta.tableName;
     const pkProp = meta.primaryColumns[0]?.propertyName ?? 'id';
     const nkProp = this.naturalKey[0];
@@ -75,7 +80,7 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
       const candidates: Array<{ src: any; row: Record<string, any>; nk: string }> = [];
       const seen = new Set<string>();
       for (const src of resp.results) {
-        const row = await this.buildRow(ctx, src, columnProps, pkProp);
+        const row = await this.buildRow(ctx, src, columnProps, propByDbName, pkProp);
         if (row === null) continue;
         const nkVal = String(src[nkProp] ?? row[nkProp] ?? '');
         if (!nkVal || seen.has(nkVal)) continue;
@@ -112,6 +117,25 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
               .updateEntity(false)
               .orIgnore() // safety net; real idempotency comes from the pre-filter
               .execute();
+          }
+        }
+
+        // Account-scope upsert: refresh already-existing rows from the source so
+        // a (selective) re-import updates changed data — names, flags, etc. —
+        // instead of silently skipping it. Matched by natural key; the OSS id
+        // and original created_at are preserved. (Instance-scope is insert-once:
+        // it only runs against an empty OSS.)
+        if (ctx.scope === 'account' && existing.length > 0) {
+          const existingByNk = new Map(existing.map((e: any) => [String(e[nkProp]), e]));
+          for (const c of candidates) {
+            const existingRow = existingByNk.get(c.nk);
+            if (!existingRow) continue;
+            const patch: Record<string, any> = { ...c.row };
+            delete patch[pkProp]; // never change the OSS id
+            delete patch.createdAt; // preserve the original creation timestamp
+            delete patch.updatedAt; // let @UpdateDateColumn set it
+            if (Object.keys(patch).length === 0) continue;
+            await txRepo.update({ [pkProp]: existingRow[pkProp] } as any, patch as any);
           }
         }
 
@@ -160,10 +184,16 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
 
   // Copies only source properties that are entity columns; adjusts the PK
   // (drop in account-scope, preserve in instance-scope) and remaps FKs.
-  private async buildRow(ctx: ImportContext, src: any, columnProps: Set<string>, pkProp: string): Promise<Record<string, any> | null> {
+  // Accepts source keys as either the entity propertyName (camelCase) or the
+  // column databaseName (snake_case); camelCase wins if both are present.
+  private async buildRow(ctx: ImportContext, src: any, columnProps: Set<string>, propByDbName: Map<string, string>, pkProp: string): Promise<Record<string, any> | null> {
     const row: Record<string, any> = {};
     for (const key of Object.keys(src ?? {})) {
-      if (columnProps.has(key)) row[key] = src[key];
+      const prop = columnProps.has(key) ? key : propByDbName.get(key);
+      if (!prop) continue;
+      // A snake_case key must not clobber a value already set from camelCase.
+      if (key !== prop && prop in row) continue;
+      row[prop] = src[key];
     }
     // PK: account-scope lets the sequence assign; instance-scope preserves it.
     if (ctx.scope === 'account') {

@@ -518,6 +518,33 @@ export class ContactsService {
     }
   }
 
+  // Bulk feed of contact<->custom-field VALUES for the Enterprise import worker.
+  // The contacts list only embeds `tags`; custom field values live in
+  // contacts_custom_fields and are otherwise only serialized per-contact by
+  // findOneById. This paginates the join rows (account-scoped via the API key)
+  // so the importer can stream them and rebuild the relation. `totalItems` is
+  // omitted on purpose (no COUNT over a large table); the caller paginates
+  // until a short page.
+  async findCustomFieldValuesPaginated(params: ContactsPageDto): Promise<PaginationDto<any>> {
+    try {
+      const accountId = this.cls.get('accountId');
+      const page = Number(params.page) || 1;
+      const itemsPerPage = Number(params.itemsPerPage) || 1000;
+      const results = await this.contactCustomFieldsRepository.query(
+        `SELECT contact_id AS "contactId", custom_field_id AS "customFieldId", value, time, number
+           FROM contacts_custom_fields
+          WHERE account_id = $1
+          ORDER BY contact_id, custom_field_id
+          LIMIT $2 OFFSET $3`,
+        [accountId, itemsPerPage, (page - 1) * itemsPerPage],
+      );
+      return new PaginationDto<any>({ results, page, itemsPerPage } as any);
+    } catch (e) {
+      console.error(e);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
   private filterContactsByTags(query: SelectQueryBuilder<ContactEntity>, params: ContactsPageDto) {
     query.andWhere(
       `EXISTS (

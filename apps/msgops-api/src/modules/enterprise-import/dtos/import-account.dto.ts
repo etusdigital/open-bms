@@ -10,6 +10,23 @@ const createAccountSchema = Joi.object({
   defaultDomain: Joi.string().allow('', null).optional(),
 }).unknown(true);
 
+// Pipeline step names eligible for selective (re-)import. Keep in sync with the
+// worker pipeline (apps/enterprise-import). The worker expands the chosen set to
+// include required parents; this just guards against unknown names.
+export const IMPORT_STEPS = [
+  'tags',
+  'custom-fields',
+  'labels',
+  'email-templates',
+  'custom-events',
+  'contacts',
+  'contact_tags',
+  'contact_custom_fields',
+  'automations',
+  'campaigns',
+  'messages',
+] as const;
+
 @JoiSchemaOptions({ stripUnknown: true })
 export class ImportAccountDto {
   @JoiSchema(createAccountSchema.required())
@@ -29,6 +46,16 @@ export class ImportAccountDto {
   // the statistics rollup is skipped (no way to resolve the source account).
   @JoiSchema(Joi.number().integer().positive().optional())
   enterpriseSourceAccountId?: number;
+
+  // Selective (re-)import: only these steps run (parents auto-included by the
+  // worker). Absent/empty = full pipeline.
+  @JoiSchema(
+    Joi.array()
+      .items(Joi.string().valid(...IMPORT_STEPS))
+      .min(1)
+      .optional(),
+  )
+  selectedSteps?: string[];
 }
 
 @JoiSchemaOptions({ stripUnknown: true })

@@ -18,6 +18,7 @@ import {
 import { setupGateway } from '@/features/setup/setup-gateway';
 import { ImportStatusView } from '@/features/super-admin/accounts/import-status-view';
 import { useImportStatus } from '@/features/super-admin/accounts/use-import-status';
+import { useActiveImportStore } from '@/features/super-admin/accounts/active-import-store';
 
 interface Props {
   onComplete: () => void;
@@ -51,6 +52,8 @@ export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
   // duplicate polling). Used only to detect failure.
   const { data: jobStatus } = useImportStatus(jobId ?? undefined);
   const failed = jobStatus?.status === 'failed';
+  const completed = jobStatus?.status === 'completed';
+  const setActiveImport = useActiveImportStore((s) => s.setActiveImport);
 
   // Reset-on-open then load the step 1 account (for the checkbox). getStatus
   // runs AFTER the reset because the reset recreates the step 1 account server-side.
@@ -123,7 +126,10 @@ export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
       const payload = buildPayload();
       lastSubmitRef.current = payload;
       const res = await setupGateway.importEnterprise(payload);
-      if (res.jobId) setJobId(res.jobId);
+      if (res.jobId) {
+        setJobId(res.jobId);
+        setActiveImport(res.jobId); // global progress toast follows the user past this step
+      }
     } catch (err) {
       setError(extractError(err, 'Erro ao iniciar import.'));
     } finally {
@@ -141,6 +147,7 @@ export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
       await setupGateway.resetEnterpriseImport();
       const res = await setupGateway.importEnterprise(lastSubmitRef.current);
       setJobId(res.jobId ?? null);
+      if (res.jobId) setActiveImport(res.jobId);
     } catch (err) {
       setError(extractError(err, 'Erro ao reiniciar o import.'));
     } finally {
@@ -228,8 +235,8 @@ export function Step2EnterpriseImport({ onComplete, onBack }: Props) {
                 {submitting ? 'Reiniciando…' : 'Tentar novamente'}
               </Button>
             )}
-            <Button onClick={onComplete} disabled={submitting}>
-              Continuar mesmo assim
+            <Button onClick={onComplete} disabled={submitting} variant={completed ? 'default' : 'secondary'}>
+              {completed ? 'Concluído — continuar' : 'Continuar mesmo assim'}
             </Button>
           </div>
         </div>

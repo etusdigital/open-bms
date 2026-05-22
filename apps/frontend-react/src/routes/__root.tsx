@@ -1,6 +1,7 @@
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
+import { ActiveImportToast } from '@/features/super-admin/accounts/active-import-toast';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ThemeProvider } from '@/lib/theme';
 import { queryClient } from '@/lib/query-client';
@@ -20,6 +21,7 @@ function RootComponent() {
         <TooltipProvider>
           <Outlet />
           <Toaster />
+          <ActiveImportToast />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

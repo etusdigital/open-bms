@@ -2185,7 +2185,20 @@
           "customEvents": "Eventos personalizados",
           "automations": "Automações",
           "campaigns": "Campanhas",
-          "messages": "Mensagens"
+          "messages": "Mensagens",
+          "contactTags": "Contatos × Tags",
+          "contactCustomFields": "Contatos × Campos personalizados"
+        },
+        "toast": {
+          "running": "Importando do Enterprise",
+          "completed": "Importação concluída",
+          "failed": "A importação falhou",
+          "view": "Ver"
+        },
+        "selective": {
+          "title": "Importar seletivamente (avançado)",
+          "help": "Deixe tudo desmarcado para importar tudo. Marque itens para um re-import pontual — itens relacionados são incluídos e travados automaticamente. Atualiza os existentes e traz os novos.",
+          "required": "incluído por dependência"
         }
       }
     },

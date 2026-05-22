@@ -2185,7 +2185,20 @@
           "customEvents": "Custom events",
           "automations": "Automations",
           "campaigns": "Campaigns",
-          "messages": "Messages"
+          "messages": "Messages",
+          "contactTags": "Contacts × Tags",
+          "contactCustomFields": "Contacts × Custom fields"
+        },
+        "toast": {
+          "running": "Importing from Enterprise",
+          "completed": "Import completed",
+          "failed": "Import failed",
+          "view": "View"
+        },
+        "selective": {
+          "title": "Selective import (advanced)",
+          "help": "Leave everything unchecked to import all. Check items for a targeted re-import — related items are auto-included and locked. Updates existing records and brings new ones.",
+          "required": "included by dependency"
         }
       }
     },

@@ -44,6 +44,11 @@ export class EnterpriseImportJobEntity {
   @Column('jsonb', { name: 'checkpoint', default: () => `'{}'` })
   checkpoint: { entity?: string; page?: number; accountId?: number };
 
+  // Subconjunto de passos do pipeline a rodar (re-import seletivo). null/vazio =
+  // pipeline completo. O worker expande pra incluir os pais obrigatórios.
+  @Column('jsonb', { name: 'selected_steps', nullable: true })
+  selectedSteps: string[] | null;
+
   @Column('text', { name: 'error', nullable: true })
   error: string | null;
 
