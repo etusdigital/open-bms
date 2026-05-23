@@ -1,33 +1,46 @@
 // k6 mock: fires synthetic SendGrid event-webhook batches at event-receiver.
 //
 // Real-world routing is SendGrid → event-receiver (host port 4011) → AMQP
-// → event-process. The actual /sendgrid endpoint inside event-process isn't
-// exposed to the host, so we drive the pipeline from its public ingress —
-// same path production traffic takes.
+// → event-process. The actual /internal/event/sendgrid endpoint inside
+// event-process isn't exposed to the host, so we drive the pipeline from
+// its public ingress — same path production traffic takes.
 //
-// Event-receiver auth: header `x-internal-token` (INTERNAL_AUTH_TOKEN). The
-// EVO-1443 spec mentions HMAC, but this stack uses shared-secret bearer auth
-// across all webhook providers (see apps/event-process/src/app.controller.ts);
-// HMAC only applies to providers whose real SaaS APIs require it (Mailersend,
-// Resend Svix, Mandrill).
+// Wire format mirrors what apps/sendgrid-mock/main.go fires when msgops-api
+// registers SendGrid: POST to `${SENDGRID_WEBHOOK_URL_BASE}` which compose
+// pins to `http://event-receiver:3011/bms/events?platform=sendgrid&account=<id>`.
+// event-receiver harvests `platform` + `account` from the querystring and
+// stores `request.body` in `message.payload`. The downstream consumer reads
+// `events.payload: SendgridPayload[]` and `events.account: string`, so the
+// HTTP body MUST be the raw event array — no envelope.
+//
+// Auth: event-receiver is unauthenticated at the network edge (it's the
+// public webhook ingress). The shared-secret gate (`x-internal-token`) sits
+// between the AMQP consumer and the internal /internal/event/sendgrid bridge
+// — see packages/messaging/src/http-bridge.ts. We don't need it on the
+// receiver request. HMAC mentioned in the EVO-1443 spec only applies to
+// providers whose real SaaS APIs require it (Mailersend / Resend Svix /
+// Mandrill).
 //
 //   k6 run \
-//     -e EVENTS=1000 -e BATCH=50 \
+//     -e DELIVERIES=1000 -e BATCH=50 \
 //     tests/load/_shared/mock-webhook/sendgrid-events.js
 //
 // Tunables:
-//   EVENTS        total events to deliver (default 1000)
-//   BATCH         events per webhook POST (default 50; SendGrid batches up to ~1k)
+//   DELIVERIES    total `delivered` events to emit (default 1000).
+//                 EVENTS is accepted as a back-compat alias.
+//   BATCH         events per webhook POST (default 50; real SendGrid batches up to ~1k)
 //   ACCOUNT_ID    target account_id seeded in PG (default 1 = bootstrap admin)
 //   RATIO_OPEN    open/delivered ratio (default 0.4)
 //   RATIO_CLICK   click/delivered ratio (default 0.05)
+//
+// Total events fired ≈ DELIVERIES × (1 + RATIO_OPEN + RATIO_CLICK × RATIO_OPEN).
 
 import http from 'k6/http';
 import { check } from 'k6';
 import { SharedArray } from 'k6/data';
-import { EVENT_RECEIVER_URL, INTERNAL_AUTH_TOKEN } from '../k6/config.js';
+import { EVENT_RECEIVER_URL } from '../k6/config.js';
 
-const TOTAL = Number(__ENV.EVENTS || 1000);
+const TOTAL = Number(__ENV.DELIVERIES || __ENV.EVENTS || 1000);
 const BATCH = Number(__ENV.BATCH || 50);
 const ACCOUNT_ID = String(__ENV.ACCOUNT_ID || '1');
 const RATIO_OPEN = Number(__ENV.RATIO_OPEN || 0.4);
@@ -60,6 +73,8 @@ const batches = new SharedArray('sendgrid-batches', function () {
 });
 
 function buildBatch(offset, size) {
+  // Each entry is a SendgridPayload — the array IS the request body, matching
+  // SendGrid's real Event Webhook format.
   const events = [];
   for (let i = 0; i < size; i++) {
     const id = offset + i;
@@ -100,21 +115,16 @@ function buildBatch(offset, size) {
       });
     }
   }
-  return {
-    payload: events,
-    platform: 'EMAIL',
-    account: ACCOUNT_ID,
-  };
+  return events;
 }
+
+const POST_URL = `${EVENT_RECEIVER_URL}/bms/events?platform=sendgrid&account=${encodeURIComponent(ACCOUNT_ID)}`;
 
 export default function () {
   const idx = __ITER % batches.length;
   const body = JSON.stringify(batches[idx]);
-  const res = http.post(`${EVENT_RECEIVER_URL}/bms/events?platform=sendgrid`, body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'x-internal-token': INTERNAL_AUTH_TOKEN,
-    },
+  const res = http.post(POST_URL, body, {
+    headers: { 'Content-Type': 'application/json' },
     tags: { endpoint: 'sendgrid-webhook' },
   });
   check(res, { 'webhook accepted': (r) => r.status >= 200 && r.status < 300 });

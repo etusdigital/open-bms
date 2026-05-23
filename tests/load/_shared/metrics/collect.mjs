@@ -143,7 +143,14 @@ function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
-    if (k.startsWith('--')) out[k.slice(2)] = argv[++i];
+    if (!k.startsWith('--')) continue;
+    const next = argv[i + 1];
+    if (next == null || next.startsWith('--')) {
+      out[k.slice(2)] = true;
+    } else {
+      out[k.slice(2)] = next;
+      i++;
+    }
   }
   return out;
 }

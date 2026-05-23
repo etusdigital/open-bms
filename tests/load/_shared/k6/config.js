@@ -1,6 +1,8 @@
 // Shared k6 config. Each test imports `stages` and `thresholds` and overrides
-// PROFILE via env: PROFILE=1k|10k|100k|1m. Stages climb in order so the same
-// script reuses the harness across bateria EVO-1442.
+// PROFILE via env: PROFILE=smoke|1k|10k|100k|1M. Stages climb in order so the
+// same script reuses the harness across bateria EVO-1442. Case-insensitive
+// match — `1m` is also accepted for ergonomics but normalized to `1M` to
+// avoid confusion with k6's `1m` duration literal.
 
 const PROFILES = {
   smoke: [
@@ -23,14 +25,15 @@ const PROFILES = {
     { duration: '15m', target: 500 },
     { duration: '2m', target: 0 },
   ],
-  '1m': [
+  '1M': [
     { duration: '5m', target: 1000 },
     { duration: '45m', target: 1000 },
     { duration: '5m', target: 0 },
   ],
 };
 
-const profile = (__ENV.PROFILE || 'smoke').toLowerCase();
+const rawProfile = __ENV.PROFILE || 'smoke';
+const profile = rawProfile === '1m' || rawProfile === '1M' ? '1M' : rawProfile.toLowerCase();
 if (!PROFILES[profile]) {
   throw new Error(`Unknown PROFILE=${profile}. Valid: ${Object.keys(PROFILES).join(', ')}`);
 }

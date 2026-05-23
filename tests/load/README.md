@@ -44,8 +44,9 @@ node tests/load/_shared/metrics/collect.mjs \
   --interval 10000 &
 METRICS_PID=$!
 
-# 4. Mock de webhook (1k eventos SendGrid sintéticos)
-k6 run -e EVENTS=1000 -e BATCH=50 \
+# 4. Mock de webhook (1k entregas SendGrid sintéticas;
+#    +open/click follow-ups conforme RATIO_OPEN / RATIO_CLICK)
+k6 run -e DELIVERIES=1000 -e BATCH=50 \
   tests/load/_shared/mock-webhook/sendgrid-events.js
 
 # 5. Para o sidecar e gera a linha de relatório
@@ -88,8 +89,11 @@ O sidecar `collect.mjs` precisa de acesso aos containers — só faz sentido rod
 `--host`). Em staging, rode-o via SSH no nó:
 
 ```bash
-ssh staging "cd /opt/bms && node tests/load/_shared/metrics/collect.mjs --out /tmp/metrics" &
+ssh staging 'cd /opt/bms && nohup node tests/load/_shared/metrics/collect.mjs --out /tmp/metrics >/tmp/metrics/collect.log 2>&1 &'
 ```
+
+(O `&` puro em `ssh "cmd &"` não desconecta — ssh fica preso esperando o FD
+fechar. `nohup … &` redireciona stdout/stderr e libera o canal.)
 
 ## Critério de "limite"
 
@@ -104,13 +108,23 @@ Esses thresholds vêm direto do AC do EVO-1443 e estão duplicados em
 
 ## Notas de implementação
 
-- **Webhook auth**: a stack usa `x-internal-token` (não HMAC) — todas as rotas
-  em `apps/event-process/src/app.controller.ts` exigem esse header. O AC do
-  EVO-1443 menciona HMAC porque providers reais (Mailersend / Resend / Mandrill)
-  sim usam, mas o gate de entrada local é shared-secret. `INTERNAL_AUTH_TOKEN`
-  é o mesmo valor do `docker-compose.yml`.
-- **Event-process não exposto**: webhooks vão pra `event-receiver:4011`, que é
-  o entrypoint real de produção; ele encaminha via AMQP pro event-process.
+- **Webhook auth — onde mora o gate**: `event-receiver` (porta 4011, entrypoint
+  público) **não autentica** — `apps/event-receiver/src/app.controller.ts` é um
+  `@Post(['/*'])` sem guard. Ele apenas embrulha o request e publica no AMQP.
+  O `x-internal-token` é injetado **depois**, pelo consumer AMQP, quando ele
+  reposta a mensagem em `/internal/event/sendgrid` no event-process (via
+  `packages/messaging/src/http-bridge.ts`). Por isso o `sendgrid-events.js` não
+  manda token — o gate não vê o request HTTP do mock. HMAC só aparece em
+  providers cujos SaaS exigem (Mailersend Svix / Resend Svix / Mandrill).
+- **Event-process não exposto**: webhooks vão pra `event-receiver` (host
+  4011 → container 3011); ele encaminha via AMQP pro event-process.
+- **Wire format**: o mock posta um **array cru** de `SendgridPayload` em
+  `/bms/events?platform=sendgrid&account=<id>`. O receiver harvesta
+  `platform` + `account` da querystring (`message.payload = request.body`),
+  então quem consome em event-process recebe `{ payload: [...], platform,
+account }` — exatamente o shape de `SendgridEvent` em
+  `apps/event-process/src/events/interfaces/events.interfaces.ts:78`. Não
+  embrulhe os eventos num envelope manual; o receiver já faz isso.
 - **Reuso EVO-1023/1037**: o `sendgrid-mock` que já roda na stack
   (`docker-compose.yml`, porta 4010) gera webhooks reais quando msgops-api manda
   um send — em testes que envolvem o caminho campanha → envio, **prefira deixar

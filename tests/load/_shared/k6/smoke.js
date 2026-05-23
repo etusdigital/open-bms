@@ -8,16 +8,14 @@
 
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { BASE_URL, thresholds } from './config.js';
+import { BASE_URL, stages, thresholds } from './config.js';
 import { login, authHeaders } from './auth.js';
 import { businessLatency, businessErrors } from './metrics.js';
 
+// Defaults to PROFILE=smoke. Override with `-e PROFILE=1k|10k|100k|1M` to
+// validate that the harness scales — same script, no edits.
 export const options = {
-  stages: [
-    { duration: '5s', target: 1 },
-    { duration: '10s', target: 2 },
-    { duration: '5s', target: 0 },
-  ],
+  stages,
   thresholds,
 };
 

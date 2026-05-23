@@ -76,7 +76,7 @@ async function main() {
       values.push(...row);
     }
     const sql = `INSERT INTO contacts (${cols.join(',')}) VALUES ${placeholders.join(',')}
-                 ON CONFLICT DO NOTHING`;
+                 ON CONFLICT ON CONSTRAINT contact_email_unique DO NOTHING`;
     await client.query(sql, values);
     inserted += size;
     if (offset % (args.batch * 10) === 0) {

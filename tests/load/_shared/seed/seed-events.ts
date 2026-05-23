@@ -81,11 +81,19 @@ async function main() {
       placeholders.push(`($${base + 1}::int, $${base + 2}::timestamptz, $${base + 3}::timestamptz, $${base + 4}::timestamptz)`);
       values.push(id, t.open || null, t.click || null, t.sent || null);
     });
+    // Mirror the timestamp into the *_date sister column. Segments built in
+    // the UI (tag-process) filter on the date variants for "last open in past
+    // N days" style predicates — leaving them NULL means EVO-1073 segments
+    // miss the seeded population entirely. Migration 1683231120217 added
+    // these columns as nullable, so we cast the timestamp to date in PG.
     await client.query(
       `UPDATE contacts c SET
-         last_open  = COALESCE(v.last_open,  c.last_open),
-         last_click = COALESCE(v.last_click, c.last_click),
-         last_sent  = COALESCE(v.last_sent,  c.last_sent)
+         last_open       = COALESCE(v.last_open,  c.last_open),
+         last_click      = COALESCE(v.last_click, c.last_click),
+         last_sent       = COALESCE(v.last_sent,  c.last_sent),
+         last_open_date  = COALESCE(v.last_open::date,  c.last_open_date),
+         last_click_date = COALESCE(v.last_click::date, c.last_click_date),
+         last_sent_date  = COALESCE(v.last_sent::date,  c.last_sent_date)
        FROM (VALUES ${placeholders.join(',')}) AS v(id, last_open, last_click, last_sent)
        WHERE c.id = v.id AND c.account_id = $${values.length + 1}`,
       [...values, args.account],
