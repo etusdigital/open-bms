@@ -270,7 +270,7 @@ export class AppService {
       const minute = Math.floor(Math.random() * 59 + 1);
       const second = Math.floor(Math.random() * 59 + 1);
       const scheduleDate = dayjs()
-        .tz('America/Sao_Paulo')
+        .tz(accountTimeZone || 'America/Sao_Paulo')
         .add(1, 'day')
         .set('hour', hour)
         .set('minute', minute)
