@@ -431,7 +431,12 @@ describe('AppService', () => {
       msgopsService.updateTag.mockResolvedValue({} as any);
 
       await expect(appService.processSegment(segmentId)).rejects.toThrow('Error executing segment');
-      expect(mockRedisClient.eval).toHaveBeenCalled();
+      expect(mockRedisClient.eval).toHaveBeenCalledWith(
+        expect.stringContaining("redis.call('get', KEYS[1]) == ARGV[1]"),
+        1,
+        `processingsegment:${segmentId}`,
+        expect.any(String),
+      );
     });
 
     it('should set segment to INACTIVE when not real-time and no campaigns', async () => {
@@ -454,6 +459,68 @@ describe('AppService', () => {
         segmentId,
         expect.objectContaining({ status: SegmentStatus.INACTIVE }),
       );
+    });
+
+    // EVO-1439: the `isRealTimeSegment` gate was dropped from the
+    // auto-deactivation block. Real-time segments older than 7 days with no
+    // linked campaigns are now eligible for INACTIVE just like non-real-time
+    // ones. Lock down the new behavior so it doesn't regress silently.
+    it('should set real-time segment to INACTIVE when old and no campaigns', async () => {
+      const segment = createTag({
+        id: segmentId,
+        isRealTimeSegment: true,
+        type: 'segment',
+        status: SegmentStatus.ACTIVE,
+        segmentInfo: [],
+        createdAt: new Date('2020-01-01'),
+      });
+      msgopsService.getTagById.mockResolvedValue(segment);
+      msgopsService.findAccount.mockResolvedValue(createAccount());
+      msgopsService.queryRunner.mockResolvedValue([{ count: 0 }]);
+      msgopsService.processSegment.mockResolvedValue({ insertIds: null, deleteIds: null });
+      msgopsService.updateTag.mockResolvedValue({} as any);
+
+      const result = await appService.processSegment(segmentId);
+      expect(result).toEqual({ status: 200, message: expect.stringContaining('Segment inactive') });
+      expect(msgopsService.updateTag).toHaveBeenCalledWith(
+        segmentId,
+        expect.objectContaining({ status: SegmentStatus.INACTIVE }),
+      );
+    });
+
+    it('should skip auto-deactivation for segment-base-size even when old and no campaigns', async () => {
+      const segment = createTag({
+        id: segmentId,
+        type: 'segment-base-size',
+        isRealTimeSegment: false,
+        status: SegmentStatus.ACTIVE,
+        segmentInfo: [],
+        createdAt: new Date('2020-01-01'),
+      });
+      msgopsService.getTagById.mockResolvedValue(segment);
+      msgopsService.findAccount.mockResolvedValue(createAccount());
+      msgopsService.processSegment.mockResolvedValue({ insertIds: [], deleteIds: [] });
+      msgopsService.getNumberContactsByTag.mockResolvedValue({
+        total: 0,
+        email: 0,
+        mobile_push: 0,
+        web_push: 0,
+        phone: 0,
+        whatsapp: 0,
+      });
+      msgopsService.updateTag.mockResolvedValue({} as any);
+
+      await appService.processSegment(segmentId);
+
+      // segmentActive() must NOT be consulted — base-size segments bypass the
+      // whole deactivation block.
+      expect(msgopsService.queryRunner).not.toHaveBeenCalled();
+      // Final updateTag should not flip status to INACTIVE.
+      const updateCalls = msgopsService.updateTag.mock.calls;
+      const inactiveCall = updateCalls.find(
+        ([, patch]) => patch?.status === SegmentStatus.INACTIVE && patch?.scheduleCloudTaskId === null,
+      );
+      expect(inactiveCall).toBeUndefined();
     });
 
     it('should handle externalQuerySteps in segment', async () => {

@@ -393,12 +393,20 @@ export class AppService {
       // Compare-and-delete: only release if our token still owns the key.
       // Guards against releasing a lock that's been re-acquired after our TTL
       // expired (e.g. a stuck run that exceeded 1900s).
-      await redisClient.eval(
+      const released = await redisClient.eval(
         "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
         1,
         redisKey,
         lockToken,
       );
+      if (released === 0) {
+        // Run exceeded TTL — a parallel worker may have acquired the lock and
+        // be processing the same segment concurrently. Surface so we can tune
+        // the TTL or investigate stuck runs.
+        this.trackerService.logInfo(
+          `[Segment][WARN] Lock release no-op for ${id} — TTL expired mid-run, concurrent processing possible`,
+        );
+      }
     }
   }
 

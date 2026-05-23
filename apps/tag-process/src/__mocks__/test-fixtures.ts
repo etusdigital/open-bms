@@ -115,6 +115,9 @@ export function createTag(overrides: Partial<TagEntity> = {}): TagEntity {
     lastCountWhatsapp: 0,
     status: 'active',
     isRealTimeSegment: true,
+    // Default fixture is "fresh" (today) so the 7-day auto-deactivation
+    // branch is skipped. Tests that need an old segment must override
+    // `createdAt` explicitly.
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
