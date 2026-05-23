@@ -198,6 +198,17 @@ export class AppService {
     }
     const currentTaskId = segment.scheduleCloudTaskId;
     const account = await this.msgopsService.findAccount(segment.accountId);
+    if (!account) {
+      this.trackerService.logInfo(
+        `[Segment] Account ${segment.accountId} not found or inactive — skipping segment ${id} and stopping further scheduling`,
+      );
+      await this.msgopsService.updateTag(segment.id, {
+        status: SegmentStatus.INACTIVE,
+        scheduleCloudTaskId: null,
+      });
+      await redisClient.del(redisKey);
+      return { status: 200, message: `[Segment] Account inactive for segment: ${id}` };
+    }
 
     try {
       segment.segmentInfo = !segment.segmentInfo ? [] : segment.segmentInfo;
