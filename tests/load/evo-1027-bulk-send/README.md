@@ -19,7 +19,7 @@ Reutilizamos `apps/sendgrid-mock` que já está na stack. `msgops-api` aponta `S
 
 ### Trigger da campanha
 
-`msgops-api` agenda via BullMQ (`SchedulerService.create`) → no `scheduleTo` o scheduler HTTP-POST `http://campaign-packer:3000/create-contacts-send/:id`. Pra medição **limpa** (sem jitter de scheduler), k6 chama o endpoint do packer **diretamente**. Pra isso, expomos `campaign-packer` em `4001:3000` no compose.
+`msgops-api` agenda via BullMQ (`SchedulerService.create`) → no `scheduleTo` o scheduler HTTP-POST `http://campaign-packer:3000/create-contacts-send/:id`. Pra medição **limpa** (sem jitter de scheduler), k6 chama o endpoint do packer **diretamente** — o container k6 é anexado à network do compose (`docker run --network <bms-net>`) e bate em `campaign-packer:3000` sem precisar de port-mapping no host.
 
 Modo alternativo (não default): setar `scheduleTo = now + 5s` e medir scheduler+packer fim-a-fim. Útil quando interessa o caminho real do botão "Enviar".
 

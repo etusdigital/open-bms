@@ -17,7 +17,7 @@
  *   --count N       quantidade de contatos a criar (default 1000)
  *   --batch N       tamanho do batch de insert de contatos (default 1000)
  *   --label STR     sufixo no nome da account (default timestamp)
- *   --dsn URL       PG DSN (default postgres://postgres:postgres@localhost:65432/msgops)
+ *   --dsn URL       PG DSN (default postgres://postgres:postgres@localhost:55432/msgops)
  *   --teardown      apaga account+children e sai
  *   --account N     account_id alvo do teardown
  */
@@ -40,9 +40,9 @@ function parseArgs(): Args {
     count: 1000,
     batch: 1000,
     label: String(Date.now()),
-    dsn: process.env.PG_DSN || 'postgres://postgres:postgres@localhost:65432/msgops',
+    dsn: process.env.PG_DSN || 'postgres://postgres:postgres@localhost:55432/msgops',
     teardown: false,
-    mockBase: process.env.SENDGRID_MOCK_BASE || 'http://localhost:4010',
+    mockBase: process.env.SENDGRID_MOCK_BASE || 'http://localhost:3010',
     eventReceiverBase: process.env.EVENT_RECEIVER_INTERNAL_BASE || 'http://event-receiver:3011',
   };
   const argv = process.argv.slice(2);

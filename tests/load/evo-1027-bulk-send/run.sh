@@ -21,7 +21,7 @@
 #   ./tests/load/evo-1027-bulk-send/run.sh --max 50k       # vai até 50k
 #
 # Env:
-#   PG_DSN                     postgres://postgres:postgres@localhost:65432/msgops
+#   PG_DSN                     postgres://postgres:postgres@localhost:55432/msgops
 #   BMS_NETWORK                bms-monorepo-open-source2_default
 #   PACKER_INTERNAL            campaign-packer:3000
 #   K6_IMAGE                   grafana/k6:latest
@@ -33,14 +33,28 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 SCENARIO_DIR="$REPO_ROOT/tests/load/evo-1027-bulk-send"
 SHARED_DIR="$REPO_ROOT/tests/load/_shared"
 
-PG_DSN="${PG_DSN:-postgres://postgres:postgres@localhost:65432/msgops}"
+PG_DSN="${PG_DSN:-postgres://postgres:postgres@localhost:55432/msgops}"
 BMS_NETWORK="${BMS_NETWORK:-bms-monorepo-open-source2_default}"
 PACKER_INTERNAL="${PACKER_INTERNAL:-campaign-packer:3000}"
 K6_IMAGE="${K6_IMAGE:-grafana/k6:latest}"
 DRAIN_TIMEOUT_S="${DRAIN_TIMEOUT_S:-900}"
-REDIS_CONTAINER="${REDIS_CONTAINER:-bms-monorepo-open-source2-redis-1}"
-POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-bms-monorepo-open-source2-postgres-1}"
 
+# Container names: resolve via `docker compose ps` so we don't hardcode the
+# project name (would break under COMPOSE_PROJECT_NAME or a different clone
+# directory). Allow env override for exotic setups.
+cd "$REPO_ROOT"
+REDIS_CONTAINER="${REDIS_CONTAINER:-$(docker compose ps -q redis 2>/dev/null | head -1)}"
+POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-$(docker compose ps -q postgres 2>/dev/null | head -1)}"
+if [[ -z "$REDIS_CONTAINER" || -z "$POSTGRES_CONTAINER" ]]; then
+  echo "ERROR: could not resolve redis/postgres containers via 'docker compose ps'." >&2
+  echo "       Make sure the stack is running ('docker compose up -d'), or set" >&2
+  echo "       REDIS_CONTAINER / POSTGRES_CONTAINER env vars explicitly." >&2
+  exit 1
+fi
+
+# Full ladder. Default range is "1k → 50k" (the cheap shakeout); use --max to
+# extend (e.g. --max 1M) or --levels to override completely.
+ALL_LEVELS=("1k" "10k" "50k" "100k" "250k" "500k" "1M")
 LEVELS=("1k" "10k" "50k")
 MAX_LEVEL=""
 
@@ -54,8 +68,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -n "$MAX_LEVEL" ]]; then
+  # --max extends from ALL_LEVELS (1k → 1M), not from the default LEVELS
+  # subset — otherwise --max 1M would silently stop at 50k.
+  if ! printf '%s\n' "${ALL_LEVELS[@]}" | grep -qx "$MAX_LEVEL"; then
+    echo "unknown level for --max: $MAX_LEVEL (valid: ${ALL_LEVELS[*]})" >&2
+    exit 1
+  fi
   filtered=()
-  for l in "${LEVELS[@]}"; do
+  for l in "${ALL_LEVELS[@]}"; do
     filtered+=("$l")
     [[ "$l" == "$MAX_LEVEL" ]] && break
   done
@@ -151,7 +171,7 @@ run_level() {
   mkdir -p "$metrics_out"
   node "$SHARED_DIR/metrics/collect.mjs" --out "$metrics_out" --interval 10000 \
     --queues 'campaign-packer,campaign-schedule-page,send-email,event-process' \
-    --redis 'redis://localhost:16379' --pg "$PG_DSN" \
+    --redis "${REDIS_URL:-redis://localhost:56379}" --pg "$PG_DSN" \
     >"$metrics_out/sidecar.log" 2>&1 &
   local metrics_pid=$!
   trap "kill $metrics_pid 2>/dev/null || true" EXIT
