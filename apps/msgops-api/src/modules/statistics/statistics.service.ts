@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { DashboardStatisticsDto, StatisticsDto } from './dto/statistics.dto';
 import { SchedulerService } from 'src/providers/queue/scheduler.service';
 import { QUEUE_BMS_USAGE } from 'src/providers/queue/queue.constants';
@@ -27,6 +27,7 @@ dayjs.extend(isSameOrAfter);
 
 @Injectable()
 export class StatisticsService {
+  private readonly logger = new Logger(StatisticsService.name);
   private redisClient: Redis;
   constructor(
     private readonly scheduler: SchedulerService,
@@ -559,11 +560,43 @@ export class StatisticsService {
     return campaigns;
   }
 
+  // Parses accounts_configs.value into an array. Handles correct JSON array
+  // shape and the legacy Postgres text-array literal (`{"<json>","<json>",...}`)
+  // produced when a JS array was passed to a TEXT column without stringifying.
+  private parseAccountConfigArray(raw: string | null | undefined, accountId?: number): any[] | null {
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      if (raw.startsWith('{') && raw.endsWith('}')) {
+        try {
+          const elements: string[] = JSON.parse(`[${raw.slice(1, -1)}]`);
+          return elements.map((s) => JSON.parse(s));
+        } catch (err) {
+          this.logger.warn(`Failed to parse legacy account_config value for account ${accountId ?? 'unknown'}: ${err}`);
+          return null;
+        }
+      }
+      this.logger.warn(`account_config value for account ${accountId ?? 'unknown'} is neither JSON nor legacy array literal — cost calc will treat as zero`);
+      return null;
+    }
+  }
+
   async findAccountUsage(accountId: number, date: string) {
-    const account = await this.accountService.findOne(accountId);
+    const account = await this.accountService.findOneIncludingDeleted(accountId);
 
     if (!account) {
       throw new HttpException('Account not exists.', HttpStatus.UNAUTHORIZED);
+    }
+
+    if (account.deletedAt) {
+      // Stop the daily snapshot chain for soft-deleted accounts so the scheduler
+      // doesn't keep retrying. Historical rows in accounts_usages are preserved.
+      // 410 Gone is semantically correct and lets HTTP callers (dashboard) and
+      // scheduler workers branch explicitly instead of seeing an empty 200 body.
+      this.logger.log(`Skipping accounts_usage snapshot for ${accountId}: account is soft-deleted`);
+      throw new HttpException('Account is deleted.', HttpStatus.GONE);
     }
 
     const email = await this.getTotalUsage('email', accountId, date, 'delivered');
@@ -679,7 +712,8 @@ export class StatisticsService {
     for (const acc of accounts) {
       const costConfig = acc.configByName('account_costs');
       if (costConfig) {
-        costConfigsByAccountId.set(acc.id, JSON.parse(costConfig.value));
+        const parsed = this.parseAccountConfigArray(costConfig.value, acc.id);
+        if (parsed) costConfigsByAccountId.set(acc.id, parsed);
       }
     }
 

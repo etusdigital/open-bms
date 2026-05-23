@@ -24,15 +24,19 @@ const audienceStepItemSchema = z.object({
     .optional(),
 });
 
+// The backend returns `null` (not `undefined`) for fields that don't apply to
+// the message's channel — e.g. SMS messages come back with `subject: null`,
+// `fromMail: null`, `fromName: null`. `.optional()` accepts `undefined` but
+// NOT `null`, which silently breaks the form on edit. Mark these as nullable.
 const campaignMessageSchema = z
   .object({
-    id: z.number().optional(),
-    title: z.string().optional(),
-    subject: z.string().optional(),
-    fromName: z.string().optional(),
-    fromMail: z.string().optional(),
-    content: z.string().optional(),
-    messageId: z.number().optional(),
+    id: z.number().nullable().optional(),
+    title: z.string().nullable().optional(),
+    subject: z.string().nullable().optional(),
+    fromName: z.string().nullable().optional(),
+    fromMail: z.string().nullable().optional(),
+    content: z.string().nullable().optional(),
+    messageId: z.number().nullable().optional(),
   })
   .passthrough();
 

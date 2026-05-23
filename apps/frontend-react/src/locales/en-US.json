@@ -782,6 +782,7 @@
     "weekDaysRequired": "Select at least one day of the week",
     "minTwoMessages": "Select at least 2 messages for A/B or Split campaigns",
     "duplicateMessageWarning": "Cannot use the same message more than once",
+    "invalidFormFields": "Please review the highlighted fields before saving.",
     "conflictTitle": "Duplicate campaign name",
     "conflictText": "Campaigns with this name already exist. Save anyway?",
     "conflictConfirm": "Save anyway",

@@ -257,6 +257,8 @@ export interface AutomationPayload {
   target?: string;
   labels?: Array<{ id: number; name: string }>;
   flowLayout?: FlowLayout | null;
+  /** ISO timestamp of the loaded automation; sent on update so the API can reject stale writes */
+  updatedAt?: string;
 }
 
 // ---------------------------------------------------------------------------

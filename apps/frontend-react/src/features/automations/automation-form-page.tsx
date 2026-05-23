@@ -223,6 +223,7 @@ export default function AutomationFormPage({ automationId }: AutomationFormPageP
       target: metadata.target || undefined,
       labels: metadata.labels,
       flowLayout: restoredLayout,
+      updatedAt: automation?.updatedAt,
     };
 
     savingRef.current = true;
@@ -241,7 +242,7 @@ export default function AutomationFormPage({ automationId }: AutomationFormPageP
         savingRef.current = false;
       },
     });
-  }, [previewAudit, previewEditorState, automationId, metadata, isActive, updateMutation, t]);
+  }, [previewAudit, previewEditorState, automationId, metadata, isActive, updateMutation, t, automation?.updatedAt]);
 
   // Last saved time
   const lastSavedText = automation?.updatedAt
@@ -320,6 +321,7 @@ export default function AutomationFormPage({ automationId }: AutomationFormPageP
         target: metadata.target || undefined,
         labels: metadata.labels,
         flowLayout,
+        ...(isEditing && { updatedAt: automation?.updatedAt }),
       };
 
       // Clear previous error
@@ -370,7 +372,7 @@ export default function AutomationFormPage({ automationId }: AutomationFormPageP
         });
       }
     },
-    [metadata, isActive, automationId, isEditing, createMutation, updateMutation, navigate, t],
+    [metadata, isActive, automationId, isEditing, createMutation, updateMutation, navigate, t, automation?.updatedAt],
   );
 
   // ---------------------------------------------------------------------------

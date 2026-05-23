@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
 import { Form } from '@/components/ui/form';
@@ -181,11 +181,21 @@ export default function CampaignForm({
 
   const preparePayload = (data: CampaignFormValues): CampaignFormValues => {
     const now = new Date().toISOString();
+    // testAB/split init defaults `scheduleTo` and `testabScheduleTo` to the
+    // current ISO timestamp the moment the user changes `type`. If the user
+    // takes a few seconds to reach the Schedule step, those timestamps fall
+    // into the past and the backend rejects with 422 ("date cannot be in the
+    // past"). Bump any defaulted timestamp that is in the past so the payload
+    // always carries a future timestamp.
+    const bumpIfPast = (iso: string): string => {
+      if (!iso) return now;
+      return new Date(iso).getTime() < Date.now() ? now : iso;
+    };
     return {
       ...data,
-      scheduleTo: data.scheduleTo || now,
-      testabScheduleTo: data.testabScheduleTo || now,
-      testabScheduleEnd: data.testabScheduleTo || now,
+      scheduleTo: bumpIfPast(data.scheduleTo),
+      testabScheduleTo: bumpIfPast(data.testabScheduleTo),
+      testabScheduleEnd: bumpIfPast(data.testabScheduleTo),
       steps: data.steps?.length
         ? data.steps
         : [[{ type: 'tag' as const, conditional_tag: 'in' as const, tag_id: [], tag_info: [] }]],
@@ -208,6 +218,53 @@ export default function CampaignForm({
       return;
     }
     onSubmit(preparePayload({ ...data, status: CampaignStatus.Scheduled }));
+  };
+
+  // Without this, `form.handleSubmit(handleFormSubmit)` silently no-ops when
+  // Zod validation fails — no toast, no console, the button just dies.
+  // Map each schema field to the step that owns it, so we can navigate the
+  // wizard back to the first offending step and surface the issue.
+  // Typed as a full Record (not Partial) so adding a new field to
+  // CampaignFormValues without updating this map is a TypeScript error —
+  // otherwise the fallback path here would silently skip navigation again.
+  // `null` = field has no associated step (programmatic or always-visible).
+  const STEP_BY_FIELD: Record<keyof CampaignFormValues, number | null> = {
+    title: 0,
+    name: 0,
+    description: 0,
+    type: 0,
+    messageType: 0,
+    labels: 0,
+    labelContent: 0,
+    steps: 1,
+    sendToAll: 1,
+    sendAfterCreate: 1,
+    runSegment: 1,
+    campaignMessage: 2,
+    scheduleTo: 3,
+    spreadSending: 3,
+    isRateLimit: 3,
+    recurrenceSettings: 3,
+    testabScheduleTo: 3,
+    testabScheduleEnd: 3,
+    testabAudiencePercent: 3,
+    testabCriteria: 3,
+    testabSentAfterTest: 3,
+    confirmSaveDuplicate: null,
+    status: null,
+  };
+
+  const handleInvalidSubmit = (errors: FieldErrors<CampaignFormValues>) => {
+    const errorFields = Object.keys(errors) as (keyof CampaignFormValues)[];
+    const stepsWithErrors = errorFields
+      .map((field) => STEP_BY_FIELD[field])
+      .filter((step): step is number => step !== null && step !== undefined);
+    const firstStep = stepsWithErrors.length ? Math.min(...stepsWithErrors) : null;
+
+    if (firstStep !== null && firstStep < stepsConfig.length) {
+      setCurrentStep(firstStep);
+    }
+    toast.error(t('campaigns.invalidFormFields'));
   };
 
   const handleSaveDraft = () => {
@@ -251,6 +308,7 @@ export default function CampaignForm({
         return (
           <SettingsStep
             form={form}
+            campaignId={campaignId}
             isCampaignRule={isCampaignRule}
             isInternal={isInternal}
             disableSimple={disableSimple}
@@ -308,7 +366,11 @@ export default function CampaignForm({
               </Button>
             )}
             {isLastStep ? (
-              <Button type="button" disabled={isPending} onClick={() => void form.handleSubmit(handleFormSubmit)()}>
+              <Button
+                type="button"
+                disabled={isPending}
+                onClick={() => void form.handleSubmit(handleFormSubmit, handleInvalidSubmit)()}
+              >
                 {isPending ? t('common.loading') : isEditing ? t('common.save') : t('common.create')}
               </Button>
             ) : (

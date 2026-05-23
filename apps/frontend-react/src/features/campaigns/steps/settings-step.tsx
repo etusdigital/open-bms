@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { type UseFormReturn } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -147,32 +147,53 @@ export default function SettingsStep({
 
   const maxTitleLength = CAMPAIGN_TITLE_MAX;
 
+  // Snapshot of title/UTM at first render. Used to suppress duplicate-name
+  // warnings in edit mode when the user has not modified the field — mirrors
+  // Vue2 where `validateCampaign` only fires on user input, never on hydration.
+  const initialTitle = useRef(form.getValues('title') ?? '');
+  const initialName = useRef(form.getValues('name') ?? '');
+
   // Debounced name validation — mirrors Vue2 debouncedValidateTitle/debouncedValidateName
   const debouncedTitle = useDebounce(title ?? '', 300);
   const utmName = form.watch('name');
   const debouncedUtmName = useDebounce(utmName ?? '', 300);
   const { data: titleValidation } = useValidateCampaignName(debouncedTitle, 'title', campaignId);
   const { data: nameValidation } = useValidateCampaignName(debouncedUtmName, 'name', campaignId);
-  const isTitleTaken = Array.isArray(titleValidation) && titleValidation.length > 0;
-  const isNameTaken = isInternal && !isCampaignRule && Array.isArray(nameValidation) && nameValidation.length > 0;
+
+  const titleDivergedFromInitial = !campaignId || debouncedTitle !== initialTitle.current;
+  const nameDivergedFromInitial = !campaignId || debouncedUtmName !== initialName.current;
+
+  const isTitleTaken = titleDivergedFromInitial && Array.isArray(titleValidation) && titleValidation.length > 0;
+  const isNameTaken =
+    isInternal &&
+    !isCampaignRule &&
+    nameDivergedFromInitial &&
+    Array.isArray(nameValidation) &&
+    nameValidation.length > 0;
 
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [labelSearch, setLabelSearch] = useState('');
   const debouncedLabelSearch = useDebounce(labelSearch, 300);
   const { data: labelOptions = [], isLoading: labelsLoading } = useLabelsForCampaign(debouncedLabelSearch);
 
-  // Track if UTM was manually edited
+  // Tracks whether the UTM was manually edited. While false, typing in the
+  // title regenerates the slug — both on create and edit, mirroring Vue2.
+  // Improvement over Vue2: once the user types in the UTM field, further
+  // title edits stop overwriting it (Vue2 would always overwrite).
   const utmManuallyEdited = useRef(false);
 
-  // Auto-generate UTM name from title
-  useEffect(() => {
-    if (isInternal && !isCampaignRule && !utmManuallyEdited.current) {
-      const generated = replaceSpecialChars(title ?? '').substring(0, CAMPAIGN_TITLE_MAX_INTERNAL);
-      form.setValue('name', generated);
-    }
-  }, [title, isInternal, isCampaignRule, form]);
-
   const showInternalFields = isInternal && !isCampaignRule;
+
+  const handleTitleChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    fieldOnChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
+  ) => {
+    fieldOnChange(e);
+    if (showInternalFields && !utmManuallyEdited.current) {
+      const generated = replaceSpecialChars(e.target.value).substring(0, CAMPAIGN_TITLE_MAX_INTERNAL);
+      form.setValue('name', generated, { shouldDirty: true, shouldValidate: false });
+    }
+  };
 
   const toggleLabel = (labelId: number, labelName: string) => {
     const current = form.getValues('labels') ?? [];
@@ -221,6 +242,7 @@ export default function SettingsStep({
                         maxLength={maxTitleLength}
                         placeholder={t('campaigns.namePlaceholder')}
                         data-testid="campaign-title"
+                        onChange={(e) => handleTitleChange(e, field.onChange)}
                       />
                     </FormControl>
                     <FormMessage />
