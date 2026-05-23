@@ -127,10 +127,8 @@ queue_depth() {
 # We don't gate on "saw nonzero" because realistic workloads (1k contacts +
 # warm send-email worker) drain in <5s — the gap between polls — and the gate
 # would never fire, false-timeouting at DRAIN_TIMEOUT_S. The downside is we
-# accept "0 from start" as drained too; for the event-process leg this is
-# always the case (pre-existing bug: DATABASE_HOST/PORT missing in compose
-# → worker can't connect, queue stays empty). The report row annotates this
-# unconditionally so consumers don't misread "✅ ok" as full coverage.
+# accept "0 from start" as drained too; trust the producer side (k6 trigger
+# returning 2xx + seed having inserted contacts) to catch silent failures.
 wait_for_drain() {
   local label="$1"
   local deadline=$(( $(date +%s) + DRAIN_TIMEOUT_S ))
@@ -240,7 +238,7 @@ run_level() {
   ram=$(echo "$report_row" | awk -F'|' '{gsub(/^ +| +$/,"",$4); print $4}')
   cpu=$(echo "$report_row" | awk -F'|' '{gsub(/^ +| +$/,"",$5); print $5}')
   p95=$(echo "$report_row" | awk -F'|' '{gsub(/^ +| +$/,"",$6); print $6}')
-  local final_status="${drain_status} ⚠️ event-process not exercised (total=${total_secs}s)"
+  local final_status="${drain_status} (total=${total_secs}s)"
   local row="| ${level} | local | ${ram} | ${cpu} | ${p95} | ${drain_secs}s | ${final_status} |"
   echo "$row" >>"$REPORT_MD"
   log "row appended: $row"

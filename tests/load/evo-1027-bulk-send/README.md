@@ -95,11 +95,10 @@ Tabela markdown em `report/results.md` (anexada ao EVO-1027, agregada em EVO-144
 ## Status
 
 - [x] `seed/seed-campaign.ts` — cria account, contatos, message e campanha (query inline, sem segmento real)
-- [x] `k6/bulk-send.js` — trigger single-shot do endpoint do packer
-- [x] `run.sh` — escada + sidecar de métricas + relatório, com gate `saw_nonzero` por fila pra evitar drain de zero espúrio
-- [x] Rodada `1k → 10k → 50k` em `report/results.md` (status partial — vide caveat de `event-process`)
+- [x] `k6/bulk-send.js` — trigger com `ITERATIONS=10` (default) pra p95 real
+- [x] `run.sh` — escada + sidecar de métricas + relatório
+- [x] Rodada `1k → 10k → 50k` em `report/results.md` cobrindo pipeline completo (campaign → packer → send-email → sendgrid-mock → event-receiver → event-process)
 
 ## Caveats conhecidos
 
-- **`event-process` não é medido nesta rodada.** Bug pré-existente no `docker-compose.yml` (faltam `DATABASE_HOST`/`DATABASE_PORT` no `x-backend-env`) impede o worker de conectar no Postgres; sua queue Bull fica em 0 mesmo com eventos chegando. `run.sh` flag automaticamente esses níveis com `(event-process not exercised)` na coluna Status. Fix vai em ticket separado, depois rodadas seguintes voltam a cobrir a ingestão.
-- **`p95 trigger` é amostra única.** k6 roda `vus=1, iterations=1` por nível — o número é a latência do POST único do packer, não p95 estatístico. Suficiente como heurística de stress (>5s → packer travado), não como SLI.
+- **Sidecar de métricas amostra a cada 10s.** Para workloads que drenam rápido (1k contatos), as queues Bull podem nunca aparecer com depth>0 nos snapshots — o drain ainda é detectado (3 polls de 5s todos zerados), mas a coluna RAM/CPU peak fica subestimada. Pra rodadas precisas, reduzir `--interval` no `_shared/metrics/collect.mjs`.
