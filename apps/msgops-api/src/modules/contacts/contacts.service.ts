@@ -466,6 +466,20 @@ export class ContactsService {
         this.filterSpecificContacts(query, params);
       }
 
+      // Page-only fetch. `total` below intentionally reflects the page
+      // size, not the total matching rows for the account. Counting the
+      // full result set inline would add ~300ms on accounts with millions
+      // of contacts (COUNT(*) is index-only but still scans), blocking
+      // the list from rendering.
+      //
+      // Clients that need the real count should call either:
+      //   - GET /contacts/dashboard for the unfiltered total (a cached
+      //     aggregate the dashboard cards already consume), or
+      //   - GET /contacts?countOnly=true&...filters for the filtered
+      //     count (short-circuits to `query.getCount()` above).
+      //
+      // The Vue2 client orchestrated this for years; the React client
+      // follows the same pattern. See use-contacts.ts → useContactsTotal.
       const results = await query
         .orderBy(`contacts.${sortBy}`, `${order}`)
         .select([`*`])

@@ -30,6 +30,6 @@ export function useSearchMessages({ title, messageType }: SearchMessagesParams) 
       });
       return data.results ?? [];
     },
-    enabled: auth.status === 'authenticated' && title.length > 0,
+    enabled: auth.status === 'authenticated',
   });
 }

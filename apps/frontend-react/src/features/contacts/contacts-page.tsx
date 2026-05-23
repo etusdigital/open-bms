@@ -15,7 +15,7 @@ import { ListPage } from '@/components/list-page';
 import { useListSearchParams } from '@/hooks/use-list-search-params';
 import type { ContactsSearchParams } from './contacts-search-schema';
 import { usePermissions } from '@/hooks/use-permissions';
-import { useContactsList, useContactDashboard, useDeleteContact } from './use-contacts';
+import { useContactsList, useContactDashboard, useContactsTotal, useDeleteContact } from './use-contacts';
 import { useContactsColumns, selectColumn } from './contacts-columns';
 import { ContactsFilterBar } from './components/contacts-filter-bar';
 import { BulkActionsBar } from './components/bulk-actions-bar';
@@ -94,7 +94,10 @@ export default function ContactsPage({ searchParams }: ContactsPageProps) {
   const allColumns = useMemo(() => [selectColumn, ...entityColumns], [entityColumns]);
 
   const data = query.data?.data ?? EMPTY_ARRAY;
-  const totalRows = query.data?.meta.total ?? 0;
+  // Total comes from a separate source (dashboard aggregate when unfiltered,
+  // countOnly endpoint when filtered) so the list endpoint can stay fast on
+  // large accounts. See use-contacts.ts → useContactsTotal.
+  const { total: totalRows } = useContactsTotal(searchParams);
   const totalPages = Math.ceil(totalRows / searchParams.pageSize);
 
   const table = useReactTable({

@@ -29,14 +29,15 @@ describe('EventPublisherService', () => {
     expect(() => new EventPublisherService()).toThrow(/AMQP_URL/);
   });
 
-  it('asserts all four published exchanges on bootstrap', async () => {
+  it('asserts all published exchanges on bootstrap', async () => {
     const svc = new EventPublisherService();
     await svc.onModuleInit();
-    expect(ensureReadyMock).toHaveBeenCalledTimes(4);
+    expect(ensureReadyMock).toHaveBeenCalledTimes(5);
     expect(ensureReadyMock).toHaveBeenCalledWith('bms.email');
     expect(ensureReadyMock).toHaveBeenCalledWith('bms.push');
     expect(ensureReadyMock).toHaveBeenCalledWith('bms.sms');
     expect(ensureReadyMock).toHaveBeenCalledWith('bms.whatsapp');
+    expect(ensureReadyMock).toHaveBeenCalledWith('bms.tags');
   });
 
   it('coerces boolean header values to "true"/"false" strings', async () => {

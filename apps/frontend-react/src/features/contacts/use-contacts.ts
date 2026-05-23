@@ -12,6 +12,38 @@ import type { ContactEditValues } from './contact-schema';
 import { toast } from 'sonner';
 import i18n from '@/lib/i18n';
 
+/**
+ * Builds the filter query params shared by the list and count requests.
+ * `page`/`itemsPerPage` are NOT included here so the same builder can feed
+ * both the paginated list and the `countOnly=true` aggregate.
+ */
+function buildContactFilterParams(params: ContactsSearchParams) {
+  return {
+    ...(params.search && { title: params.search }),
+    ...(params.tags && { tags: parseCsvIds(params.tags) }),
+    ...(params.segments && { segments: parseCsvIds(params.segments) }),
+    ...(params.status === 'active' && { isActive: true }),
+    ...(params.status === 'unsubscribed' && { isUnsubscribed: true }),
+    ...(params.status === 'bounced' && { hasBounced: true }),
+    ...(params.status === 'blocked' && { isBlocked: true }),
+    ...(params.startDate && { startDate: params.startDate }),
+    ...(params.endDate && { endDate: params.endDate }),
+  };
+}
+
+/** Are any of the contact filters active? Used to decide whether the total
+ *  comes from the cached dashboard aggregate or from a filtered countOnly call. */
+export function hasContactFilters(params: ContactsSearchParams): boolean {
+  return Boolean(
+    params.tags ||
+      params.segments ||
+      params.search ||
+      params.startDate ||
+      params.endDate ||
+      (params.status && params.status !== 'all'),
+  );
+}
+
 async function fetchContactsList(
   params: ContactsSearchParams,
   signal?: AbortSignal,
@@ -20,23 +52,18 @@ async function fetchContactsList(
     params: {
       page: params.page,
       itemsPerPage: params.pageSize,
-      ...(params.search && { title: params.search }),
       ...(params.sort && { sort: params.sort, order: params.order }),
-      ...(params.tags && { tags: parseCsvIds(params.tags) }),
-      ...(params.segments && { segments: parseCsvIds(params.segments) }),
-      ...(params.status === 'active' && { isActive: true }),
-      ...(params.status === 'unsubscribed' && { isUnsubscribed: true }),
-      ...(params.status === 'bounced' && { hasBounced: true }),
-      ...(params.status === 'blocked' && { isBlocked: true }),
-      ...(params.startDate && { startDate: params.startDate }),
-      ...(params.endDate && { endDate: params.endDate }),
+      ...buildContactFilterParams(params),
     },
     signal,
   });
   return {
     data: mapContacts(data.results),
     meta: {
-      total: Number(data.totalItems),
+      // The backend intentionally returns page-size as `totalItems` for the
+      // list endpoint (to keep the response fast). Real total comes from
+      // useContactsTotal — do not read meta.total from here.
+      total: data.results?.length ?? 0,
       page: Number(data.page),
       pageSize: Number(data.itemsPerPage),
     },
@@ -53,6 +80,49 @@ export function useContactsList(params: ContactsSearchParams) {
     placeholderData: keepPreviousData,
     enabled: auth.status === 'authenticated',
   });
+}
+
+/**
+ * Total of contacts matching the current filters. Two sources:
+ * - Without filters: reuses the dashboard aggregate (already fetched for
+ *   the "Total contacts" card and cached for 5 minutes).
+ * - With filters: hits GET /contacts?countOnly=true&...filters, which
+ *   short-circuits to a single COUNT(*) in the backend.
+ *
+ * Mirrors the Vue2 orchestration so the list endpoint can stay fast even
+ * on accounts with millions of contacts.
+ */
+export function useContactsTotal(params: ContactsSearchParams) {
+  const auth = useAppStore((s) => s.auth);
+  const accountId = auth.status === 'authenticated' ? auth.account.id : 0;
+  const filtered = hasContactFilters(params);
+
+  const dashboard = useContactDashboard();
+
+  const filteredCount = useQuery({
+    queryKey: [...queryKeys.contacts.all, 'total', { accountId, filters: buildContactFilterParams(params) }],
+    queryFn: async ({ signal }) => {
+      const { data } = await apiClient.get<RawPaginatedResponse<unknown>>('/contacts', {
+        params: { countOnly: true, ...buildContactFilterParams(params) },
+        signal,
+      });
+      return Number(data.totalItems) || 0;
+    },
+    placeholderData: keepPreviousData,
+    enabled: auth.status === 'authenticated' && filtered,
+  });
+
+  if (filtered) {
+    return {
+      total: filteredCount.data ?? 0,
+      isLoading: filteredCount.isLoading,
+    };
+  }
+
+  return {
+    total: dashboard.data?.total ?? 0,
+    isLoading: dashboard.isLoading,
+  };
 }
 
 export function useContact(uuid: string) {

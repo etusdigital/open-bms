@@ -13,6 +13,9 @@ describe('MsgopsService', () => {
     findOneOrFail: jest.fn(),
     merge: jest.fn(),
     update: jest.fn().mockResolvedValue(undefined),
+    manager: {
+      query: jest.fn().mockResolvedValue([{ value: 'UTC' }]),
+    },
   };
 
   const mockCampaignContactRepo = {
@@ -363,7 +366,7 @@ describe('MsgopsService', () => {
       const weekDays = [1, 3, 5]; // Mon, Wed, Fri
       const interval = 1;
 
-      const result = service.nextOccurrence(currentScheduleTo, weekDays, interval);
+      const result = service.nextOccurrence(currentScheduleTo, weekDays, interval, 'UTC');
       expect(result).toBeDefined();
       expect(weekDays).toContain(result.getDay());
     });
@@ -373,7 +376,7 @@ describe('MsgopsService', () => {
       const weekDays = [1]; // Monday
       const interval = 2;
 
-      const result = service.nextOccurrence(currentScheduleTo, weekDays, interval);
+      const result = service.nextOccurrence(currentScheduleTo, weekDays, interval, 'UTC');
       expect(result).toBeDefined();
       expect(result.getDay()).toBe(1);
     });
@@ -383,7 +386,7 @@ describe('MsgopsService', () => {
       const weekDays = [3, 5]; // Wed, Fri
       const interval = 1;
 
-      const result = service.nextOccurrence(currentScheduleTo, weekDays, interval);
+      const result = service.nextOccurrence(currentScheduleTo, weekDays, interval, 'UTC');
       expect(result).toBeDefined();
     });
 
@@ -392,7 +395,7 @@ describe('MsgopsService', () => {
       const weekDays = [1, 3]; // Mon, Wed
       const interval = 1;
 
-      const result = service.nextOccurrence(currentScheduleTo, weekDays, interval);
+      const result = service.nextOccurrence(currentScheduleTo, weekDays, interval, 'UTC');
       expect(result).toBeDefined();
     });
   });
