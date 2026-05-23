@@ -31,6 +31,8 @@ interface Args {
   dsn: string;
   teardown: boolean;
   accountId?: number;
+  mockBase: string;
+  eventReceiverBase: string;
 }
 
 function parseArgs(): Args {
@@ -40,6 +42,8 @@ function parseArgs(): Args {
     label: String(Date.now()),
     dsn: process.env.PG_DSN || 'postgres://postgres:postgres@localhost:65432/msgops',
     teardown: false,
+    mockBase: process.env.SENDGRID_MOCK_BASE || 'http://localhost:4010',
+    eventReceiverBase: process.env.EVENT_RECEIVER_INTERNAL_BASE || 'http://event-receiver:3011',
   };
   const argv = process.argv.slice(2);
   for (let i = 0; i < argv.length; i++) {
@@ -50,6 +54,8 @@ function parseArgs(): Args {
     else if (k === '--dsn') out.dsn = argv[++i];
     else if (k === '--teardown') out.teardown = true;
     else if (k === '--account') out.accountId = Number(argv[++i]);
+    else if (k === '--mock-base') out.mockBase = argv[++i];
+    else if (k === '--event-receiver-base') out.eventReceiverBase = argv[++i];
   }
   return out;
 }
@@ -60,9 +66,65 @@ async function teardown(client: Client, accountId: number) {
   await client.query('DELETE FROM campaigns_messages WHERE campaign_id IN (SELECT id FROM campaigns WHERE account_id=$1)', [accountId]);
   await client.query('DELETE FROM campaigns WHERE account_id=$1', [accountId]);
   await client.query('DELETE FROM messages WHERE account_id=$1', [accountId]);
+  await client.query('DELETE FROM accounts_configs WHERE account_id=$1', [accountId]);
   await client.query('DELETE FROM contacts WHERE account_id=$1', [accountId]);
   await client.query('DELETE FROM accounts WHERE id=$1', [accountId]);
   console.error(`[seed-campaign] teardown done for account_id=${accountId}`);
+}
+
+async function setupSendgridMock(
+  client: Client,
+  accountId: number,
+  mockBase: string,
+  eventReceiverBase: string,
+): Promise<{ apiKey: string; webhookUrl: string }> {
+  // The send-email handler reads `sendgrid_key` from accounts_configs first
+  // (apps/send-email/src/handlers/sendgrid/sendGrid.handler.ts:315). The
+  // @sendgrid/mail SDK validates that keys start with "SG." — so the global
+  // dev placeholder fails. We plant a valid-shaped key per seeded account.
+  const apiKey = 'SG.MOCK_LOAD_EVO1027';
+  // Webhook URL must be reachable BY sendgrid-mock (inside docker network).
+  // sendgrid-mock parses `account=<id>` and routes events to event-receiver.
+  const webhookUrl = `${eventReceiverBase}/bms/events?platform=sendgrid&account=${accountId}`;
+
+  await client.query(
+    `INSERT INTO accounts_configs (account_id, name, description, value, is_load_config)
+     VALUES ($1, 'sendgrid_key', 'EVO-1027 mock key', $2, false),
+            ($1, 'sendgrid_webhook_url', 'EVO-1027 mock webhook', $3, false)
+     ON CONFLICT (account_id, name) DO UPDATE SET value = EXCLUDED.value`,
+    [accountId, apiKey, webhookUrl],
+  );
+
+  // Register webhook on the in-memory sendgrid-mock so it fires synthetic
+  // delivered/open/click events on /v3/mail/send. The mock accepts any
+  // bearer (it stores webhooks keyed by URL).
+  const payload = {
+    enabled: true,
+    url: webhookUrl,
+    friendly_name: `load-evo1027-${accountId}`,
+    bounce: true,
+    click: true,
+    deferred: true,
+    delivered: true,
+    dropped: true,
+    open: true,
+    processed: true,
+    spam_report: true,
+    unsubscribe: true,
+    group_resubscribe: true,
+    group_unsubscribe: true,
+  };
+  const resp = await fetch(`${mockBase}/v3/user/webhooks/event/settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok && resp.status !== 409) {
+    const text = await resp.text();
+    throw new Error(`sendgrid-mock webhook register failed: ${resp.status} ${text}`);
+  }
+  console.error(`[seed-campaign] sendgrid-mock webhook registered → ${webhookUrl}`);
+  return { apiKey, webhookUrl };
 }
 
 async function createAccount(client: Client, label: string): Promise<number> {
@@ -193,6 +255,7 @@ async function main() {
 
   const accountId = await createAccount(client, args.label);
   console.error(`[seed-campaign] account_id=${accountId}`);
+  await setupSendgridMock(client, accountId, args.mockBase, args.eventReceiverBase);
   const contacts = await insertContacts(client, accountId, args.count, args.batch);
   const messageId = await createMessage(client, accountId, args.label);
   console.error(`[seed-campaign] message_id=${messageId}`);
