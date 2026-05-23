@@ -39,14 +39,13 @@ function authenticate(accountName = 'Plusdin', accounts?: { id: number; name: st
     name: accountName,
     description: '',
     isActive: true,
-    isInternal: false,
     groupId: 1,
   };
   const userAccounts = accounts
     ? accounts.map((a) => ({
         accountId: a.id,
         isMasterUser: false,
-        account: { ...a, description: '', isActive: true, isInternal: false, groupId: 1 },
+        account: { ...a, description: '', isActive: true, groupId: 1 },
       }))
     : [{ accountId: 1, isMasterUser: false, account: mainAccount }];
 

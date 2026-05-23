@@ -13,10 +13,6 @@ export class AccountEntity {
 
   @Column('text', { name: 'description' })
   description: string;
-
-  @Column('boolean', { name: 'is_internal', default: false })
-  isInternal: boolean;
-
   @Column('integer', { name: 'group_id' })
   groupId: number;
 

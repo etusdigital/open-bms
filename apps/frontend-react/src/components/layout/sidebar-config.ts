@@ -19,7 +19,6 @@ export interface NavItem {
   route?: string;
   permission?: Permission;
   superAdminOnly?: boolean;
-  internalOnly?: boolean;
   exactMatch?: boolean;
   children?: NavItem[];
 }
@@ -74,7 +73,6 @@ export const MENU_ITEMS: NavItem[] = [
         labelKey: 'sidebar.transactional',
         route: '/messages/transactional',
         permission: 'messages:view',
-        internalOnly: true,
       },
       {
         labelKey: 'sidebar.templates',
@@ -88,7 +86,6 @@ export const MENU_ITEMS: NavItem[] = [
     icon: ShieldCheck,
     route: '/messages/2fa',
     permission: 'messages:view',
-    internalOnly: true,
   },
   {
     labelKey: 'sidebar.contacts',
@@ -119,7 +116,6 @@ export const MENU_ITEMS: NavItem[] = [
         labelKey: 'sidebar.customEvents',
         route: '/custom-events',
         permission: 'audience:custom_fields_view',
-        internalOnly: true,
       },
       {
         labelKey: 'sidebar.unsubscribed',
@@ -150,7 +146,6 @@ export const MENU_ITEMS: NavItem[] = [
     icon: Tag,
     route: '/labels',
     permission: 'infra:view',
-    internalOnly: true,
   },
   {
     labelKey: 'sidebar.superAdmin',

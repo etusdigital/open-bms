@@ -113,22 +113,7 @@ export class ValidLinksService {
         if (!validUrl) {
           return false;
         }
-        if (!this.cls.get('isInternalAccount')) {
-          return true;
-        }
-
-        const headers = {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          Accept: '*/*',
-          'Accept-Language': 'en-US,en;q=0.5',
-          'Accept-Encoding': 'gzip, deflate, br',
-          Connection: 'keep-alive',
-          'Cache-Control': 'no-cache',
-          Pragma: 'no-cache',
-        };
-
-        const checkHead = await this.httpService.head(link, { headers }).toPromise();
-        return checkHead.status < 500 && checkHead.status !== HttpStatus.NOT_FOUND;
+        return true;
       }
 
       return true;

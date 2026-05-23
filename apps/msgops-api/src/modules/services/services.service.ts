@@ -170,16 +170,6 @@ export class ServicesService {
     return await this.contactService.unsubscribedByEmail(this.cls.get('accountId'), email);
   }
 
-  async invalidateInternalAccountsCache(): Promise<{ invalidated: number }> {
-    const accounts = await this.accountService.getInternalAccounts();
-
-    for (const account of accounts) {
-      await this.accountCacheService.invalidateAccountCache(account.id);
-    }
-
-    return { invalidated: accounts.length };
-  }
-
   async processTransactional(transactionalMessage: TransactionalMessage) {
     if (!transactionalMessage.name) {
       throw new HttpException(`Can't process without message name`, HttpStatus.UNPROCESSABLE_ENTITY);

@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { DateRangePicker } from '@/components/date-range-picker';
-import { useAppStore } from '@/stores/app-store';
 import type { StatisticsSearchParams } from '../statistics-search-schema';
 
 interface StatisticsFilterBarProps {
@@ -26,8 +25,6 @@ export function StatisticsFilterBar({
 }: StatisticsFilterBarProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const auth = useAppStore((s) => s.auth);
-  const isInternal = auth.status === 'authenticated' && auth.account.isInternal;
 
   // Re-compute daily — key on the date string so it stays stable within a day
   const dateKey = format(startOfDay(new Date()), 'yyyy-MM-dd');
@@ -64,14 +61,12 @@ export function StatisticsFilterBar({
         className="bg-secondary hover:bg-secondary/80 min-w-[240px]"
       />
 
-      {isInternal && (
-        <div className="flex items-center gap-2">
-          <Switch id="per-user-toggle" checked={showPerUser} onCheckedChange={onTogglePerUser} />
-          <Label htmlFor="per-user-toggle" className="cursor-pointer text-xs font-normal">
-            {t('statistics.perUser')}
-          </Label>
-        </div>
-      )}
+      <div className="flex items-center gap-2">
+        <Switch id="per-user-toggle" checked={showPerUser} onCheckedChange={onTogglePerUser} />
+        <Label htmlFor="per-user-toggle" className="cursor-pointer text-xs font-normal">
+          {t('statistics.perUser')}
+        </Label>
+      </div>
 
       <Button
         variant="outline"

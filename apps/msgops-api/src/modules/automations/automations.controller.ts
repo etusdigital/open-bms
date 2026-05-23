@@ -83,10 +83,8 @@ export class AutomationsController {
         );
       }
 
-      const isInternal = this.cls.get('isInternalAccount');
-      const titleLength = isInternal ? 25 : 40;
-      if (automatioDto.title.length > titleLength) {
-        throw new ForbiddenException('Automation title cannot be longer than ' + titleLength + ' characters');
+      if (automatioDto.title.length > 40) {
+        throw new ForbiddenException('Automation title cannot be longer than 40 characters');
       }
 
       const currentUser = this.cls.get('userId');
@@ -129,10 +127,8 @@ export class AutomationsController {
       );
     }
 
-    const isInternal = this.cls.get('isInternalAccount');
-    const titleLength = isInternal ? 25 : 40;
-    if (automatioDto.title.length > titleLength) {
-      throw new ForbiddenException('Automation title cannot be longer than ' + titleLength + ' characters');
+    if (automatioDto.title.length > 40) {
+      throw new ForbiddenException('Automation title cannot be longer than 40 characters');
     }
 
     const currentUser = this.cls.get('userId');

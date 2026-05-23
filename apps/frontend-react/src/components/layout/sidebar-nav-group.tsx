@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils';
 import { SidebarNavLink } from './sidebar-nav-link';
 import type { NavItem } from './sidebar-config';
 import { usePermissions } from '@/hooks/use-permissions';
-import { useAppStore } from '@/stores/app-store';
 
 interface SidebarNavGroupProps {
   item: NavItem;
@@ -19,11 +18,9 @@ export function SidebarNavGroup({ item, collapsed }: SidebarNavGroupProps) {
   const { t } = useTranslation();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { can } = usePermissions();
-  const auth = useAppStore((s) => s.auth);
-  const isInternal = auth.status === 'authenticated' ? auth.account.isInternal : false;
 
   const visibleChildren = (item.children || []).filter(
-    (child) => (!child.permission || can(child.permission)) && (!child.internalOnly || isInternal),
+    (child) => !child.permission || can(child.permission),
   );
 
   const isChildActive = visibleChildren.some((child) => isRouteActiveCheck(child, pathname));

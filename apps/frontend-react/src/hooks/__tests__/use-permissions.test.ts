@@ -27,7 +27,6 @@ describe('usePermissions', () => {
         name: 'Account',
         description: '',
         isActive: true,
-        isInternal: false,
         groupId: 1,
       },
       userAccounts: [],

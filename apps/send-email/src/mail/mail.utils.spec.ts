@@ -1176,7 +1176,7 @@ describe('Mail Utils', () => {
       expect(result.template).toContain('&nbsp;');
     });
 
-    describe('internal account trailing slash', () => {
+    describe('destination URL', () => {
       // Extract the URL encoded inside the bmsclick wrapper's url= param.
       // Template href looks like: https://bmsclick.<host>/redirect?url=<base64>
       // where base64 decodes to: `${auxOriginalLink}&bmsu=${uuid}&bmsa=${accountId}`
@@ -1193,31 +1193,9 @@ describe('Mail Utils', () => {
         { name: 'has_bms_click_redirect', value: 'true' },
       ];
 
-      it('adds a trailing slash to the destination URL for internal accounts', () => {
-        const account: any = {
-          id: 42,
-          isInternal: true,
-          accountConfigs: bmsRedirectAccountConfigs,
-        };
-        const content = '<html><body><a href="https://example.com/lp?utm=x">Click</a></body></html>';
-        const result = mailUtils.createEmailPixel({
-          emailContent: content,
-          provider: 'sendgrid',
-          utmCampaign: 'utm',
-          messageId: 1,
-          account,
-          contact: baseContact,
-          isSendgridVariables: false,
-        });
-        const destination = decodeBmsclickUrl(result.template);
-        expect(destination.startsWith('https://example.com/lp/?')).toBe(true);
-        expect(destination).toContain('utm=x');
-      });
-
-      it('leaves the destination URL unchanged for external accounts', () => {
+      it('leaves the destination URL unchanged', () => {
         const account: any = {
           id: 43,
-          // isInternal omitted (external)
           accountConfigs: bmsRedirectAccountConfigs,
         };
         const content = '<html><body><a href="https://example.com/lp?utm=x">Click</a></body></html>';

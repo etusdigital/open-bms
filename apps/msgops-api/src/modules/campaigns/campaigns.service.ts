@@ -243,7 +243,7 @@ export class CampaignsService {
   async validateNames(params: CampaignFilterDto) {
     const value = params.titleCreate.trim();
     const title = value;
-    const name = this.cls.get('isInternalAccount') ? value : replaceSpecialChars(value);
+    const name = replaceSpecialChars(value);
 
     return this.campaignRepository
       .createQueryBuilder('campaigns')
@@ -312,7 +312,7 @@ export class CampaignsService {
     // import) and must stay un-gated.
     campaignDto = this.formattedCampaignDate(campaignDto);
     await this.checkDuplicateAudience(campaignDto);
-    campaignDto.name = this.cls.get('isInternalAccount') && !isTriggerCampaign ? replaceSpecialChars(campaignDto.name.trim()) : replaceSpecialChars(campaignDto.title.trim());
+    campaignDto.name = replaceSpecialChars(campaignDto.title.trim());
 
     this.validatedScheduleToDate(campaignDto);
     if (campaignDto.type !== CampaignsType.TESTAB) {
@@ -409,7 +409,7 @@ export class CampaignsService {
 
     campaignDto = this.formattedCampaignDate(campaignDto);
     await this.checkDuplicateAudience(campaignDto);
-    campaignDto.name = this.cls.get('isInternalAccount') && !isTriggerCampaign ? replaceSpecialChars(campaignDto.name.trim()) : replaceSpecialChars(campaignDto.title.trim());
+    campaignDto.name = replaceSpecialChars(campaignDto.title.trim());
 
     let campaign = await this.campaignRepository.findOneOrFail({
       where: {

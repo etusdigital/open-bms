@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { load } from 'cheerio';
 import Handlebars from 'handlebars';
-import { addTrailingSlash } from '@msgops/url-utils';
 import { Email, SendEmailMessage, Account, AutomationContactsBatch, Contact, CustomFields, ReplaceLinks, Campaign, Automation } from '../interfaces';
 import { FormatterUtils } from '../utils/formatter.utils';
 import { Email as BatchEmail, MapVariables, DefaultParams } from './mail.interface';
@@ -444,13 +443,6 @@ export class MailUtils {
             isCampaignsTest = true;
             auxOriginalLink = `https://vouquitar.com/s1-sg-cartao-de-credito-sicredi-internacional-3/?${queryString}`;
           }
-        }
-
-        // Canonicalise trailing slash for internal accounts (skips unsubscribe paths
-        // as a defensive guard against slash-strict landing-page routes).
-        const isUnsubscribe = /\/unsub/i.test(auxOriginalLink);
-        if (options.account?.isInternal && !isUnsubscribe) {
-          auxOriginalLink = addTrailingSlash(auxOriginalLink);
         }
 
         const messagesIdsToFwd = process.env.MESSAGES_TO_ADD_FWD?.split(',') || [];

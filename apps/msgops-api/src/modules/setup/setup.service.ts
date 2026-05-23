@@ -304,7 +304,6 @@ export class SetupService implements OnModuleInit {
           name: accountName,
           groupId: 1,
           isActive: true,
-          isInternal: false,
         }),
       ));
     await userAccountRepo.save(

@@ -24,7 +24,6 @@ export function authenticateStore(options: AuthenticateOptions = {}) {
       name: 'Account',
       description: '',
       isActive: true,
-      isInternal: false,
       groupId: 1,
     },
     userAccounts: [],

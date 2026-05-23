@@ -584,7 +584,6 @@ export class UsersService {
     const lightAccount = (account: any) => ({
       id: account.id,
       name: account.name,
-      isInternal: account.isInternal,
       isActive: account.isActive,
     });
 
@@ -606,7 +605,7 @@ export class UsersService {
         .createQueryBuilder('ua')
         .innerJoinAndSelect('ua.account', 'account', 'account.deleted_at IS NULL')
         .leftJoin('ua.roleOverride', 'role')
-        .select(['ua.userId', 'ua.accountId', 'ua.isMasterUser', 'ua.roleOverrideRoleId', 'account.id', 'account.name', 'account.isInternal', 'account.isActive', 'role.code'])
+        .select(['ua.userId', 'ua.accountId', 'ua.isMasterUser', 'ua.roleOverrideRoleId', 'account.id', 'account.name', 'account.isActive', 'role.code'])
         .where('ua.userId = :userId', { userId: user.id })
         .getMany();
       membershipSource = memberships.map((m) => ({

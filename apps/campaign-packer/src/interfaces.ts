@@ -255,7 +255,6 @@ export interface Account {
   id?: number;
   name?: string;
   description?: string;
-  isInternal?: boolean;
   groupId?: number;
   accountConfigs?: AccountConfig[];
   customFields?: CustomFields[];

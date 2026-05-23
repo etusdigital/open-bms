@@ -30,8 +30,6 @@ interface BlockItem {
   icon: React.ComponentType<{ className?: string }>;
   /** Key in AccountChannels — if set, block is disabled when false */
   channelFlag?: keyof AccountChannels;
-  /** If true, only shown for internal accounts */
-  internalOnly?: boolean;
 }
 
 interface BlockCategory {
@@ -108,13 +106,11 @@ const BLOCK_CATEGORIES: BlockCategory[] = [
         type: 'contactTransfer',
         labelKey: 'automations.editor.contacts.contactTransfer',
         icon: ArrowRightLeft,
-        internalOnly: true,
       },
       {
         type: 'removeAutomation',
         labelKey: 'automations.editor.contacts.removeAutomation',
         icon: UserMinus,
-        internalOnly: true,
       },
     ],
   },
@@ -260,8 +256,6 @@ export function BlocksSidebar() {
     sms: channelSms,
     whatsapp: channelWhatsapp,
   };
-  const isInternal = useAppStore((s) => (s.auth.status === 'authenticated' ? s.auth.account.isInternal : false));
-
   return (
     <div className="bg-background flex min-h-0 w-[260px] shrink-0 flex-col overflow-hidden border-l">
       <div className="border-b px-4 py-3">
@@ -276,9 +270,7 @@ export function BlocksSidebar() {
                 {t(category.labelKey as never)}
               </p>
               <div className="space-y-1.5">
-                {category.items
-                  .filter((item) => !item.internalOnly || isInternal)
-                  .map((item) => {
+                {category.items.map((item) => {
                     const disabled = item.channelFlag ? !channels[item.channelFlag] : false;
 
                     return (

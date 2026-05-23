@@ -93,7 +93,6 @@ export interface Account {
   name: string;
   description: string;
   isActive: boolean;
-  isInternal: boolean;
   groupId: number;
 }
 

@@ -30,7 +30,7 @@ import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/app-store';
 import type { AccountConfig } from '@/types';
 import type { CampaignFormValues } from '../campaign-schema';
-import { CAMPAIGN_TITLE_MAX, CAMPAIGN_TITLE_MAX_INTERNAL, CAMPAIGN_DESCRIPTION_MAX } from '../campaign-schema';
+import { CAMPAIGN_TITLE_MAX, CAMPAIGN_UTM_NAME_MAX, CAMPAIGN_DESCRIPTION_MAX } from '../campaign-schema';
 import type { CampaignMessageType, CampaignType } from '../types';
 import { replaceSpecialChars } from '../utils';
 import { useLabelsForCampaign } from '../use-campaign-labels';
@@ -125,7 +125,6 @@ interface SettingsStepProps {
   form: UseFormReturn<CampaignFormValues>;
   campaignId?: number;
   isCampaignRule?: boolean;
-  isInternal?: boolean;
   disableSimple?: boolean;
 }
 
@@ -133,7 +132,6 @@ export default function SettingsStep({
   form,
   campaignId,
   isCampaignRule = false,
-  isInternal = false,
   disableSimple = false,
 }: SettingsStepProps) {
   const { t } = useTranslation();
@@ -165,7 +163,6 @@ export default function SettingsStep({
 
   const isTitleTaken = titleDivergedFromInitial && Array.isArray(titleValidation) && titleValidation.length > 0;
   const isNameTaken =
-    isInternal &&
     !isCampaignRule &&
     nameDivergedFromInitial &&
     Array.isArray(nameValidation) &&
@@ -182,15 +179,15 @@ export default function SettingsStep({
   // title edits stop overwriting it (Vue2 would always overwrite).
   const utmManuallyEdited = useRef(false);
 
-  const showInternalFields = isInternal && !isCampaignRule;
+  const showAdvancedFields = !isCampaignRule;
 
   const handleTitleChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     fieldOnChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
   ) => {
     fieldOnChange(e);
-    if (showInternalFields && !utmManuallyEdited.current) {
-      const generated = replaceSpecialChars(e.target.value).substring(0, CAMPAIGN_TITLE_MAX_INTERNAL);
+    if (showAdvancedFields && !utmManuallyEdited.current) {
+      const generated = replaceSpecialChars(e.target.value).substring(0, CAMPAIGN_UTM_NAME_MAX);
       form.setValue('name', generated, { shouldDirty: true, shouldValidate: false });
     }
   };
@@ -223,7 +220,7 @@ export default function SettingsStep({
         <h4 className="mb-3 text-sm font-medium">{t('campaigns.detailsSection')}</h4>
         <div className="space-y-4 rounded-lg border p-4">
           {/* Nome + UTM Campaign side-by-side */}
-          {showInternalFields ? (
+          {showAdvancedFields ? (
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -276,7 +273,7 @@ export default function SettingsStep({
                     <FormControl>
                       <Input
                         {...field}
-                        maxLength={CAMPAIGN_TITLE_MAX_INTERNAL}
+                        maxLength={CAMPAIGN_UTM_NAME_MAX}
                         placeholder={t('campaigns.utmCampaignPlaceholder')}
                         data-testid="campaign-utm-name"
                         onChange={(e) => {
@@ -340,8 +337,8 @@ export default function SettingsStep({
             )}
           />
 
-          {/* Labels multi-select — visible for internal users and campaign rules */}
-          {(showInternalFields || isCampaignRule) && (
+          {/* Labels multi-select */}
+          {(showAdvancedFields || isCampaignRule) && (
             <FormField
               control={form.control}
               name="labels"
@@ -417,7 +414,7 @@ export default function SettingsStep({
           )}
 
           {/* Rate limit checkbox */}
-          {showInternalFields && (
+          {showAdvancedFields && (
             <FormField
               control={form.control}
               name="isRateLimit"

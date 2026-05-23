@@ -115,7 +115,6 @@ export function SuperAdminAccountFormPage({ accountId }: SuperAdminAccountFormPa
   const editDefaults = (account: SuperAdminAccount): SuperAdminEditAccountValues => ({
     name: account.name,
     description: account.description ?? '',
-    isInternal: account.isInternal,
     channels: extractChannelDefaults(account.accountConfigs),
   });
 

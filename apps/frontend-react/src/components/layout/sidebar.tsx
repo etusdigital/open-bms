@@ -24,7 +24,6 @@ export function Sidebar() {
   const setSidebarCollapsed = useAppStore((s) => s.setSidebarCollapsed);
   const { can } = usePermissions();
   const auth = useAppStore((s) => s.auth);
-  const isInternal = auth.status === 'authenticated' ? auth.account.isInternal : false;
   const isSuperAdmin = auth.status === 'authenticated' && auth.effectiveRole === 'super_admin';
 
   const permissions = useAppStore((s) => (s.auth.status === 'authenticated' ? s.auth.permissions : null));
@@ -32,13 +31,10 @@ export function Sidebar() {
   const visibleItems = useMemo(
     () =>
       MENU_ITEMS.filter(
-        (item) =>
-          (!item.permission || can(item.permission)) &&
-          (!item.superAdminOnly || isSuperAdmin) &&
-          (!item.internalOnly || isInternal),
+        (item) => (!item.permission || can(item.permission)) && (!item.superAdminOnly || isSuperAdmin),
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- permissions changes invalidate can()
-    [can, isSuperAdmin, isInternal, permissions],
+    [can, isSuperAdmin, permissions],
   );
 
   const showSettings = !SETTINGS_ITEM.permission || can(SETTINGS_ITEM.permission);
