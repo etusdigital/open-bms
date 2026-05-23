@@ -224,31 +224,41 @@ export default function CampaignForm({
   // Zod validation fails — no toast, no console, the button just dies.
   // Map each schema field to the step that owns it, so we can navigate the
   // wizard back to the first offending step and surface the issue.
-  const STEP_BY_FIELD: Partial<Record<keyof CampaignFormValues, number>> = {
+  // Typed as a full Record (not Partial) so adding a new field to
+  // CampaignFormValues without updating this map is a TypeScript error —
+  // otherwise the fallback path here would silently skip navigation again.
+  // `null` = field has no associated step (programmatic or always-visible).
+  const STEP_BY_FIELD: Record<keyof CampaignFormValues, number | null> = {
     title: 0,
+    name: 0,
     description: 0,
     type: 0,
     messageType: 0,
-    name: 0,
     labels: 0,
+    labelContent: 0,
     steps: 1,
     sendToAll: 1,
+    sendAfterCreate: 1,
+    runSegment: 1,
     campaignMessage: 2,
     scheduleTo: 3,
+    spreadSending: 3,
+    isRateLimit: 3,
     recurrenceSettings: 3,
     testabScheduleTo: 3,
     testabScheduleEnd: 3,
     testabAudiencePercent: 3,
     testabCriteria: 3,
     testabSentAfterTest: 3,
-    spreadSending: 3,
+    confirmSaveDuplicate: null,
+    status: null,
   };
 
   const handleInvalidSubmit = (errors: FieldErrors<CampaignFormValues>) => {
     const errorFields = Object.keys(errors) as (keyof CampaignFormValues)[];
     const stepsWithErrors = errorFields
       .map((field) => STEP_BY_FIELD[field])
-      .filter((step): step is number => step !== undefined);
+      .filter((step): step is number => step !== null && step !== undefined);
     const firstStep = stepsWithErrors.length ? Math.min(...stepsWithErrors) : null;
 
     if (firstStep !== null && firstStep < stepsConfig.length) {

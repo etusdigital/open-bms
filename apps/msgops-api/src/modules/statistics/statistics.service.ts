@@ -563,7 +563,7 @@ export class StatisticsService {
   // Parses accounts_configs.value into an array. Handles correct JSON array
   // shape and the legacy Postgres text-array literal (`{"<json>","<json>",...}`)
   // produced when a JS array was passed to a TEXT column without stringifying.
-  private parseAccountConfigArray(raw: string | null | undefined): any[] | null {
+  private parseAccountConfigArray(raw: string | null | undefined, accountId?: number): any[] | null {
     if (!raw) return null;
     try {
       const parsed = JSON.parse(raw);
@@ -574,10 +574,11 @@ export class StatisticsService {
           const elements: string[] = JSON.parse(`[${raw.slice(1, -1)}]`);
           return elements.map((s) => JSON.parse(s));
         } catch (err) {
-          this.logger.warn(`Failed to parse legacy account_config value: ${err}`);
+          this.logger.warn(`Failed to parse legacy account_config value for account ${accountId ?? 'unknown'}: ${err}`);
           return null;
         }
       }
+      this.logger.warn(`account_config value for account ${accountId ?? 'unknown'} is neither JSON nor legacy array literal — cost calc will treat as zero`);
       return null;
     }
   }
@@ -592,8 +593,10 @@ export class StatisticsService {
     if (account.deletedAt) {
       // Stop the daily snapshot chain for soft-deleted accounts so the scheduler
       // doesn't keep retrying. Historical rows in accounts_usages are preserved.
+      // 410 Gone is semantically correct and lets HTTP callers (dashboard) and
+      // scheduler workers branch explicitly instead of seeing an empty 200 body.
       this.logger.log(`Skipping accounts_usage snapshot for ${accountId}: account is soft-deleted`);
-      return;
+      throw new HttpException('Account is deleted.', HttpStatus.GONE);
     }
 
     const email = await this.getTotalUsage('email', accountId, date, 'delivered');
@@ -709,7 +712,7 @@ export class StatisticsService {
     for (const acc of accounts) {
       const costConfig = acc.configByName('account_costs');
       if (costConfig) {
-        const parsed = this.parseAccountConfigArray(costConfig.value);
+        const parsed = this.parseAccountConfigArray(costConfig.value, acc.id);
         if (parsed) costConfigsByAccountId.set(acc.id, parsed);
       }
     }
