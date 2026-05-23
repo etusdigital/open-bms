@@ -39,7 +39,17 @@ export class AccountsController {
   @Post()
   create(@Body() accountDto: CreateAccountDto, @Req() req: any) {
     this.requireSuperAdmin(req);
-    const userId = req?.authzContext?.userId || req?.user?.id || 0;
+    // Audit trail is mandatory for account creation. authzContext is the
+    // canonical principal — built from the JWT or API key by
+    // PrincipalContextGuard with a database-backed userId. We deliberately
+    // do NOT fall back to req.user.id: passport-jwt's validate() returns
+    // the raw JWT payload, so req.user.id would be whatever (if anything)
+    // happens to be in a non-standard claim — never a trustworthy DB id.
+    // Failing closed here keeps a single source of truth for audit identity.
+    const userId = req?.authzContext?.userId;
+    if (typeof userId !== 'number' || userId <= 0) {
+      throw new ForbiddenException('User identity required to create an account');
+    }
     return this.accountsService.create(accountDto, userId);
   }
 

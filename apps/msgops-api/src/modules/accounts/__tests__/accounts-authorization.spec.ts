@@ -510,17 +510,35 @@ describe('AccountsController — authorization', () => {
       expect(res.status).toBe(403);
     });
 
-    it('returns 201 when super_admin', async () => {
+    it('returns 201 when super_admin with a resolved userId', async () => {
       const res = await request(app.getHttpServer())
         .post('/accounts')
         .send({ name: 'test', defaultDomain: 'test.com' })
-        .set('x-test-authz', JSON.stringify({ isSuperAdmin: true }));
+        .set('x-test-authz', JSON.stringify({ isSuperAdmin: true, userId: 42 }));
 
       expect(res.status).toBe(201);
     });
 
     it('returns 403 when no authzContext is present', async () => {
       const res = await request(app.getHttpServer()).post('/accounts').send({ name: 'test', defaultDomain: 'test.com' });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 403 when super_admin context is missing userId (fail-closed audit guard)', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/accounts')
+        .send({ name: 'test', defaultDomain: 'test.com' })
+        .set('x-test-authz', JSON.stringify({ isSuperAdmin: true }));
+
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 403 when super_admin context has userId=0', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/accounts')
+        .send({ name: 'test', defaultDomain: 'test.com' })
+        .set('x-test-authz', JSON.stringify({ isSuperAdmin: true, userId: 0 }));
 
       expect(res.status).toBe(403);
     });
