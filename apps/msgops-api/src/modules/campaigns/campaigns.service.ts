@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, HttpException, HttpStatus, ForbiddenException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, HttpException, HttpStatus, ForbiddenException, Logger } from '@nestjs/common';
 import { SchedulerService } from '../../providers/queue/scheduler.service';
 import { QUEUE_CAMPAIGN_TRIGGER, QUEUE_CAMPAIGN_TESTAB } from '../../providers/queue/queue.constants';
 import { CampaignDto } from './campaign.dto';
@@ -16,6 +16,8 @@ import { ClsService } from 'nestjs-cls';
 import { replaceSpecialChars } from 'src/utils/utils.service';
 import { ContactEntity } from 'src/entities/contact.entity';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import { ContactDeviceEntity } from 'src/entities/contact-device.entity';
 import { CampaignContactEntity } from 'src/entities/campaign-contact.entity';
 import { TagEntity } from 'src/entities/tag.entity';
@@ -29,8 +31,31 @@ import { LabelsEntity } from 'src/entities/labels.entity';
 import { LabelsService } from '../labels/labels.service';
 import { AccountConfigsProvider } from '../../providers/account-configs.provider';
 
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+/**
+ * Validates an `accounts_configs.time_zone` value and falls back to `'UTC'`
+ * when it is not a recognised IANA zone. Non-IANA strings (e.g. `"BRT"`,
+ * `"GMT-3"`, typos, deprecated zones) make `dayjs(...).tz(value)` silently
+ * return Invalid Date, which then propagates through `nextOccurrence` and
+ * breaks rescheduling without a clear error. Probing via
+ * `Intl.DateTimeFormat` is the cheap, dependency-free way to verify the zone.
+ */
+export function resolveIanaTimezone(value: string | undefined | null, logger?: Logger): string {
+  if (!value) return 'UTC';
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value });
+    return value;
+  } catch {
+    logger?.warn(`Invalid IANA timezone "${value}" in accounts_configs; falling back to UTC`);
+    return 'UTC';
+  }
+}
+
 @Injectable()
 export class CampaignsService {
+  private readonly logger = new Logger(CampaignsService.name);
   public ajv: Ajv;
   constructor(
     private readonly scheduler: SchedulerService,
@@ -438,7 +463,8 @@ export class CampaignsService {
           }
 
           if (updatedRecurrenceSettings.frequency === CampaignRecurrenceFrequency.weekly) {
-            newEventDate = this.nextOccurrence(campaign.recurrenceSettings.lastSentDate, updatedRecurrenceSettings.weekDays, updatedRecurrenceSettings.interval);
+            const accountTimezone = await this.getAccountTimezone(campaign.accountId);
+            newEventDate = this.nextOccurrence(campaign.recurrenceSettings.lastSentDate, updatedRecurrenceSettings.weekDays, updatedRecurrenceSettings.interval, accountTimezone);
           }
 
           if (updatedRecurrenceSettings.frequency === CampaignRecurrenceFrequency.monthly) {
@@ -544,27 +570,38 @@ export class CampaignsService {
     );
   }
 
-  nextOccurrence(currentScheduleTo: Date, weekDays: number[], interval: number): Date {
+  async getAccountTimezone(accountId: number): Promise<string> {
+    if (!accountId) return 'UTC';
+    const account = await this.accountRepository.findOne({
+      where: { id: accountId },
+      relations: ['accountConfigs'],
+    });
+    return resolveIanaTimezone(account?.configByName('time_zone')?.value, this.logger);
+  }
+
+  nextOccurrence(currentScheduleTo: Date, weekDays: number[], interval: number, tz: string): Date {
     weekDays.sort();
 
-    let findDate = dayjs(currentScheduleTo)
-      .set('hour', currentScheduleTo.getHours())
-      .set('minutes', currentScheduleTo.getMinutes())
-      .set('seconds', 0)
-      .set('milliseconds', 0)
-      .add(1, 'day');
+    // All day/week arithmetic happens in the account's timezone — prevents
+    // PDBR-144, where calculations ran in UTC and shifted the next occurrence
+    // by 1 day for any time that crosses midnight UTC.
+    const ref = dayjs(currentScheduleTo).tz(tz);
+    const localHour = ref.hour();
+    const localMinute = ref.minute();
 
-    const latestSentDate = dayjs(currentScheduleTo).startOf('week').set('hour', currentScheduleTo.getHours()).set('minutes', currentScheduleTo.getMinutes());
+    let findDate = ref.set('hour', localHour).set('minute', localMinute).set('second', 0).set('millisecond', 0).add(1, 'day');
+
+    const latestSentDate = ref.startOf('week').set('hour', localHour).set('minute', localMinute);
 
     while (true) {
       if (weekDays.includes(findDate.day()) && findDate.toDate() >= dayjs().toDate()) {
-        const isValidWeek = findDate.startOf('week').set('hour', currentScheduleTo.getHours()).set('minutes', currentScheduleTo.getMinutes()).diff(latestSentDate, 'week');
+        const isValidWeek = findDate.startOf('week').set('hour', localHour).set('minute', localMinute).diff(latestSentDate, 'week');
 
         if (isValidWeek % interval === 0) {
           return findDate.toDate();
         } else {
           // Not the correct week based on interval. Skip to the next week's same day.
-          findDate = findDate.add(7, 'day').startOf('week').set('hour', currentScheduleTo.getHours()).set('minutes', currentScheduleTo.getMinutes());
+          findDate = findDate.add(7, 'day').startOf('week').set('hour', localHour).set('minute', localMinute);
           continue;
         }
       }
