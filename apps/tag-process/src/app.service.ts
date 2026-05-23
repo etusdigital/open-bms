@@ -6,6 +6,7 @@ import {
   SegmentStatus,
   EventsTrigger,
   Status,
+  SegmentInfo,
   SegmentToClickHouse,
   SegmentExternalQueryPayload,
 } from './interfaces';
@@ -83,6 +84,26 @@ export class AppService {
 
   private processMessageCatchError(error: any) {
     throw new HttpException(`Message process error ${error.message || JSON.stringify(error)}`, 400);
+  }
+
+  private async publishSegmentDataChunked(
+    type: 'segment-in' | 'segment-out',
+    segment: { id: number; name: string; accountId: number },
+    contacts: number[],
+  ) {
+    // Rabbit's default frame size and downstream Fastify bodyLimits choke on
+    // 150k+ contact id payloads. Split into 50k-per-message chunks so each
+    // message stays comfortably under typical broker/HTTP limits.
+    const chunkSize = 50_000;
+    for (let i = 0; i < contacts.length; i += chunkSize) {
+      await this.queuePublisher.publishSegmentData({
+        type,
+        tagId: segment.id,
+        tagName: segment.name,
+        accountId: segment.accountId,
+        contacts: contacts.slice(i, i + chunkSize),
+      });
+    }
   }
 
   async processTagBatch(tagBatch: TagBatch) {
@@ -320,25 +341,11 @@ export class AppService {
       }
 
       if (account.isInternal && dataInsertAndDelete.insertIds && dataInsertAndDelete.insertIds.length) {
-        const dataInsert = {
-          type: 'segment-in',
-          tagId: segment.id,
-          tagName: segment.name,
-          accountId: segment.accountId,
-          contacts: dataInsertAndDelete.insertIds,
-        };
-        await this.queuePublisher.publishSegmentData(dataInsert);
+        await this.publishSegmentDataChunked('segment-in', segment, dataInsertAndDelete.insertIds);
       }
 
       if (account.isInternal && dataInsertAndDelete.deleteIds && dataInsertAndDelete.deleteIds.length) {
-        const dataDelete = {
-          type: 'segment-out',
-          tagId: segment.id,
-          tagName: segment.name,
-          accountId: segment.accountId,
-          contacts: dataInsertAndDelete.deleteIds,
-        };
-        await this.queuePublisher.publishSegmentData(dataDelete);
+        await this.publishSegmentDataChunked('segment-out', segment, dataInsertAndDelete.deleteIds);
       }
 
       return await this.msgopsService.updateTag(segment.id, {
@@ -558,10 +565,43 @@ export class AppService {
 
     if (reasons) {
       const segmentDbInfo = await this.msgopsService.getTagById(segemenData.tagId);
-      segmentDbInfo.segmentInfo[segmentDbInfo.segmentInfo.length - 1] = {
-        ...segmentDbInfo.segmentInfo[segmentDbInfo.segmentInfo.length - 1],
-        ...(segemenData.type == 'segment-out' ? { outInfo: { ...reasonData } } : { inInfo: { ...reasonInData } }),
-      };
+      const lastIndex = segmentDbInfo.segmentInfo.length - 1;
+      const lastEntry = (segmentDbInfo.segmentInfo[lastIndex] ?? {}) as SegmentInfo;
+      // Sum into existing aggregates so chunked deliveries (one segment-in/out
+      // payload split across multiple AMQP messages) accumulate instead of
+      // overwriting each other. Concurrent deliveries for the same segment run
+      // can still race at the row-level read-modify-write.
+      if (segemenData.type == 'segment-out') {
+        const previous = lastEntry.outInfo ?? {
+          unsub_qtd: 0,
+          bounce_qtd: 0,
+          open_qtd: 0,
+          click_qtd: 0,
+          in_tag_qtd: 0,
+          engagement_qtd: 0,
+          invalid_qtd: 0,
+        };
+        lastEntry.outInfo = {
+          unsub_qtd: previous.unsub_qtd + reasonData.unsub_qtd,
+          bounce_qtd: previous.bounce_qtd + reasonData.bounce_qtd,
+          open_qtd: previous.open_qtd + reasonData.open_qtd,
+          click_qtd: previous.click_qtd + reasonData.click_qtd,
+          in_tag_qtd: previous.in_tag_qtd + reasonData.in_tag_qtd,
+          engagement_qtd: previous.engagement_qtd + reasonData.engagement_qtd,
+          invalid_qtd: previous.invalid_qtd + reasonData.invalid_qtd,
+        };
+      } else {
+        const previous = lastEntry.inInfo ?? { bought: 0, reengaged: 0 };
+        lastEntry.inInfo = {
+          bought: previous.bought + reasonInData.bought,
+          reengaged: previous.reengaged + reasonInData.reengaged,
+        };
+      }
+      if (lastIndex >= 0) {
+        segmentDbInfo.segmentInfo[lastIndex] = lastEntry;
+      } else {
+        segmentDbInfo.segmentInfo = [lastEntry];
+      }
       await this.msgopsService.updateTag(segmentDbInfo.id, { segmentInfo: segmentDbInfo.segmentInfo });
     }
   }
