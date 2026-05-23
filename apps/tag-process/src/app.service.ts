@@ -213,7 +213,13 @@ export class AppService {
     try {
       segment.segmentInfo = !segment.segmentInfo ? [] : segment.segmentInfo;
       const lastValidDate = dayjs().subtract(7, 'day');
-      if (segment.status !== SegmentStatus.REACTIVATING && dayjs(segment.createdAt) < lastValidDate) {
+      // Skip auto-deactivation for base-size segments — they don't drive campaigns,
+      // so segmentActive() always returns 0 and they'd get wiped on every run.
+      if (
+        segment.type !== 'segment-base-size' &&
+        segment.status !== SegmentStatus.REACTIVATING &&
+        dayjs(segment.createdAt) < lastValidDate
+      ) {
         const campaignsSchedule = await this.segmentActive(segment.id);
         if (campaignsSchedule == 0) {
           await this.msgopsService.processSegment(segment.id, segment.accountId, null, null);
