@@ -76,7 +76,7 @@ describe('useContactsList', () => {
     expect(params).not.toHaveProperty('title');
   });
 
-  it('returns contact data and meta', async () => {
+  it('returns contact data and page metadata (total reflects page size, not full count)', async () => {
     const { result } = renderHook(() => useContactsList(defaultParams), {
       wrapper: createQueryWrapper(),
     });
@@ -84,7 +84,9 @@ describe('useContactsList', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(result.current.data?.data).toHaveLength(2);
-    expect(result.current.data?.meta.total).toBe(2);
+    // meta.total mirrors the page size — the real account-wide total is
+    // sourced from useContactsTotal (dashboard aggregate / countOnly).
+    expect(result.current.data?.meta.total).toBe(result.current.data?.data.length);
   });
 });
 

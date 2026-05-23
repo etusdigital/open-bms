@@ -137,6 +137,7 @@ export class MsgopsService {
          JOIN accounts_configs ac ON ac.account_id = c.account_id
         WHERE c.id = $1
           AND ac.name = 'time_zone'
+        ORDER BY ac.id DESC
         LIMIT 1`,
       [campaignId],
     );
@@ -148,17 +149,14 @@ export class MsgopsService {
 
     // All day/week arithmetic happens in the account's timezone — prevents
     // PDBR-144, where calculations ran in UTC and shifted the next occurrence
-    // by 1 day for any time that crosses midnight UTC.
+    // by 1 day for any time that crosses midnight UTC. After `.tz(tz)`, the
+    // dayjs instance already carries the local hour/minute, so we only need
+    // to re-pin hour/minute when re-anchoring to startOf('week').
     const ref = dayjs(currentScheduleTo).tz(tz);
     const localHour = ref.hour();
     const localMinute = ref.minute();
 
-    let findDate = ref
-      .set('hour', localHour)
-      .set('minute', localMinute)
-      .set('second', 0)
-      .set('millisecond', 0)
-      .add(1, 'day');
+    let findDate = ref.set('second', 0).set('millisecond', 0).add(1, 'day');
 
     const latestSentDate = ref.startOf('week').set('hour', localHour).set('minute', localMinute);
 

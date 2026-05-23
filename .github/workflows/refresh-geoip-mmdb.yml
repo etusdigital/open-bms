@@ -67,11 +67,18 @@ jobs:
           ARCHIVE_NAME="${FILENAME%.gz}"
 
           # API returns `date` in human form ("April 2026"), not ISO. Derive
-          # YYYY-MM from the filename, which embeds it deterministically as
-          # dbip-full-YYYY-MM.mmdb.gz.
+          # YYYY-MM from the filename — every DB-IP MMDB filename embeds it
+          # deterministically as <db-slug>-YYYY-MM.mmdb.gz (e.g.
+          # dbip-location-isp-2026-04.mmdb.gz).
           MONTH=$(echo "$FILENAME" | grep -oE '[0-9]{4}-[0-9]{2}' | head -1)
           if [ -z "$MONTH" ]; then
             echo "::error::Could not parse YYYY-MM from filename: $FILENAME (api date: $DATE)"; exit 1
+          fi
+
+          # Fail loudly if DB-IP returned neither checksum — otherwise the
+          # later Verify steps both skip and we'd upload unverified bytes.
+          if [ -z "$MD5" ] && [ -z "$SHA1" ]; then
+            echo "::error::DB-IP response missing both md5sum and sha1sum; refusing to upload unverified MMDB"; exit 1
           fi
 
           {
