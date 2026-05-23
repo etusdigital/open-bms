@@ -1,4 +1,4 @@
-import { Injectable, HttpException } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import {
   LeadMessage,
   TagBatch,
@@ -12,7 +12,7 @@ import {
 import { AutomationHandler } from './handlers/automation.handler';
 import { MsgopsService } from './msgops/msgops.service';
 import { QueuePublisher } from './providers/queue/queue.publisher';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -189,28 +189,43 @@ export class AppService {
 
     const redisClient = await this.redisService.getOrThrow();
     const redisKey = `processingsegment:${id}`;
-    await redisClient.set(redisKey, currentDate.getTime());
+    const lockToken = randomUUID();
 
-    const segment = await this.msgopsService.getTagById(id);
-    if (!segment) {
-      this.trackerService.logInfo(`[Segment] Segment not found: ${id}`);
-      return { status: 200, message: `[Segment] Segment not found: ${id}` };
-    }
-    const currentTaskId = segment.scheduleCloudTaskId;
-    const account = await this.msgopsService.findAccount(segment.accountId);
-    if (!account) {
-      this.trackerService.logInfo(
-        `[Segment] Account ${segment.accountId} not found or inactive — skipping segment ${id} and stopping further scheduling`,
+    // Atomic SET NX EX: replaces the previous non-atomic `set` so concurrent
+    // dispatches (BullMQ retry + a fresh schedule, or two workers) can't both
+    // enter processSegment. TTL 1900s is above any plausible run duration.
+    // On contention we throw 5xx — BullMQ retries the job per the configured
+    // backoff and the HTTP entrypoint replies 5xx so the AMQP consumer nacks.
+    const acquired = await redisClient.set(redisKey, lockToken, 'EX', 1900, 'NX');
+    if (acquired !== 'OK') {
+      this.trackerService.logInfo(`[Segment] Lock contention for ${id}; deferring to retry`);
+      throw new HttpException(
+        { status: HttpStatus.SERVICE_UNAVAILABLE, message: `[Segment] Locked: ${id}` },
+        HttpStatus.SERVICE_UNAVAILABLE,
       );
-      await this.msgopsService.updateTag(segment.id, {
-        status: SegmentStatus.INACTIVE,
-        scheduleCloudTaskId: null,
-      });
-      await redisClient.del(redisKey);
-      return { status: 200, message: `[Segment] Account inactive for segment: ${id}` };
     }
 
+    let segment: Awaited<ReturnType<typeof this.msgopsService.getTagById>> | null = null;
+    let currentTaskId: string | null = null;
     try {
+      segment = await this.msgopsService.getTagById(id);
+      if (!segment) {
+        this.trackerService.logInfo(`[Segment] Segment not found: ${id}`);
+        return { status: 200, message: `[Segment] Segment not found: ${id}` };
+      }
+      currentTaskId = segment.scheduleCloudTaskId;
+      const account = await this.msgopsService.findAccount(segment.accountId);
+      if (!account) {
+        this.trackerService.logInfo(
+          `[Segment] Account ${segment.accountId} not found or inactive — skipping segment ${id} and stopping further scheduling`,
+        );
+        await this.msgopsService.updateTag(segment.id, {
+          status: SegmentStatus.INACTIVE,
+          scheduleCloudTaskId: null,
+        });
+        return { status: 200, message: `[Segment] Account inactive for segment: ${id}` };
+      }
+
       segment.segmentInfo = !segment.segmentInfo ? [] : segment.segmentInfo;
       const lastValidDate = dayjs().subtract(7, 'day');
       // Skip auto-deactivation for base-size segments — they don't drive campaigns,
@@ -338,6 +353,14 @@ export class AppService {
         status: SegmentStatus.ACTIVE,
       });
     } catch (error) {
+      // If the throw landed before we loaded the segment (e.g. DB error from
+      // getTagById), there's no segment_info to update — rethrow and let the
+      // finally release the lock.
+      if (!segment) {
+        this.trackerService.logInfo(`[Segment] Error before segment load: ${id}`, error);
+        throw new Error(`[Segment] Error executing segment: ${id}`);
+      }
+
       const duration = Math.abs(new Date().getTime() - currentDate.getTime());
       segment.segmentInfo.push({
         date: currentDate,
@@ -360,7 +383,15 @@ export class AppService {
       this.trackerService.logInfo(`[Segment] Error executing segment: ${id}`, error);
       throw new Error(`[Segment] Error executing segment: ${id}`);
     } finally {
-      await redisClient.del(redisKey);
+      // Compare-and-delete: only release if our token still owns the key.
+      // Guards against releasing a lock that's been re-acquired after our TTL
+      // expired (e.g. a stuck run that exceeded 1900s).
+      await redisClient.eval(
+        "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+        1,
+        redisKey,
+        lockToken,
+      );
     }
   }
 

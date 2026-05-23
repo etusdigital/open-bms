@@ -29,6 +29,7 @@ describe('AppService', () => {
       set: jest.fn().mockResolvedValue('OK'),
       del: jest.fn().mockResolvedValue(1),
       get: jest.fn().mockResolvedValue(null),
+      eval: jest.fn().mockResolvedValue(1),
     };
 
     automationHandler = {
@@ -430,7 +431,7 @@ describe('AppService', () => {
       msgopsService.updateTag.mockResolvedValue({} as any);
 
       await expect(appService.processSegment(segmentId)).rejects.toThrow('Error executing segment');
-      expect(mockRedisClient.del).toHaveBeenCalled();
+      expect(mockRedisClient.eval).toHaveBeenCalled();
     });
 
     it('should set segment to INACTIVE when not real-time and no campaigns', async () => {

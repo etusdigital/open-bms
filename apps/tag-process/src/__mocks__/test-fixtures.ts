@@ -115,8 +115,8 @@ export function createTag(overrides: Partial<TagEntity> = {}): TagEntity {
     lastCountWhatsapp: 0,
     status: 'active',
     isRealTimeSegment: true,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
+    createdAt: new Date(),
+    updatedAt: new Date(),
     ...overrides,
   } as TagEntity;
 }
