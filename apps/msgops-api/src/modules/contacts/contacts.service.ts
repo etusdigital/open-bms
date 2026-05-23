@@ -1844,6 +1844,12 @@ export class ContactsService {
    */
   async deactivateInactiveContacts() {
     try {
+      // Opt-in: pre-OSS this job ran only on internal accounts (effectively a
+      // no-op for most installs). Now scoped to all accounts, but gated so
+      // upgrades don't silently sweep production data on first cron tick.
+      if (process.env.DEACTIVATE_INACTIVE_CONTACTS_ENABLED !== 'true') {
+        return;
+      }
       const accounts = await this.accountsService.getAllAccounts();
       const deactivateDays = parseInt(process.env.DEACTIVATE_CONTACTS_IN_DAYS) || 180;
 

@@ -340,6 +340,14 @@ export class AppService {
         segment.segmentInfo = segment.segmentInfo.slice(-100);
       }
 
+      if (dataInsertAndDelete.insertIds && dataInsertAndDelete.insertIds.length) {
+        await this.publishSegmentDataChunked('segment-in', segment, dataInsertAndDelete.insertIds);
+      }
+
+      if (dataInsertAndDelete.deleteIds && dataInsertAndDelete.deleteIds.length) {
+        await this.publishSegmentDataChunked('segment-out', segment, dataInsertAndDelete.deleteIds);
+      }
+
       return await this.msgopsService.updateTag(segment.id, {
         scheduleCloudTaskId: segment.scheduleCloudTaskId,
         lastCount: segment.lastCount,
