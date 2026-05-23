@@ -147,6 +147,10 @@ export class AccountsService {
     }
   }
 
+  async findOneIncludingDeleted(id: number): Promise<AccountEntity | null> {
+    return this.accountRepository.findOne({ where: { id }, withDeleted: true });
+  }
+
   // Idempotency helper for retried account provisioning (setup wizard / Enterprise
   // import). `accounts.name` carries a column-level DB UNIQUE constraint (NOT
   // partial on deleted_at), so a retry after a partial failure would otherwise
@@ -654,10 +658,15 @@ export class AccountsService {
           }
         }
 
+        // accounts_configs.value is a TEXT column. Pushing a JS object/array directly
+        // makes the pg driver serialize it as a Postgres array literal (e.g. {"...","..."})
+        // instead of a JSON string, breaking downstream JSON.parse callers. Always
+        // stringify non-string values here so storage shape stays consistent.
+        const value = typeof provider.value === 'string' || provider.value == null ? provider.value : JSON.stringify(provider.value);
         accountProviders.push({
           accountId: id.toString(),
           name: provider.name,
-          value: provider.value,
+          value,
           description: provider.description,
           isLoadConfig: provider.isLoadConfig || true,
         });

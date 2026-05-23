@@ -41,6 +41,7 @@ function Button({
   variant = 'default',
   size = 'default',
   asChild = false,
+  type,
   ...props
 }: React.ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & {
@@ -48,12 +49,21 @@ function Button({
   }) {
   const Comp = asChild ? Slot.Root : 'button';
 
+  // Default to type="button" to prevent accidental form submits. The HTML
+  // default for <button> inside a <form> is type="submit", which makes any
+  // non-submit button (e.g. duplicate, delete, dropdown trigger) submit the
+  // surrounding form on click. Submit buttons must declare type="submit"
+  // explicitly. When asChild renders a non-button element (e.g. <a>, <Link>),
+  // we forward `type` only if the caller passed one.
+  const typeProp = asChild ? (type === undefined ? {} : { type }) : { type: type ?? 'button' };
+
   return (
     <Comp
       data-slot="button"
       data-variant={variant}
       data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
+      {...typeProp}
       {...props}
     />
   );
