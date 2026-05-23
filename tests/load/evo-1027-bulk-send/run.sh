@@ -122,6 +122,15 @@ queue_depth() {
   echo $((wait + active + delayed))
 }
 
+# Drain heuristic: 3 consecutive 5s polls with all 3 queues at depth=0.
+#
+# We don't gate on "saw nonzero" because realistic workloads (1k contacts +
+# warm send-email worker) drain in <5s — the gap between polls — and the gate
+# would never fire, false-timeouting at DRAIN_TIMEOUT_S. The downside is we
+# accept "0 from start" as drained too; for the event-process leg this is
+# always the case (pre-existing bug: DATABASE_HOST/PORT missing in compose
+# → worker can't connect, queue stays empty). The report row annotates this
+# unconditionally so consumers don't misread "✅ ok" as full coverage.
 wait_for_drain() {
   local label="$1"
   local deadline=$(( $(date +%s) + DRAIN_TIMEOUT_S ))
@@ -134,7 +143,6 @@ wait_for_drain() {
     printf '  [drain %s] schedule-page=%s send-email=%s event-process=%s\n' "$label" "$d1" "$d2" "$d3" >&2
     if (( d1 == 0 && d2 == 0 && d3 == 0 )); then
       zero_streak=$((zero_streak + 1))
-      # 3 consecutive 0-readings = drained. Avoids racing the first cycle.
       if (( zero_streak >= 3 )); then return 0; fi
     else
       zero_streak=0
@@ -201,7 +209,7 @@ run_level() {
 
   # 4) drain wait
   local drain_t0=$(date +%s)
-  local drain_status="OK"
+  local drain_status="ok"
   if ! wait_for_drain "$level"; then
     drain_status="DRAIN-TIMEOUT"
   fi
@@ -213,27 +221,35 @@ run_level() {
   wait $metrics_pid 2>/dev/null || true
   trap - EXIT
 
-  # 6) report row
+  # 6) report row.
+  # report.mjs emits "| label | env | RAM | CPU | p95 | <status> |" based on
+  # k6 p95/errorRate only. We want the drain leg's verdict in there too, plus
+  # the standing "event-process not exercised" annotation (see wait_for_drain
+  # comment). Reconstruct the row ourselves from report.mjs's cells instead
+  # of sedding the Status cell — sed-on-pipe-delimited-table is fragile.
   local docker_csv="$metrics_out/docker-stats.csv"
   [[ -f "$docker_csv" ]] || docker_csv="/dev/null"
-  local row
-  row=$(node "$SHARED_DIR/report/report.mjs" \
+  local report_row
+  report_row=$(node "$SHARED_DIR/report/report.mjs" \
         --k6 "$k6_out/summary.json" \
         --docker "$docker_csv" \
         --label "$level" --env "local" 2>>"$RAW_DIR/${level}-report.log")
-  # report.mjs row: "| label | env | RAM | CPU | p95 | Status |"
-  # We want:        "| label | env | RAM | CPU | p95 | <drain>s | <status> (total=<n>s) |"
-  # Inject drain_secs as a new column before the last (Status) cell.
-  local row_with_drain
-  row_with_drain=$(echo "$row" | sed -E "s/\| ([^|]+) \|$/| ${drain_secs}s | \1 (total=${total_secs}s) |/")
-  echo "$row_with_drain" >>"$REPORT_MD"
-  log "row appended: $row_with_drain"
+  # Extract the RAM/CPU/p95 cells from report.mjs's row by field index.
+  # Row shape: "| label | env | RAM | CPU | p95 | status |"
+  local ram cpu p95
+  ram=$(echo "$report_row" | awk -F'|' '{gsub(/^ +| +$/,"",$4); print $4}')
+  cpu=$(echo "$report_row" | awk -F'|' '{gsub(/^ +| +$/,"",$5); print $5}')
+  p95=$(echo "$report_row" | awk -F'|' '{gsub(/^ +| +$/,"",$6); print $6}')
+  local final_status="${drain_status} ⚠️ event-process not exercised (total=${total_secs}s)"
+  local row="| ${level} | local | ${ram} | ${cpu} | ${p95} | ${drain_secs}s | ${final_status} |"
+  echo "$row" >>"$REPORT_MD"
+  log "row appended: $row"
 
   # 7) teardown
   pnpm --silent tsx "$SCENARIO_DIR/seed/seed-campaign.ts" \
     --teardown --account "$account_id" --dsn "$PG_DSN" \
     >>"$RAW_DIR/${level}-teardown.log" 2>&1
-  curl -s -X POST http://localhost:4010/__mock/reset >/dev/null || true
+  curl -s -X POST "${SENDGRID_MOCK_BASE:-http://localhost:3010}/__mock/reset" >/dev/null || true
 
   log "level $level done in ${total_secs}s (drain ${drain_secs}s, status ${drain_status})"
   return 0

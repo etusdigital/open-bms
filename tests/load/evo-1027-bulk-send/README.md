@@ -92,10 +92,14 @@ Tabela markdown em `report/results.md` (anexada ao EVO-1027, agregada em EVO-144
 | 10k    | local    | …                        | …        | …        | …           | …      |
 | 50k    | local    | …                        | …        | …        | …           | …      |
 
-## TODO (este PR)
+## Status
 
-- [ ] Expor `campaign-packer` em `4001:3000` no `docker-compose.yml` (com nota "for load testing")
-- [ ] `seed/seed-campaign.ts` — cria account, contatos via `_shared/seed/seed-contacts.ts`, segmento via `_shared/seed/seed-segment.ts`, e campanha pointing pro segmento
-- [ ] `k6/bulk-send.js` — trigger + drain polling
-- [ ] `run.sh` — orquestra escada + sidecar de métricas + relatório
-- [ ] Rodar `1k → 10k → 50k` e preencher `report/results.md`
+- [x] `seed/seed-campaign.ts` — cria account, contatos, message e campanha (query inline, sem segmento real)
+- [x] `k6/bulk-send.js` — trigger single-shot do endpoint do packer
+- [x] `run.sh` — escada + sidecar de métricas + relatório, com gate `saw_nonzero` por fila pra evitar drain de zero espúrio
+- [x] Rodada `1k → 10k → 50k` em `report/results.md` (status partial — vide caveat de `event-process`)
+
+## Caveats conhecidos
+
+- **`event-process` não é medido nesta rodada.** Bug pré-existente no `docker-compose.yml` (faltam `DATABASE_HOST`/`DATABASE_PORT` no `x-backend-env`) impede o worker de conectar no Postgres; sua queue Bull fica em 0 mesmo com eventos chegando. `run.sh` flag automaticamente esses níveis com `(event-process not exercised)` na coluna Status. Fix vai em ticket separado, depois rodadas seguintes voltam a cobrir a ingestão.
+- **`p95 trigger` é amostra única.** k6 roda `vus=1, iterations=1` por nível — o número é a latência do POST único do packer, não p95 estatístico. Suficiente como heurística de stress (>5s → packer travado), não como SLI.
