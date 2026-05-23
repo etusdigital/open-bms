@@ -12,10 +12,12 @@ import ContactsPage from '../contacts-page';
 const mockDeleteMutate = vi.fn();
 let mockListQueryReturn: Record<string, unknown> = {};
 let mockDashboardReturn: Record<string, unknown> = {};
+let mockTotalReturn: { total: number; isLoading: boolean } = { total: 0, isLoading: false };
 
 vi.mock('../use-contacts', () => ({
   useContactsList: () => mockListQueryReturn,
   useContactDashboard: () => mockDashboardReturn,
+  useContactsTotal: () => mockTotalReturn,
   useDeleteContact: () => ({
     mutate: mockDeleteMutate,
     isPending: false,
