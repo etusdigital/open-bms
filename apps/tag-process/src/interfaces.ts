@@ -295,6 +295,10 @@ export interface SegmentInfo {
     engagement_qtd: number;
     invalid_qtd: number;
   };
+  inInfo?: {
+    bought: number;
+    reengaged: number;
+  };
 }
 
 export enum DeviceType {

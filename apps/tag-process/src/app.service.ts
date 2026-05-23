@@ -1,4 +1,4 @@
-import { Injectable, HttpException } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import {
   LeadMessage,
   TagBatch,
@@ -6,13 +6,14 @@ import {
   SegmentStatus,
   EventsTrigger,
   Status,
+  SegmentInfo,
   SegmentToClickHouse,
   SegmentExternalQueryPayload,
 } from './interfaces';
 import { AutomationHandler } from './handlers/automation.handler';
 import { MsgopsService } from './msgops/msgops.service';
 import { QueuePublisher } from './providers/queue/queue.publisher';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -83,6 +84,26 @@ export class AppService {
 
   private processMessageCatchError(error: any) {
     throw new HttpException(`Message process error ${error.message || JSON.stringify(error)}`, 400);
+  }
+
+  private async publishSegmentDataChunked(
+    type: 'segment-in' | 'segment-out',
+    segment: { id: number; name: string; accountId: number },
+    contacts: number[],
+  ) {
+    // Rabbit's default frame size and downstream Fastify bodyLimits choke on
+    // 150k+ contact id payloads. Split into 50k-per-message chunks so each
+    // message stays comfortably under typical broker/HTTP limits.
+    const chunkSize = 50_000;
+    for (let i = 0; i < contacts.length; i += chunkSize) {
+      await this.queuePublisher.publishSegmentData({
+        type,
+        tagId: segment.id,
+        tagName: segment.name,
+        accountId: segment.accountId,
+        contacts: contacts.slice(i, i + chunkSize),
+      });
+    }
   }
 
   async processTagBatch(tagBatch: TagBatch) {
@@ -189,21 +210,49 @@ export class AppService {
 
     const redisClient = await this.redisService.getOrThrow();
     const redisKey = `processingsegment:${id}`;
-    await redisClient.set(redisKey, currentDate.getTime());
+    const lockToken = randomUUID();
 
-    const segment = await this.msgopsService.getTagById(id);
-    if (!segment) {
-      this.trackerService.logInfo(`[Segment] Segment not found: ${id}`);
-      return { status: 200, message: `[Segment] Segment not found: ${id}` };
+    // Atomic SET NX EX: replaces the previous non-atomic `set` so concurrent
+    // dispatches (BullMQ retry + a fresh schedule, or two workers) can't both
+    // enter processSegment. TTL 1900s is above any plausible run duration.
+    // On contention we throw 5xx — BullMQ retries the job per the configured
+    // backoff and the HTTP entrypoint replies 5xx so the AMQP consumer nacks.
+    const acquired = await redisClient.set(redisKey, lockToken, 'EX', 1900, 'NX');
+    if (acquired !== 'OK') {
+      this.trackerService.logInfo(`[Segment] Lock contention for ${id}; deferring to retry`);
+      throw new HttpException(
+        { status: HttpStatus.SERVICE_UNAVAILABLE, message: `[Segment] Locked: ${id}` },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
     }
-    const currentTaskId = segment.scheduleCloudTaskId;
-    const account = await this.msgopsService.findAccount(segment.accountId);
 
+    let segment: Awaited<ReturnType<typeof this.msgopsService.getTagById>> | null = null;
+    let currentTaskId: string | null = null;
     try {
+      segment = await this.msgopsService.getTagById(id);
+      if (!segment) {
+        this.trackerService.logInfo(`[Segment] Segment not found: ${id}`);
+        return { status: 200, message: `[Segment] Segment not found: ${id}` };
+      }
+      currentTaskId = segment.scheduleCloudTaskId;
+      const account = await this.msgopsService.findAccount(segment.accountId);
+      if (!account) {
+        this.trackerService.logInfo(
+          `[Segment] Account ${segment.accountId} not found or inactive — skipping segment ${id} and stopping further scheduling`,
+        );
+        await this.msgopsService.updateTag(segment.id, {
+          status: SegmentStatus.INACTIVE,
+          scheduleCloudTaskId: null,
+        });
+        return { status: 200, message: `[Segment] Account inactive for segment: ${id}` };
+      }
+
       segment.segmentInfo = !segment.segmentInfo ? [] : segment.segmentInfo;
       const lastValidDate = dayjs().subtract(7, 'day');
+      // Skip auto-deactivation for base-size segments — they don't drive campaigns,
+      // so segmentActive() always returns 0 and they'd get wiped on every run.
       if (
-        segment.isRealTimeSegment === false &&
+        segment.type !== 'segment-base-size' &&
         segment.status !== SegmentStatus.REACTIVATING &&
         dayjs(segment.createdAt) < lastValidDate
       ) {
@@ -257,7 +306,7 @@ export class AppService {
       const minute = Math.floor(Math.random() * 59 + 1);
       const second = Math.floor(Math.random() * 59 + 1);
       const scheduleDate = dayjs()
-        .tz('America/Sao_Paulo')
+        .tz(accountTimeZone || 'America/Sao_Paulo')
         .add(1, 'day')
         .set('hour', hour)
         .set('minute', minute)
@@ -292,25 +341,11 @@ export class AppService {
       }
 
       if (account.isInternal && dataInsertAndDelete.insertIds && dataInsertAndDelete.insertIds.length) {
-        const dataInsert = {
-          type: 'segment-in',
-          tagId: segment.id,
-          tagName: segment.name,
-          accountId: segment.accountId,
-          contacts: dataInsertAndDelete.insertIds,
-        };
-        await this.queuePublisher.publishSegmentData(dataInsert);
+        await this.publishSegmentDataChunked('segment-in', segment, dataInsertAndDelete.insertIds);
       }
 
       if (account.isInternal && dataInsertAndDelete.deleteIds && dataInsertAndDelete.deleteIds.length) {
-        const dataDelete = {
-          type: 'segment-out',
-          tagId: segment.id,
-          tagName: segment.name,
-          accountId: segment.accountId,
-          contacts: dataInsertAndDelete.deleteIds,
-        };
-        await this.queuePublisher.publishSegmentData(dataDelete);
+        await this.publishSegmentDataChunked('segment-out', segment, dataInsertAndDelete.deleteIds);
       }
 
       return await this.msgopsService.updateTag(segment.id, {
@@ -325,6 +360,14 @@ export class AppService {
         status: SegmentStatus.ACTIVE,
       });
     } catch (error) {
+      // If the throw landed before we loaded the segment (e.g. DB error from
+      // getTagById), there's no segment_info to update — rethrow and let the
+      // finally release the lock.
+      if (!segment) {
+        this.trackerService.logInfo(`[Segment] Error before segment load: ${id}`, error);
+        throw new Error(`[Segment] Error executing segment: ${id}`);
+      }
+
       const duration = Math.abs(new Date().getTime() - currentDate.getTime());
       segment.segmentInfo.push({
         date: currentDate,
@@ -347,7 +390,23 @@ export class AppService {
       this.trackerService.logInfo(`[Segment] Error executing segment: ${id}`, error);
       throw new Error(`[Segment] Error executing segment: ${id}`);
     } finally {
-      await redisClient.del(redisKey);
+      // Compare-and-delete: only release if our token still owns the key.
+      // Guards against releasing a lock that's been re-acquired after our TTL
+      // expired (e.g. a stuck run that exceeded 1900s).
+      const released = await redisClient.eval(
+        "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+        1,
+        redisKey,
+        lockToken,
+      );
+      if (released === 0) {
+        // Run exceeded TTL — a parallel worker may have acquired the lock and
+        // be processing the same segment concurrently. Surface so we can tune
+        // the TTL or investigate stuck runs.
+        this.trackerService.logInfo(
+          `[Segment][WARN] Lock release no-op for ${id} — TTL expired mid-run, concurrent processing possible`,
+        );
+      }
     }
   }
 
@@ -514,10 +573,43 @@ export class AppService {
 
     if (reasons) {
       const segmentDbInfo = await this.msgopsService.getTagById(segemenData.tagId);
-      segmentDbInfo.segmentInfo[segmentDbInfo.segmentInfo.length - 1] = {
-        ...segmentDbInfo.segmentInfo[segmentDbInfo.segmentInfo.length - 1],
-        ...(segemenData.type == 'segment-out' ? { outInfo: { ...reasonData } } : { inInfo: { ...reasonInData } }),
-      };
+      const lastIndex = segmentDbInfo.segmentInfo.length - 1;
+      const lastEntry = (segmentDbInfo.segmentInfo[lastIndex] ?? {}) as SegmentInfo;
+      // Sum into existing aggregates so chunked deliveries (one segment-in/out
+      // payload split across multiple AMQP messages) accumulate instead of
+      // overwriting each other. Concurrent deliveries for the same segment run
+      // can still race at the row-level read-modify-write.
+      if (segemenData.type == 'segment-out') {
+        const previous = lastEntry.outInfo ?? {
+          unsub_qtd: 0,
+          bounce_qtd: 0,
+          open_qtd: 0,
+          click_qtd: 0,
+          in_tag_qtd: 0,
+          engagement_qtd: 0,
+          invalid_qtd: 0,
+        };
+        lastEntry.outInfo = {
+          unsub_qtd: previous.unsub_qtd + reasonData.unsub_qtd,
+          bounce_qtd: previous.bounce_qtd + reasonData.bounce_qtd,
+          open_qtd: previous.open_qtd + reasonData.open_qtd,
+          click_qtd: previous.click_qtd + reasonData.click_qtd,
+          in_tag_qtd: previous.in_tag_qtd + reasonData.in_tag_qtd,
+          engagement_qtd: previous.engagement_qtd + reasonData.engagement_qtd,
+          invalid_qtd: previous.invalid_qtd + reasonData.invalid_qtd,
+        };
+      } else {
+        const previous = lastEntry.inInfo ?? { bought: 0, reengaged: 0 };
+        lastEntry.inInfo = {
+          bought: previous.bought + reasonInData.bought,
+          reengaged: previous.reengaged + reasonInData.reengaged,
+        };
+      }
+      if (lastIndex >= 0) {
+        segmentDbInfo.segmentInfo[lastIndex] = lastEntry;
+      } else {
+        segmentDbInfo.segmentInfo = [lastEntry];
+      }
       await this.msgopsService.updateTag(segmentDbInfo.id, { segmentInfo: segmentDbInfo.segmentInfo });
     }
   }
