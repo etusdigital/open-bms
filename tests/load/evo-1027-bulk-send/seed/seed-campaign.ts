@@ -130,8 +130,8 @@ async function setupSendgridMock(
 async function createAccount(client: Client, label: string): Promise<number> {
   const name = `load-evo1027-${label}`.slice(0, 255);
   const res = await client.query<{ id: number }>(
-    `INSERT INTO accounts (name, description, is_active, is_internal)
-     VALUES ($1, $2, true, true) RETURNING id`,
+    `INSERT INTO accounts (name, description, is_active)
+     VALUES ($1, $2, true) RETURNING id`,
     [name, `EVO-1027 load test account (${label})`],
   );
   return res.rows[0].id;
