@@ -202,11 +202,7 @@ export class AppService {
     try {
       segment.segmentInfo = !segment.segmentInfo ? [] : segment.segmentInfo;
       const lastValidDate = dayjs().subtract(7, 'day');
-      if (
-        segment.isRealTimeSegment === false &&
-        segment.status !== SegmentStatus.REACTIVATING &&
-        dayjs(segment.createdAt) < lastValidDate
-      ) {
+      if (segment.status !== SegmentStatus.REACTIVATING && dayjs(segment.createdAt) < lastValidDate) {
         const campaignsSchedule = await this.segmentActive(segment.id);
         if (campaignsSchedule == 0) {
           await this.msgopsService.processSegment(segment.id, segment.accountId, null, null);
