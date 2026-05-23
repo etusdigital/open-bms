@@ -29,7 +29,6 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR, enUS } from 'date-fns/locale';
 import i18n from '@/lib/i18n';
 
-import { useAppStore } from '@/stores/app-store';
 import { AutomationEditor } from './editor/automation-editor';
 import { BlocksSidebar } from './editor/panels/blocks-sidebar';
 import { AutomationDetailsModal, type AutomationMetadata } from './editor/panels/automation-details-modal';
@@ -130,7 +129,6 @@ export default function AutomationFormPage({ automationId }: AutomationFormPageP
   // Statistics + history state
   const [statsOpen, setStatsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const isInternal = useAppStore((s) => (s.auth.status === 'authenticated' ? s.auth.account.isInternal : false));
   const [previewAudit, setPreviewAudit] = useState<AuditRecord | null>(null);
   const { data: audits = [], isLoading: auditsLoading } = useAutomationAudits(automationId ?? 0);
 
@@ -444,8 +442,8 @@ export default function AutomationFormPage({ automationId }: AutomationFormPageP
           </select>
         )}
 
-        {/* Statistics button (internal accounts only, edit mode) */}
-        {isEditing && !isPreviewMode && isInternal && (
+        {/* Statistics button (edit mode) */}
+        {isEditing && !isPreviewMode && (
           <Button
             variant="ghost"
             size="sm"

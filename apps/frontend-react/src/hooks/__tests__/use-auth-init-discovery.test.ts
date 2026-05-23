@@ -25,9 +25,9 @@ vi.mock('@/features/auth/use-auth', () => ({
 }));
 
 const discoveryAccounts = [
-  { accountId: 42, isMasterUser: false, account: { id: 42, name: 'AccountA', isInternal: false } },
-  { accountId: 99, isMasterUser: false, account: { id: 99, name: 'AccountB', isInternal: false } },
-  { accountId: 200, isMasterUser: true, account: { id: 200, name: 'AccountC', isInternal: true } },
+  { accountId: 42, isMasterUser: false, account: { id: 42, name: 'AccountA' } },
+  { accountId: 99, isMasterUser: false, account: { id: 99, name: 'AccountB' } },
+  { accountId: 200, isMasterUser: true, account: { id: 200, name: 'AccountC' } },
 ];
 
 const discoveryResponse = {

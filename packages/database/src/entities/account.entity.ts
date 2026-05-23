@@ -6,8 +6,4 @@ export class Account {
   id: number;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  name: string;
-
-  @Column({ name: 'is_internal', type: 'boolean', default: false })
-  isInternal: boolean;
-}
+  name: string;}

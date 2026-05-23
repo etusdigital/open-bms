@@ -5,7 +5,6 @@ export interface SuperAdminAccount {
   name: string;
   description?: string;
   isActive: boolean;
-  isInternal: boolean;
   accountConfigs?: AccountConfig[];
   createdAt: string;
   updatedAt?: string;

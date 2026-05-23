@@ -73,14 +73,6 @@ export function useSuperAdminAccountsColumns({
           ),
       },
       {
-        accessorKey: 'isInternal',
-        header: t('superAdmin.accounts.isInternal'),
-        cell: ({ row }) =>
-          row.original.isInternal ? (
-            <Badge variant="outline">{t('superAdmin.accounts.internal')}</Badge>
-          ) : null,
-      },
-      {
         accessorKey: 'createdAt',
         header: t('common.createdAt'),
         cell: ({ row }) => formatDateTime(row.original.createdAt),

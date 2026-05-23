@@ -379,7 +379,7 @@ describe('SetupService', () => {
         data: { name: 'Admin', email: 'admin@bms.io', password: 'password1', accountName: 'Acme' } as any,
       });
 
-      expect(accountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Acme', groupId: 1, isActive: true, isInternal: false }));
+      expect(accountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Acme', groupId: 1, isActive: true }));
       expect(userAccountRepo.save).toHaveBeenCalledWith(expect.objectContaining({ userId: 42, accountId: 700, isMasterUser: true }));
     });
 

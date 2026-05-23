@@ -17,8 +17,6 @@ interface CampaignFormPageProps {
 export default function CampaignFormPage({ campaignId }: CampaignFormPageProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const auth = useAppStore((s) => s.auth);
-  const isInternal = auth.status === 'authenticated' ? auth.account.isInternal : false;
   const isSuperAdmin = useAppStore(selectIsSuperAdmin);
   const isEditing = campaignId !== undefined;
 
@@ -135,7 +133,6 @@ export default function CampaignFormPage({ campaignId }: CampaignFormPageProps) 
           onSubmit={handleSubmit}
           onCancel={() => navigate({ to: '/campaigns', search: {} as never })}
           isPending={mutation.isPending}
-          isInternal={isInternal}
           isSuperAdmin={isSuperAdmin}
         />
       </FormPage.Content>

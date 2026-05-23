@@ -76,27 +76,23 @@ export class AccountsService {
     return this.accountRepository.find();
   }
 
-  async findOneLightweight(id: number): Promise<{ id: number; name: string; isInternal: boolean; isActive: boolean } | null> {
+  async findOneLightweight(id: number): Promise<{ id: number; name: string; isActive: boolean } | null> {
     return this.accountRepository
       .createQueryBuilder('account')
-      .select(['account.id', 'account.name', 'account.isInternal', 'account.isActive'])
+      .select(['account.id', 'account.name', 'account.isActive'])
       .where('account.id = :id', { id })
       .andWhere('account.deleted_at IS NULL')
       .getOne();
   }
 
-  async getAllAccountsLightweight(): Promise<Array<{ id: number; name: string; isInternal: boolean; isActive: boolean }>> {
+  async getAllAccountsLightweight(): Promise<Array<{ id: number; name: string; isActive: boolean }>> {
     return this.accountRepository
       .createQueryBuilder('account')
-      .select(['account.id', 'account.name', 'account.isInternal', 'account.isActive'])
+      .select(['account.id', 'account.name', 'account.isActive'])
       .where('account.deleted_at IS NULL')
       .andWhere('account.is_active = true')
       .orderBy('account.name', 'ASC')
       .getMany();
-  }
-
-  async getInternalAccounts(): Promise<Array<AccountEntity>> {
-    return this.accountRepository.find({ where: { isInternal: true } });
   }
 
   async listPaginated(params: PageDto, userId: number): Promise<PaginationDto<AccountEntity>> {

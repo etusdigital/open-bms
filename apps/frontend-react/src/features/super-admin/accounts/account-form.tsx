@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -50,7 +50,6 @@ function CreateForm({
     defaultValues: {
       name: '',
       description: '',
-      isInternal: false,
       isActive: true,
       defaultDomain: '',
       accountConfigs: [],
@@ -100,22 +99,6 @@ function CreateForm({
                   <Input {...field} placeholder="https://example.com" />
                 </FormControl>
                 <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="isInternal"
-            render={({ field }) => (
-              <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <FormLabel>{t('superAdmin.accounts.isInternal')}</FormLabel>
-                  <FormDescription>{t('superAdmin.accounts.isInternalHelp')}</FormDescription>
-                </div>
-                <FormControl>
-                  <Switch checked={field.value} onCheckedChange={field.onChange} />
-                </FormControl>
               </FormItem>
             )}
           />
@@ -189,22 +172,6 @@ function EditForm({
                   <Textarea rows={3} {...field} maxLength={500} />
                 </FormControl>
                 <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="isInternal"
-            render={({ field }) => (
-              <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <FormLabel>{t('superAdmin.accounts.isInternal')}</FormLabel>
-                  <FormDescription>{t('superAdmin.accounts.isInternalHelp')}</FormDescription>
-                </div>
-                <FormControl>
-                  <Switch checked={field.value} onCheckedChange={field.onChange} />
-                </FormControl>
               </FormItem>
             )}
           />

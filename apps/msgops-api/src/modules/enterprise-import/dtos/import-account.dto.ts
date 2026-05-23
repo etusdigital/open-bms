@@ -6,7 +6,6 @@ const createAccountSchema = Joi.object({
   name: Joi.string().trim().required(),
   description: Joi.string().allow('', null).optional(),
   isActive: Joi.boolean().default(true).optional(),
-  isInternal: Joi.boolean().default(false).optional(),
   defaultDomain: Joi.string().allow('', null).optional(),
 }).unknown(true);
 

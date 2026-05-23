@@ -52,12 +52,11 @@ describe('AccountsService — findWithCleanConfigs', () => {
     service = module.get<AccountsService>(AccountsService);
   });
 
-  it('preserves isInternal on the returned account (true)', async () => {
+  it('returns the account fetched from the repository', async () => {
     const account = Object.assign(new AccountEntity(), {
       id: 42,
-      name: 'Internal Account',
+      name: 'Account',
       isActive: true,
-      isInternal: true,
       groupId: 1,
     });
     accountRepository.findOneOrFail.mockResolvedValue(account);
@@ -67,33 +66,14 @@ describe('AccountsService — findWithCleanConfigs', () => {
     const result = await service.findWithCleanConfigs(42);
 
     expect(result).toBeDefined();
-    expect(result.isInternal).toBe(true);
     expect(result.id).toBe(42);
   });
 
-  it('preserves isInternal on the returned account (false)', async () => {
-    const account = Object.assign(new AccountEntity(), {
-      id: 7,
-      name: 'External Account',
-      isActive: true,
-      isInternal: false,
-      groupId: 1,
-    });
-    accountRepository.findOneOrFail.mockResolvedValue(account);
-    customFieldRepository.find.mockResolvedValue([]);
-    accountConfigRepository.find.mockResolvedValue([]);
-
-    const result = await service.findWithCleanConfigs(7);
-
-    expect(result.isInternal).toBe(false);
-  });
-
-  it('replaces customFields and accountConfigs but does not strip isInternal', async () => {
+  it('replaces customFields and accountConfigs with freshly loaded data', async () => {
     const account = Object.assign(new AccountEntity(), {
       id: 99,
       name: 'Another Account',
       isActive: true,
-      isInternal: true,
       groupId: 2,
       customFields: [{ name: 'stale' } as unknown as CustomFieldsEntity],
       accountConfigs: [{ name: 'stale' } as unknown as AccountConfigEntity],
@@ -107,7 +87,6 @@ describe('AccountsService — findWithCleanConfigs', () => {
 
     const result = await service.findWithCleanConfigs(99);
 
-    expect(result.isInternal).toBe(true);
     expect(result.customFields).toBe(loadedFields);
     expect(result.accountConfigs).toBe(loadedConfigs);
   });

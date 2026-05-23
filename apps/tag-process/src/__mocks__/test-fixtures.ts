@@ -10,7 +10,6 @@ export function createAccount(overrides: Partial<AccountEntity> = {}): AccountEn
   return {
     id: 1,
     name: 'Test Account',
-    isInternal: false,
     description: 'Test account description',
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),

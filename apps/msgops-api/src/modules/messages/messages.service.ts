@@ -984,7 +984,6 @@ export class MessagesService {
       .take(params.itemsPerPage)
       .where({ language })
       .andWhere('html IS NOT NULL')
-      .andWhere('is_internal = :isInternal', { isInternal: false })
       .orderBy(sortBy, order);
 
     const [emailsLabels, total] = await query.getManyAndCount();

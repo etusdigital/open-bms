@@ -34,7 +34,6 @@ describe('ServicesService', () => {
     id: 1,
     name: 'Test Account',
     isActive: true,
-    isInternal: true,
     groupId: 1,
     createdAt: new Date(),
     updatedAt: new Date(),

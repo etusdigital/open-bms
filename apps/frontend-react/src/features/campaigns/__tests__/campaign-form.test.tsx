@@ -54,14 +54,13 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });
 
-async function renderForm(props?: { defaultValues?: Record<string, unknown>; isInternal?: boolean }) {
+async function renderForm(props?: { defaultValues?: Record<string, unknown> }) {
   return renderWithRouter(
     <QueryClientProvider client={queryClient}>
       <CampaignForm
         onSubmit={mockOnSubmit}
         onCancel={mockOnCancel}
         isPending={false}
-        isInternal={props?.isInternal}
         defaultValues={props?.defaultValues as any}
       />
     </QueryClientProvider>,

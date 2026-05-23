@@ -23,7 +23,7 @@ const meResponse = {
     {
       accountId: 1,
       isMasterUser: false,
-      account: { id: 1, name: 'TestCo', isInternal: false },
+      account: { id: 1, name: 'TestCo' },
     },
   ],
 };

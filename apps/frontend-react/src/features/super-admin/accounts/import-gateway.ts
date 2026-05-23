@@ -29,7 +29,7 @@ export interface ImportStatusResponse {
 }
 
 export interface CreateImportInput {
-  accountData: { name: string; description?: string; isActive?: boolean; isInternal?: boolean };
+  accountData: { name: string; description?: string; isActive?: boolean };
   enterpriseBaseUrl: string;
   enterpriseApiKey: string;
   // Selective re-import: only these pipeline steps run (parents auto-included

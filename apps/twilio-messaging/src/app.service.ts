@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { addTrailingSlash } from '@msgops/url-utils';
 import Redis from 'ioredis';
 import { RedisService } from './providers/redis/redis.service';
 import {
@@ -255,7 +254,7 @@ export class AppService {
 
   async createRedirectLink(opts: CreateRedirectLinkOptions) {
     let { url } = opts;
-    const { utmsDefault, type, utmCampaign, baseUrl, account } = opts;
+    const { utmsDefault, type, utmCampaign, baseUrl } = opts;
     url += url.includes('?') ? `&${utmsDefault}` : `?${utmsDefault}`;
     if (!url.includes('utm_source')) {
       url += '&utm_source=bms';
@@ -266,7 +265,6 @@ export class AppService {
     if (!url.includes('utm_campaign')) {
       url += `&utm_campaign=${utmCampaign}`;
     }
-    if (account.isInternal) url = addTrailingSlash(url);
     return await this.msgopsService.createShortLink(url, baseUrl);
   }
 

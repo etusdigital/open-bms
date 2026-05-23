@@ -25,7 +25,6 @@ interface CampaignFormProps {
   onCancel: () => void;
   isPending: boolean;
   isCampaignRule?: boolean;
-  isInternal?: boolean;
   isSuperAdmin?: boolean;
 }
 
@@ -36,7 +35,6 @@ export default function CampaignForm({
   onCancel,
   isPending,
   isCampaignRule = false,
-  isInternal = false,
   isSuperAdmin = false,
 }: CampaignFormProps) {
   const { t } = useTranslation();
@@ -284,7 +282,6 @@ export default function CampaignForm({
               form={form}
               campaignId={campaignId}
               isCampaignRule={isCampaignRule}
-              isInternal={isInternal}
               disableSimple={disableSimple}
             />
           );
@@ -310,7 +307,6 @@ export default function CampaignForm({
             form={form}
             campaignId={campaignId}
             isCampaignRule={isCampaignRule}
-            isInternal={isInternal}
             disableSimple={disableSimple}
           />
         );

@@ -299,7 +299,6 @@ describe('AppService', () => {
 
   describe('createRedirectLink', () => {
     const externalAccount = { id: 1, name: 'External' } as any;
-    const internalAccount = { id: 2, name: 'Internal', isInternal: true } as any;
 
     it('should append UTMs and create short link', async () => {
       await service.createRedirectLink({
@@ -381,20 +380,7 @@ describe('AppService', () => {
       expect(matches.length).toBe(1);
     });
 
-    it('should add trailing slash before query for internal account', async () => {
-      await service.createRedirectLink({
-        url: 'https://example.com/lp',
-        utmsDefault: 'key=val',
-        type: 'whatsapp',
-        utmCampaign: 'campaign-1',
-        baseUrl: '',
-        account: internalAccount,
-      });
-      const calledUrl = mockMsgopsService.createShortLink.mock.calls[0][0];
-      expect(calledUrl).toMatch(/^https:\/\/example\.com\/lp\/\?/);
-    });
-
-    it('should NOT add trailing slash for external account', async () => {
+    it('should not modify the URL path with a trailing slash', async () => {
       await service.createRedirectLink({
         url: 'https://example.com/lp',
         utmsDefault: 'key=val',

@@ -95,10 +95,6 @@ export class CampaignsController {
   @Post()
   @RequirePermission('campaigns:create')
   async createOne(@Body() campaignDto: CampaignDto): Promise<CampaignDto> {
-    const isInternal = this.cls.get('isInternalAccount');
-    if (campaignDto.type !== CampaignsType.TRIGGER && isInternal && !campaignDto.name) {
-      throw new ForbiddenException('Campaign name is required');
-    }
     // Defense in depth: reject campaigns on a channel not enabled for the account.
     // Gating lives here (not in the shared createOne primitive) so the
     // Enterprise→OSS batch import, which reuses createOne, stays un-gated.
@@ -112,10 +108,6 @@ export class CampaignsController {
   @Put()
   @RequirePermission('campaigns:update')
   async updateOrCreateOne(@Body() campaignDto: CampaignDto): Promise<CampaignDto> {
-    const isInternal = this.cls.get('isInternalAccount');
-    if (isInternal && !campaignDto.name) {
-      throw new ForbiddenException('Campaign name is required');
-    }
     return await this.campaignService.update(campaignDto);
   }
 

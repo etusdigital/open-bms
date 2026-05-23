@@ -20,10 +20,6 @@ export class AccountEntity {
 
   @Column('varchar', { name: 'name', length: 255 })
   name: string;
-
-  @Column('boolean', { name: 'is_internal', default: false })
-  isInternal: boolean;
-
   @Column('text', { name: 'description' })
   description: string;
 

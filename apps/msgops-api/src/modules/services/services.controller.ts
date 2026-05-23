@@ -46,11 +46,4 @@ export class ServicesController {
   async unsubscribed(@Body() leadConceptionDto: { email: string }): Promise<any> {
     return await this.servicesService.unsubscribed(leadConceptionDto.email);
   }
-
-  @Post('/invalidate-internal-cache')
-  @ApiOperation({ summary: 'Invalidate Redis cache for all internal accounts' })
-  @RequirePermission('infra:manage')
-  async invalidateInternalCache() {
-    return await this.servicesService.invalidateInternalAccountsCache();
-  }
 }

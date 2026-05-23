@@ -19,7 +19,4 @@ export class EmailsLabelsEntity {
 
   @Column('text', { name: 'html' })
   html: string;
-
-  @Column('bool', { name: 'is_internal' })
-  isInternal: boolean;
 }

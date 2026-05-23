@@ -3,7 +3,6 @@ import { z } from 'zod';
 export const superAdminCreateAccountSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().max(500).optional().default(''),
-  isInternal: z.boolean().default(false),
   isActive: z.boolean().default(true),
   defaultDomain: z.string().max(500).optional().default(''),
   accountConfigs: z
@@ -32,7 +31,6 @@ export type ChannelsValues = z.infer<typeof channelsSchema>;
 export const superAdminEditAccountSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().max(500).optional().default(''),
-  isInternal: z.boolean().default(false),
   channels: channelsSchema,
 });
 

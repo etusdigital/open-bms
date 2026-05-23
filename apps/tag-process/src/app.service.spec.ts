@@ -337,56 +337,6 @@ describe('AppService', () => {
       expect(queuePublisher.scheduleSegmentRecalculation).not.toHaveBeenCalled();
     });
 
-    it('should send segment-in pubsub when account is internal and has inserts', async () => {
-      const account = createAccount({ isInternal: true });
-      const segment = createTag({
-        id: segmentId,
-        isRealTimeSegment: true,
-        segmentInfo: [],
-      });
-      msgopsService.getTagById.mockResolvedValue(segment);
-      msgopsService.findAccount.mockResolvedValue(account);
-      msgopsService.processSegment.mockResolvedValue({ insertIds: [1, 2], deleteIds: [] });
-      msgopsService.getNumberContactsByTag.mockResolvedValue({
-        total: 2,
-        email: 2,
-        mobile_push: 0,
-        web_push: 0,
-        phone: 0,
-        whatsapp: 0,
-      });
-      msgopsService.updateTag.mockResolvedValue({} as any);
-
-      await appService.processSegment(segmentId);
-
-      expect(queuePublisher.publishSegmentData).toHaveBeenCalledWith(expect.objectContaining({ type: 'segment-in' }));
-    });
-
-    it('should send segment-out pubsub when account is internal and has deletes', async () => {
-      const account = createAccount({ isInternal: true });
-      const segment = createTag({
-        id: segmentId,
-        isRealTimeSegment: true,
-        segmentInfo: [],
-      });
-      msgopsService.getTagById.mockResolvedValue(segment);
-      msgopsService.findAccount.mockResolvedValue(account);
-      msgopsService.processSegment.mockResolvedValue({ insertIds: [], deleteIds: [3, 4] });
-      msgopsService.getNumberContactsByTag.mockResolvedValue({
-        total: 0,
-        email: 0,
-        mobile_push: 0,
-        web_push: 0,
-        phone: 0,
-        whatsapp: 0,
-      });
-      msgopsService.updateTag.mockResolvedValue({} as any);
-
-      await appService.processSegment(segmentId);
-
-      expect(queuePublisher.publishSegmentData).toHaveBeenCalledWith(expect.objectContaining({ type: 'segment-out' }));
-    });
-
     it('should trim segmentInfo to last 100 entries', async () => {
       const longSegmentInfo = Array.from({ length: 105 }, (_, i) => ({
         date: new Date(),

@@ -209,38 +209,6 @@ describe('AppService', () => {
       const campaignCount = (calledUrl.match(/utm_campaign/g) || []).length;
       expect(campaignCount).toBe(1);
     });
-
-    it('should add trailing slash to URL path for internal account', async () => {
-      const internalAccount = { ...makeAccount(), isInternal: true };
-      await service.createRedirectLink({
-        url: 'https://example.com/lp',
-        utmsDefault: 'foo=bar',
-        type: 'sms',
-        utmCampaign: 'campaign1',
-        baseUrl: '',
-        account: internalAccount,
-      });
-      const calledUrl = (msgopsService.createShortLink as jest.Mock).mock.calls[0][0];
-      const queryIdx = calledUrl.indexOf('?');
-      expect(queryIdx).toBeGreaterThan(-1);
-      expect(calledUrl.slice(0, queryIdx)).toBe('https://example.com/lp/');
-    });
-
-    it('should not add trailing slash for external account', async () => {
-      const externalAccount = { ...makeAccount(), isInternal: false };
-      await service.createRedirectLink({
-        url: 'https://example.com/lp',
-        utmsDefault: 'foo=bar',
-        type: 'sms',
-        utmCampaign: 'campaign1',
-        baseUrl: '',
-        account: externalAccount,
-      });
-      const calledUrl = (msgopsService.createShortLink as jest.Mock).mock.calls[0][0];
-      const queryIdx = calledUrl.indexOf('?');
-      expect(queryIdx).toBeGreaterThan(-1);
-      expect(calledUrl.slice(0, queryIdx)).toBe('https://example.com/lp');
-    });
   });
 
   describe('processSingleSms', () => {

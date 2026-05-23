@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { requiredString, optionalString } from '@/lib/zod-primitives';
 
 export const CAMPAIGN_TITLE_MAX = 40;
-export const CAMPAIGN_TITLE_MAX_INTERNAL = 25;
+export const CAMPAIGN_UTM_NAME_MAX = 25;
 export const CAMPAIGN_DESCRIPTION_MAX = 255;
 
 const audienceStepItemSchema = z.object({

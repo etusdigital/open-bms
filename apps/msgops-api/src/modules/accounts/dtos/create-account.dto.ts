@@ -17,9 +17,6 @@ export class CreateAccountDto {
   @JoiSchema(Joi.boolean().default(true).optional())
   isActive?: boolean;
 
-  @JoiSchema(Joi.boolean().default(false).optional())
-  isInternal?: boolean;
-
   @JoiSchema(Joi.array().allow(null).optional())
   customFields?: object[];
 

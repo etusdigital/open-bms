@@ -25,7 +25,6 @@
     "@aws-sdk/client-sesv2": "^3.1044.0",
     "@bms/messaging": "workspace:*",
     "@mailchimp/mailchimp_transactional": "^1.4.1",
-    "@msgops/url-utils": "workspace:*",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.1.13",
     "@nestjs/config": "^4.0.3",

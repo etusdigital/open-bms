@@ -42,7 +42,6 @@ export interface Account {
   sendgridKey?: string;
   settings?: string;
   linkUnsubscriber?: string;
-  isInternal?: boolean;
 }
 
 export interface AccountConfig {

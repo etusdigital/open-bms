@@ -290,7 +290,7 @@ export class ContactsController {
   @CronRoute()
   @Post('/deactivate-inactive-contacts')
   async deactivateInactiveContacts() {
-    return this.contactsService.deactivateInternalContacts();
+    return this.contactsService.deactivateInactiveContacts();
   }
 
   @RequirePermission('audience:contacts_edit')

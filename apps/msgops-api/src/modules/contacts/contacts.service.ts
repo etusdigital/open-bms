@@ -265,12 +265,6 @@ export class ContactsService {
         ipAddress,
         userAgent,
       });
-      if (this.cls.get('isInternalAccount')) {
-        return {
-          exportId: `export_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          estimatedTotal: 1,
-        };
-      }
       const query = this.generateParametrizedSelectQuery(params, true);
       const total = await query.getCount();
       return {
@@ -285,9 +279,6 @@ export class ContactsService {
 
   async exportContactsStream(params: ContactsPageDto, response: any) {
     try {
-      if (this.cls.get('isInternalAccount')) {
-        return;
-      }
       const exportId = params.exportId;
       const total = params.exportTotal;
 
@@ -488,19 +479,6 @@ export class ContactsService {
         .getRawMany();
 
       if (exportContacts) {
-        if (this.cls.get('isInternalAccount')) {
-          await this.auditService.createAudit({
-            accountId: this.cls.get('accountId'),
-            entity: 'contacts',
-            entityId: 1,
-            type: 'export',
-            newValues: await JSON.parse(JSON.stringify(params)),
-            user: currentUser,
-            ipAddress,
-            userAgent,
-          });
-          return;
-        }
         const headers = ['name', 'email', 'status', 'created_at'];
         const contacts = results.map((contact) => {
           if (contact.email) {
@@ -1314,10 +1292,7 @@ export class ContactsService {
       return;
     }
 
-    // The `allAccounts` and `is_internal` flags were a SaaS multi-tenant concept
-    // where suppression cascaded across all customer accounts managed by the
-    // operator. In OSS each deployment owns its own data, so we always scope
-    // both the contact update and the suppression record to the current account.
+    // Suppression always scopes to the current account.
     const accountId = this.cls.get<number>('accountId');
     if (!accountId) {
       throw new BadRequestException('Account context is required. Send the Account-Id header.');
@@ -1867,9 +1842,15 @@ export class ContactsService {
    *
    * Processing is done in batches to minimize database load.
    */
-  async deactivateInternalContacts() {
+  async deactivateInactiveContacts() {
     try {
-      const accounts = await this.accountsService.getInternalAccounts();
+      // Opt-in: pre-OSS this job ran only on internal accounts (effectively a
+      // no-op for most installs). Now scoped to all accounts, but gated so
+      // upgrades don't silently sweep production data on first cron tick.
+      if (process.env.DEACTIVATE_INACTIVE_CONTACTS_ENABLED !== 'true') {
+        return;
+      }
+      const accounts = await this.accountsService.getAllAccounts();
       const deactivateDays = parseInt(process.env.DEACTIVATE_CONTACTS_IN_DAYS) || 180;
 
       const BATCH_SIZE = 1000;

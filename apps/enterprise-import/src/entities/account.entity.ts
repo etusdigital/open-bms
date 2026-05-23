@@ -13,10 +13,6 @@ export class AccountEntity {
 
   @Column('boolean', { name: 'is_active', default: true })
   isActive: boolean;
-
-  @Column('boolean', { name: 'is_internal', default: false })
-  isInternal: boolean;
-
   @Column('integer', { name: 'group_id' })
   groupId: number;
 
