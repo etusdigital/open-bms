@@ -39,17 +39,20 @@ PACKER_INTERNAL="${PACKER_INTERNAL:-campaign-packer:3000}"
 K6_IMAGE="${K6_IMAGE:-grafana/k6:latest}"
 DRAIN_TIMEOUT_S="${DRAIN_TIMEOUT_S:-900}"
 
-# Container names: resolve via `docker compose ps` so we don't hardcode the
-# project name (would break under COMPOSE_PROJECT_NAME or a different clone
-# directory). Allow env override for exotic setups.
+# Container names: only needed in local docker-compose mode. When REDIS_URL is
+# set (remote/loadtest mode), redis-cli works through SSH tunnel — no docker
+# exec needed.
 cd "$REPO_ROOT"
-REDIS_CONTAINER="${REDIS_CONTAINER:-$(docker compose ps -q redis 2>/dev/null | head -1)}"
-POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-$(docker compose ps -q postgres 2>/dev/null | head -1)}"
-if [[ -z "$REDIS_CONTAINER" || -z "$POSTGRES_CONTAINER" ]]; then
-  echo "ERROR: could not resolve redis/postgres containers via 'docker compose ps'." >&2
-  echo "       Make sure the stack is running ('docker compose up -d'), or set" >&2
-  echo "       REDIS_CONTAINER / POSTGRES_CONTAINER env vars explicitly." >&2
-  exit 1
+if [[ -z "${REDIS_URL:-}" ]]; then
+  REDIS_CONTAINER="${REDIS_CONTAINER:-$(docker compose ps -q redis 2>/dev/null | head -1)}"
+  POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-$(docker compose ps -q postgres 2>/dev/null | head -1)}"
+  if [[ -z "$REDIS_CONTAINER" || -z "$POSTGRES_CONTAINER" ]]; then
+    echo "ERROR: could not resolve redis/postgres containers via 'docker compose ps'." >&2
+    echo "       Make sure the stack is running ('docker compose up -d'), or set" >&2
+    echo "       REDIS_CONTAINER / POSTGRES_CONTAINER env vars explicitly," >&2
+    echo "       or set REDIS_URL for remote mode (skips container resolution)." >&2
+    exit 1
+  fi
 fi
 
 # Full ladder. Default range is "1k → 50k" (the cheap shakeout); use --max to
@@ -113,12 +116,21 @@ fi
 log() { printf '\n[run.sh %s] %s\n' "$(date +%H:%M:%S)" "$*" >&2; }
 
 # Poll queue depth for the given Bull queue name. Sums wait + active + delayed.
+# When REDIS_URL is set (remote/loadtest mode), queries via redis-cli -u (no
+# docker exec needed — works through SSH tunnel). Otherwise falls back to the
+# local `docker exec REDIS_CONTAINER` path.
 queue_depth() {
   local q="$1"
   local wait active delayed
-  wait=$(docker exec "$REDIS_CONTAINER" redis-cli LLEN "bull:${q}:wait" 2>/dev/null || echo 0)
-  active=$(docker exec "$REDIS_CONTAINER" redis-cli LLEN "bull:${q}:active" 2>/dev/null || echo 0)
-  delayed=$(docker exec "$REDIS_CONTAINER" redis-cli ZCARD "bull:${q}:delayed" 2>/dev/null || echo 0)
+  if [[ -n "${REDIS_URL:-}" ]]; then
+    wait=$(redis-cli -u "$REDIS_URL" LLEN "bull:${q}:wait" 2>/dev/null || echo 0)
+    active=$(redis-cli -u "$REDIS_URL" LLEN "bull:${q}:active" 2>/dev/null || echo 0)
+    delayed=$(redis-cli -u "$REDIS_URL" ZCARD "bull:${q}:delayed" 2>/dev/null || echo 0)
+  else
+    wait=$(docker exec "$REDIS_CONTAINER" redis-cli LLEN "bull:${q}:wait" 2>/dev/null || echo 0)
+    active=$(docker exec "$REDIS_CONTAINER" redis-cli LLEN "bull:${q}:active" 2>/dev/null || echo 0)
+    delayed=$(docker exec "$REDIS_CONTAINER" redis-cli ZCARD "bull:${q}:delayed" 2>/dev/null || echo 0)
+  fi
   echo $((wait + active + delayed))
 }
 
@@ -183,16 +195,29 @@ run_level() {
   trap "kill $metrics_pid 2>/dev/null || true" EXIT
   sleep 2
 
-  # 3) k6 trigger (in BMS network so it reaches campaign-packer:3000)
+  # 3) k6 trigger.
+  #   Local mode: attach k6 container to BMS network → http://campaign-packer:3000
+  #   Remote mode (PACKER_BASE_URL set by caller, e.g. http://localhost:53000
+  #     pointing at SSH-tunneled manager port): use --network host so k6 reaches
+  #     the tunnel via loopback.
   local k6_out="$RAW_DIR/${level}-k6"
   mkdir -p "$k6_out"
   local trigger_t0=$(date +%s)
-  if ! docker run --rm --network "$BMS_NETWORK" \
+  local k6_net_args
+  local packer_url
+  if [[ -n "${PACKER_BASE_URL:-}" ]]; then
+    k6_net_args=(--network host)
+    packer_url="$PACKER_BASE_URL"
+  else
+    k6_net_args=(--network "$BMS_NETWORK")
+    packer_url="http://$PACKER_INTERNAL"
+  fi
+  if ! docker run --rm "${k6_net_args[@]}" \
         --user "$(id -u):$(id -g)" \
         -v "$SCENARIO_DIR/k6:/scripts" -v "$k6_out:/out" \
         -e CAMPAIGN_ID="$campaign_id" \
         -e EXPECTED_CONTACTS="$contacts" \
-        -e PACKER_BASE_URL="http://$PACKER_INTERNAL" \
+        -e PACKER_BASE_URL="$packer_url" \
         "$K6_IMAGE" run \
           --summary-export=/out/summary.json \
           --out csv=/out/k6.csv \
