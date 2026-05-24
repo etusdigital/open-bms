@@ -1,27 +1,32 @@
 # BMS Open Source — Docker Swarm stack ISOLADA pra teste de carga (EVO-1027).
 #
-# Deriva de stack.bms-staging.yml. Diferenças:
-#   - serviços não necessários pro pipeline campaign→send→ingest removidos
-#     (frontend, send-push, send-whatsapp, twilio, tag-process, tracker,
-#     message-trigger, campaign-events-tracker, geolocation)
-#   - sendgrid-mock adicionado pra absorver envios + disparar eventos
-#     sintéticos delivered/open/click sem mandar e-mail real
-#   - send-email aponta SENDGRID_API_BASE_URL pro mock interno
-#   - network `internal` com attachable: true pra seed/k6 do laptop
-#   - postgres/redis/campaign-packer publicados em 127.0.0.1 do manager
-#     pra tunelar com `ssh -L` e rodar o harness do laptop
-#   - sem Traefik labels, sem network_public (stack não recebe tráfego externo)
+# Clone ÍNTEGRO do bms-staging (todos os serviços, mesma image tag) +
+# `sendgrid-mock` adicionado pra absorver envios sem mandar e-mail real.
+# Diferenças mínimas vs bms-staging:
+#   - sendgrid-mock service novo
+#   - network `internal` com attachable: true pra seed/k6 do laptop entrarem
+#     via `docker run --network bms-loadtest_internal`
+#   - postgres/redis/campaign-packer/sendgrid-mock publicados em 127.0.0.1 do
+#     manager pra tunelar com `ssh -L` e rodar harness do laptop
+#   - sem Traefik labels nem network_public (stack não recebe tráfego externo;
+#     se mantivesse, colidiria com rotas do bms-staging real)
+#   - volumes próprios prefixados pelo stack name (não compartilha com staging)
+#   - SENDGRID_API_KEY/BASE_URL configurados via super-admin UI →
+#     PUT /admin/integrations/sendgrid/settings (grava em system_config),
+#     não via env. Apontar BASE_URL pra http://sendgrid-mock:3010.
 #
 # Pré-requisito no manager (one-time):
 #   - docker load < bms-sendgrid-mock-loadtest.tar (build local + save/load)
 #
 # Deploy (do laptop):
-#   STACK_NAME=bms-loadtest STACK_FILE=infra/swarm/stack.bms-loadtest.yml \
-#     DOCKER_HOST=ssh://evolution_manager bash infra/swarm/deploy.sh
+#   TMP_ENV=$(mktemp) && ssh evolution_manager 'cat /opt/bms-staging/.env' > "$TMP_ENV" &&
+#     set -a && source "$TMP_ENV" && set +a &&
+#     DOCKER_HOST=ssh://evolution_manager docker stack deploy --with-registry-auth \
+#       -c infra/swarm/stack.bms-loadtest.yml bms-loadtest
 #
 # Teardown:
 #   DOCKER_HOST=ssh://evolution_manager docker stack rm bms-loadtest
-#   DOCKER_HOST=ssh://evolution_manager docker volume ls -q | grep ^bms-loadtest_ | \
+#   DOCKER_HOST=ssh://evolution_manager docker volume ls -q | grep ^bms-loadtest_ |
 #     xargs -r -I{} docker -H ssh://evolution_manager volume rm {}
 
 version: '3.9'
@@ -110,7 +115,6 @@ services:
   postgres:
     image: postgres:16-alpine
     # Publica em 127.0.0.1:55432 do manager pra seed via SSH tunnel.
-    # Bind em loopback do manager → não exposto fora do host.
     ports:
       - target: 5432
         published: 55432
@@ -297,6 +301,21 @@ services:
         limits:
           memory: 768M
 
+  frontend-react:
+    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-frontend-react:${IMAGE_TAG:?must set IMAGE_TAG}
+    networks: [internal]
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1/']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    deploy:
+      <<: *restart-policy
+      resources:
+        limits:
+          memory: 256M
+
   event-receiver:
     image: ${IMAGE_REGISTRY:-evoapicloud}/bms-event-receiver:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
@@ -316,9 +335,10 @@ services:
       PORT: '3000'
       # main.ts exige BRIDGE_ENDPOINT explícito quando NODE_ENV=production.
       BRIDGE_ENDPOINT: http://localhost:3000
-      # Geolocation service não está no loadtest stack — desabilitar
-      # enrichment pra evitar timeout chamando geolocation:50051.
-      GEO_ENRICHMENT_ENABLED: 'false'
+      GEOIP_SERVICE_URL: geolocation:50051
+      GEO_GRPC_URL: geolocation:50051
+      GEO_ENRICHMENT_ENABLED: 'true'
+      GEO_PROVIDER: local
       # event-process uses a separate `pg` Pool driven by DATABASE_* envs
       # (db.provider.ts). Without these the SendgridService.processSendgrid
       # path hits ECONNREFUSED and webhooks pile up in the DLQ.
@@ -346,12 +366,6 @@ services:
       PORT: '3000'
       BRIDGE_ENDPOINT: http://localhost:3000
       BMS_CONFIG_DIR: /data/config
-      # EVO-1052 override: nenhum e-mail real sai durante o load test, tudo
-      # cai no sendgrid-mock que responde 2xx + dispara delivered/open/click.
-      SENDGRID_API_BASE_URL: http://sendgrid-mock:3010
-      # SDK do SendGrid valida que a key começa com "SG." mesmo apontando
-      # pro mock. Override do dev-placeholder pra um valor SG.* qualquer.
-      SENDGRID_API_KEY: SG.LOADTEST_PLACEHOLDER_KEY
     volumes:
       - bms-config:/data/config:ro
     networks: [internal]
@@ -363,8 +377,8 @@ services:
 
   sendgrid-mock:
     image: bms-sendgrid-mock:loadtest
-    # Publica em 127.0.0.1:53010 do manager pra o seed registrar o webhook
-    # via SSH tunnel (POST /v3/user/webhooks/event/settings).
+    # Publica em 127.0.0.1:53010 do manager pra o seed registrar webhook
+    # e/ou admin config apontar URL via SSH tunnel.
     ports:
       - target: 3010
         published: 53010
@@ -380,6 +394,61 @@ services:
         limits:
           memory: 128M
 
+  send-push:
+    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-send-push:${IMAGE_TAG:?must set IMAGE_TAG}
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+      BRIDGE_ENDPOINT: http://localhost:3000
+      BMS_CONFIG_DIR: /data/config
+    volumes:
+      - bms-config:/data/config:ro
+    networks: [internal]
+    deploy:
+      <<: *restart-policy
+      resources:
+        limits:
+          memory: 384M
+
+  send-whatsapp:
+    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-send-whatsapp:${IMAGE_TAG:?must set IMAGE_TAG}
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+      BRIDGE_ENDPOINT: http://localhost:3000
+    networks: [internal]
+    deploy:
+      <<: *restart-policy
+      resources:
+        limits:
+          memory: 384M
+
+  twilio-messaging:
+    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-twilio-messaging:${IMAGE_TAG:?must set IMAGE_TAG}
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+      BRIDGE_ENDPOINT: http://localhost:3000
+    networks: [internal]
+    deploy:
+      <<: *restart-policy
+      resources:
+        limits:
+          memory: 384M
+
+  campaign-events-tracker:
+    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-campaign-events-tracker:${IMAGE_TAG:?must set IMAGE_TAG}
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+      BRIDGE_ENDPOINT: http://localhost:3000
+    networks: [internal]
+    deploy:
+      <<: *restart-policy
+      resources:
+        limits:
+          memory: 384M
+
   campaign-packer:
     image: ${IMAGE_REGISTRY:-evoapicloud}/bms-campaign-packer:${IMAGE_TAG:?must set IMAGE_TAG}
     # Publica em 127.0.0.1:53000 do manager pra k6 disparar via SSH tunnel.
@@ -391,6 +460,63 @@ services:
     environment:
       <<: *backend-env
       PORT: '3000'
+    networks: [internal]
+    deploy:
+      <<: *restart-policy
+      resources:
+        limits:
+          memory: 512M
+
+  tracker:
+    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-tracker:${IMAGE_TAG:?must set IMAGE_TAG}
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    networks: [internal]
+    deploy:
+      <<: *restart-policy
+      resources:
+        limits:
+          memory: 512M
+
+  tag-process:
+    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-tag-process:${IMAGE_TAG:?must set IMAGE_TAG}
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+      # main.ts exige BRIDGE_ENDPOINT explícito quando NODE_ENV=production.
+      BRIDGE_ENDPOINT: http://localhost:3000
+    networks: [internal]
+    deploy:
+      <<: *restart-policy
+      resources:
+        limits:
+          memory: 512M
+
+  message-trigger:
+    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-message-trigger:${IMAGE_TAG:?must set IMAGE_TAG}
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+      BRIDGE_ENDPOINT: http://localhost:3000
+    networks: [internal]
+    deploy:
+      <<: *restart-policy
+      resources:
+        limits:
+          memory: 512M
+
+  geolocation:
+    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-geolocation:${IMAGE_TAG:?must set IMAGE_TAG}
+    environment:
+      <<: *backend-env
+      PORT: '50051'
+      GEO_MMDB_DIR: /data/geo
+      BMS_CONFIG_DIR: /data/config
+    volumes:
+      # Pré-requisito: scp data/geo/dbip-city-lite.mmdb manager1:/opt/bms-staging/data/geo/
+      - /opt/bms-staging/data/geo:/data/geo:ro
+      - bms-config:/data/config:ro
     networks: [internal]
     deploy:
       <<: *restart-policy
