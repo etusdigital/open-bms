@@ -366,6 +366,10 @@ services:
       PORT: '3000'
       BRIDGE_ENDPOINT: http://localhost:3000
       BMS_CONFIG_DIR: /data/config
+      # DEBUG inst. pra próxima rodada — capturar Redis/AMQP/Bull events
+      # durante consume pra isolar o silencio do consumer.
+      NODE_DEBUG: ioredis
+      DEBUG: bull*,ioredis*,amqplib*
     volumes:
       - bms-config:/data/config:ro
     networks: [internal]

@@ -38,7 +38,9 @@ interface Args {
 function parseArgs(): Args {
   const out: Args = {
     count: 1000,
-    batch: 1000,
+    // 5000 × 11 cols = 55k bind params, abaixo do limite Postgres (65535).
+    // Reduz round-trips pelo SSH tunnel (era 100 pra 100k contatos, agora 20).
+    batch: 5000,
     label: String(Date.now()),
     dsn: process.env.PG_DSN || 'postgres://postgres:postgres@localhost:55432/msgops',
     teardown: false,
