@@ -88,10 +88,6 @@ export class EnterpriseSession {
     return this.paged('/contacts', params);
   }
 
-  listCustomEvents(params: PageParams): Promise<PagedResponse<any>> {
-    return this.paged('/custom-events', params);
-  }
-
   listAutomations(params: PageParams): Promise<PagedResponse<any>> {
     return this.paged('/automations', params);
   }

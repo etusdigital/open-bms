@@ -17,7 +17,6 @@ import { ContactTagEntity } from 'src/entities/contact-tag.entity';
 import { SuppressionEntity } from 'src/entities/suppression.entity';
 import { ClsService } from 'nestjs-cls';
 import { ContactDeviceEntity } from 'src/entities/contact-device.entity';
-import { CustomEventService } from '../custom-events/custom-events.service';
 import { replaceSpecialChars } from '../../utils/utils.service';
 import dayjs from 'dayjs';
 import { AccountEntity } from 'src/entities/account.entity';
@@ -52,7 +51,6 @@ export class ContactsService {
     @InjectRepository(AccountEntity)
     private readonly accountRepository: Repository<AccountEntity>,
     private readonly customFieldService: CustomFieldsService,
-    private readonly customEventService: CustomEventService,
     private readonly accountsService: AccountsService,
     private readonly redisService: RedisService,
     private readonly auditService: AuditService,
@@ -1584,44 +1582,6 @@ export class ContactsService {
       .execute();
   }
 
-  async updateContactsEvents() {
-    const accounts = await this.customEventService.getAccountWithCustomEvents();
-    if (!accounts.length) {
-      return;
-    }
-
-    for (const accountId of accounts.map((account) => account.accountId)) {
-      const uuidQuery = `UPDATE events_logs AS el 
-        SET contact_id = ct.id, email = ct.email
-        FROM contacts AS ct
-        WHERE (
-          (el.uuid is not null AND ct.uuid = el.uuid)
-          OR 
-          (el.email is not null AND ct.email = el.email)
-        )
-        AND el.time >= '${dayjs().utc().subtract(15, 'minute').format('YYYY-MM-DD HH:mm:ss')}'
-        AND el.time < '${dayjs().utc().format('YYYY-MM-DD HH:mm:ss')}'
-        AND el.uuid != 'None' 
-        AND el.contact_id is null
-        AND el.account_id = ${accountId}
-        AND ct.account_id = ${accountId};`;
-
-      const emailquery = `UPDATE events_logs AS el 
-      SET contact_id = ct.id
-      FROM contacts AS ct
-      WHERE ct.email = el.email
-      AND el.time >= '${dayjs().utc().subtract(15, 'minute').format('YYYY-MM-DD HH:mm:ss')}'
-      AND el.time < '${dayjs().utc().format('YYYY-MM-DD HH:mm:ss')}'
-      AND el.email is not null 
-      AND el.contact_id is null
-      AND el.account_id = ${accountId}
-      AND ct.account_id = ${accountId};`;
-
-      await this.contactDeviceRepository.query(uuidQuery);
-      await this.contactDeviceRepository.query(emailquery);
-    }
-  }
-
   async findContactHistory(id: number, params: ContactsPageDto): Promise<PaginationDto<any>> {
     try {
       const itemsPerPage = Number(params.itemsPerPage) || 10;
@@ -1639,7 +1599,7 @@ export class ContactsService {
 
       const activities = ContactsService.toArray(params.activities);
       const shouldFetchAutomations = !activities.length || activities.includes('automation');
-      const shouldFetchEvents = !activities.length || activities.includes('message') || activities.includes('custom_event');
+      const shouldFetchEvents = !activities.length || activities.includes('message');
 
       if (shouldFetchAutomations) {
         const buildAutomationsQuery = () => {
@@ -1713,10 +1673,10 @@ export class ContactsService {
   }
 
   /**
-   * Fetches message / custom_event history for a contact from the ClickHouse
+   * Fetches message history for a contact from the ClickHouse
    * `events_logs_v2` table (the events do NOT live in Postgres — see EVO-1427).
    *
-   * ClickHouse cannot join the Postgres `messages` / `custom_events` tables, so
+   * ClickHouse cannot join the Postgres `messages` table, so
    * titles and properties are hydrated in a second Postgres round-trip. Any
    * failure propagates to the caller's catch block: a missing data source must
    * surface as an error, not be masked as an empty history.
@@ -1744,17 +1704,8 @@ export class ContactsService {
       where.push(`time BETWEEN '${escape(start.format('YYYY-MM-DD HH:mm:ss'))}' AND '${escape(end.format('YYYY-MM-DD HH:mm:ss'))}'`);
     }
 
-    if (activities.length) {
-      const activityConditions: string[] = [];
-      if (activities.includes('custom_event')) {
-        activityConditions.push("message_type = 'custom_events'");
-      }
-      if (activities.includes('message')) {
-        activityConditions.push("message_type != 'custom_events'");
-      }
-      if (activityConditions.length) {
-        where.push(`(${activityConditions.join(' OR ')})`);
-      }
+    if (activities.length && activities.includes('message')) {
+      where.push("message_type != 'custom_events'");
     }
 
     const channels = ContactsService.toArray(params.channels);
@@ -1792,9 +1743,8 @@ export class ContactsService {
       return { events: [], total };
     }
 
-    // Hydrate message titles / custom-event names from Postgres (cross-DB join).
-    const messageIds = [...new Set(rows.filter((r) => r.message_type !== 'custom_events' && Number(r.message_id) > 0).map((r) => Number(r.message_id)))];
-    const eventIds = [...new Set(rows.filter((r) => r.message_type === 'custom_events' && Number(r.event_id) > 0).map((r) => Number(r.event_id)))];
+    // Hydrate message titles from Postgres (cross-DB join).
+    const messageIds = [...new Set(rows.filter((r) => Number(r.message_id) > 0).map((r) => Number(r.message_id)))];
 
     const messagesById = new Map<number, { title: string; type: string }>();
     if (messageIds.length) {
@@ -1804,25 +1754,14 @@ export class ContactsService {
       }
     }
 
-    const customEventsById = new Map<number, { name: string; properties: any }>();
-    if (eventIds.length) {
-      const eventRows = await this.contactRepository.manager.query('SELECT id, name, properties FROM custom_events WHERE id = ANY($1)', [eventIds]);
-      for (const ce of eventRows) {
-        customEventsById.set(Number(ce.id), { name: ce.name, properties: ce.properties });
-      }
-    }
-
     const events = rows.map((row) => {
-      const isCustomEvent = row.message_type === 'custom_events';
-      const message = isCustomEvent ? undefined : messagesById.get(Number(row.message_id));
-      const customEvent = isCustomEvent ? customEventsById.get(Number(row.event_id)) : undefined;
+      const message = messagesById.get(Number(row.message_id));
 
       return {
         ...row,
         time: ContactsService.chTimeToIso(row.time) ?? row.time,
-        message_title: isCustomEvent ? (customEvent?.name ?? null) : (message?.title ?? null),
-        event_properties: isCustomEvent ? (customEvent?.properties ?? null) : null,
-        type: isCustomEvent ? 'custom_event' : 'message',
+        message_title: message?.title ?? null,
+        type: 'message',
         // ClickHouse defaults `message_type` to '' (the old Postgres column was
         // nullable); when blank, fall back to the message's own type.
         message_type: !row.message_type && message?.type ? message.type : row.message_type,

@@ -12,7 +12,6 @@ import { MessagesModule } from '../messages/messages.module';
 import { CampaignModule } from '../campaigns/campaigns.module';
 import { AutomationsModule } from '../automations/automations.module';
 import { StatisticsAggregationService } from './statistics.aggregation';
-import { VerifyStatisticsEntity } from 'src/entities/verify-statistics.entity';
 import { ClickhouseProvider } from 'src/providers/clickhouse.provider';
 
 @Module({
@@ -24,7 +23,7 @@ import { ClickhouseProvider } from 'src/providers/clickhouse.provider';
     CampaignModule,
     ContactsModule,
     PoolsModule,
-    TypeOrmModule.forFeature([AccountUsageEntity, EventStatisticsEntity, VerifyStatisticsEntity]),
+    TypeOrmModule.forFeature([AccountUsageEntity, EventStatisticsEntity]),
   ],
   controllers: [StatisticsController],
   providers: [StatisticsService, StatisticsAggregationService, ClickhouseProvider],

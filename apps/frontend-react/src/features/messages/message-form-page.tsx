@@ -19,7 +19,6 @@ interface MessageFormPageProps {
 }
 
 function getListRoute(messageType: AnyMessageType): string {
-  if (messageType.startsWith('2FA-')) return '/messages/2fa';
   if (messageType.startsWith('transactional-')) return '/messages/transactional';
   switch (messageType) {
     case 'email':
@@ -54,7 +53,6 @@ export default function MessageFormPage({ messageId, messageType, onSuccess }: M
   const listRoute = getListRoute(messageType);
   const pageTitle = ANY_MESSAGE_TYPE_LABELS[messageType];
   const formMessageType = baseMessageType(messageType);
-  const is2FA = messageType.startsWith('2FA-');
   const isTransactional = messageType.startsWith('transactional-');
   const campaignInUse = isEditing && messageQuery.data?.campaignInUse;
 
@@ -198,7 +196,7 @@ export default function MessageFormPage({ messageId, messageType, onSuccess }: M
               isEditing && messageQuery.data?.labels ? messageQuery.data.labels.map((l) => l.id) : undefined
             }
             onSubmit={handleSubmit}
-            onTypeChange={!isEditing && !is2FA ? handleTypeChange : undefined}
+            onTypeChange={!isEditing ? handleTypeChange : undefined}
             isPending={mutation.isPending}
           />
           {s3Missing && (

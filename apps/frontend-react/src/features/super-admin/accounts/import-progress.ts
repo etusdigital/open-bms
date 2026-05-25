@@ -9,7 +9,6 @@ export const ENTITY_I18N: Record<string, string> = {
   'custom-fields': 'customFields',
   labels: 'labels',
   'email-templates': 'emailTemplates',
-  'custom-events': 'customEvents',
   contacts: 'contacts',
   contact_tags: 'contactTags',
   contact_custom_fields: 'contactCustomFields',

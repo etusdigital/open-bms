@@ -7,16 +7,14 @@ import { EmailTemplatesImporter } from './importers/email-templates.importer';
 import { ContactsImporter } from './importers/contacts.importer';
 import { ContactTagsImporter } from './importers/contact-tags.importer';
 import { ContactCustomFieldsImporter } from './importers/contact-custom-fields.importer';
-import { CustomEventsImporter } from './importers/custom-events.importer';
 import { AutomationsImporter } from './importers/automations.importer';
 import { CampaignsImporter } from './importers/campaigns.importer';
 import { MessagesImporter } from './importers/messages.importer';
 
 // Order matters: FK dependencies must come first (e.g. campaigns before
-// messages; custom_events before campaigns that reference them).
+// messages).
 // Out of scope (manual platform setup): account-settings, instance-config,
-// users (imported data is account-scoped; admin is created by the wizard),
-// and events_statistics (super-admin-only rollup, unavailable to a key).
+// users (imported data is account-scoped; admin is created by the wizard).
 @Injectable()
 export class ImportPipeline {
   readonly steps: ImporterStep[];
@@ -26,7 +24,6 @@ export class ImportPipeline {
     customFields: CustomFieldsImporter,
     labels: LabelsImporter,
     emailTemplates: EmailTemplatesImporter,
-    customEvents: CustomEventsImporter,
     contacts: ContactsImporter,
     contactTags: ContactTagsImporter,
     contactCustomFields: ContactCustomFieldsImporter,
@@ -37,6 +34,6 @@ export class ImportPipeline {
     // contactTags / contactCustomFields run after contacts (and after tags /
     // custom-fields respectively) so their src->newId mappings exist when the
     // join rows are resolved.
-    this.steps = [tags, customFields, labels, emailTemplates, customEvents, contacts, contactTags, contactCustomFields, automations, campaigns, messages];
+    this.steps = [tags, customFields, labels, emailTemplates, contacts, contactTags, contactCustomFields, automations, campaigns, messages];
   }
 }

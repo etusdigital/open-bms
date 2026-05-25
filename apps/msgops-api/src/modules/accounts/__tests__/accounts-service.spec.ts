@@ -7,7 +7,6 @@ import { AccountEntity } from '../../../entities/account.entity';
 import { AccountConfigEntity } from '../../../entities/account-config.entity';
 import { UserAccountEntity } from '../../../entities/users-account.entity';
 import { CustomFieldsEntity } from '../../../entities/custom-fields.entity';
-import { CustomEventEntity } from '../../../entities/custom-event.entity';
 import { AccountApiKeyEntity } from '../../../entities/account-api-key.entity';
 import { RoleEntity } from '../../../entities/role.entity';
 import { RedisService } from '../../../providers/redis.provider';
@@ -33,7 +32,6 @@ describe('AccountsService — findWithCleanConfigs', () => {
         AccountsService,
         { provide: getRepositoryToken(AccountEntity), useValue: accountRepository },
         { provide: getRepositoryToken(CustomFieldsEntity), useValue: customFieldRepository },
-        { provide: getRepositoryToken(CustomEventEntity), useValue: {} },
         { provide: getRepositoryToken(AccountConfigEntity), useValue: accountConfigRepository },
         { provide: getRepositoryToken(UserAccountEntity), useValue: {} },
         { provide: getRepositoryToken(AccountApiKeyEntity), useValue: {} },
@@ -113,7 +111,6 @@ describe('AccountsService — updateAccountConfig — default_email_provider cro
         AccountsService,
         { provide: getRepositoryToken(AccountEntity), useValue: {} },
         { provide: getRepositoryToken(CustomFieldsEntity), useValue: {} },
-        { provide: getRepositoryToken(CustomEventEntity), useValue: {} },
         { provide: getRepositoryToken(AccountConfigEntity), useValue: accountConfigRepository },
         { provide: getRepositoryToken(UserAccountEntity), useValue: {} },
         { provide: getRepositoryToken(AccountApiKeyEntity), useValue: {} },
@@ -210,7 +207,6 @@ describe('AccountsService.create — skipDefaults', () => {
   let accountRepository: any;
   let accountConfigRepository: any;
   let customFieldRepository: any;
-  let customEventRepository: any;
   let userAccountRepository: any;
   let storage: any;
   let scheduler: any;
@@ -222,7 +218,6 @@ describe('AccountsService.create — skipDefaults', () => {
     };
     accountConfigRepository = { createQueryBuilder: jest.fn() };
     customFieldRepository = { createQueryBuilder: jest.fn() };
-    customEventRepository = { createQueryBuilder: jest.fn() };
     userAccountRepository = {
       createQueryBuilder: jest.fn(() => ({
         insert: jest.fn().mockReturnThis(),
@@ -243,7 +238,6 @@ describe('AccountsService.create — skipDefaults', () => {
         AccountsService,
         { provide: getRepositoryToken(AccountEntity), useValue: accountRepository },
         { provide: getRepositoryToken(CustomFieldsEntity), useValue: customFieldRepository },
-        { provide: getRepositoryToken(CustomEventEntity), useValue: customEventRepository },
         { provide: getRepositoryToken(AccountConfigEntity), useValue: accountConfigRepository },
         { provide: getRepositoryToken(UserAccountEntity), useValue: userAccountRepository },
         { provide: getRepositoryToken(AccountApiKeyEntity), useValue: {} },
@@ -262,9 +256,8 @@ describe('AccountsService.create — skipDefaults', () => {
     service = module.get<AccountsService>(AccountsService);
   });
 
-  it('with skipDefaults:true does not insert custom fields, custom events, nor call the scheduler', async () => {
+  it('with skipDefaults:true does not insert custom fields nor call the scheduler', async () => {
     const customFieldsSpy = jest.spyOn(service as any, 'createOrUpdateCustomFields').mockResolvedValue({});
-    const customEventsSpy = jest.spyOn(service as any, 'createOrUpdateCustomEvents').mockResolvedValue({});
     const accountConfigsSpy = jest.spyOn(service as any, 'createOrUpdateAccountsConfigs').mockResolvedValue({});
     const permissionsSpy = jest.spyOn(service as any, 'permissionsUserAccounts').mockResolvedValue({});
 
@@ -273,21 +266,18 @@ describe('AccountsService.create — skipDefaults', () => {
     expect(accountRepository.save).toHaveBeenCalled();
     expect(permissionsSpy).toHaveBeenCalled(); // user-account link always happens
     expect(customFieldsSpy).not.toHaveBeenCalled();
-    expect(customEventsSpy).not.toHaveBeenCalled();
     expect(accountConfigsSpy).not.toHaveBeenCalled();
     expect(scheduler.create).not.toHaveBeenCalled();
   });
 
   it('default behavior (no opts) preserves default inserts', async () => {
     const customFieldsSpy = jest.spyOn(service as any, 'createOrUpdateCustomFields').mockResolvedValue({});
-    const customEventsSpy = jest.spyOn(service as any, 'createOrUpdateCustomEvents').mockResolvedValue({});
     const accountConfigsSpy = jest.spyOn(service as any, 'createOrUpdateAccountsConfigs').mockResolvedValue({});
     jest.spyOn(service as any, 'permissionsUserAccounts').mockResolvedValue({});
 
     await service.create({ name: 'X' } as any, 1);
 
     expect(customFieldsSpy).toHaveBeenCalled();
-    expect(customEventsSpy).toHaveBeenCalled();
     expect(accountConfigsSpy).toHaveBeenCalled();
   });
 });

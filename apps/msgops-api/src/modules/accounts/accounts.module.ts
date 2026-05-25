@@ -7,7 +7,6 @@ import { AccountsService } from './accounts.service';
 import { AccountsController } from './accounts.controller';
 import { UserAccountEntity } from '../../entities/users-account.entity';
 import { CustomFieldsEntity } from '../../entities/custom-fields.entity';
-import { CustomEventEntity } from '../../entities/custom-event.entity';
 import { SendgridHandler } from 'src/handlers/email/sendgrid/sendgrid.handler';
 import { AccountConfigsProvider } from 'src/providers/account-configs.provider';
 import { S3StorageProvider } from 'src/providers/s3-storage.provider';
@@ -21,7 +20,7 @@ import { ApiKeyAuditLogEntity } from '../../entities/api-key-audit-log.entity';
 @Module({
   imports: [
     HttpModule,
-    TypeOrmModule.forFeature([AccountEntity, AccountConfigEntity, CustomFieldsEntity, CustomEventEntity, UserAccountEntity, AccountApiKeyEntity, RoleEntity, ApiKeyAuditLogEntity]),
+    TypeOrmModule.forFeature([AccountEntity, AccountConfigEntity, CustomFieldsEntity, UserAccountEntity, AccountApiKeyEntity, RoleEntity, ApiKeyAuditLogEntity]),
   ],
   controllers: [AccountsController],
   providers: [AccountsService, AccountConfigsProvider, S3StorageProvider, SendgridHandler, EvolutionHandler, AccountCacheService, ApiKeyRegenService],

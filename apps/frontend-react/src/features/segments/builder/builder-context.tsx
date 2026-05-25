@@ -61,7 +61,6 @@ const ALL_STEP_TYPES: StepType[] = [
   'user_field',
   'tag',
   'automation_state',
-  'custom_event',
 ];
 
 interface BuilderProviderProps {

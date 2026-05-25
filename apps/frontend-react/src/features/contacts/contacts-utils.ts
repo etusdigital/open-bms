@@ -23,6 +23,5 @@ export function getEventTime(item: HistoryItem, options?: DateFormatOptions): st
 
 export function getEventLabel(item: HistoryItem): string {
   if (item.type === 'automation') return item.automation_title ?? 'Automation';
-  if (item.type === 'custom_event') return `Event #${item.event_id}`;
   return item.message_title ?? 'Message';
 }

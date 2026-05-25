@@ -225,18 +225,12 @@ export class AutomationsService {
         `automations_tag:${automation.accountId}:${automationDto?.triggers?.settings?.id || 0}`,
         `automations-messages-formatted`,
         `automations_push:${newAutomation.accountId}`,
-        `events_trigger:${this.cls.get('accountId')}:custom_events:${automation.triggers.settings.id}`,
-        `events_trigger:${this.cls.get('accountId')}:custom_events:${automation.triggers.settings.id}:automations`,
         `events_trigger:${this.cls.get('accountId')}:${automation.triggers.settings.eventType}:${automation.triggers.settings.id}`,
         `events_trigger:${this.cls.get('accountId')}:${automation.triggers.settings.eventType}:${automation.triggers.settings.id}:automations`,
       ]);
 
       if (automation.triggers.settings.type === 'events' && automation.triggers.settings.eventType) {
         await redisClient.set(`events_trigger:${this.cls.get('accountId')}:${automation.triggers.settings.eventType}:${automation.triggers.settings.id}`, 'true');
-      }
-
-      if (automation.triggers.settings.type === 'custom_events' && automation.triggers.settings.id) {
-        await redisClient.set(`events_trigger:${this.cls.get('accountId')}:custom_events:${automation.triggers.settings.id}`, 'true');
       }
 
       if (automation.target) {
@@ -303,9 +297,6 @@ export class AutomationsService {
         `automations_tag:${automation.accountId}:${newTagId}`,
         `automations-messages-formatted`,
         `automations_push:${automation.accountId}`,
-        `events_trigger:${this.cls.get('accountId')}:custom_events:${oldTagId}`,
-        `events_trigger:${this.cls.get('accountId')}:custom_events:${newTagId}`,
-        `events_trigger:${this.cls.get('accountId')}:custom_events:${newTagId}:automations`,
         `events_trigger:${this.cls.get('accountId')}:${oldEventType}:${oldTagId}`,
         `events_trigger:${this.cls.get('accountId')}:${oldEventType}:${newTagId}`,
         `events_trigger:${this.cls.get('accountId')}:${oldEventType}:${newTagId}:automations`,
@@ -313,10 +304,6 @@ export class AutomationsService {
 
       if (automation.triggers.settings.type === 'events' && automation.triggers.settings.eventType) {
         await redisClient.set(`events_trigger:${this.cls.get('accountId')}:${automation.triggers.settings.eventType}:${newTagId}`, 'true');
-      }
-
-      if (automation.triggers.settings.type === 'custom_events' && automation.triggers.settings.id) {
-        await redisClient.set(`events_trigger:${this.cls.get('accountId')}:custom_events:${newTagId}`, 'true');
       }
 
       if (automation.target && automationDto.target != oldTarget) {
@@ -407,8 +394,6 @@ export class AutomationsService {
         `automations-messages-formatted`,
         `automations_push:${automation.accountId}`,
         `automations:${automation.type}:${automation.name}`,
-        `events_trigger:${this.cls.get('accountId')}:custom_events:${automation.triggers.settings.id}`,
-        `events_trigger:${this.cls.get('accountId')}:custom_events:${automation.triggers.settings.id}:automations`,
         `events_trigger:${this.cls.get('accountId')}:${automation.triggers.settings.eventType}:${automation.triggers.settings.id}`,
         `events_trigger:${this.cls.get('accountId')}:${automation.triggers.settings.eventType}:${automation.triggers.settings.id}:automations`,
       ]);

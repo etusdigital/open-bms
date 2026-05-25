@@ -47,7 +47,6 @@ describe('EventPublisherService', () => {
     it.each([
       ['sendgrid', 'sendgrid'],
       ['TWILIO', 'twilio'],
-      ['custom_events', 'custom'],
       ['sparkpost', 'sparkpost'],
       ['push', 'push'],
       ['webhook', 'webhook'],
@@ -102,11 +101,6 @@ describe('EventPublisherService', () => {
       expect(publishMock).toHaveBeenCalledWith(expect.objectContaining({ routingKey: 'event.received.unknown' }));
     });
 
-    it('normalizes custom_events to custom', async () => {
-      await service.publish({}, { platform: 'custom_events' });
-      expect(publishMock).toHaveBeenCalledWith(expect.objectContaining({ routingKey: 'event.received.custom' }));
-    });
-
     it('drops boolean header with warn in dev', async () => {
       await service.publish({}, { platform: 'sendgrid', tracked: true });
       expect(publishMock).toHaveBeenCalledWith(
@@ -135,7 +129,6 @@ describe('EventPublisherService', () => {
     it.each<[unknown, string]>([
       ['sendgrid', 'event.received.sendgrid'],
       ['TWILIO', 'event.received.twilio'],
-      ['custom_events', 'event.received.custom'],
       ['HACKER<script>', 'event.received.unknown'],
       ['malicious-payload-with-very-long-cardinality-explosion', 'event.received.unknown'],
       [undefined, 'event.received.unknown'],

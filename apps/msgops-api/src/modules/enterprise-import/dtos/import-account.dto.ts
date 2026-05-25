@@ -17,7 +17,6 @@ export const IMPORT_STEPS = [
   'custom-fields',
   'labels',
   'email-templates',
-  'custom-events',
   'contacts',
   'contact_tags',
   'contact_custom_fields',

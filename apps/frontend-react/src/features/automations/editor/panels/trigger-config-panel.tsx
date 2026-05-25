@@ -60,23 +60,6 @@ function useEmailMessages(search: string) {
   });
 }
 
-function useCustomEvents(search: string) {
-  const auth = useAppStore((s) => s.auth);
-  const accountId = auth.status === 'authenticated' ? auth.account.id : 0;
-  return useQuery<{ results: Array<{ id: number; name: string }> }>({
-    queryKey: ['custom-events', 'trigger-select', { accountId, search }],
-    queryFn: async ({ signal }) => {
-      const { data } = await apiClient.get('/custom-events', {
-        params: { page: 1, itemsPerPage: 20, ...(search && { title: search }) },
-        signal,
-      });
-      return data;
-    },
-    placeholderData: keepPreviousData,
-    enabled: auth.status === 'authenticated',
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -84,7 +67,6 @@ function useCustomEvents(search: string) {
 const TRIGGER_TYPES = [
   { value: 'tag', labelKey: 'automations.editor.trigger.typeTag' },
   { value: 'events', labelKey: 'automations.editor.trigger.typeEvents' },
-  { value: 'custom_events', labelKey: 'automations.editor.trigger.typeCustomEvents' },
   { value: 'web-push', labelKey: 'automations.editor.trigger.typeWebPush' },
   { value: 'mobile-push', labelKey: 'automations.editor.trigger.typeMobilePush' },
 ] as const;
@@ -113,7 +95,6 @@ const AUTOMATION_CONDITION_STEP_TYPES: StepType[] = [
   'user_field',
   'tag',
   'automation_state',
-  'custom_event',
   'lead',
 ];
 
@@ -170,8 +151,6 @@ export function TriggerConfigPanel({ data, onSave, onClose }: TriggerConfigPanel
   const [eventType, setEventType] = useState<string>(data.settings.eventType ?? 'open');
   const [messageId, setMessageId] = useState(data.settings.id ? String(data.settings.id) : '');
   const [messageTitle, setMessageTitle] = useState(data.settings.title ?? '');
-  const [customEventId, setCustomEventId] = useState(data.settings.id ? String(data.settings.id) : '');
-  const [customEventName, setCustomEventName] = useState(data.settings.name ?? '');
 
   // Frequency
   const [applyFrequency, setApplyFrequency] = useState(data.settings.applyFrequency ?? 'unique');
@@ -186,19 +165,15 @@ export function TriggerConfigPanel({ data, onSave, onClose }: TriggerConfigPanel
   // Debounced search states
   const [_tagSearch, _setTagSearch] = useState('');
   const [_msgSearch, _setMsgSearch] = useState('');
-  const [_ceSearch, _setCeSearch] = useState('');
   const tagDebounce = useRef<ReturnType<typeof setTimeout>>(null);
   const msgDebounce = useRef<ReturnType<typeof setTimeout>>(null);
-  const ceDebounce = useRef<ReturnType<typeof setTimeout>>(null);
   const [debouncedTagSearch, setDebouncedTagSearch] = useState('');
   const [debouncedMsgSearch, setDebouncedMsgSearch] = useState('');
-  const [debouncedCeSearch, setDebouncedCeSearch] = useState('');
 
   useEffect(
     () => () => {
       if (tagDebounce.current) clearTimeout(tagDebounce.current);
       if (msgDebounce.current) clearTimeout(msgDebounce.current);
-      if (ceDebounce.current) clearTimeout(ceDebounce.current);
     },
     [],
   );
@@ -211,15 +186,10 @@ export function TriggerConfigPanel({ data, onSave, onClose }: TriggerConfigPanel
     if (msgDebounce.current) clearTimeout(msgDebounce.current);
     msgDebounce.current = setTimeout(() => setDebouncedMsgSearch(s), 300);
   }, []);
-  const debounce_ce = useCallback((s: string) => {
-    if (ceDebounce.current) clearTimeout(ceDebounce.current);
-    ceDebounce.current = setTimeout(() => setDebouncedCeSearch(s), 300);
-  }, []);
 
   // API queries
   const { data: tagsRes, isLoading: tagsLoading } = useTags(debouncedTagSearch);
   const { data: msgsRes, isLoading: msgsLoading } = useEmailMessages(debouncedMsgSearch);
-  const { data: ceRes, isLoading: ceLoading } = useCustomEvents(debouncedCeSearch);
 
   const tagOptions: SelectOption[] = useMemo(() => {
     const items = (tagsRes?.results ?? []).map((t) => ({ value: String(t.id), label: t.name }));
@@ -241,15 +211,6 @@ export function TriggerConfigPanel({ data, onSave, onClose }: TriggerConfigPanel
     }
     return [{ value: '0', label: t('automations.editor.trigger.anyMessage') }, ...items];
   }, [msgsRes, messageId, messageTitle, t]);
-
-  const ceOptions: SelectOption[] = useMemo(() => {
-    const items = (ceRes?.results ?? []).map((e) => ({ value: String(e.id), label: e.name }));
-    // Ensure the currently selected custom event is always in the list
-    if (customEventId && customEventName && !items.find((o) => o.value === customEventId)) {
-      items.unshift({ value: customEventId, label: customEventName });
-    }
-    return items;
-  }, [ceRes, customEventId, customEventName]);
 
   // Persist to parent
   const persist = useCallback(
@@ -287,9 +248,6 @@ export function TriggerConfigPanel({ data, onSave, onClose }: TriggerConfigPanel
           settings.name = overrides?.name ?? '';
           settings.title = overrides?.title ?? messageTitle;
         }
-      } else if (type === 'custom_events') {
-        settings.id = overrides?.id ?? (Number(customEventId) || 0);
-        settings.name = overrides?.name ?? customEventName;
       } else if (type === 'web-push' || type === 'mobile-push') {
         settings.id = 0;
       } else {
@@ -306,8 +264,6 @@ export function TriggerConfigPanel({ data, onSave, onClose }: TriggerConfigPanel
       eventType,
       messageId,
       messageTitle,
-      customEventId,
-      customEventName,
       applyFrequency,
       typeMultiply,
       periodDisplay,
@@ -443,29 +399,6 @@ export function TriggerConfigPanel({ data, onSave, onClose }: TriggerConfigPanel
             </div>
           )}
         </>
-      )}
-
-      {triggerType === 'custom_events' && (
-        <div className="space-y-2">
-          <Label>{t('automations.editor.trigger.customEvent')}</Label>
-          <SearchableApiSelect
-            value={customEventId}
-            onValueChange={(v) => {
-              const ce = ceRes?.results?.find((e) => String(e.id) === v);
-              if (ce) {
-                setCustomEventId(String(ce.id));
-                setCustomEventName(ce.name);
-                persist({ id: ce.id, name: ce.name });
-              }
-            }}
-            options={ceOptions}
-            isLoading={ceLoading}
-            onSearchChange={debounce_ce}
-            placeholder={t('automations.editor.trigger.selectCustomEvent')}
-            className="h-9 w-full text-sm"
-            popoverClassName="w-[var(--radix-popover-trigger-width)]"
-          />
-        </div>
       )}
 
       {/* web-push and mobile-push have no sub-fields */}

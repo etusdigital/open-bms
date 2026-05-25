@@ -65,21 +65,17 @@ describe('AppService', () => {
         expect.objectContaining({
           source: 'web',
           timestamp: expect.any(Number),
-          payload: expect.arrayContaining([
-            expect.objectContaining({
-              type: 'test',
-              event: 'click',
-              properties: { button: 'submit' },
-            }),
-          ]),
+          payload: expect.objectContaining({
+            type: 'test',
+            event: 'click',
+            properties: { button: 'submit' },
+          }),
           client_info: expect.objectContaining({
             EVENT_FAMILY: 'test-agent',
             userAgent: 'test-agent',
           }),
         }),
         expect.objectContaining({
-          platform: 'custom_events',
-          events: 'click',
           source: 'web',
         }),
       );
@@ -112,36 +108,6 @@ describe('AppService', () => {
           },
         }),
         expect.any(Object),
-      );
-    });
-
-    it('should process custom events correctly', async () => {
-      const customEvent = {
-        type: 'custom',
-        event: 'user_action',
-        properties: { action: 'click' },
-      };
-      const mockRequest = createMockRequest(
-        customEvent,
-        {},
-        { 'content-type': 'application/json', 'user-agent': 'test-agent' },
-      );
-
-      const result = await service.handleMessage(mockRequest, mockRequest.headers);
-
-      expect(result).toEqual({ response: 'ok' });
-      expect(eventPublisherService.publish).toHaveBeenCalledWith(
-        expect.objectContaining({
-          payload: expect.arrayContaining([expect.objectContaining(customEvent)]),
-          client_info: expect.objectContaining({
-            EVENT_FAMILY: 'test-agent',
-            userAgent: 'test-agent',
-          }),
-        }),
-        expect.objectContaining({
-          platform: 'custom_events',
-          events: 'user_action',
-        }),
       );
     });
 
@@ -190,22 +156,17 @@ describe('AppService', () => {
       expect(result).toEqual({ response: 'ok' });
       expect(eventPublisherService.publish).toHaveBeenCalledWith(
         expect.objectContaining({
-          payload: expect.arrayContaining([
-            expect.objectContaining({
-              type: 'test',
-              event: 'plain_text',
-              properties: { source: 'text' },
-            }),
-          ]),
+          payload: expect.objectContaining({
+            type: 'test',
+            event: 'plain_text',
+            properties: { source: 'text' },
+          }),
           client_info: expect.objectContaining({
             EVENT_FAMILY: 'test-agent',
             userAgent: 'test-agent',
           }),
         }),
-        expect.objectContaining({
-          platform: 'custom_events',
-          events: 'plain_text',
-        }),
+        expect.any(Object),
       );
     });
 
@@ -219,21 +180,6 @@ describe('AppService', () => {
         statusCode: 422,
         response: 'Invalid JSON',
       });
-    });
-
-    it('should handle error processing custom events', async () => {
-      const invalidPayload = { type: 'test', event: 'test', properties: { key: 'value' } };
-      const mockRequest = createMockRequest(invalidPayload, {}, { 'content-type': 'application/json' });
-
-      jest.spyOn(service as any, 'cleanPayload').mockImplementation(() => {
-        throw new Error('test error');
-      });
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-      const result = await service.handleMessage(mockRequest, mockRequest.headers);
-
-      expect(result).toEqual({ response: 'ok' });
-      expect(consoleSpy).toHaveBeenCalledWith('Error processing custom events:', expect.any(Error));
-      consoleSpy.mockRestore();
     });
 
     it('should handle empty form-urlencoded body', async () => {

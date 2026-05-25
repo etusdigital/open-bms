@@ -380,9 +380,3 @@ export const AUTOMATION_STATE_ACTIONS = [
   { value: 'running', labelKey: 'segments.builder.automationActions.running' },
 ] as const;
 
-// ─── Custom Event Conditionals ───────────────────────────────────────────────
-
-export const CUSTOM_EVENT_CONDITIONALS = [
-  { value: 'in', labelKey: 'segments.builder.customEvent.has' },
-  { value: 'not in', labelKey: 'segments.builder.customEvent.hasNot' },
-] as const;

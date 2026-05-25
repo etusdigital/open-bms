@@ -179,7 +179,7 @@ describe('builderReducer', () => {
       expect(next.cards[0].steps[0].id).toBeTruthy();
     });
 
-    it.each(['interation', 'custom_event', 'automation_state'] as const)(
+    it.each(['interation', 'automation_state'] as const)(
       'seeds conditional_times_value to >= on a new %s step (EVO-1423)',
       (stepType) => {
         const card = makeCard({ id: 'card-1' });

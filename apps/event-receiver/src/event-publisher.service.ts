@@ -1,20 +1,9 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { AmqpPublisher, EXCHANGES } from '@bms/messaging';
 
-const PLATFORM_ALLOWLIST = new Set([
-  'sendgrid',
-  'sparkpost',
-  'twilio',
-  'push',
-  'custom',
-  'webhook',
-  'internal',
-  'unknown',
-]);
+const PLATFORM_ALLOWLIST = new Set(['sendgrid', 'sparkpost', 'twilio', 'push', 'webhook', 'internal', 'unknown']);
 
-const PLATFORM_NORMALIZATIONS: Record<string, string> = {
-  custom_events: 'custom',
-};
+const PLATFORM_NORMALIZATIONS: Record<string, string> = {};
 
 export function sanitizePlatform(raw: unknown): string {
   if (typeof raw !== 'string') return 'unknown';

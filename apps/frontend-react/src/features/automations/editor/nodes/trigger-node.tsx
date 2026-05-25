@@ -7,7 +7,6 @@ import type { TriggerNodeData } from '../types';
 const TYPE_LABEL_KEYS: Record<string, string> = {
   tag: 'automations.editor.trigger.typeTag',
   events: 'automations.editor.trigger.typeEvents',
-  custom_events: 'automations.editor.trigger.typeCustomEvents',
   'web-push': 'automations.editor.trigger.typeWebPush',
   'mobile-push': 'automations.editor.trigger.typeMobilePush',
 };
@@ -29,8 +28,6 @@ export const TriggerNode = memo(function TriggerNode({ data, selected }: NodePro
         )
       : '';
     label = `${t('automations.editor.trigger.typeEvents')}: ${eventLabel}`;
-  } else if (settings.type === 'custom_events') {
-    label = `${t('automations.editor.trigger.typeCustomEvents')}: ${settings.name ?? ''}`;
   } else {
     label = t((TYPE_LABEL_KEYS[settings.type] ?? 'automations.editor.addTrigger') as never);
   }

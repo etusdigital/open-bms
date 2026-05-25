@@ -6,7 +6,6 @@ import type {
   BuilderCard,
   InteractionStepData,
   AutomationStateStepData,
-  CustomEventStepData,
   TagStepData,
 } from '../types';
 
@@ -38,16 +37,6 @@ function makeAutomation(overrides: Partial<AutomationStateStepData> = {}): Autom
   };
 }
 
-function makeCustomEvent(overrides: Partial<CustomEventStepData> = {}): CustomEventStepData {
-  return {
-    id: crypto.randomUUID(),
-    type: 'custom_event',
-    conditional_event_type: 'in',
-    time: 7,
-    ...overrides,
-  };
-}
-
 function makeTag(overrides: Partial<TagStepData> = {}): TagStepData {
   return { id: crypto.randomUUID(), type: 'tag', conditional_tag: 'in', tag_id: [1], ...overrides };
 }
@@ -74,12 +63,6 @@ describe('validateBuilder', () => {
 
   it('detects missing period on automation_state step', () => {
     const state = makeState(makeCard('c1', [makeAutomation({ time: null })]));
-    const errors = validateBuilder(state);
-    expect(errors).toHaveLength(1);
-  });
-
-  it('detects missing period on custom_event step', () => {
-    const state = makeState(makeCard('c1', [makeCustomEvent({ time: null })]));
     const errors = validateBuilder(state);
     expect(errors).toHaveLength(1);
   });
@@ -128,9 +111,9 @@ describe('validateBuilder', () => {
   it('reports multiple errors across cards', () => {
     const state = makeState(
       makeCard('c1', [makeInteraction({ time: null })]),
-      makeCard('c2', [makeAutomation({ time: null }), makeCustomEvent({ time: null })]),
+      makeCard('c2', [makeAutomation({ time: null })]),
     );
     const errors = validateBuilder(state);
-    expect(errors).toHaveLength(3);
+    expect(errors).toHaveLength(2);
   });
 });

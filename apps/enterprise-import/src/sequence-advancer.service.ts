@@ -10,7 +10,6 @@ const TARGET_TABLES: Array<{ table: string; column: string }> = [
   { table: 'users', column: 'id' },
   { table: 'tags', column: 'id' },
   { table: 'custom_fields', column: 'id' },
-  { table: 'custom_events', column: 'id' },
   { table: 'labels', column: 'id' },
   { table: 'emails_templates', column: 'id' },
   { table: 'contacts', column: 'id' },

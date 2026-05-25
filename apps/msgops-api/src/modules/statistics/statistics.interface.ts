@@ -31,8 +31,6 @@ export interface AggregatedData {
   deferred: number;
   sent: number;
   close: number;
-  events_count: number;
-  events_unique: number;
 
   // Metadata
   pool?: string;

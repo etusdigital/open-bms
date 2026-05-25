@@ -604,7 +604,6 @@ export class StatisticsService {
     const countContacts = await this.contactService.count(accountId);
     const pools = await this.messagesService.getPools(accountId);
     const countIps = await this.poolService.poolsIpsCount(pools, accountId);
-    const countVerify = await this.getVerifyUsage(accountId, date);
 
     await this.accountUsageRepository
       .createQueryBuilder('accounts_usages')
@@ -634,12 +633,6 @@ export class StatisticsService {
           date,
           count: countIps || 0,
         },
-        {
-          accountId,
-          service: 'COUNT_VERIFY',
-          date,
-          count: countVerify?.total || 0,
-        },
       ])
       .orIgnore()
       .execute();
@@ -663,15 +656,6 @@ export class StatisticsService {
     AND es.account_id = $2 AND date = DATE($3)`;
 
     const response = await this.eventStatisticsRepository.query(query, [message_type, accountId, date]);
-    return response.length ? response[0] : {};
-  }
-
-  async getVerifyUsage(accountId: number, date: string) {
-    const query = `SELECT SUM(count_total) as total
-    FROM verify_statistics
-    WHERE date = $1 AND account_id = $2`;
-
-    const response = await this.eventStatisticsRepository.query(query, [date, accountId]);
     return response.length ? response[0] : {};
   }
 
@@ -920,14 +904,6 @@ export class StatisticsService {
     }
 
     return leads;
-  }
-
-  async statisticsCustomEvents(customEventId: number, startDate: string, endDate: string) {
-    const query = `SELECT * FROM events_statistics
-      WHERE account_id = $1
-        AND event_id = $2
-        AND date BETWEEN $3 AND $4`;
-    return this.eventStatisticsRepository.query(query, [this.cls.get('accountId'), customEventId, startDate, endDate]);
   }
 
   async exportDataToRedis() {

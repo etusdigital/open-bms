@@ -102,13 +102,6 @@ describe('getEventTime', () => {
     expect(result).toContain('01:00');
   });
 
-  it('renders custom_event time in the account timezone', () => {
-    // custom_event rows carry their timestamp in `time`, like message rows
-    const item = { type: 'custom_event', event_id: 7, time: '2026-05-20T01:00:00Z' } as HistoryItem;
-    const result = getEventTime(item, { timezone: 'America/Sao_Paulo', locale: 'pt-BR' });
-    expect(result).toContain('19/05/2026');
-    expect(result).toContain('22:00');
-  });
 });
 
 describe('getEventLabel', () => {
@@ -120,11 +113,6 @@ describe('getEventLabel', () => {
   it('returns fallback for automation without title', () => {
     const item = { type: 'automation' } as HistoryItem;
     expect(getEventLabel(item)).toBe('Automation');
-  });
-
-  it('returns event label for custom_event type', () => {
-    const item = { type: 'custom_event', event_id: 42 } as HistoryItem;
-    expect(getEventLabel(item)).toBe('Event #42');
   });
 
   it('returns message title for message type', () => {
