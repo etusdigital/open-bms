@@ -105,7 +105,7 @@ export interface SuppressedContact {
 }
 
 export interface HistoryItem {
-  type: 'automation' | 'message' | 'custom_event';
+  type: 'automation' | 'message';
   time?: string;
   created_at?: string;
   event?: string;

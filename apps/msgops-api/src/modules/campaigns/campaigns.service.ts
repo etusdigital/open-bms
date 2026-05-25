@@ -369,10 +369,6 @@ export class CampaignsService {
         await redisClient.set(`events_trigger:campaign:${this.cls.get('accountId')}:${campaign.triggers.settings.eventType}:${campaign.triggers.settings.id}`, 'true');
       }
 
-      if (isTriggerCampaign && campaign.triggers.settings.type === 'custom_events' && campaign.triggers.settings.id) {
-        await redisClient.set(`events_trigger:campaign:${this.cls.get('accountId')}:custom_events:${campaign.triggers.settings.id}`, 'true');
-      }
-
       if (campaignDto.labels && campaignDto.labels.length > 0) {
         await this.labelsService.saveEntityLabelsSafe('campaigns', campaignCreate.id, campaignDto.labels);
       }
@@ -531,16 +527,6 @@ export class CampaignsService {
         ]);
 
         await redisClient.set(`events_trigger:campaign:${this.cls.get('accountId')}:${campaign.triggers?.settings?.eventType}:${campaign.triggers?.settings?.id}`, 'true');
-      }
-
-      if (isTriggerCampaign && campaign.triggers.settings.type === 'custom_events' && campaign.triggers.settings.id) {
-        const redisClient = await this.redisService.getClient();
-        await redisClient.del([
-          `events_trigger:campaign:${this.cls.get('accountId')}:custom_events:${oldTriggerId}`,
-          `events_trigger:${this.cls.get('accountId')}:custom_events:${oldTriggerId}:campaigns`,
-          `events_trigger:${this.cls.get('accountId')}:custom_events:${campaign.triggers.settings.id}:campaigns`,
-        ]);
-        await redisClient.set(`events_trigger:campaign:${this.cls.get('accountId')}:custom_events:${campaign.triggers.settings.id}`, 'true');
       }
 
       if (campaignDto.labels && campaignDto.labels.length > 0) {

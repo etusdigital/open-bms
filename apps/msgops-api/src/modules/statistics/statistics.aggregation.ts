@@ -10,10 +10,6 @@ import { Redis } from 'ioredis';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { VerifyStatisticType } from '../verify/verify-statistics.service';
-import { VerifyMethod } from '../verify/verify.interface';
-import { VerifyStatisticsEntity } from 'src/entities/verify-statistics.entity';
-
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -31,8 +27,6 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
 
     @InjectRepository(EventStatisticsEntity)
     private readonly eventStatisticsRepository: Repository<EventStatisticsEntity>,
-    @InjectRepository(VerifyStatisticsEntity)
-    private readonly verifyStatisticsRepository: Repository<VerifyStatisticsEntity>,
   ) {
     this.redisClient = this.redisService.getClient();
   }
@@ -73,7 +67,7 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
     }
     this.aggregationRunning = true;
     try {
-      await Promise.all([this.transferRedisDataToPostgres(), this.transferVerifyRedisDataToPostgres()]);
+      await this.transferRedisDataToPostgres();
       await this.runDailyCleanupIfDue();
     } catch (err) {
       this.logger.error(`Scheduled aggregation cycle failed: ${(err as Error)?.message ?? err}`);
@@ -284,83 +278,6 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
 
           await globalStatUpdatePipeline.exec();
         }
-
-        // custom events
-        const customEvents = await this.redisClient.smembers(`statistics_processed_custom_events:${account.id}:${currentDate}`);
-        const pipeline = this.redisClient.pipeline();
-
-        // TODO: process pageview events
-        for (const eventId of customEvents) {
-          if (eventId === 'null') {
-            continue;
-          }
-
-          const statisticsKey = `statistics:${account.id}:${currentDate}:custom_events:${eventId}`;
-          const uniqueKey = `statistics_unique:${account.id}:${currentDate}:custom_events:${eventId}`;
-
-          pipeline.hgetall(statisticsKey);
-          pipeline.scard(uniqueKey);
-        }
-        const results = await pipeline.exec();
-
-        const batchSize = 100;
-        const batches = [];
-        for (let i = 0; i < customEvents.length; i++) {
-          const eventId = customEvents[i];
-          if (eventId === 'null') {
-            continue;
-          }
-
-          const startIdx = i * 2;
-          const statistics = results[startIdx][1] as any;
-          statistics.events_count = statistics.count;
-          statistics.events_unique = results[startIdx + 1][1] || 0;
-
-          const aggregatedData = this.aggregateRedisData(statistics);
-
-          batches.push({
-            date: currentDate,
-            accountId: account.id,
-            eventType: 'custom_events',
-            type: 'custom_event',
-            eventId: parseInt(eventId),
-            data: aggregatedData,
-          });
-
-          if (batches.length === batchSize || i === customEvents.length - 1) {
-            await this.batchUpsertEventStatistics(batches, queryRunner, date);
-            batches.length = 0;
-          }
-        }
-
-        // TODO: add global custom events statistics and unique counts
-        // // Process unique custom events counts for account-level statistics
-        // const globalCustomEventsStatisticsKey = `account_events_statistics:${account.id}:custom_events:${currentDate}`;
-        // const customEventUniquesPipeline = this.redisClient.pipeline();
-
-        // // Get list of all custom event IDs that have unique tracking
-        // const customEventUniqueKeys = await this.redisClient.keys(`account_events_unique:${account.id}:custom_events:${currentDate}:*`);
-
-        // // Filter out hourly keys and extract event IDs
-        // const customEventIds = customEventUniqueKeys.filter((key) => !key.includes(':hourly:')).map((key) => key.split(':').pop());
-
-        // // Get unique counts for each custom event
-        // for (const eventId of customEventIds) {
-        //   const globalUniqueKey = `account_events_unique:${account.id}:custom_events:${currentDate}:${eventId}`;
-        //   customEventUniquesPipeline.scard(globalUniqueKey);
-        // }
-
-        // const customEventUniquesResults = await customEventUniquesPipeline.exec();
-
-        // // Update account-level statistics for custom events
-        // const updateCustomEventsPipeline = this.redisClient.pipeline();
-        // for (let i = 0; i < customEventIds.length; i++) {
-        //   const eventId = customEventIds[i];
-        //   const uniqueCount = customEventUniquesResults[i][1] || 0;
-        //   updateCustomEventsPipeline.hset(globalCustomEventsStatisticsKey, `unique_${eventId}`, uniqueCount);
-        // }
-
-        // await updateCustomEventsPipeline.exec();
 
         await queryRunner.commitTransaction();
       } catch (e) {
@@ -620,122 +537,5 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
         console.log(`Deleted ${keys.length} account_events_unique keys`);
       }
     } while (cursor !== '0');
-  }
-
-  /**
-   * Transfers 2FA statistics data from Redis to PostgreSQL for all active accounts
-   * - Uses transactions to ensure data consistency
-   * - Batches upserts for better performance
-   * - Processes data for multiple 2FA methods (SMS, EMAIL, WHATSAPP)
-   * @returns {Promise<void>}
-   */
-  async transferVerifyRedisDataToPostgres(): Promise<void> {
-    const accounts = await this.accountService.getActiveAccountIds();
-
-    for (const account of accounts) {
-      const accountConfigVerify = await this.accountService.findConfig('2fa_settings', account.id);
-      if (!accountConfigVerify.length) {
-        continue;
-      }
-      const settings = JSON.parse(accountConfigVerify[0].value);
-      const methods = Object.values(VerifyMethod);
-      const currentDate = dayjs().subtract(15, 'minute').tz(account.time_zone).format('YYYY-MM-DD');
-
-      const queryRunner = this.verifyStatisticsRepository.manager.connection.createQueryRunner();
-      await queryRunner.connect();
-      await queryRunner.startTransaction();
-
-      try {
-        const batchRecords = [];
-
-        for (const method of methods) {
-          if (!Object.prototype.hasOwnProperty.call(settings, method.toLowerCase())) {
-            continue;
-          }
-          const groupNames = Object.keys(settings[method.toLowerCase()]);
-          for (const groupName of groupNames) {
-            // Get all keys matching the pattern for this method and account
-            const redisKey = `2fa_${method.toUpperCase()}_${groupName}_${account.id}_${currentDate}`;
-            const statistics = await this.redisClient.hgetall(redisKey);
-            // Only process if there's data
-            if (Object.keys(statistics).length > 0) {
-              batchRecords.push({
-                accountId: account.id,
-                date: currentDate,
-                type: method.toUpperCase(),
-                group: groupName,
-                countTotal: parseInt(statistics[VerifyStatisticType.TOTAL] || '0'),
-                countSuccess: parseInt(statistics[VerifyStatisticType.SUCCESS] || '0'),
-                countError: parseInt(statistics[VerifyStatisticType.ERROR] || '0'),
-                countVerifyValidated: parseInt(statistics[VerifyStatisticType.VALIDATED] || '0'),
-                countVerifyRejected: parseInt(statistics[VerifyStatisticType.REJECTED] || '0'),
-              });
-            }
-          }
-        }
-
-        if (batchRecords.length > 0) {
-          await this.batchUpsert2faStatistics(batchRecords, queryRunner);
-        }
-
-        await queryRunner.commitTransaction();
-      } catch (e) {
-        await queryRunner.rollbackTransaction();
-        console.error(`Error transferring verify statistics for account ${account.id}:`, e);
-        throw e;
-      } finally {
-        await queryRunner.release();
-      }
-    }
-  }
-
-  private async batchUpsert2faStatistics(
-    records: Array<{
-      accountId: number;
-      date: string;
-      type: string;
-      group: string;
-      countTotal: number;
-      countSuccess: number;
-      countError: number;
-      countVerifyValidated: number;
-      countVerifyRejected: number;
-    }>,
-    queryRunner: QueryRunner,
-  ): Promise<void> {
-    const valuesIndex = records
-      .map((_, index) => {
-        const offset = index * 9; // 9 columns (including group)
-        return `($${1 + offset}, $${2 + offset}, $${3 + offset}, $${4 + offset}, $${5 + offset}, $${6 + offset}, $${7 + offset}, $${8 + offset}, $${9 + offset})`;
-      })
-      .join(',');
-
-    const parameters = records.flatMap((record) => [
-      record.accountId,
-      record.date,
-      record.type,
-      record.group,
-      record.countTotal,
-      record.countSuccess,
-      record.countError,
-      record.countVerifyValidated,
-      record.countVerifyRejected,
-    ]);
-
-    const upsertQuery = `
-        INSERT INTO "verify_statistics" (
-          account_id, date, type, "group", count_total, count_success, 
-          count_error, count_verify_validated, count_verify_rejected
-        ) VALUES ${valuesIndex}
-        ON CONFLICT (account_id, type, date, "group")
-        DO UPDATE SET
-          count_total = EXCLUDED.count_total,
-          count_success = EXCLUDED.count_success,
-          count_error = EXCLUDED.count_error,
-          count_verify_validated = EXCLUDED.count_verify_validated,
-          count_verify_rejected = EXCLUDED.count_verify_rejected
-      `;
-
-    await queryRunner.manager.query(upsertQuery, parameters);
   }
 }

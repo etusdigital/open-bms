@@ -8,7 +8,7 @@ export interface BuilderError {
 }
 
 /** Step types that require a time/period value to be set */
-const TIMED_STEP_TYPES = new Set(['interation', 'automation_state', 'custom_event']);
+const TIMED_STEP_TYPES = new Set(['interation', 'automation_state']);
 
 /**
  * Validates the builder state before form submission.

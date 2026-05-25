@@ -7,7 +7,7 @@ import { RedisStatistics } from './statistics.interface';
  * with nulls because aggregateRedisData never reads them.
  */
 describe('StatisticsAggregationService.aggregateRedisData', () => {
-  const service = new StatisticsAggregationService(null as any, { getClient: () => ({}) } as any, null as any, null as any);
+  const service = new StatisticsAggregationService(null as any, { getClient: () => ({}) } as any, null as any);
 
   it('parses bot_click and datacenter_click scalars from the Redis hash', () => {
     const result = service.aggregateRedisData({
@@ -61,7 +61,7 @@ describe('StatisticsAggregationService.onModuleInit', () => {
   const ORIGINAL = process.env.STATISTICS_AGGREGATION_INTERVAL_MS;
 
   function makeService(): StatisticsAggregationService {
-    return new StatisticsAggregationService(null as any, { getClient: () => ({}) } as any, null as any, null as any);
+    return new StatisticsAggregationService(null as any, { getClient: () => ({}) } as any, null as any);
   }
 
   afterEach(() => {

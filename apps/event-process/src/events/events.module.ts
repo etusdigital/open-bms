@@ -8,7 +8,6 @@ import { SesService } from './services/ses.service';
 import { MandrillService } from './services/mandrill.service';
 import { PushService } from './services/push.service';
 import { TwilioService } from './services/twilio.service';
-import { CustomEventsService } from './services/custom-events.service';
 import { FormatterUtils } from '../utils/formatter.utils';
 import { MsgopsModule } from '../msgops/msgops.module';
 import { RedisModule } from '../providers/redis/redis.module';
@@ -30,7 +29,6 @@ import { InternalEventsService } from './services/internal-events.service';
     MandrillService,
     PushService,
     TwilioService,
-    CustomEventsService,
     InternalEventsService,
     CacheService,
     AnalyticsPublisherProvider,
@@ -45,7 +43,6 @@ import { InternalEventsService } from './services/internal-events.service';
     MandrillService,
     PushService,
     TwilioService,
-    CustomEventsService,
     InternalEventsService,
   ],
 })

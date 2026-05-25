@@ -165,12 +165,6 @@ export class ContactsController {
     return this.contactsService.removeInvalidContactsDevices();
   }
 
-  @CronRoute()
-  @Post('/events-update')
-  async updateContactsEvents() {
-    return this.contactsService.updateContactsEvents();
-  }
-
   // `:id` accepts a numeric id OR a uuid; findOneByIdentifier detects which.
   // Calling findOneById directly treated a uuid as an integer id -> Postgres
   // "invalid input syntax for type integer" -> 500 when the frontend opened a

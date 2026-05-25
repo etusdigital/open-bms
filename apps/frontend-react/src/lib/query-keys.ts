@@ -22,7 +22,6 @@ export const queryKeys = {
   tags: createEntityQueryKeys('tags'),
   customFields: createEntityQueryKeys('custom-fields'),
   labels: createEntityQueryKeys('labels'),
-  customEvents: createEntityQueryKeys('custom-events'),
   pools: createEntityQueryKeys('pools'),
   senders: createEntityQueryKeys('senders'),
   segments: createEntityQueryKeys('segments'),

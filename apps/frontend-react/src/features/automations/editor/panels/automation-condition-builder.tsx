@@ -20,7 +20,6 @@ import { UserFieldStep } from '@/features/segments/builder/user-field-step';
 import { AutomationCustomFieldStep } from './automation-custom-field-step';
 import { TagStep } from '@/features/segments/builder/tag-step';
 import { AutomationAutomationStateStep } from './automation-automation-state-step';
-import { AutomationCustomEventStep } from './automation-custom-event-step';
 import { UnsupportedStep } from '@/features/segments/builder/unsupported-step';
 import { AutomationLeadStep } from './automation-lead-step';
 import type { StepData, StepType, UnsupportedStepData } from '@/features/segments/builder/types';
@@ -35,7 +34,6 @@ const STEP_TYPE_LABELS: Record<StepType, string> = {
   user_field: 'segments.builder.stepTypes.contactField',
   tag: 'segments.builder.stepTypes.tag',
   automation_state: 'automations.editor.automationFilter.stepLabel',
-  custom_event: 'segments.builder.stepTypes.customEvent',
   lead: 'automations.editor.lead.title',
 };
 
@@ -45,7 +43,6 @@ const STEP_COMPONENTS: Record<string, React.ComponentType<{ data: any; cardId: s
   user_field: UserFieldStep,
   tag: TagStep,
   automation_state: AutomationAutomationStateStep,
-  custom_event: AutomationCustomEventStep,
   lead: AutomationLeadStep,
 };
 

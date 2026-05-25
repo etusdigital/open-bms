@@ -94,7 +94,6 @@ export class AccountEntity {
     'default_country',
     'default_sender_name',
     'default_sender_email',
-    '2fa_settings',
     'google_manager_config',
     'whatsapp_access_token',
     'whatsapp_business_id',

@@ -11,7 +11,6 @@ import { CustomFieldStep } from './custom-field-step';
 import { UserFieldStep } from './user-field-step';
 import { TagStep } from './tag-step';
 import { AutomationStateStep } from './automation-state-step';
-import { CustomEventStep } from './custom-event-step';
 import type { StepData, UnsupportedStepData } from './types';
 
 // ─── Step Renderer (registry pattern) ────────────────────────────────────────
@@ -28,7 +27,6 @@ const STEP_COMPONENTS: Record<string, React.ComponentType<{ data: any; cardId: s
   user_field: UserFieldStep,
   tag: TagStep,
   automation_state: AutomationStateStep,
-  custom_event: CustomEventStep,
 };
 
 function StepRenderer({ data, cardId, stepIndex: _stepIndex }: StepComponentProps) {

@@ -1,6 +1,6 @@
 import { memo, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Zap, Send, Calendar } from 'lucide-react';
+import { Zap, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,15 +40,12 @@ function getHistoryItemIcon(item: HistoryItem) {
       return <Zap className="h-3.5 w-3.5 text-amber-500" />;
     case 'message':
       return <Send className="h-3.5 w-3.5 text-blue-500" />;
-    case 'custom_event':
-      return <Calendar className="h-3.5 w-3.5 text-purple-500" />;
   }
 }
 
 function getHistoryItemId(item: HistoryItem, idx: number): string {
   if (item.type === 'automation' && item.automation_id) return `auto-${item.automation_id}-${idx}`;
   if (item.type === 'message' && item.message_id) return `msg-${item.message_id}-${idx}`;
-  if (item.type === 'custom_event' && item.event_id) return `evt-${item.event_id}-${idx}`;
   return `item-${idx}`;
 }
 
@@ -112,9 +109,6 @@ export const ContactHistoryCard = memo(function ContactHistoryCard({ contactId }
               </SelectItem>
               <SelectItem value="message" className="text-xs">
                 {t('contacts.historyFilterMessage')}
-              </SelectItem>
-              <SelectItem value="custom_event" className="text-xs">
-                {t('contacts.historyFilterCustomEvent')}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -204,9 +198,7 @@ export const ContactHistoryCard = memo(function ContactHistoryCard({ contactId }
                     <Badge variant="outline" className="text-xs">
                       {item.type === 'automation'
                         ? t('contacts.historyFilterAutomation')
-                        : item.type === 'message'
-                          ? t('contacts.historyFilterMessage')
-                          : t('contacts.historyFilterCustomEvent')}
+                        : t('contacts.historyFilterMessage')}
                     </Badge>
                     {item.event && (
                       <Badge variant="secondary" className="text-xs">

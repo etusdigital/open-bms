@@ -19,7 +19,6 @@ const STEP_TYPE_LABELS: Record<StepType, string> = {
   user_field: 'segments.builder.stepTypes.contactField',
   tag: 'segments.builder.stepTypes.tag',
   automation_state: 'segments.builder.stepTypes.automationState',
-  custom_event: 'segments.builder.stepTypes.customEvent',
   lead: 'segments.builder.stepTypes.lead',
 };
 

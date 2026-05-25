@@ -9,7 +9,6 @@ export type StepType =
   | 'user_field'
   | 'tag'
   | 'automation_state'
-  | 'custom_event'
   | 'lead';
 
 // ─── Per-Step Data Interfaces ────────────────────────────────────────────────
@@ -69,21 +68,6 @@ export interface AutomationStateStepData extends BaseStepData {
   time_custom?: number | null; // custom days
 }
 
-export interface CustomEventStepData extends BaseStepData {
-  type: 'custom_event';
-  conditional_event_type?: 'in' | 'not in' | null;
-  event?: { id: number; name: string } | null;
-  conditional_times_value?: string | null; // comparison operator
-  custom_times_value?: number | null; // times count
-  time?: number | string | null; // period value
-  time_type?: string | null; // period type: date, range, custom, current_week, last_week
-  time_custom?: number | null; // custom days
-  custom_event_date?: string | null; // for date/range period
-  custom_event_date_end?: string | null; // for range period
-  conditional_week_day_filter?: string | null; // weekday: 0-6
-  properties?: Array<{ property: string; value: string }> | null;
-}
-
 export interface LeadStepData extends BaseStepData {
   type: 'lead';
   lead_field_key?: string | null;
@@ -105,7 +89,6 @@ export type StepData =
   | UserFieldStepData
   | TagStepData
   | AutomationStateStepData
-  | CustomEventStepData
   | LeadStepData
   | UnsupportedStepData;
 
@@ -176,13 +159,6 @@ export type UpdateStepAction =
       stepId: string;
       stepType: 'automation_state';
       data: StepUpdateData<'automation_state'>;
-    }
-  | {
-      type: 'UPDATE_STEP';
-      cardId: string;
-      stepId: string;
-      stepType: 'custom_event';
-      data: StepUpdateData<'custom_event'>;
     };
 
 // ─── Serialization Types (Wire Format) ───────────────────────────────────────
@@ -220,8 +196,6 @@ export function createDefaultStep(stepType: StepType): StepData {
       return { id, type: 'tag', conditional_tag: 'in', tag_id: [], tag_info: [] };
     case 'automation_state':
       return { id, type: 'automation_state', event: 'entered', custom_times_value: 0, conditional_times_value: '>=' };
-    case 'custom_event':
-      return { id, type: 'custom_event', conditional_event_type: 'in', custom_times_value: 1, conditional_times_value: '>=' };
     case 'lead':
       return { id, type: 'lead', conditional_lead_field: '=' };
   }

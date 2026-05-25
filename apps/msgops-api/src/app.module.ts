@@ -20,16 +20,15 @@ import { TagsModule } from './modules/tags/tags.module';
 import { CustomFieldsModule } from './modules/custom-fields/custom-fields.module';
 import { UsersModule } from './modules/users/users.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
-import { VerifyModule } from './modules/verify/verify.module';
 import { ClsMiddleware, ClsModule } from 'nestjs-cls';
 import { PostmasterModule } from './modules/postmaster/postmaster.module';
-import { CustomEventModule } from './modules/custom-events/custom-events.module';
 import { BatchModule } from './modules/batch/batch.module';
 import { LabelsModule } from './modules/labels/labels.module';
 import { AuthzModule } from './modules/authz/authz.module';
 import { SetupModule } from './modules/setup/setup.module';
 import { AccountSettingsModule } from './modules/account-settings/account-settings.module';
 import { AdminGeoIpModule } from './modules/admin-geoip/admin-geoip.module';
+import { ActivityModule } from './modules/activity/activity.module';
 import { AdminIntegrationsModule } from './modules/admin-integrations/admin-integrations.module';
 import { EnterpriseImportModule } from './modules/enterprise-import/enterprise-import.module';
 import { MessagingModule } from './providers/messaging/messaging.module';
@@ -58,7 +57,6 @@ import { SystemConfigCacheModule } from './providers/system-config-cache.module'
     PoolsModule,
     SendersModule,
     TagsModule,
-    CustomEventModule,
     CustomFieldsModule,
     UsersModule,
     StatisticsModule,
@@ -69,13 +67,13 @@ import { SystemConfigCacheModule } from './providers/system-config-cache.module'
         mount: false,
       },
     }),
-    VerifyModule,
     BatchModule,
     LabelsModule,
     SetupModule,
     AccountSettingsModule,
     AdminGeoIpModule,
     AdminIntegrationsModule,
+    ActivityModule,
     EnterpriseImportModule,
   ],
   providers: [AuditSubscriber],

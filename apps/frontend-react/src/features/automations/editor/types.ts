@@ -47,7 +47,7 @@ export type AutomationStepType =
 
 export interface TriggerSettings {
   id?: number;
-  type?: 'tag' | 'events' | 'custom_events' | 'web-push' | 'mobile-push';
+  type?: 'tag' | 'events' | 'web-push' | 'mobile-push';
   name?: string;
   applyFrequency?: 'unique' | 'multiply' | 'multiply-period';
   timePeriod?: number;

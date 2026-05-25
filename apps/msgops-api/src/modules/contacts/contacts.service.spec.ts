@@ -144,23 +144,6 @@ describe('ContactsService', () => {
       });
     });
 
-    it('hydrates custom_event name and properties from Postgres', async () => {
-      const managerQuery = jest.fn().mockResolvedValue([{ id: 9, name: 'Signup', properties: { plan: 'pro' } }]);
-      const { service } = buildService({
-        rows: [{ message_type: 'custom_events', message_id: 0, event_id: 9, event: 'signup', time: '2026-05-22 10:00:00.000', contact_id: contactId }],
-        managerQuery,
-      });
-
-      const result = await service.findContactHistory(contactId, { ...baseParams, activities: ['custom_event'] });
-
-      expect(managerQuery).toHaveBeenCalledWith(expect.stringContaining('FROM custom_events'), [[9]]);
-      expect(result.results[0]).toMatchObject({
-        type: 'custom_event',
-        message_title: 'Signup',
-        event_properties: { plan: 'pro' },
-      });
-    });
-
     it('falls back to the message type when ClickHouse message_type is blank', async () => {
       const managerQuery = jest.fn().mockResolvedValue([{ id: 5, title: 'Promo', type: 'sms' }]);
       const { service } = buildService({
@@ -179,14 +162,6 @@ describe('ContactsService', () => {
       await service.findContactHistory(contactId, { ...baseParams, activities: ['message'], channels: ['email', 'wpp'] });
 
       expect(runQuery).toHaveBeenCalledWith(expect.stringContaining("message_type IN ('email', 'whatsapp')"));
-    });
-
-    it('applies the activity-type filter in the ClickHouse query', async () => {
-      const { service, runQuery } = buildService();
-
-      await service.findContactHistory(contactId, { ...baseParams, activities: ['custom_event'] });
-
-      expect(runQuery).toHaveBeenCalledWith(expect.stringContaining("message_type = 'custom_events'"));
     });
 
     it('reports the overall match count and caps a page at itemsPerPage', async () => {

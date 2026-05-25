@@ -10,7 +10,6 @@ import { SesService } from './events/services/ses.service';
 import { MandrillService } from './events/services/mandrill.service';
 import { PushService } from './events/services/push.service';
 import { TwilioService } from './events/services/twilio.service';
-import { CustomEventsService } from './events/services/custom-events.service';
 import { InternalEventsService } from './events/services/internal-events.service';
 import { FormatterUtils } from './utils/formatter.utils';
 import { PlatformType } from './events/interfaces/push.interfaces';
@@ -30,7 +29,6 @@ describe('AppController', () => {
   const mockMandrillService = { processMandrill: jest.fn().mockResolvedValue({}) };
   const mockPushService = { processPush: jest.fn().mockResolvedValue({}) };
   const mockTwilioService = { processTwilioNotification: jest.fn().mockResolvedValue({}) };
-  const mockCustomEventsService = { customEventsProcess: jest.fn().mockResolvedValue({}) };
   const mockInternalEventsService = { internalEventsProcess: jest.fn().mockResolvedValue({}) };
 
   beforeEach(async () => {
@@ -50,7 +48,6 @@ describe('AppController', () => {
         { provide: MandrillService, useValue: mockMandrillService },
         { provide: PushService, useValue: mockPushService },
         { provide: TwilioService, useValue: mockTwilioService },
-        { provide: CustomEventsService, useValue: mockCustomEventsService },
         { provide: InternalEventsService, useValue: mockInternalEventsService },
       ],
     }).compile();
@@ -104,22 +101,6 @@ describe('AppController', () => {
       await controller.push(VALID_TOKEN, events as any);
 
       expect(mockPushService.processPush).toHaveBeenCalledWith(expect.objectContaining({ payload: events }));
-    });
-  });
-
-  describe('POST /internal/event/custom', () => {
-    it('delegates to customEventsService', async () => {
-      const events = { platform: PlatformType.CUSTOMEVENTS, payload: [] };
-      await controller.custom(VALID_TOKEN, events as any);
-
-      expect(mockCustomEventsService.customEventsProcess).toHaveBeenCalledWith(events);
-    });
-
-    it('throws BadRequestException on error', async () => {
-      mockCustomEventsService.customEventsProcess.mockRejectedValueOnce(new Error('fail'));
-      const events = { platform: PlatformType.CUSTOMEVENTS, payload: [] };
-
-      await expect(controller.custom(VALID_TOKEN, events as any)).rejects.toThrow(BadRequestException);
     });
   });
 

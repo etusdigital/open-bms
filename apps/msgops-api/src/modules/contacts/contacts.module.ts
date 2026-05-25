@@ -11,7 +11,6 @@ import { UtilsService } from '../../utils/utils.service';
 import { ContactCustomFieldEntity } from '../../entities/contact-custom-field.entity';
 import { ContactTagEntity } from 'src/entities/contact-tag.entity';
 import { ContactDeviceEntity } from 'src/entities/contact-device.entity';
-import { CustomEventModule } from '../custom-events/custom-events.module';
 import { SuppressionEntity } from 'src/entities/suppression.entity';
 import { AccountEntity } from 'src/entities/account.entity';
 import { ContactAutomationEntity } from 'src/entities/contact-automation.entity';
@@ -22,7 +21,6 @@ import { ClickhouseProvider } from '../../providers/clickhouse.provider';
 @Module({
   imports: [
     AccountsModule,
-    CustomEventModule,
     TypeOrmModule.forFeature([
       ContactEntity,
       SuppressionEntity,

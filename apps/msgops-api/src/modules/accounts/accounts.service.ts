@@ -8,7 +8,6 @@ import { PaginationDto } from '../../dtos/pagination.dto';
 import { CreateAccountDto } from './dtos/create-account.dto';
 import { UserAccountEntity } from '../../entities/users-account.entity';
 import { CustomFieldsEntity } from '../../entities/custom-fields.entity';
-import { CustomEventEntity } from '../../entities/custom-event.entity';
 import { PageDto } from '../../dtos/filters/page.dto';
 import { RedisService } from '../../providers/redis.provider';
 import { createHash, randomBytes } from 'crypto';
@@ -33,8 +32,6 @@ export class AccountsService {
     private readonly accountRepository: Repository<AccountEntity>,
     @InjectRepository(CustomFieldsEntity)
     private readonly customFieldRepository: Repository<CustomFieldsEntity>,
-    @InjectRepository(CustomEventEntity)
-    private readonly customEventRepository: Repository<CustomEventEntity>,
     @InjectRepository(AccountConfigEntity)
     private readonly accountConfigRepository: Repository<AccountConfigEntity>,
     @InjectRepository(UserAccountEntity)
@@ -378,16 +375,8 @@ export class AccountsService {
           },
         ];
 
-        const customEvents = [
-          {
-            name: 'pageview',
-            isDefault: true,
-          },
-        ];
-
         await this.createOrUpdateCustomFields(account.id, accountDto.customFields);
-        await this.createOrUpdateCustomEvents(account.id, customEvents);
-      } // close: if (!skipDefaults) custom-fields/custom-events block
+      } // close: if (!skipDefaults) custom-fields block
       await this.permissionsUserAccounts(account.id, userId, true);
 
       try {
@@ -597,34 +586,6 @@ export class AccountsService {
         .execute();
 
       // Invalidate account cache after creating/updating custom fields
-      this.accountCacheService.invalidateAccountCacheAsync(id);
-
-      return result;
-    } catch (e) {
-      console.error(e);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  async createOrUpdateCustomEvents(id: number, CustomEventsDto: any) {
-    try {
-      const customEvents = CustomEventsDto.map((customEvent) => {
-        return {
-          accountId: id.toString(),
-          name: customEvent.name,
-          isDefault: customEvent.isDefault,
-        };
-      });
-
-      const result = await this.customEventRepository
-        .createQueryBuilder('customEvents')
-        .insert()
-        .into(CustomEventEntity)
-        .values(customEvents)
-        .orUpdate(['is_default'], ['account_id', 'name'])
-        .execute();
-
-      // Invalidate account cache after creating/updating custom events
       this.accountCacheService.invalidateAccountCacheAsync(id);
 
       return result;

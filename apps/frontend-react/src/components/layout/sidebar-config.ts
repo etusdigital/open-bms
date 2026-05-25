@@ -6,7 +6,6 @@ import {
   Users,
   Server,
   Send,
-  ShieldCheck,
   ShieldAlert,
   Tag,
   Settings,
@@ -82,12 +81,6 @@ export const MENU_ITEMS: NavItem[] = [
     ],
   },
   {
-    labelKey: 'sidebar.twoFa',
-    icon: ShieldCheck,
-    route: '/messages/2fa',
-    permission: 'messages:view',
-  },
-  {
     labelKey: 'sidebar.contacts',
     icon: Users,
     permission: 'audience:contacts_view',
@@ -110,11 +103,6 @@ export const MENU_ITEMS: NavItem[] = [
       {
         labelKey: 'sidebar.customFields',
         route: '/customfields',
-        permission: 'audience:custom_fields_view',
-      },
-      {
-        labelKey: 'sidebar.customEvents',
-        route: '/custom-events',
         permission: 'audience:custom_fields_view',
       },
       {
@@ -170,6 +158,11 @@ export const MENU_ITEMS: NavItem[] = [
       {
         labelKey: 'sidebar.superAdminIntegrations',
         route: '/super-admin/integrations',
+        superAdminOnly: true,
+      },
+      {
+        labelKey: 'sidebar.superAdminActivity',
+        route: '/super-admin/activity',
         superAdminOnly: true,
       },
     ],

@@ -14,7 +14,6 @@ const KNOWN_STEP_TYPES: Set<string> = new Set<StepType>([
   'user_field',
   'tag',
   'automation_state',
-  'custom_event',
   'lead',
 ]);
 
@@ -212,9 +211,9 @@ function serializeStep(step: StepData): VueLegacyStep {
   // steps already carry '>=' from `createDefaultStep`; this guard backfills
   // legacy steps loaded from the DB that predate that seeding, so a step
   // with a repeated-count condition (custom_times_value > 1) never
-  // serializes without the operator. custom_event/automation_state steps
-  // with count 0/1 are not covered here — the query builder defaults their
-  // operator to '>=' at generation time.
+  // serializes without the operator. automation_state steps with count
+  // 0/1 are not covered here — the query builder defaults their operator
+  // to '>=' at generation time.
   if (Number(output.custom_times_value) > 1 && output.conditional_times_value == null) {
     output.conditional_times_value = '>=';
   }

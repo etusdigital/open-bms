@@ -1,7 +1,6 @@
 import { BadRequestException, Body, Controller, Headers, Post, UnauthorizedException } from '@nestjs/common';
 import * as crypto from 'crypto';
 import {
-  CustomEventRequest,
   InternalRequest,
   MailerSendRawEvent,
   MandrillRawEvent,
@@ -22,7 +21,6 @@ import { SesService } from './events/services/ses.service';
 import { MandrillService } from './events/services/mandrill.service';
 import { PushService } from './events/services/push.service';
 import { TwilioService } from './events/services/twilio.service';
-import { CustomEventsService } from './events/services/custom-events.service';
 import { EventsService } from './events/services/events.service';
 import { InternalEventsService } from './events/services/internal-events.service';
 import { Webhook as SvixWebhook } from 'svix';
@@ -44,7 +42,6 @@ export class AppController {
     private readonly mandrillService: MandrillService,
     private readonly pushService: PushService,
     private readonly twilioService: TwilioService,
-    private readonly customEventsService: CustomEventsService,
     private readonly internalEventsService: InternalEventsService,
   ) {}
 
@@ -284,22 +281,6 @@ export class AppController {
       }
       return this.pushService.processPush(events as PushWebhook);
     });
-  }
-
-  @Post('custom')
-  async custom(@Headers('x-internal-token') token: string, @Body() events: CustomEventRequest): Promise<any> {
-    this.assertAuth(token);
-    if (!events) throw new BadRequestException('Body cannot be empty');
-    try {
-      return await this.eventsService.processWithIdempotency(this.idempotencyKey(events), () =>
-        this.customEventsService.customEventsProcess(events),
-      );
-    } catch (error) {
-      this.formatterUtils.logInfo(
-        `Error processing custom events: ${JSON.stringify(error)} - payload: ${JSON.stringify(events)}`,
-      );
-      throw new BadRequestException('Error processing custom events');
-    }
   }
 
   @Post('internal')

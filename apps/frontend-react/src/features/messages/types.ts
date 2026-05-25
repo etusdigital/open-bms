@@ -1,7 +1,5 @@
 export type MessageType = 'email' | 'sms' | 'web-push' | 'mobile-push' | 'whatsapp';
 
-export type TwoFAMessageType = '2FA-email' | '2FA-sms' | '2FA-whatsapp';
-
 export type TransactionalMessageType =
   | 'transactional-email'
   | 'transactional-sms'
@@ -9,7 +7,7 @@ export type TransactionalMessageType =
   | 'transactional-mobile-push'
   | 'transactional-whatsapp';
 
-export type AnyMessageType = MessageType | TwoFAMessageType | TransactionalMessageType;
+export type AnyMessageType = MessageType | TransactionalMessageType;
 
 /** All transactional message types — used to filter the transactional listing page. */
 export const TRANSACTIONAL_TYPES: TransactionalMessageType[] = [
@@ -80,9 +78,6 @@ export const MESSAGE_TYPE_LABELS: Record<MessageType, string> = {
 
 export const ANY_MESSAGE_TYPE_LABELS: Record<AnyMessageType, string> = {
   ...MESSAGE_TYPE_LABELS,
-  '2FA-email': '2FA Email',
-  '2FA-sms': '2FA SMS',
-  '2FA-whatsapp': '2FA WhatsApp',
   'transactional-email': 'Email Transacional',
   'transactional-sms': 'SMS Transacional',
   'transactional-web-push': 'Web Push Transacional',
@@ -90,9 +85,8 @@ export const ANY_MESSAGE_TYPE_LABELS: Record<AnyMessageType, string> = {
   'transactional-whatsapp': 'WhatsApp Transacional',
 };
 
-/** Extracts the base MessageType from an AnyMessageType (e.g. '2FA-email' or 'transactional-email' → 'email') */
+/** Extracts the base MessageType from an AnyMessageType (e.g. 'transactional-email' → 'email') */
 export function baseMessageType(type: AnyMessageType): MessageType {
-  if (type.startsWith('2FA-')) return type.replace('2FA-', '') as MessageType;
   if (type.startsWith('transactional-')) return type.replace('transactional-', '') as MessageType;
   return type as MessageType;
 }
