@@ -32,6 +32,9 @@ const PACKER_BASE_URL = __ENV.PACKER_BASE_URL || 'http://campaign-packer:3000';
 const CAMPAIGN_ID = __ENV.CAMPAIGN_ID;
 const EXPECTED_CONTACTS = Number(__ENV.EXPECTED_CONTACTS || 0);
 const ITERATIONS = Number(__ENV.ITERATIONS || 10);
+// p95 ceiling configurável — default 5s do critério EVO-1027. Override pra
+// continuar a escada quando sabemos que vai estourar (250k+ staging, 100k+ local).
+const P95_CEILING_MS = Number(__ENV.P95_CEILING_MS || 5000);
 
 if (!CAMPAIGN_ID) {
   throw new Error('CAMPAIGN_ID env is required');
@@ -51,9 +54,8 @@ export const options = {
     },
   },
   thresholds: {
-    // p95 of the packer trigger should be sub-5s even at high volume (packer
-    // only enqueues; if it blows past 5s the API is already showing strain).
-    trigger_latency_ms: ['p(95)<5000'],
+    // p95 ceiling do trigger — configurável via P95_CEILING_MS env.
+    trigger_latency_ms: [`p(95)<${P95_CEILING_MS}`],
     trigger_errors: ['count==0'],
   },
 };

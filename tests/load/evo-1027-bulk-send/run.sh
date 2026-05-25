@@ -217,6 +217,8 @@ run_level() {
         -v "$SCENARIO_DIR/k6:/scripts" -v "$k6_out:/out" \
         -e CAMPAIGN_ID="$campaign_id" \
         -e EXPECTED_CONTACTS="$contacts" \
+        ${ITERATIONS:+-e ITERATIONS="$ITERATIONS"} \
+        ${P95_CEILING_MS:+-e P95_CEILING_MS="$P95_CEILING_MS"} \
         -e PACKER_BASE_URL="$packer_url" \
         "$K6_IMAGE" run \
           --summary-export=/out/summary.json \
