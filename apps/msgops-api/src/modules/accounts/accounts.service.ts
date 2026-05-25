@@ -11,7 +11,6 @@ import { CustomFieldsEntity } from '../../entities/custom-fields.entity';
 import { PageDto } from '../../dtos/filters/page.dto';
 import { RedisService } from '../../providers/redis.provider';
 import { createHash, randomBytes } from 'crypto';
-import { replaceSpecialChars } from '../../utils/utils.service';
 import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import { SchedulerService } from 'src/providers/queue/scheduler.service';
 import { QUEUE_BMS_USAGE } from 'src/providers/queue/queue.constants';
