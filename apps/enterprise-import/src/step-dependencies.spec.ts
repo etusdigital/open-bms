@@ -22,19 +22,7 @@ describe('expandSelectedSteps', () => {
 
   it('every dependency target is itself a known step key (no dangling parents)', () => {
     // parents must be real importer names; this guards against typos vs pipeline.
-    const known = new Set([
-      'tags',
-      'custom-fields',
-      'labels',
-      'email-templates',
-      'custom-events',
-      'contacts',
-      'contact_tags',
-      'contact_custom_fields',
-      'automations',
-      'campaigns',
-      'messages',
-    ]);
+    const known = new Set(['tags', 'custom-fields', 'labels', 'email-templates', 'contacts', 'contact_tags', 'contact_custom_fields', 'automations', 'campaigns', 'messages']);
     for (const parents of Object.values(STEP_DEPENDENCIES)) {
       for (const p of parents) expect(known.has(p)).toBe(true);
     }

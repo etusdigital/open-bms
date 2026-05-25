@@ -59,27 +59,6 @@ export class AppService {
       ip: remoteIp,
     };
 
-    // Handle custom events
-    try {
-      let payload = message.payload || request.body;
-      if (!Array.isArray(payload)) {
-        payload = [payload];
-      }
-
-      if (
-        payload.every(
-          (item: any) => typeof item === 'object' && 'type' in item && 'event' in item && 'properties' in item,
-        )
-      ) {
-        args.platform = 'custom_events';
-        message.payload = this.cleanPayload(payload);
-        const events = new Set(message.payload.map((item: any) => item.event));
-        args.events = Array.from(events).join(', ');
-      }
-    } catch (error) {
-      console.error('Error processing custom events:', error);
-    }
-
     // Rename keys in payload
     if (Array.isArray(message.payload)) {
       message.payload = message.payload.map((item: any) => this.renameKey(item, '-', '_'));
@@ -108,22 +87,5 @@ export class AppService {
       newObj[newKey] = value;
     }
     return newObj;
-  }
-
-  private cleanPayload(data: any): any {
-    if (typeof data === 'object' && data !== null) {
-      if (Array.isArray(data)) {
-        return data.filter((item) => item !== null).map((item) => this.cleanPayload(item));
-      } else {
-        const cleanedObj: any = {};
-        for (const [key, value] of Object.entries(data)) {
-          if (value !== null) {
-            cleanedObj[key] = this.cleanPayload(value);
-          }
-        }
-        return cleanedObj;
-      }
-    }
-    return data;
   }
 }

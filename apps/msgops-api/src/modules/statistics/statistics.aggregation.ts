@@ -356,8 +356,6 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
       record.data.deferred,
       record.data.sent,
       record.data.close,
-      record.data.events_count,
-      record.data.events_unique,
       JSON.stringify(record.data.click_position_data),
       JSON.stringify(record.data.email_provider_data),
       JSON.stringify(record.data.browser_data),
@@ -371,7 +369,6 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
         INSERT INTO events_statistics (
           date, account_id, event_type, type, message_id, automation_id, campaign_id, is_test_ab, event_id, pool, provider, provider_account, utm_campaign,
           processed, delivered, open, unique_open, click, unique_click, bounce, blocked, bot_click, datacenter_click, spam_report, unsubscribe, deferred, sent, close,
-          events_count, events_unique,
           click_position, email_provider, browser, os, device, country, region
         ) VALUES ${valuesIndex}`;
 
@@ -420,8 +417,6 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
       deferred: parseInt(statistics.deferred || '0'),
       sent: parseInt(statistics.sent || '0'),
       close: parseInt(statistics.close || '0'),
-      events_count: parseInt(statistics.events_count || '0'),
-      events_unique: parseInt(statistics.events_unique || '0'),
 
       pool: statistics.pool,
       is_test_ab: isTestAb,

@@ -14,7 +14,6 @@ import { EmailTemplatesImporter } from './importers/email-templates.importer';
 import { ContactsImporter } from './importers/contacts.importer';
 import { ContactTagsImporter } from './importers/contact-tags.importer';
 import { ContactCustomFieldsImporter } from './importers/contact-custom-fields.importer';
-import { CustomEventsImporter } from './importers/custom-events.importer';
 import { AutomationsImporter } from './importers/automations.importer';
 import { CampaignsImporter } from './importers/campaigns.importer';
 import { MessagesImporter } from './importers/messages.importer';
@@ -34,7 +33,6 @@ import { TagEntity } from './entities/tag.entity';
 import { CustomFieldsEntity } from './entities/custom-fields.entity';
 import { LabelsEntity } from './entities/labels.entity';
 import { EmailsTemplatesEntity } from './entities/emails-templates.entity';
-import { CustomEventEntity } from './entities/custom-event.entity';
 import { AutomationEntity } from './entities/automation.entity';
 import { CampaignEntity } from './entities/campaign.entity';
 import { CampaignMessageEntity } from './entities/campaign-message.entity';
@@ -55,7 +53,6 @@ const ENTITIES = [
   CustomFieldsEntity,
   LabelsEntity,
   EmailsTemplatesEntity,
-  CustomEventEntity,
   AutomationEntity,
   CampaignEntity,
   CampaignMessageEntity,
@@ -103,7 +100,6 @@ const ENTITIES = [
     ContactsImporter,
     ContactTagsImporter,
     ContactCustomFieldsImporter,
-    CustomEventsImporter,
     AutomationsImporter,
     CampaignsImporter,
     MessagesImporter,
