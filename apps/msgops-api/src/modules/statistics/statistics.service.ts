@@ -532,11 +532,11 @@ export class StatisticsService {
   }
 
   sumStatisticsValues(statistic, item) {
-    statistic.delivered += Number(item.delivered);
+    statistic.delivered += Number(item?.delivered || 0);
     statistic.open += Number(item?.open || 0);
-    statistic.click += Number(item.click);
-    statistic.unsubscribe += Number(item.unsubscribe);
-    statistic.bounce += Number(item.bounce);
+    statistic.click += Number(item?.click || 0);
+    statistic.unsubscribe += Number(item?.unsubscribe || 0);
+    statistic.bounce += Number(item?.bounce || 0);
     statistic.blocked += Number(item?.blocked || 0);
     statistic.sent += Number(item?.sent || 0);
     statistic.close += Number(item?.close || 0);
