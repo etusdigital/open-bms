@@ -299,6 +299,45 @@ describe('serializeFlowToSteps', () => {
     expect(yesBranch.type).toBe('conditionalTrue');
     expect(yesBranch.settings).toEqual(conditionalRules);
   });
+
+  // Legacy/migrated layouts can carry edges to conditionalTrue without the explicit
+  // `sourceHandle === 'yes'`. The mirror must still fire by walking the parent type.
+  it('mirrors conditional parent settings into conditionalTrue even when sourceHandle is missing', () => {
+    const rules = [
+      {
+        type: 'interation',
+        event_type: 'email',
+        conditional_interation: 'yes',
+        event: 'last_open_date',
+        time: 0,
+      },
+    ];
+
+    const nodes = [
+      { id: '1', type: 'trigger', position: { x: 0, y: 0 }, data: { stepId: 1, settings: { type: 'tag', name: 'x' } } },
+      { id: '2', type: 'conditional', position: { x: 0, y: 150 }, data: { stepId: 2, settings: rules } },
+      { id: '3', type: 'conditionalTrue', position: { x: -100, y: 300 }, data: { stepId: 3, settings: [] } },
+      { id: '4', type: 'conditionalFalse', position: { x: 100, y: 300 }, data: { stepId: 4, settings: {} } },
+      { id: '5', type: 'end', position: { x: -100, y: 450 }, data: { stepId: 5, settings: {} } },
+      { id: '6', type: 'end', position: { x: 100, y: 450 }, data: { stepId: 6, settings: {} } },
+    ];
+    const edges = [
+      { id: 'e1-2', source: '1', target: '2' },
+      // No sourceHandle on the edge to conditionalTrue (simulates legacy layout)
+      { id: 'e2-3', source: '2', target: '3' },
+      { id: 'e2-4', source: '2', target: '4', sourceHandle: 'no' },
+      { id: 'e3-5', source: '3', target: '5' },
+      { id: 'e4-6', source: '4', target: '6' },
+    ];
+
+    const result = serializeFlowToSteps(nodes as never, edges as never);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const conditional = result.root.child[0];
+    const trueBranch = conditional.child.find((c) => c.type === 'conditionalTrue');
+    expect(trueBranch?.settings).toEqual(rules);
+  });
 });
 
 // ---------------------------------------------------------------------------

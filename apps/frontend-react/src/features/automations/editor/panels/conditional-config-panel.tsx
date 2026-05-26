@@ -23,7 +23,7 @@ interface ConditionalConfigProps {
   onClose: () => void;
 }
 
-function rulesToCards(rules: ConditionalRule[]): BuilderCard[] {
+export function rulesToCards(rules: ConditionalRule[]): BuilderCard[] {
   if (!rules || !Array.isArray(rules) || rules.length === 0) {
     return [{ id: crypto.randomUUID(), steps: [] }];
   }
@@ -38,7 +38,7 @@ function rulesToCards(rules: ConditionalRule[]): BuilderCard[] {
 // keeping the automation conditional payload schema-clean (EVO-1452).
 const AUTOMATION_CONDITIONAL_DROP_FIELDS = ['conditional_times_value'] as const;
 
-function cardsToRules(cards: BuilderCard[]): ConditionalRule[] {
+export function cardsToRules(cards: BuilderCard[]): ConditionalRule[] {
   const serialized = serializeSteps(cards);
   if (serialized.length === 0) return [];
   return (serialized[0] as Record<string, unknown>[]).map((rule) => {

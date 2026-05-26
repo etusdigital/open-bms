@@ -74,6 +74,12 @@ export const TagStep = memo(function TagStep({ data, cardId }: TagStepProps) {
       // here at the source. `segment-base-size` is not a valid schema value, so we
       // fall back to 'tag' for anything outside the {tag, segment} pair.
       const normalizedType: 'tag' | 'segment' = tag.type === 'segment' ? 'segment' : 'tag';
+      if (tag.type && tag.type !== 'tag' && tag.type !== 'segment') {
+        // Surface unknown upstream types so we notice rather than silently
+        // misclassifying the entry as 'tag'. Schema accepts only {tag, segment}.
+         
+        console.warn('[TagStep] Unknown tag type from API, coercing to "tag":', tag.type);
+      }
       update({
         tag_id: [...selectedIds, tag.id],
         tag_info: [...selectedTags, { id: tag.id, name: tag.name, type: normalizedType, count: tag.lastCount ?? null }],

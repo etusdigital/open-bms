@@ -150,7 +150,18 @@ export function serializeFlowToSteps(nodes: AutomationNode[], edges: AutomationE
     // node; we re-impose the legacy invariant here at the wire-format boundary.
     let settings = data.settings;
     if (stepType === 'conditionalTrue') {
-      const parentEdge = edges.find((e) => e.target === nodeId && e.sourceHandle === 'yes');
+      // Prefer the edge whose handle is 'yes'; fall back to any incoming edge whose
+      // source node is a conditional. Legacy/migrated layouts may have an edge
+      // without sourceHandle set, and we still need to mirror the parent's rules
+      // or the backend rejects with the generic `error_conditional`.
+      const incomingEdges = edges.filter((e) => e.target === nodeId);
+      const yesEdge = incomingEdges.find((e) => e.sourceHandle === 'yes');
+      const parentEdge =
+        yesEdge ??
+        incomingEdges.find((e) => {
+          const parent = nodes.find((n) => n.id === e.source);
+          return parent?.type === 'conditional';
+        });
       if (parentEdge) {
         const parentNode = nodes.find((n) => n.id === parentEdge.source);
         const parentSettings = (parentNode?.data as AnyNodeData | undefined)?.settings;
