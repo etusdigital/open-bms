@@ -43,6 +43,11 @@ export const importGateway = {
     return data;
   },
 
+  async listJobs(signal?: AbortSignal): Promise<ImportStatusResponse[]> {
+    const { data } = await apiClient.get<ImportStatusResponse[]>('/imports', { signal });
+    return data;
+  },
+
   async getStatus(jobId: string, signal?: AbortSignal): Promise<ImportStatusResponse> {
     const { data } = await apiClient.get<ImportStatusResponse>(`/imports/${jobId}`, { signal });
     return data;

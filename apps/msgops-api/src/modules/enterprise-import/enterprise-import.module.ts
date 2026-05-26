@@ -5,19 +5,21 @@ import { AccountsModule } from '../accounts/accounts.module';
 import { EnterpriseImportJobEntity } from '../../entities/enterprise-import-job.entity';
 import { EnterpriseIdMappingEntity } from '../../entities/enterprise-id-mapping.entity';
 import { AccountEntity } from '../../entities/account.entity';
+import { ContactEntity } from '../../entities/contact.entity';
 import { QUEUE_ENTERPRISE_IMPORT } from '../../providers/queue/queue.constants';
 import { EnterpriseImportController } from './enterprise-import.controller';
 import { EnterpriseImportService } from './enterprise-import.service';
+import { EmailReconcileService } from './email-reconcile.service';
 import { EnterpriseImportEnabledGuard } from './enterprise-import.guard';
 
 @Module({
   imports: [
     BullModule.registerQueue({ name: QUEUE_ENTERPRISE_IMPORT }),
-    TypeOrmModule.forFeature([EnterpriseImportJobEntity, EnterpriseIdMappingEntity, AccountEntity]),
+    TypeOrmModule.forFeature([EnterpriseImportJobEntity, EnterpriseIdMappingEntity, AccountEntity, ContactEntity]),
     AccountsModule,
   ],
   controllers: [EnterpriseImportController],
-  providers: [EnterpriseImportService, EnterpriseImportEnabledGuard],
+  providers: [EnterpriseImportService, EmailReconcileService, EnterpriseImportEnabledGuard],
   exports: [EnterpriseImportService],
 })
 export class EnterpriseImportModule {}

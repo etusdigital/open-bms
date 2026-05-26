@@ -234,6 +234,18 @@ export class EnterpriseImportService {
     return this.mapToStatusDto(job);
   }
 
+  // Most-recent-first list of import jobs. Used by the super-admin Import page
+  // to surface previous jobs without forcing the operator to memorize UUIDs.
+  // Capped at 50 because the table is unlikely to grow large enough to need
+  // server-side pagination — if it does, swap for a paged endpoint.
+  async listJobs(limit = 50): Promise<ImportStatusDto[]> {
+    const jobs = await this.jobRepo.find({
+      order: { createdAt: 'DESC' },
+      take: Math.max(1, Math.min(limit, 100)),
+    });
+    return jobs.map((j) => this.mapToStatusDto(j));
+  }
+
   async resume(jobId: string, newApiKey?: string): Promise<{ jobId: string; status: string }> {
     const job = await this.jobRepo.findOne({ where: { id: jobId } });
     if (!job) throw new NotFoundException(`Job ${jobId} not found`);

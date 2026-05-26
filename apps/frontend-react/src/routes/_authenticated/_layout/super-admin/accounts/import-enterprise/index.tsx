@@ -1,8 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { AccountImportForm } from '@/features/super-admin/accounts/account-import-form';
+import { ImportJobsList } from '@/features/super-admin/accounts/import-jobs-list';
 
-export const Route = createFileRoute('/_authenticated/_layout/super-admin/accounts/import-enterprise')({
+export const Route = createFileRoute('/_authenticated/_layout/super-admin/accounts/import-enterprise/')({
   component: ImportEnterpriseRoute,
 });
 
@@ -15,6 +16,11 @@ function ImportEnterpriseRoute() {
         <p className="text-muted-foreground text-sm">{t('superAdmin.accounts.import.pageSubtitle')}</p>
       </header>
       <AccountImportForm />
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">{t('superAdmin.accounts.import.jobsList.title')}</h2>
+        <ImportJobsList />
+      </section>
     </div>
   );
 }

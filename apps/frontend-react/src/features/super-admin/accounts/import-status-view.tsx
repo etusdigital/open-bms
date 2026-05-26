@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { useImportStatus } from './use-import-status';
 import { useResumeImport } from './use-account-import';
 import { ProgressList } from './progress-list';
+import { ReconcileEmailsCard } from './reconcile-emails-card';
 import type { ImportStatus } from './import-gateway';
 
 const STATUS_VARIANT: Record<ImportStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -74,6 +75,10 @@ export function ImportStatusView({ jobId, hideResume = false }: { jobId: string;
       {data.status === 'failed' && !hideResume && (
         <Button onClick={() => setDialogOpen(true)}>{t('superAdmin.accounts.import.resumeFromCheckpoint')}</Button>
       )}
+
+      {/* EVO-1464 — após o import concluir, oferece o passo de reconciliação
+          via CSV pra trocar emails mascarados pelos reais. */}
+      {data.status === 'completed' && <ReconcileEmailsCard jobId={data.jobId} />}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
