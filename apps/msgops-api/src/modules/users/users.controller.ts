@@ -133,11 +133,12 @@ export class UsersController {
 
   @Get(':id')
   @RequirePermission('account:users_view')
-  async findOne(@Param('id') id: number, @AuthUser() authUser: any) {
+  async findOne(@Param('id') id: number, @AuthUser() authUser: any, @Req() req: any) {
     const providerId = this.getProviderId(authUser);
     const currentUser = await this.userService.findOneByProviderId(providerId);
 
-    if (currentUser.id && currentUser.id !== Number(id)) {
+    const isSuperAdmin = req?.authzContext?.isSuperAdmin === true;
+    if (!isSuperAdmin && currentUser.id && currentUser.id !== Number(id)) {
       return this.userService.findOneByMasterId(Number(id), currentUser.id);
     }
 
