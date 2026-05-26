@@ -1,24 +1,118 @@
-# BMS Open Source v0.1.0 — Docker Swarm stack para staging em manager1.evo-ai.co
+# =============================================================================
+#  BMS Open Source — Docker Swarm stack (Portainer-ready)
+# =============================================================================
 #
-# Sub-stack `bms-staging` rodando junto dos demais serviços do manager.
-# Derivado de docker-compose.yml raiz com adaptações pra Swarm:
-#   - sem `build:` (imagens vêm do Docker Hub da organização)
-#   - sem `container_name` (Swarm gera nome `<stack>_<service>.<task>.<id>`)
-#   - sem `depends_on.condition: service_healthy` (Swarm ignora; restart policy + healthchecks reconciliam)
-#   - portas internas não expostas no host; ingress público via Traefik existente
+#  Guia completo de deploy: infra/swarm/DEPLOY.md
 #
-# Pré-requisitos no manager (one-time):
-#   1. scp data/geo/dbip-city-lite.mmdb manager1:/opt/bms-staging/data/geo/
-#   2. mkdir -p /opt/bms-staging/data/geo (já implícito no scp)
-#   3. DNS Cloudflare: bms-staging.evo-ai.co → IP do manager
-#      e ch-ui-bms-staging.evo-ai.co → IP do manager (console do ClickHouse)
-#   4. SendGrid API key + webhook URL configurados via super-admin UI APÓS primeiro boot
+# -----------------------------------------------------------------------------
+#  PRÉ-REQUISITOS (one-time, antes de subir o stack)
+# -----------------------------------------------------------------------------
 #
-# Deploy:
-#   IMAGE_TAG=bms-staging-<sha7> docker stack deploy -c stack.bms-staging.yml bms-staging
+#  1) DNS público apontando 2 hostnames pro IP do manager:
+#       • <FRONTEND_HOST>  ex.: bms-app.exemplo.ai      (app + API + webhooks)
+#       • <CH_UI_HOST>     ex.: ch-ui-bms.exemplo.ai    (console ClickHouse)
 #
-# Rollback:
-#   docker stack rm bms-staging  (volumes ficam pra inspeção)
+#  2) Swarm configs criados via Portainer (Configs → Add config) ou via CLI.
+#     Os 3 configs precisam EXISTIR antes do deploy do stack.
+#     Conteúdo em: infra/clickhouse-init/ e infra/clickhouse-config/users.d/
+#
+#       • clickhouse-init-01            ← conteúdo de 01-init-bms.sql
+#       • clickhouse-init-02-auth       ← conteúdo de 02-events-rabbitmq.sh
+#       • clickhouse-users-experimental ← conteúdo de 00-experimental.xml
+#
+#     ⚠️  Swarm configs são imutáveis. Pra atualizar conteúdo, crie versão nova
+#         (ex.: clickhouse-init-01-v2) e atualize a referência abaixo.
+#
+#  3) Traefik v3 rodando na overlay externa `network_public` (nome real: bmsNet
+#     no nosso staging — ajustar embaixo se diferente). Use stack.traefik.yml
+#     deste repo se ainda não tem Traefik. Timeouts longos (600s) são obrigatórios
+#     pra cobrir operações longas no msgops-api (import enterprise, exports).
+#
+#  4) Imagens publicadas em ${IMAGE_REGISTRY}/bms-*:${IMAGE_TAG}. Verificar que
+#     bms-enterprise-import existe — sem ela o stack falha. Build local no
+#     manager via `docker build -f apps/enterprise-import/Dockerfile ...`
+#     se ainda não estiver no Docker Hub.
+#
+# -----------------------------------------------------------------------------
+#  VARIÁVEIS DE AMBIENTE (todas obrigatórias — colocar em Portainer → Stack →
+#  Environment variables, ou usar stack.env no caso de deploy via Repository)
+# -----------------------------------------------------------------------------
+#
+#  Hosts / imagens:
+#    FRONTEND_HOST                       ex.: bms-app.exemplo.ai
+#    CH_UI_HOST                          ex.: ch-ui-bms.exemplo.ai
+#    FRONTEND_URL                        ex.: https://bms-app.exemplo.ai
+#    CORS_ORIGINS                        ex.: https://bms-app.exemplo.ai
+#    IMAGE_REGISTRY                      ex.: evoapicloud
+#    IMAGE_TAG                           ex.: latest  ou  bms-<sha7>
+#
+#  Senhas / segredos (gerar com `openssl rand -base64 N`):
+#    POSTGRES_PASSWORD                   `openssl rand -base64 24`
+#    RABBITMQ_PASSWORD                   `openssl rand -base64 24`
+#    CLICKHOUSE_PASSWORD                 `openssl rand -base64 24`
+#    MINIO_ROOT_PASSWORD                 `openssl rand -base64 24`
+#    JWT_SECRET                          `openssl rand -base64 48`
+#    CRON_SECRET                         `openssl rand -base64 32`
+#    INTERNAL_AUTH_TOKEN                 `openssl rand -base64 32`
+#    CH_UI_SECRET_KEY                    `openssl rand -base64 32`
+#    ENTERPRISE_IMPORT_ENCRYPTION_KEY    `openssl rand -base64 32`  (AES-256,
+#                                         32 bytes. PERDER = dados cifrados
+#                                         ficam ilegíveis — guardar em cofre.)
+#
+#  Opcionais (têm defaults):
+#    RABBITMQ_USER                       default: bms
+#    MINIO_ROOT_USER                     default: bmsadmin
+#    TRAEFIK_NETWORK_NAME                default: bmsNet
+#                                         (rede overlay externa onde Traefik vive)
+#
+# -----------------------------------------------------------------------------
+#  DEPLOY VIA PORTAINER
+# -----------------------------------------------------------------------------
+#
+#  1) Portainer → Configs → Add config (3x, conforme §2 dos pré-requisitos).
+#  2) Portainer → Stacks → Add stack → Web editor.
+#  3) Cole este YAML.
+#  4) Em "Environment variables" cole TODAS as envs da lista acima.
+#  5) Deploy the stack.
+#  6) Aguardar ~2 min, verificar `Stacks → bms → Services` — todos 1/1 exceto
+#     bms-config-init e minio-bootstrap (one-shots — 0/1 é normal).
+#  7) Acessar https://<FRONTEND_HOST>/setup pro wizard.
+#
+# -----------------------------------------------------------------------------
+#  DEPLOY VIA CLI (alternativa)
+# -----------------------------------------------------------------------------
+#
+#  export <todas as envs acima>
+#  docker stack deploy -c stack.bms.yml --resolve-image=always bms
+#
+# -----------------------------------------------------------------------------
+#  ROLLBACK
+# -----------------------------------------------------------------------------
+#
+#  docker stack rm bms                              (volumes preservados)
+#  docker volume rm $(docker volume ls -q | grep ^bms_)  (apaga TUDO — cuidado)
+#
+# -----------------------------------------------------------------------------
+#  NOTAS DE DESIGN
+# -----------------------------------------------------------------------------
+#
+#  • Adaptado do docker-compose.yml raiz: sem `build:` (imagens prontas no Hub),
+#    sem `container_name` (Swarm gera <stack>_<service>.<task>.<id>), sem
+#    `depends_on.condition: service_healthy` (Swarm ignora — restart policy +
+#    healthchecks reconciliam).
+#  • msgops-api roteia /api/* diretamente via Traefik com StripPrefix. SEM nginx
+#    no meio (o nginx do frontend-react tinha proxy_read_timeout 60s que matava
+#    operações longas — import enterprise, exports).
+#  • frontend-react só na network_public — sem precisar resolver msgops-api
+#    internamente (Traefik separa as rotas).
+#  • enterprise-import é um worker BullMQ que consome jobs enfileirados pelo
+#    msgops-api em POST /accounts/import. Sem ele, jobs ficam status=pending
+#    pra sempre.
+#  • geolocation usa volume nomeado `geo-data` (não bind mount no host). Pra
+#    popular o GeoIP mmdb depois:
+#      docker cp dbip-city-lite.mmdb <container>:/data/geo/
+#
+# =============================================================================
 
 version: '3.9'
 
@@ -74,14 +168,24 @@ x-backend-env: &backend-env
   JWT_ACCESS_TTL: '3600'
   JWT_REFRESH_TTL: '2592000'
   API_DOCS: /api-docs
-  FRONTEND_URL: https://bms-staging.evo-ai.co
-  CORS_ORIGINS: https://bms-staging.evo-ai.co
+  FRONTEND_URL: ${FRONTEND_URL:?must set FRONTEND_URL}
+  CORS_ORIGINS: ${CORS_ORIGINS:?must set CORS_ORIGINS}
   # SendGrid settings come from super-admin UI → system_config → bms-config/sendgrid.env (loaded at boot).
   # Provide harmless placeholder so msgops-api SendGridHandler boot doesn't trip the eager-SDK guard.
   SENDGRID_API_KEY: dev-placeholder-not-a-real-key
   SENDGRID_KEYS_MAP: '{"plusdin-campaigns":"dev"}'
   SPARKPOST_API_KEY: dev-placeholder-not-a-real-key
   OPEN_AI_KEY: dev-placeholder-not-a-real-key
+  # Habilita o módulo Enterprise Import (rota POST /accounts/import + GET /imports/:jobId).
+  # Sem essa flag, EnterpriseImportEnabledGuard retorna 404 em todas as rotas
+  # do módulo — gate intencional pra esconder a feature em instalações que não
+  # vão migrar do Enterprise.
+  ENTERPRISE_IMPORT_ENABLED: 'true'
+  # Chave AES-256 (base64, 32 bytes) usada pra cifrar a API key do Enterprise
+  # no banco. Gere com:  openssl rand -base64 32
+  # Sem essa env, o endpoint POST /accounts/import dá 500 com a mensagem
+  # "ENTERPRISE_IMPORT_ENCRYPTION_KEY not set" (api-key-encryption.util.ts).
+  ENTERPRISE_IMPORT_ENCRYPTION_KEY: ${ENTERPRISE_IMPORT_ENCRYPTION_KEY:?must set ENTERPRISE_IMPORT_ENCRYPTION_KEY}
   LIMIT_CONTACT_BATCH: '1000'
   CAMPAIGN_TRIGGER_ENDPOINT: ${CAMPAIGN_TRIGGER_ENDPOINT:-http://campaign-packer:3000/create-contacts-send}
   CAMPAIGN_TEST_AB_ENDPOINT: ${CAMPAIGN_TEST_AB_ENDPOINT:-http://campaign-packer:3000/create-test}
@@ -239,26 +343,26 @@ services:
           memory: 4G
 
   # CH-UI: web console for the analytics ClickHouse.
-  # Browser → Traefik (basic-auth) → ch-ui (3488). The ch-ui server opens the
-  # ClickHouse connection itself over the `internal` network, so ClickHouse
-  # stays unexposed — only ch-ui is reachable from outside.
-  # Prereq: DNS Cloudflare ch-ui-bms-staging.evo-ai.co → IP do manager.
+  # Browser → Traefik → ch-ui (3488). The ch-ui server opens the ClickHouse
+  # connection itself over the `internal` network, so ClickHouse stays
+  # unexposed — only ch-ui is reachable from outside.
+  # Prereq: DNS apontando ${CH_UI_HOST} → IP do manager.
   ch-ui:
     image: ghcr.io/caioricciuti/ch-ui:v2.1.1
     environment:
       NODE_ENV: production
       PORT: '3488'
-      APP_URL: https://ch-ui-bms-staging.evo-ai.co
-      ALLOWED_ORIGINS: https://ch-ui-bms-staging.evo-ai.co
+      APP_URL: https://${CH_UI_HOST:?must set CH_UI_HOST}
+      ALLOWED_ORIGINS: https://${CH_UI_HOST}
       # Signs ch-ui session cookies — without it ch-ui falls back to a
       # hardcoded default key. ch-ui has its own login/user accounts.
       APP_SECRET_KEY: ${CH_UI_SECRET_KEY:?must set CH_UI_SECRET_KEY}
       # Seeds only the host — ch-ui's client takes user/pass as separate
-      # fields, not from the URL. On first login, open the seeded "BMS
-      # Staging" connection and enter user `default` + CLICKHOUSE_PASSWORD;
-      # ch-ui persists it in its own SQLite (ch-ui-data volume).
+      # fields, not from the URL. On first login, open the seeded connection
+      # and enter user `default` + CLICKHOUSE_PASSWORD; ch-ui persists it in
+      # its own SQLite (ch-ui-data volume).
       CLICKHOUSE_URL: http://clickhouse:8123
-      CONNECTION_NAME: BMS Staging
+      CONNECTION_NAME: BMS
     volumes:
       - ch-ui-data:/app/data
     networks: [internal, network_public]
@@ -276,7 +380,7 @@ services:
       labels:
         - traefik.enable=true
         - traefik.docker.network=network_public
-        - traefik.http.routers.bms-ch-ui.rule=Host(`ch-ui-bms-staging.evo-ai.co`)
+        - traefik.http.routers.bms-ch-ui.rule=Host(`${CH_UI_HOST}`)
         - traefik.http.routers.bms-ch-ui.entrypoints=websecure
         - traefik.http.routers.bms-ch-ui.tls.certresolver=letsencryptresolver
         - traefik.http.routers.bms-ch-ui.priority=20
@@ -302,9 +406,9 @@ services:
       BMS_CONFIG_DIR: /data/config
     volumes:
       - bms-config:/data/config
-    # Não precisa de network_public — msgops-api não recebe tráfego direto
-    # do Traefik. O nginx do frontend-react faz proxy_pass com strip de /api/.
-    networks: [internal]
+    # network_public: Traefik faz proxy direto para cá em /api/*.
+    # internal: ainda fala com postgres, redis, rabbitmq, clickhouse, minio.
+    networks: [internal, network_public]
     healthcheck:
       # /api-docs (Swagger) é desabilitado em produção (main.ts:53). Usa
       # /setup/status que é @PublicRoute() e existe em prod. Origin
@@ -317,7 +421,7 @@ services:
           '--spider',
           '-q',
           '--header',
-          'Origin: https://bms-staging.evo-ai.co',
+          'Origin: ${FRONTEND_HOST}',
           'http://127.0.0.1:5001/setup/status',
         ]
       interval: 10s
@@ -330,16 +434,30 @@ services:
         limits:
           memory: 768M
       labels:
-        # Traefik não roteia /api diretamente para cá.
-        # O nginx do frontend-react faz proxy_pass http://msgops-api:5001/
-        # com strip do prefixo /api/ — e as rotas NestJS não têm prefixo /api.
-        - traefik.enable=false
+        # Traefik roteia ${FRONTEND_HOST}/api/* direto pra cá.
+        # Antes passava pelo nginx do frontend-react (proxy_read_timeout 60s),
+        # que matava operações longas como import enterprise. Sem nginx no meio,
+        # operações longas (import, exports, bulk) usam o timeout do entrypoint
+        # do Traefik (configurado em 600s no service traefik externo).
+        - traefik.enable=true
+        - traefik.docker.network=network_public
+        - traefik.http.routers.bms-api.rule=Host(`${FRONTEND_HOST}`) && PathPrefix(`/api`)
+        - traefik.http.routers.bms-api.entrypoints=websecure
+        - traefik.http.routers.bms-api.tls.certresolver=letsencryptresolver
+        # priority > bms-ui (10) e < bms-events (30) — pega tudo /api/* antes
+        # do catch-all do frontend.
+        - traefik.http.routers.bms-api.priority=20
+        - traefik.http.routers.bms-api.middlewares=bms-api-strip
+        # NestJS não usa prefixo /api nas rotas — strip antes de mandar.
+        - traefik.http.middlewares.bms-api-strip.stripprefix.prefixes=/api
+        - traefik.http.services.bms-api.loadbalancer.server.port=5001
 
   frontend-react:
     image: ${IMAGE_REGISTRY:-evoapicloud}/bms-frontend-react:${IMAGE_TAG:?must set IMAGE_TAG}
-    # `internal`: nginx resolve `msgops-api` para proxy_pass no startup.
-    # `network_public`: Traefik precisa desta rede para rotear tráfego ao frontend.
-    networks: [internal, network_public]
+    # Só `network_public` — não precisa mais resolver `msgops-api` internamente.
+    # Traefik faz o proxy direto pra /api/*. nginx do container só serve estáticos
+    # e o location /api/ vira código morto (não chega request lá).
+    networks: [network_public]
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1/']
       interval: 10s
@@ -354,7 +472,9 @@ services:
       labels:
         - traefik.enable=true
         - traefik.docker.network=network_public
-        - traefik.http.routers.bms-ui.rule=Host(`bms-staging.evo-ai.co`)
+        # Catch-all do host — pega tudo que não casar com bms-api (priority 20)
+        # nem bms-events (priority 30). SPA + estáticos.
+        - traefik.http.routers.bms-ui.rule=Host(`${FRONTEND_HOST}`)
         - traefik.http.routers.bms-ui.entrypoints=websecure
         - traefik.http.routers.bms-ui.tls.certresolver=letsencryptresolver
         - traefik.http.routers.bms-ui.priority=10
@@ -374,7 +494,7 @@ services:
       labels:
         - traefik.enable=true
         - traefik.docker.network=network_public
-        - traefik.http.routers.bms-events.rule=Host(`bms-staging.evo-ai.co`) && PathPrefix(`/bms/events`)
+        - traefik.http.routers.bms-events.rule=Host(`${FRONTEND_HOST}`) && PathPrefix(`/bms/events`)
         - traefik.http.routers.bms-events.entrypoints=websecure
         - traefik.http.routers.bms-events.tls.certresolver=letsencryptresolver
         - traefik.http.routers.bms-events.priority=30
@@ -482,6 +602,23 @@ services:
         limits:
           memory: 384M
 
+  # Worker que consome jobs enfileirados por msgops-api em POST /accounts/import.
+  # Sem ele, jobs ficam status=pending pra sempre (enterprise_import_jobs table).
+  # Usa BullMQ no Redis pra coordenar — não precisa de port exposto pro Traefik.
+  # Precisa das mesmas envs do msgops-api (ENTERPRISE_IMPORT_ENCRYPTION_KEY
+  # pra decifrar a API key do Enterprise no banco).
+  enterprise-import:
+    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-enterprise-import:${IMAGE_TAG:?must set IMAGE_TAG}
+    environment:
+      <<: *backend-env
+      PORT: '3001'
+    networks: [internal]
+    deploy:
+      <<: *restart-policy
+      resources:
+        limits:
+          memory: 512M
+
   campaign-packer:
     image: ${IMAGE_REGISTRY:-evoapicloud}/bms-campaign-packer:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
@@ -541,8 +678,11 @@ services:
       GEO_MMDB_DIR: /data/geo
       BMS_CONFIG_DIR: /data/config
     volumes:
-      # Pré-requisito: scp data/geo/dbip-city-lite.mmdb manager1:/opt/bms-staging/data/geo/
-      - /opt/bms-staging/data/geo:/data/geo:ro
+      # Volume nomeado em vez de bind mount — evita crash loop quando o path
+      # /opt/bms-staging/data/geo não existe no host. Pra popular o mmdb:
+      #   docker cp dbip-city-lite.mmdb $(docker ps -q -f name=geolocation):/data/geo/
+      # ou via init container num próximo iteration.
+      - geo-data:/data/geo
       - bms-config:/data/config:ro
     networks: [internal]
     deploy:
@@ -559,21 +699,25 @@ volumes:
   clickhouse-data:
   ch-ui-data:
   bms-config:
+  geo-data:
 
 networks:
-  # Overlay attachable já existente no manager (Traefik vive aqui).
+  # Overlay attachable EXTERNA — onde o Traefik vive. Setar TRAEFIK_NETWORK_NAME
+  # pro nome real da rede (ex.: bmsNet, traefik_public). A rede precisa existir
+  # ANTES do stack subir — geralmente criada junto do Traefik via
+  # `docker network create --driver overlay --attachable <nome>`.
   network_public:
     external: true
-  # Rede interna do stack — apps + infra falam aqui.
+    name: ${TRAEFIK_NETWORK_NAME:-bmsNet}
+  # Rede interna do stack — apps + infra falam aqui. Criada pelo Swarm na hora.
   internal:
     driver: overlay
     attachable: false
 
 configs:
-  # Caminhos relativos a este arquivo (infra/swarm/stack.bms-staging.yml).
   clickhouse-init-01:
-    file: ../clickhouse-init/01-init-bms.sql
+    external: true
   clickhouse-init-02-auth:
-    file: ../clickhouse-init/02-events-rabbitmq.sh
+    external: true
   clickhouse-users-experimental:
-    file: ../clickhouse-config/users.d/00-experimental.xml
+    external: true

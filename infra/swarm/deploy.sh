@@ -1,26 +1,31 @@
 #!/usr/bin/env bash
-# Deploy / atualiza o stack `bms-staging` no manager.
+# Deploy / atualiza o stack do BMS Open Source no manager (alternativa CLI ao
+# Portainer — pro fluxo Portainer ver infra/swarm/DEPLOY.md).
 #
-# Carrega segredos de /opt/bms-staging/.env (no manager) e chama
+# Carrega segredos de $ENV_FILE (default /opt/bms/.env) e chama
 # `docker stack deploy`. Idempotente — pode ser executado várias vezes
 # pra atualizar tags de imagem ou envs.
 #
 # Pré-requisitos no manager:
-#   - /opt/bms-staging/.env populado (ver secrets.env.example nesta pasta)
-#   - /opt/bms-staging/data/geo/dbip-city-lite.mmdb presente
-#   - `docker login` feito com credenciais que enxergam evoapicloud/bms-*
+#   - $ENV_FILE populado (ver secrets.env.example nesta pasta)
+#   - Swarm configs ClickHouse criados (ver infra/swarm/DEPLOY.md §2)
+#   - Rede overlay externa criada (ex: docker network create --driver overlay --attachable bmsNet)
+#   - `docker login` feito com credenciais que enxergam $IMAGE_REGISTRY/bms-*
 #
 # Uso (a partir de uma checkout do repo no manager):
 #   sudo bash infra/swarm/deploy.sh
 #
 # Ou remoto, do laptop:
 #   DOCKER_HOST=ssh://evolution_manager bash infra/swarm/deploy.sh
+#
+# Override via env:
+#   ENV_FILE=/caminho/.env STACK_NAME=bms-prod bash infra/swarm/deploy.sh
 
 set -euo pipefail
 
-ENV_FILE="${ENV_FILE:-/opt/bms-staging/.env}"
-STACK_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/stack.bms-staging.yml"
-STACK_NAME="${STACK_NAME:-bms-staging}"
+ENV_FILE="${ENV_FILE:-/opt/bms/.env}"
+STACK_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/stack.bms.yml"
+STACK_NAME="${STACK_NAME:-bms}"
 
 if [[ ! -f "$STACK_FILE" ]]; then
   echo "ERRO: $STACK_FILE não encontrado." >&2

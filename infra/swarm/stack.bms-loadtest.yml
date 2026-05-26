@@ -544,7 +544,7 @@ networks:
     attachable: true
 
 configs:
-  # Caminhos relativos a este arquivo (infra/swarm/stack.bms-staging.yml).
+  # Caminhos relativos a este arquivo (infra/swarm/stack.bms-loadtest.yml).
   clickhouse-init-01:
     file: ../clickhouse-init/01-init-bms.sql
   clickhouse-init-02:
