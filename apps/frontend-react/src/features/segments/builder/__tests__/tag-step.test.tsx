@@ -46,8 +46,8 @@ describe('TagStep', () => {
   it('displays tag badges when tags selected', () => {
     renderStep({
       tag_info: [
-        { id: 1, name: 'VIP', lastCount: 500 },
-        { id: 2, name: 'Active', lastCount: 1000 },
+        { id: 1, name: 'VIP', type: 'tag', count: 500 },
+        { id: 2, name: 'Active', type: 'tag', count: 1000 },
       ],
     });
     expect(screen.getByText('VIP')).toBeInTheDocument();

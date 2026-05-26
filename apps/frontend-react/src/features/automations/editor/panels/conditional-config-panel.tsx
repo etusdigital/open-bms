@@ -30,10 +30,24 @@ function rulesToCards(rules: ConditionalRule[]): BuilderCard[] {
   return parseSteps([rules]);
 }
 
+// Fields the segments builder emits that the automation backend schema
+// (obj_conditional_interaction / obj_conditional_automation_entry) does not
+// accept under additionalProperties:false. Stripping at this boundary is
+// the right place: it preserves the field for the segments query builder
+// (which uses it to write `HAVING COUNT(...) >= N` against ClickHouse) while
+// keeping the automation conditional payload schema-clean (EVO-1452).
+const AUTOMATION_CONDITIONAL_DROP_FIELDS = ['conditional_times_value'] as const;
+
 function cardsToRules(cards: BuilderCard[]): ConditionalRule[] {
   const serialized = serializeSteps(cards);
   if (serialized.length === 0) return [];
-  return serialized[0] as ConditionalRule[];
+  return (serialized[0] as Record<string, unknown>[]).map((rule) => {
+    const cleaned: Record<string, unknown> = { ...rule };
+    for (const field of AUTOMATION_CONDITIONAL_DROP_FIELDS) {
+      delete cleaned[field];
+    }
+    return cleaned;
+  }) as ConditionalRule[];
 }
 
 export function ConditionalConfigPanel({ data, onSave, onClose }: ConditionalConfigProps) {

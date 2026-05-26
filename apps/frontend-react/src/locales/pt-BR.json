@@ -1602,6 +1602,8 @@
       "error_tag": "A etapa de tag possui erros. Revise a configuração da tag.",
       "error_wait": "A etapa de espera possui erros. Verifique a duração.",
       "error_conditional": "A etapa condicional possui erros. Revise as regras.",
+      "missing_period": "Uma regra de interação na condicional está sem o período. Revise as regras.",
+      "empty_card": "A condicional está sem regras. Adicione pelo menos uma regra ou remova a condicional.",
       "error_split": "A etapa de split possui erros. As porcentagens devem somar 100%.",
       "error_http_request": "A etapa de requisição HTTP possui erros. Verifique a URL e configuração.",
       "error_random_message": "A etapa de múltiplas mensagens possui erros. É necessário pelo menos 1 mensagem.",

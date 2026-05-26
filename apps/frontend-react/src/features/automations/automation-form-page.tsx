@@ -35,6 +35,7 @@ import { AutomationDetailsModal, type AutomationMetadata } from './editor/panels
 import { VersionHistoryPanel } from './editor/panels/version-history-panel';
 import { AutomationStatisticsDialog } from './editor/panels/automation-statistics-dialog';
 import { deserializeWithLayout, serializeFlowToSteps, buildFlowLayout } from './editor/editor-serializer';
+import { validateAutomationConditionals } from './editor/validate-conditionals';
 import {
   useAutomationDetail,
   useCreateAutomation,
@@ -300,6 +301,18 @@ export default function AutomationFormPage({ automationId }: AutomationFormPageP
       const result = serializeFlowToSteps(state.nodes, state.edges);
       if (!result.success) {
         toast.error(result.error);
+        return;
+      }
+
+      // Validate conditionals client-side: the backend AJV collapses every
+      // failure on obj_conditional into the generic `error_conditional`
+      // message, hiding which rule is actually broken. Run the same checks
+      // here first so the user gets a precise toast + step highlight.
+      const conditionalErrors = validateAutomationConditionals(result.root);
+      if (conditionalErrors.length > 0) {
+        const first = conditionalErrors[0];
+        toast.error(t(`automations.errors.${first.type}`, first.message));
+        editorRef.current?.highlightError(first.stepId);
         return;
       }
 

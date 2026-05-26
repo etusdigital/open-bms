@@ -199,6 +199,106 @@ describe('serializeFlowToSteps', () => {
 
     expect(result.root.child[0].type).toBe('someUnknownFutureStep');
   });
+
+  // Backend schema (obj_conditional with minItems:1, applied to conditionalTrue via the
+  // automation-schema if/then chain) requires conditionalTrue.settings to mirror the parent
+  // conditional's rules. The Vue legacy preserved this invariant by duplicating settings on
+  // create; the React editor stores settings only on the conditional node, so the serializer
+  // is the single place that re-imposes the invariant on the wire format.
+  it('copies conditional parent settings into conditionalTrue.settings on serialization', () => {
+    const rules = [
+      {
+        type: 'interation',
+        event_type: 'email',
+        conditional_interation: 'yes',
+        event: 'last_open_date',
+        time: 0,
+      },
+    ];
+
+    const nodes = [
+      { id: '1', type: 'trigger', position: { x: 0, y: 0 }, data: { stepId: 1, settings: { type: 'tag', name: 'x' } } },
+      { id: '2', type: 'conditional', position: { x: 0, y: 150 }, data: { stepId: 2, settings: rules } },
+      // conditionalTrue is stored with an empty array in the editor — the bug we're fixing
+      { id: '3', type: 'conditionalTrue', position: { x: -100, y: 300 }, data: { stepId: 3, settings: [] } },
+      { id: '4', type: 'conditionalFalse', position: { x: 100, y: 300 }, data: { stepId: 4, settings: {} } },
+      { id: '5', type: 'end', position: { x: -100, y: 450 }, data: { stepId: 5, settings: {} } },
+      { id: '6', type: 'end', position: { x: 100, y: 450 }, data: { stepId: 6, settings: {} } },
+    ];
+    const edges = [
+      { id: 'e1-2', source: '1', target: '2' },
+      { id: 'e2-3', source: '2', target: '3', sourceHandle: 'yes' },
+      { id: 'e2-4', source: '2', target: '4', sourceHandle: 'no' },
+      { id: 'e3-5', source: '3', target: '5' },
+      { id: 'e4-6', source: '4', target: '6' },
+    ];
+
+    const result = serializeFlowToSteps(nodes as never, edges as never);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const conditional = result.root.child[0];
+    expect(conditional.type).toBe('conditional');
+
+    const yesBranch = conditional.child[0];
+    const noBranch = conditional.child[1];
+    expect(yesBranch.type).toBe('conditionalTrue');
+    expect(yesBranch.settings).toEqual(rules);
+
+    expect(noBranch.type).toBe('conditionalFalse');
+    expect(noBranch.settings).toEqual({});
+  });
+
+  it('roundtrips a conditional automation with conditionalTrue.settings mirrored from the parent', () => {
+    const conditionalRules = [
+      {
+        type: 'interation',
+        event_type: 'email',
+        conditional_interation: 'yes',
+        event: 'last_open_date',
+        time: 7,
+      },
+    ];
+
+    const conditionalAutomation: ApiStep = {
+      id: 1,
+      type: 'trigger',
+      settings: { type: 'tag', name: 'welcome' },
+      child: [
+        {
+          id: 2,
+          type: 'conditional',
+          settings: conditionalRules,
+          child: [
+            {
+              id: 'conditional_2_1',
+              type: 'conditionalTrue',
+              // Backend storage already has the duplicate; deserializer must preserve it
+              settings: conditionalRules,
+              child: [{ id: 3, type: 'end', settings: {} as Record<string, never>, child: [] }],
+            },
+            {
+              id: 'conditional_2_2',
+              type: 'conditionalFalse',
+              settings: {} as Record<string, never>,
+              child: [{ id: 4, type: 'end', settings: {} as Record<string, never>, child: [] }],
+            },
+          ],
+        },
+      ],
+    } as ApiStep;
+
+    const { nodes, edges } = deserializeStepsToFlow(conditionalAutomation);
+    const result = serializeFlowToSteps(nodes, edges);
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const cond = result.root.child[0];
+    const yesBranch = cond.child[0];
+    expect(yesBranch.type).toBe('conditionalTrue');
+    expect(yesBranch.settings).toEqual(conditionalRules);
+  });
 });
 
 // ---------------------------------------------------------------------------

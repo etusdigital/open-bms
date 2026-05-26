@@ -1602,6 +1602,8 @@
       "error_tag": "Tag step has errors. Please review the tag configuration.",
       "error_wait": "Wait step has errors. Please check the duration.",
       "error_conditional": "Conditional step has errors. Please review the rules.",
+      "missing_period": "An interaction rule in the conditional has no period set. Please review the rules.",
+      "empty_card": "The conditional has no rules. Add at least one rule or remove the conditional.",
       "error_split": "Split step has errors. Percentages must sum to 100%.",
       "error_http_request": "HTTP Request step has errors. Please check URL and configuration.",
       "error_random_message": "Random message step has errors. At least 1 message is required.",

@@ -19,6 +19,7 @@ import type { TagStepData } from './types';
 interface TagOption {
   id: number;
   name: string;
+  type?: string;
   lastCount?: number;
 }
 
@@ -68,9 +69,14 @@ export const TagStep = memo(function TagStep({ data, cardId }: TagStepProps) {
       });
     } else {
       // Add
+      // The backend schema (obj_conditional_tag.tag_info) requires `type` and accepts
+      // `count`. The /tags API returns `lastCount` and may omit `type`; we translate
+      // here at the source. `segment-base-size` is not a valid schema value, so we
+      // fall back to 'tag' for anything outside the {tag, segment} pair.
+      const normalizedType: 'tag' | 'segment' = tag.type === 'segment' ? 'segment' : 'tag';
       update({
         tag_id: [...selectedIds, tag.id],
-        tag_info: [...selectedTags, { id: tag.id, name: tag.name, lastCount: tag.lastCount }],
+        tag_info: [...selectedTags, { id: tag.id, name: tag.name, type: normalizedType, count: tag.lastCount ?? null }],
       });
     }
   };

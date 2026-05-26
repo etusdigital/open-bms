@@ -190,6 +190,16 @@ describe('builderReducer', () => {
       },
     );
 
+    it('initializes interaction step with time=0 so the backend schema accepts it without user touching the period select', () => {
+      const card = makeCard({ id: 'card-1' });
+      const state = stateWithCards(card);
+
+      const next = dispatch(state, { type: 'ADD_STEP', cardId: 'card-1', stepType: 'interation' });
+      const step = next.cards[0].steps[0] as { type: string; time?: unknown };
+      expect(step.type).toBe('interation');
+      expect(step.time).toBe(0);
+    });
+
     it('sets stepConnector on subsequent steps', () => {
       const step = makeInteractionStep({ id: 'step-1' });
       const card = makeCard({ id: 'card-1', steps: [step] });

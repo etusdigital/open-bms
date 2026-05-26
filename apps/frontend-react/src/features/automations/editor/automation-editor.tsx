@@ -175,7 +175,7 @@ const AutomationEditorInner = forwardRef<AutomationEditorHandle, AutomationEdito
         stepIdCounter,
         viewport: reactFlowInstance?.getViewport(),
       }),
-      highlightError: (stepId: number) => {
+      highlightError: (stepId: number | string) => {
         const nodeId = String(stepId);
         setErrorNodeId(nodeId);
         // Zoom to the erroring node

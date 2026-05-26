@@ -129,6 +129,44 @@ describe('builder-serializer', () => {
       expect(step.time).toBe('all');
     });
 
+    // Backend schema obj_conditional_tag.tag_info expects { id, name, type, count? }.
+    // Older payloads (and the legacy Vue UI) carried `lastCount` and sometimes omitted
+    // `type`. Normalize on parse so a roundtrip never re-sends `lastCount` or a missing
+    // `type` to the backend.
+    it('normalizes legacy tag_info entries: lastCount → count and missing type → "tag"', () => {
+      const json = JSON.stringify([
+        [
+          {
+            type: 'tag',
+            conditional_tag: 'in',
+            tag_id: [5991],
+            tag_info: [{ id: 5991, name: 'tagation', lastCount: 12 }],
+          },
+        ],
+      ]);
+
+      const cards = parseSteps(json);
+      const step = cards[0].steps[0] as { tag_info?: Array<Record<string, unknown>> };
+      expect(step.tag_info).toEqual([{ id: 5991, name: 'tagation', type: 'tag', count: 12 }]);
+    });
+
+    it('preserves tag_info type=segment when already present', () => {
+      const json = JSON.stringify([
+        [
+          {
+            type: 'tag',
+            conditional_tag: 'in',
+            tag_id: [1],
+            tag_info: [{ id: 1, name: 'big-spenders', type: 'segment', count: 5000 }],
+          },
+        ],
+      ]);
+
+      const cards = parseSteps(json);
+      const step = cards[0].steps[0] as { tag_info?: Array<Record<string, unknown>> };
+      expect(step.tag_info).toEqual([{ id: 1, name: 'big-spenders', type: 'segment', count: 5000 }]);
+    });
+
     // ─── Interaction action/period normalization ───────────────────────
 
     it('converts DB field event to action key using conditional_interation (negation)', () => {
