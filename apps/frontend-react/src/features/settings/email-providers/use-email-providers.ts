@@ -66,7 +66,8 @@ export function useEmailProviders() {
   const hasAnyConfigured = configuredProviders.length > 0;
 
   const isLoading = queries.some((q) => q.isLoading);
+  const isError = queries.some((q) => q.isError);
   const refresh = () => qc.invalidateQueries({ queryKey: ['email-providers', accountId] });
 
-  return { providers, configuredProviders, hasAnyConfigured, defaultProvider, isLoading, refresh };
+  return { providers, configuredProviders, hasAnyConfigured, defaultProvider, isLoading, isError, refresh };
 }

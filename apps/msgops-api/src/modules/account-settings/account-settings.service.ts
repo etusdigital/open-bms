@@ -168,6 +168,13 @@ export class AccountSettingsService {
     await this.accountConfigs.upsertByAccountId(accountId, SENDGRID_WEBHOOK_NAME, registered.url);
     this.sendgridHandler.invalidateApiKeyCache(accountId);
 
+    // EVO-1462 AC14: the first configured provider becomes default silently.
+    // No-op when a default already exists (subsequent providers don't steal it).
+    const currentDefault = await this.accountConfigs.getByAccountId(accountId, DEFAULT_EMAIL_PROVIDER_NAME);
+    if (!currentDefault?.value) {
+      await this.accountConfigs.upsertByAccountId(accountId, DEFAULT_EMAIL_PROVIDER_NAME, 'sendgrid');
+    }
+
     return {
       source: 'account',
       apiKeyMasked: maskApiKey(dto.apiKey),
