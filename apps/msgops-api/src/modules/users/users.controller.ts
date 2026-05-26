@@ -133,11 +133,13 @@ export class UsersController {
 
   @Get(':id')
   @RequirePermission('account:users_view')
-  async findOne(@Param('id') id: number, @AuthUser() authUser: any) {
+  async findOne(@Param('id') id: number, @AuthUser() authUser: any, @Req() req: any) {
     const providerId = this.getProviderId(authUser);
     const currentUser = await this.userService.findOneByProviderId(providerId);
 
-    if (currentUser.id && currentUser.id !== Number(id)) {
+    // super_admin bypasses master-id scoping: orphan users (no userAccount rows) are invisible via findOneByMasterId.
+    const isSuperAdmin = req?.authzContext?.isSuperAdmin === true;
+    if (!isSuperAdmin && currentUser.id !== Number(id)) {
       return this.userService.findOneByMasterId(Number(id), currentUser.id);
     }
 
