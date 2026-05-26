@@ -10,6 +10,13 @@
   <a href="https://github.com/etusdigital/bms-open/actions"><img src="https://github.com/etusdigital/bms-open/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
 
+<p align="center">
+  <a href="https://etus.com.br/open-bms">Website</a> &middot;
+  <a href="https://github.com/etusdigital/bms-open">Repository</a> &middot;
+  <a href="./infra/swarm/DEPLOY.md">Deploy guide</a> &middot;
+  <a href="./CONTRIBUTING.md">Contributing</a>
+</p>
+
 ---
 
 ## About

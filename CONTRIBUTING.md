@@ -110,8 +110,8 @@ the process in [SECURITY.md](./SECURITY.md).
 
 ## Questions?
 
-Open a **Question** issue on GitHub. We aim to respond within a few business
-days.
+- **Website**: [etus.com.br/open-bms](https://etus.com.br/open-bms)
+- **GitHub Discussions**: [github.com/etusdigital/bms-open/discussions](https://github.com/etusdigital/bms-open/discussions)
 
 Thanks for helping make Open BMS better!
 

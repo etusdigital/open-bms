@@ -65,3 +65,4 @@ vulnerabilities will be:
 ---
 
 For general inquiries (non-security): **raphael.petronilho@etus.com.br**
+For more information: [etus.com.br/open-bms](https://etus.com.br/open-bms)
