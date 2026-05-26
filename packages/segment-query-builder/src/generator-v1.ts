@@ -175,6 +175,21 @@ export function generateSegmentQueryV1(tag: TagLike, segmentDto: SegmentDtoLike,
         }
 
         case 'user_field':
+          // Defense-in-depth (EVO-1463): user_field steps whose UI default was
+          // never confirmed reach here missing `conditional_user_field` and/or
+          // `user_field_value`. Without these guards, the generic fallback at
+          // the end of this block crashes the whole segment with
+          // `Cannot read properties of undefined (reading 'toLowerCase')`,
+          // which loops every ~20s in tag-process. Mirror the UI defaults so
+          // legacy/incomplete steps still produce valid SQL.
+
+          if (!step.user_field_key) {
+            // No field selected — emit a no-op predicate so the SQL stays valid
+            // and the rest of the segment can still be evaluated.
+            query += ' TRUE';
+            break;
+          }
+
           if (step.user_field_key === 'created_at_date' || step.user_field_key === 'last_automation_date') {
             if (step.conditional_user_field === '-') {
               query += ` ct.${step.user_field_key} >= (CURRENT_DATE AT TIME ZONE '${timeZoneValue}' - interval '${step.user_field_value} day')`;
@@ -182,7 +197,8 @@ export function generateSegmentQueryV1(tag: TagLike, segmentDto: SegmentDtoLike,
             }
 
             const date = new Date(step.user_field_value).toISOString();
-            query += ` ${step.user_field_key} ${step.conditional_user_field} '${date}'`;
+            const dateOperator = step.conditional_user_field ?? '=';
+            query += ` ${step.user_field_key} ${dateOperator} '${date}'`;
             break;
           }
 
@@ -193,19 +209,28 @@ export function generateSegmentQueryV1(tag: TagLike, segmentDto: SegmentDtoLike,
           }
 
           if (step.user_field_key === 'is_email_deliverable') {
-            if (step.conditional_user_field === 'true') {
+            // Default to 'true' when the operator is missing — matches the UI
+            // visual default (BooleanField in user-field-step.tsx).
+            const deliverable = step.conditional_user_field ?? 'true';
+            if (deliverable === 'true') {
               query += ` ct.is_valid AND ct.is_unsubscribed = false AND ct.has_bounced = false`;
               break;
             }
 
-            if (step.conditional_user_field === 'false') {
+            if (deliverable === 'false') {
               query += ` (ct.is_valid = false OR ct.is_unsubscribed = true OR ct.has_bounced = true)`;
               break;
             }
           }
 
           if (step.user_field_key === 'communication_channels') {
-            query += ` ct.${step.user_field_value} = ${step.conditional_user_field}`;
+            if (!step.user_field_value) {
+              // No channel selected — emit a no-op rather than `ct.undefined = X`.
+              query += ' TRUE';
+              break;
+            }
+            const channelOperator = step.conditional_user_field === 'false' ? 'false' : 'true';
+            query += ` ct.${step.user_field_value} = ${channelOperator}`;
             if (step.user_field_value === 'has_web_push') {
               const joinContactsDevices = 'INNER JOIN contacts_devices ctd on ctd.contact_id = ct.id AND ctd.account_id = ct.account_id';
               query = query.replace('#PUSH_JOIN_REPLACE#', joinContactsDevices);
@@ -217,6 +242,13 @@ export function generateSegmentQueryV1(tag: TagLike, segmentDto: SegmentDtoLike,
             break;
           }
 
+          // Generic fallback (last_vertical_type and any future text-equality
+          // field). Skip the step rather than crash if value is missing or
+          // not a string — the rest of the segment can still be evaluated.
+          if (typeof step.user_field_value !== 'string' || !step.conditional_user_field) {
+            query += ' TRUE';
+            break;
+          }
           query += ` ${step.user_field_key} ${step.conditional_user_field} '${step.user_field_value.toLowerCase()}'`;
 
           break;

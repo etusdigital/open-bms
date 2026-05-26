@@ -245,12 +245,45 @@ function serializeStep(step: StepData): VueLegacyStep {
     output.conditional_times_value = '>=';
   }
 
+  // Defense-in-depth for user_field steps (EVO-1463). New steps now seed
+  // `conditional_user_field` in `handleFieldChange` (see user-field-step.tsx),
+  // but legacy steps loaded from the DB might have been saved with the field
+  // missing — that crashes segment-query-builder/v1 at the
+  // `step.user_field_value.toLowerCase()` line. Backfill the operator to the
+  // same default the UI renders so the SQL is valid.
+  if (step.type === 'user_field' && output.conditional_user_field == null) {
+    const backfill = defaultOperatorForUserField(output.user_field_key);
+    if (backfill !== null) {
+      output.conditional_user_field = backfill;
+    }
+  }
+
   // Post-process interaction steps: convert action keys → DB fields, denormalize period
   if (step.type === 'interation') {
     normalizeInteractionOnSerialize(output);
   }
 
   return output as VueLegacyStep;
+}
+
+/**
+ * Same mapping as user-field-step.tsx → defaultOperatorFor. Kept local here
+ * to avoid the serializer importing from a React component file.
+ */
+function defaultOperatorForUserField(fieldKey: unknown): string | null {
+  if (typeof fieldKey !== 'string') return null;
+  switch (fieldKey) {
+    case 'created_at_date':
+    case 'last_automation_date':
+    case 'email_provider':
+    case 'last_vertical_type':
+      return '=';
+    case 'communication_channels':
+    case 'is_email_deliverable':
+      return 'true';
+    default:
+      return null;
+  }
 }
 
 /**

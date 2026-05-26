@@ -171,6 +171,17 @@ export function generateSegmentQueryV2(tag: TagLike, segmentDto: SegmentDtoLike,
         }
 
         case 'user_field':
+          // Defense-in-depth (EVO-1463). Same logic as generator-v1 — see
+          // that file for full context. Mirror UI defaults so legacy steps
+          // missing conditional_user_field / user_field_value produce valid
+          // SQL instead of crashing tag-process with `.toLowerCase()` on
+          // undefined.
+
+          if (!step.user_field_key) {
+            query += ' TRUE';
+            break;
+          }
+
           if (step.user_field_key === 'created_at_date' || step.user_field_key === 'last_automation_date') {
             if (step.conditional_user_field === '-') {
               query += ` ct.${step.user_field_key} >= (CURRENT_DATE AT TIME ZONE '${timeZoneValue}' - interval '${step.user_field_value} day')`;
@@ -178,7 +189,8 @@ export function generateSegmentQueryV2(tag: TagLike, segmentDto: SegmentDtoLike,
             }
 
             const date = new Date(step.user_field_value).toISOString();
-            query += ` ${step.user_field_key} ${step.conditional_user_field} '${date}'`;
+            const dateOperator = step.conditional_user_field ?? '=';
+            query += ` ${step.user_field_key} ${dateOperator} '${date}'`;
             break;
           }
 
@@ -189,19 +201,25 @@ export function generateSegmentQueryV2(tag: TagLike, segmentDto: SegmentDtoLike,
           }
 
           if (step.user_field_key === 'is_email_deliverable') {
-            if (step.conditional_user_field === 'true') {
+            const deliverable = step.conditional_user_field ?? 'true';
+            if (deliverable === 'true') {
               query += ` ct.is_valid AND ct.is_unsubscribed = false AND ct.has_bounced = false`;
               break;
             }
 
-            if (step.conditional_user_field === 'false') {
+            if (deliverable === 'false') {
               query += ` (ct.is_valid = false OR ct.is_unsubscribed = true OR ct.has_bounced = true)`;
               break;
             }
           }
 
           if (step.user_field_key === 'communication_channels') {
-            query += ` ct.${step.user_field_value} = ${step.conditional_user_field}`;
+            if (!step.user_field_value) {
+              query += ' TRUE';
+              break;
+            }
+            const channelOperator = step.conditional_user_field === 'false' ? 'false' : 'true';
+            query += ` ct.${step.user_field_value} = ${channelOperator}`;
             if (step.user_field_value === 'has_web_push') {
               const joinContactsDevices = 'INNER JOIN contacts_devices ctd on ctd.contact_id = ct.id AND ctd.account_id = ct.account_id';
               query = query.replace('#PUSH_JOIN_REPLACE#', joinContactsDevices);
@@ -213,6 +231,10 @@ export function generateSegmentQueryV2(tag: TagLike, segmentDto: SegmentDtoLike,
             break;
           }
 
+          if (typeof step.user_field_value !== 'string' || !step.conditional_user_field) {
+            query += ' TRUE';
+            break;
+          }
           query += ` ${step.user_field_key} ${step.conditional_user_field} '${step.user_field_value.toLowerCase()}'`;
 
           break;

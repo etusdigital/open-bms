@@ -578,5 +578,59 @@ describe('builder-serializer', () => {
       expect(reserialized[0][0].lead_source).toBe('api');
       expect(reserialized[0][0].utm_source).toBe('Facebook');
     });
+
+    // EVO-1463 — legacy user_field steps stored without `conditional_user_field`
+    // crash the segment query builder. The serializer backfills the operator
+    // with the same default the UI would have rendered, so the SQL stays valid.
+    describe('user_field backfill (EVO-1463)', () => {
+      it('backfills conditional_user_field=true for is_email_deliverable', () => {
+        const legacy = [[{ type: 'user_field', user_field_key: 'is_email_deliverable' }]];
+        const cards = parseSteps(JSON.stringify(legacy));
+        const reserialized = serializeSteps(cards);
+
+        expect(reserialized[0][0]).toMatchObject({
+          type: 'user_field',
+          user_field_key: 'is_email_deliverable',
+          conditional_user_field: 'true',
+        });
+      });
+
+      it('backfills conditional_user_field=true for communication_channels', () => {
+        const legacy = [[{ type: 'user_field', user_field_key: 'communication_channels', user_field_value: 'has_email' }]];
+        const cards = parseSteps(JSON.stringify(legacy));
+        const reserialized = serializeSteps(cards);
+
+        expect(reserialized[0][0]).toMatchObject({
+          type: 'user_field',
+          user_field_key: 'communication_channels',
+          user_field_value: 'has_email',
+          conditional_user_field: 'true',
+        });
+      });
+
+      it('backfills conditional_user_field="=" for email_provider', () => {
+        const legacy = [[{ type: 'user_field', user_field_key: 'email_provider', user_field_value: 'Gmail' }]];
+        const cards = parseSteps(JSON.stringify(legacy));
+        const reserialized = serializeSteps(cards);
+
+        expect(reserialized[0][0].conditional_user_field).toBe('=');
+      });
+
+      it('does not override an existing conditional_user_field', () => {
+        const stored = [[{ type: 'user_field', user_field_key: 'is_email_deliverable', conditional_user_field: 'false' }]];
+        const cards = parseSteps(JSON.stringify(stored));
+        const reserialized = serializeSteps(cards);
+
+        expect(reserialized[0][0].conditional_user_field).toBe('false');
+      });
+
+      it('leaves unknown user_field_key alone (no backfill)', () => {
+        const legacy = [[{ type: 'user_field', user_field_key: 'future_field' }]];
+        const cards = parseSteps(JSON.stringify(legacy));
+        const reserialized = serializeSteps(cards);
+
+        expect(reserialized[0][0].conditional_user_field).toBeUndefined();
+      });
+    });
   });
 });

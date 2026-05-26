@@ -282,4 +282,73 @@ describe('generateSegmentQueryV1', () => {
 
     expect(out.query).toContain('LIMIT 5000');
   });
+
+  // EVO-1463 — user_field steps may reach this layer missing
+  // `conditional_user_field` and/or `user_field_value` (frontend bug where
+  // visual defaults of dropdowns weren't persisted). The generator must
+  // never crash with `Cannot read properties of undefined (reading
+  // 'toLowerCase')` — it should emit a valid no-op or apply a sane default.
+  describe('user_field defensive defaults (EVO-1463)', () => {
+    it('defaults is_email_deliverable to "true" when operator missing', () => {
+      const dto: SegmentDtoLike = {
+        steps: [[{ type: 'user_field', user_field_key: 'is_email_deliverable' }]],
+      };
+      const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+      expect(out.query).toContain('ct.is_valid');
+      expect(out.query).toContain('ct.is_unsubscribed = false');
+      expect(out.query).toContain('ct.has_bounced = false');
+    });
+
+    it('treats communication_channels without operator as TRUE (has channel)', () => {
+      const dto: SegmentDtoLike = {
+        steps: [[{ type: 'user_field', user_field_key: 'communication_channels', user_field_value: 'has_email' }]],
+      };
+      const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+      expect(out.query).toContain('ct.has_email = true');
+    });
+
+    it('emits no-op TRUE when communication_channels has no user_field_value', () => {
+      const dto: SegmentDtoLike = {
+        steps: [[{ type: 'user_field', user_field_key: 'communication_channels' }]],
+      };
+      // Crucially: must not throw — see crash logs from staging (2026-05-26).
+      expect(() => generateSegmentQueryV1(tag, dto, { timeZone })).not.toThrow();
+      const out = generateSegmentQueryV1(tag, dto, { timeZone });
+      expect(out.query).not.toContain('undefined');
+    });
+
+    it('does not throw when user_field_value is missing on the generic fallback', () => {
+      // last_vertical_type uses the generic `.toLowerCase()` branch — the
+      // original crash site. With the guard, this should emit a no-op.
+      const dto: SegmentDtoLike = {
+        steps: [[{ type: 'user_field', user_field_key: 'last_vertical_type', conditional_user_field: '=' }]],
+      };
+      expect(() => generateSegmentQueryV1(tag, dto, { timeZone })).not.toThrow();
+      const out = generateSegmentQueryV1(tag, dto, { timeZone });
+      expect(out.query).not.toContain('undefined');
+    });
+
+    it('does not throw when user_field_value is non-string', () => {
+      const dto: SegmentDtoLike = {
+        steps: [
+          [
+            {
+              type: 'user_field',
+              user_field_key: 'last_vertical_type',
+              conditional_user_field: '=',
+              user_field_value: 123 as unknown as string,
+            },
+          ],
+        ],
+      };
+      expect(() => generateSegmentQueryV1(tag, dto, { timeZone })).not.toThrow();
+    });
+
+    it('does not throw when user_field_key is missing', () => {
+      const dto: SegmentDtoLike = { steps: [[{ type: 'user_field' }]] };
+      expect(() => generateSegmentQueryV1(tag, dto, { timeZone })).not.toThrow();
+    });
+  });
 });

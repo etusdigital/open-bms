@@ -17,6 +17,28 @@ import { StepField } from './interaction-step';
 import { DatePickerField } from './date-picker-field';
 import type { UserFieldStepData } from './types';
 
+/**
+ * Default `conditional_user_field` per field key — must match the `?? 'X'`
+ * fallback rendered in each *Field component below. Seeding on field change
+ * keeps the persisted state consistent with the UI's visual default, so a
+ * step saved without the user touching the operator dropdown never reaches
+ * the backend with `conditional_user_field = undefined` (EVO-1463).
+ */
+export function defaultOperatorFor(fieldKey: string): string | null {
+  switch (fieldKey) {
+    case 'created_at_date':
+    case 'last_automation_date':
+    case 'email_provider':
+    case 'last_vertical_type':
+      return '=';
+    case 'communication_channels':
+    case 'is_email_deliverable':
+      return 'true';
+    default:
+      return null;
+  }
+}
+
 interface UserFieldStepProps {
   data: UserFieldStepData;
   cardId: string;
@@ -34,13 +56,16 @@ export const UserFieldStep = memo(function UserFieldStep({ data, cardId }: UserF
   };
 
   const handleFieldChange = (value: string) => {
-    // Reset filter values when field changes. `email_provider` is seeded
-    // with the `=` operator so a step left with the dropdown untouched
-    // still persists `conditional_user_field` — otherwise the segment
-    // query builder injects literal `undefined` into the SQL.
+    // Reset filter values when field changes. Seed `conditional_user_field`
+    // with the field-specific default visible in each *Field component below
+    // (`?? 'X'`). A step left with the dropdown untouched would otherwise
+    // serialize without the operator and crash segment-query-builder/v1
+    // with `Cannot read properties of undefined (reading 'toLowerCase')`
+    // at the line that injects `${step.user_field_value.toLowerCase()}`
+    // (EVO-1463, mesma classe de bug do EVO-1423 com `conditional_times_value`).
     update({
       user_field_key: value,
-      conditional_user_field: value === 'email_provider' ? '=' : null,
+      conditional_user_field: defaultOperatorFor(value),
       user_field_value: null,
     });
   };
