@@ -311,14 +311,13 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
   ): Promise<void> {
     const valuesIndex = records
       .map((_, index) => {
-        const offset = index * 37; // 37 is the number of columns in the events_statistics table
+        const offset = index * 35; // matches the column list in the INSERT below
         return `($${1 + offset}, $${2 + offset}, $${3 + offset}, $${4 + offset}, $${5 + offset}, $${6 + offset},
                 $${7 + offset}, $${8 + offset}, $${9 + offset}, $${10 + offset}, $${11 + offset}, $${12 + offset},
                 $${13 + offset}, $${14 + offset}, $${15 + offset}, $${16 + offset}, $${17 + offset}, $${18 + offset},
                 $${19 + offset}, $${20 + offset}, $${21 + offset}, $${22 + offset}, $${23 + offset}, $${24 + offset},
                 $${25 + offset}, $${26 + offset}, $${27 + offset}, $${28 + offset}, $${29 + offset}, $${30 + offset},
-                $${31 + offset}, $${32 + offset}, $${33 + offset}, $${34 + offset}, $${35 + offset},
-                $${36 + offset}, $${37 + offset})`;
+                $${31 + offset}, $${32 + offset}, $${33 + offset}, $${34 + offset}, $${35 + offset})`;
       })
       .join(',');
 
