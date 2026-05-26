@@ -146,7 +146,7 @@ export class StatisticsService {
           ${select} ${filters} ${groupBY} ${orderBy}
         )
         SELECT ${groupItems.map((item) => `stats.${item}`).join(', ')},
-          delivered::integer, open::integer, click::integer, unsubscribe::integer, bounce::integer, blocked::integer, unique_opens::integer, unique_clicks::integer
+          COALESCE(delivered, 0)::integer AS delivered, COALESCE(open, 0)::integer AS open, COALESCE(click, 0)::integer AS click, COALESCE(unsubscribe, 0)::integer AS unsubscribe, COALESCE(bounce, 0)::integer AS bounce, COALESCE(blocked, 0)::integer AS blocked, COALESCE(unique_opens, 0)::integer AS unique_opens, COALESCE(unique_clicks, 0)::integer AS unique_clicks
           FROM generate_series(DATE($2), DATE($3), interval '1 day') as gs(date)
             LEFT JOIN stats ON stats.date = gs.date
             ORDER BY gs.date DESC`;
@@ -215,7 +215,7 @@ export class StatisticsService {
         keys.forEach((key) => {
           finalObject[key] = item[1][key];
         });
-        return { date: dates[index], ...finalObject, unique_opens: finalObject['unique_open'], unique_clicks: finalObject['unique_click'] };
+        return { date: dates[index], ...defaultObject, ...finalObject, unique_opens: finalObject['unique_open'] ?? 0, unique_clicks: finalObject['unique_click'] ?? 0 };
       }
       return { date: dates[index], ...defaultObject };
     });
@@ -486,7 +486,7 @@ export class StatisticsService {
       ${select} ${filters} ${groupBY} ${orderBy}
     )
     SELECT ${groupItems.map((item) => `stats.${item}`).join(', ')},
-      delivered::integer, sent::integer, click::integer, unsubscribe::integer, bounce::integer, close::integer
+      COALESCE(delivered, 0)::integer AS delivered, COALESCE(sent, 0)::integer AS sent, COALESCE(click, 0)::integer AS click, COALESCE(unsubscribe, 0)::integer AS unsubscribe, COALESCE(bounce, 0)::integer AS bounce, COALESCE(close, 0)::integer AS close
       FROM generate_series(DATE($3), DATE($4), interval '1 day') as gs(date)
         LEFT JOIN stats ON stats.date = gs.date
         ORDER BY gs.date DESC`;
@@ -532,11 +532,11 @@ export class StatisticsService {
   }
 
   sumStatisticsValues(statistic, item) {
-    statistic.delivered += Number(item.delivered);
+    statistic.delivered += Number(item?.delivered || 0);
     statistic.open += Number(item?.open || 0);
-    statistic.click += Number(item.click);
-    statistic.unsubscribe += Number(item.unsubscribe);
-    statistic.bounce += Number(item.bounce);
+    statistic.click += Number(item?.click || 0);
+    statistic.unsubscribe += Number(item?.unsubscribe || 0);
+    statistic.bounce += Number(item?.bounce || 0);
     statistic.blocked += Number(item?.blocked || 0);
     statistic.sent += Number(item?.sent || 0);
     statistic.close += Number(item?.close || 0);
