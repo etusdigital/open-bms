@@ -289,7 +289,7 @@ export interface AutomationEditorHandle {
     viewport?: { x: number; y: number; zoom: number };
   };
   /** Highlight a step with an error border and zoom to it */
-  highlightError: (stepId: number) => void;
+  highlightError: (stepId: number | string) => void;
   /** Clear the error highlight */
   clearError: () => void;
 }

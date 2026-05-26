@@ -106,7 +106,34 @@ function parseRawStep(raw: VueLegacyStep, stepConnector?: 'and' | 'or'): StepDat
     normalizeInteractionOnParse(step);
   }
 
+  // Post-process tag steps: legacy data carries `lastCount` and may omit `type`,
+  // but the backend schema obj_conditional_tag.tag_info uses `count` and requires
+  // `type: 'tag' | 'segment'`. Normalize on parse so a roundtrip never re-sends
+  // the legacy shape.
+  if (raw.type === 'tag') {
+    normalizeTagOnParse(step);
+  }
+
   return step as unknown as StepData;
+}
+
+function normalizeTagOnParse(step: Record<string, unknown>) {
+  const tagInfo = step.tag_info;
+  if (!Array.isArray(tagInfo)) return;
+
+  step.tag_info = tagInfo.map((entry) => {
+    if (entry === null || typeof entry !== 'object') return entry;
+    const e = entry as Record<string, unknown>;
+    const rawType = e.type;
+    const normalizedType: 'tag' | 'segment' = rawType === 'segment' ? 'segment' : 'tag';
+    const count = e.count !== undefined ? e.count : (e.lastCount ?? null);
+    return {
+      id: e.id,
+      name: e.name,
+      type: normalizedType,
+      count,
+    };
+  });
 }
 
 /**

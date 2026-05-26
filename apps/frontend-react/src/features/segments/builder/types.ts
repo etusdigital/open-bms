@@ -55,7 +55,9 @@ export interface TagStepData extends BaseStepData {
   type: 'tag';
   conditional_tag?: 'in' | 'not in' | null;
   tag_id?: number[] | null;
-  tag_info?: Array<{ id: number; name: string; lastCount?: number }> | null;
+  // Wire shape consumed by the backend schema (obj_conditional_tag.tag_info):
+  // each entry needs `type: 'tag' | 'segment'`. `count` is optional.
+  tag_info?: Array<{ id: number; name: string; type: 'tag' | 'segment'; count?: number | null }> | null;
 }
 
 export interface AutomationStateStepData extends BaseStepData {
@@ -180,6 +182,9 @@ export function createDefaultStep(stepType: StepType): StepData {
       // <Select> shows '>=' by default but only writes to state on change —
       // a step left untouched would serialize without it and crash the
       // ClickHouse query with `HAVING COUNT(...) undefined N` (EVO-1423).
+      // The automation conditional path strips this field at its boundary
+      // (conditional-config-panel.tsx → cardsToRules) — the backend schema
+      // there does not accept `conditional_times_value` (EVO-1452).
       return {
         id,
         type: 'interation',
@@ -187,6 +192,7 @@ export function createDefaultStep(stepType: StepType): StepData {
         conditional_interation: 'yes',
         custom_times_value: 1,
         conditional_times_value: '>=',
+        time: 0,
       };
     case 'custom_field':
       return { id, type: 'custom_field' };

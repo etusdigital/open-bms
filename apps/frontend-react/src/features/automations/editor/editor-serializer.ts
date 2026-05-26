@@ -125,9 +125,9 @@ export function serializeFlowToSteps(nodes: AutomationNode[], edges: AutomationE
 
     // Sort children: by sourceHandle (for branching nodes) or Y position (for linear)
     const sortedEntries = [...childEntries].sort((a, b) => {
-      // If sourceHandle exists, sort by handle name (path-1 < path-2, yes < no)
+      // If sourceHandle exists, sort by handle name (yes before no; path-N numerically)
       if (a.sourceHandle && b.sourceHandle) {
-        return a.sourceHandle.localeCompare(b.sourceHandle);
+        return compareSourceHandles(a, b);
       }
       // Fallback: sort by Y position
       const nodeA = nodes.find((n) => n.id === a.target);
@@ -145,10 +145,36 @@ export function serializeFlowToSteps(nodes: AutomationNode[], edges: AutomationE
     const isUnsupported = 'originalType' in data;
     const stepType = isUnsupported ? (data as UnsupportedNodeData).originalType : (node.type ?? 'end');
 
+    // Backend schema requires conditionalTrue.settings to mirror its parent conditional's
+    // rules (obj_conditional with minItems:1). The editor only stores rules on the conditional
+    // node; we re-impose the legacy invariant here at the wire-format boundary.
+    let settings = data.settings;
+    if (stepType === 'conditionalTrue') {
+      // Prefer the edge whose handle is 'yes'; fall back to any incoming edge whose
+      // source node is a conditional. Legacy/migrated layouts may have an edge
+      // without sourceHandle set, and we still need to mirror the parent's rules
+      // or the backend rejects with the generic `error_conditional`.
+      const incomingEdges = edges.filter((e) => e.target === nodeId);
+      const yesEdge = incomingEdges.find((e) => e.sourceHandle === 'yes');
+      const parentEdge =
+        yesEdge ??
+        incomingEdges.find((e) => {
+          const parent = nodes.find((n) => n.id === e.source);
+          return parent?.type === 'conditional';
+        });
+      if (parentEdge) {
+        const parentNode = nodes.find((n) => n.id === parentEdge.source);
+        const parentSettings = (parentNode?.data as AnyNodeData | undefined)?.settings;
+        if (parentSettings !== undefined) {
+          settings = parentSettings;
+        }
+      }
+    }
+
     return {
       id: data.stepId,
       type: stepType,
-      settings: data.settings,
+      settings,
       child: children,
     } as ApiStep;
   }
@@ -252,4 +278,18 @@ export function buildFlowLayout(
     })),
     viewport,
   };
+}
+
+function compareSourceHandles(a: { sourceHandle?: string }, b: { sourceHandle?: string }): number {
+  const ah = a.sourceHandle ?? '';
+  const bh = b.sourceHandle ?? '';
+  if (ah === bh) return 0;
+  // Conditional: yes before no
+  if (ah === 'yes' && bh === 'no') return -1;
+  if (ah === 'no' && bh === 'yes') return 1;
+  // Split: 'path-N' compared numerically so path-10 sorts after path-2
+  const am = ah.match(/^path-(\d+)$/);
+  const bm = bh.match(/^path-(\d+)$/);
+  if (am && bm) return Number(am[1]) - Number(bm[1]);
+  return ah.localeCompare(bh);
 }

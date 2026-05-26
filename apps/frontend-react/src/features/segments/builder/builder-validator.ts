@@ -50,9 +50,11 @@ export function validateBuilder(state: BuilderState): BuilderError[] {
 /**
  * Checks if a timed step has a valid period set.
  * time: 0 (today) is VALID — we check for null/undefined/empty-string explicitly.
+ * Missing key counts as invalid: the backend AJV schema lists `time` as required
+ * for obj_conditional_interaction, so an absent field would be rejected with the
+ * generic `error_conditional` message — we catch it earlier here.
  */
 function hasValidPeriod(step: StepData): boolean {
-  if (!('time' in step)) return true;
   const time = (step as { time?: unknown }).time;
   return time !== null && time !== undefined && time !== '';
 }
