@@ -49,14 +49,14 @@ docker volume create volume_swarm_certificates
 
 ### 1.4. Imagens publicadas no Docker Hub
 
-O stack referencia `${IMAGE_REGISTRY}/bms-*:${IMAGE_TAG}` (padrão `evoapicloud/bms-*:latest`). Confira que todas existem:
+O stack referencia `${IMAGE_REGISTRY}/bms-*:${IMAGE_TAG}` (padrão `etusdigital/bms-*:latest`). Confira que todas existem:
 
 ```bash
 for img in msgops-api frontend-react event-receiver event-process \
            send-email send-push send-whatsapp twilio-messaging \
            campaign-events-tracker campaign-packer tracker \
            tag-process message-trigger geolocation enterprise-import; do
-  docker pull evoapicloud/bms-$img:latest >/dev/null 2>&1 \
+  docker pull etusdigital/bms-$img:latest >/dev/null 2>&1 \
     && echo "✅ $img" || echo "❌ $img"
 done
 ```
@@ -115,6 +115,7 @@ Se **não tem ou precisa subir do zero**, deploy o `stack.traefik.yml` deste rep
 ### 3.1. Criar stack no Portainer
 
 **Portainer → Stacks → Add stack**:
+
 - **Name**: `traefik`
 - **Build method**: Web editor
 - **Web editor**: cola o conteúdo de [`infra/swarm/stack.traefik.yml`](./stack.traefik.yml)
@@ -123,9 +124,9 @@ Se **não tem ou precisa subir do zero**, deploy o `stack.traefik.yml` deste rep
 
 Na seção **Environment variables** abaixo do editor, adicione:
 
-| Name | Value |
-|---|---|
-| `LETSENCRYPT_EMAIL` | `admin@seudominio.com` |
+| Name                   | Value                                        |
+| ---------------------- | -------------------------------------------- |
+| `LETSENCRYPT_EMAIL`    | `admin@seudominio.com`                       |
 | `TRAEFIK_NETWORK_NAME` | `bmsNet` (mesmo nome da rede criada em §1.2) |
 
 Clica **Deploy the stack**.
@@ -164,7 +165,7 @@ Cole esse bloco num terminal local (ou no manager via SSH) — ele imprime um `.
   echo "CORS_ORIGINS=https://bms-app.exemplo.ai"
 
   # === Imagens / rede ===
-  echo "IMAGE_REGISTRY=evoapicloud"
+  echo "IMAGE_REGISTRY=etusdigital"
   echo "IMAGE_TAG=latest"
   echo "TRAEFIK_NETWORK_NAME=bmsNet"
 
@@ -195,28 +196,28 @@ Cole esse bloco num terminal local (ou no manager via SSH) — ele imprime um `.
 
 ### 4.3. Lista de referência (todas as envs)
 
-| Nome | Como obter | Obrigatória? |
-|---|---|---|
-| `FRONTEND_HOST` | seu domínio do app, ex.: `bms-app.exemplo.ai` | ✅ |
-| `CH_UI_HOST` | seu domínio do ch-ui, ex.: `ch-ui-bms.exemplo.ai` | ✅ |
-| `FRONTEND_URL` | `https://${FRONTEND_HOST}` | ✅ |
-| `CORS_ORIGINS` | `https://${FRONTEND_HOST}` (vírgula-separado se múltiplos) | ✅ |
-| `IMAGE_REGISTRY` | org no Docker Hub | ✅ (default `evoapicloud`) |
-| `IMAGE_TAG` | tag das imagens (`latest` ou sha7) | ✅ |
-| `TRAEFIK_NETWORK_NAME` | nome da rede overlay externa | ✅ (default `bmsNet`) |
-| `POSTGRES_PASSWORD` | `openssl rand -base64 24` | ✅ |
-| `RABBITMQ_USER` | qualquer string | ✅ (default `bms`) |
-| `RABBITMQ_PASSWORD` | `openssl rand -base64 24` | ✅ |
-| `CLICKHOUSE_PASSWORD` | `openssl rand -base64 24` | ✅ |
-| `MINIO_ROOT_USER` | qualquer string | ✅ (default `bmsadmin`) |
-| `MINIO_ROOT_PASSWORD` | `openssl rand -base64 24` | ✅ |
-| `JWT_SECRET` | `openssl rand -base64 48` | ✅ |
-| `CRON_SECRET` | `openssl rand -base64 32` | ✅ |
-| `INTERNAL_AUTH_TOKEN` | `openssl rand -base64 32` | ✅ |
-| `CH_UI_SECRET_KEY` | `openssl rand -base64 32` | ✅ |
-| `ENTERPRISE_IMPORT_ENCRYPTION_KEY` | `openssl rand -base64 32` (AES-256) | ✅ |
-| `BOOTSTRAP_ADMIN_EMAIL` | email do primeiro super-admin | ✅ |
-| `BOOTSTRAP_ADMIN_PASSWORD` | `openssl rand -base64 18` | ✅ |
+| Nome                               | Como obter                                                 | Obrigatória?               |
+| ---------------------------------- | ---------------------------------------------------------- | -------------------------- |
+| `FRONTEND_HOST`                    | seu domínio do app, ex.: `bms-app.exemplo.ai`              | ✅                         |
+| `CH_UI_HOST`                       | seu domínio do ch-ui, ex.: `ch-ui-bms.exemplo.ai`          | ✅                         |
+| `FRONTEND_URL`                     | `https://${FRONTEND_HOST}`                                 | ✅                         |
+| `CORS_ORIGINS`                     | `https://${FRONTEND_HOST}` (vírgula-separado se múltiplos) | ✅                         |
+| `IMAGE_REGISTRY`                   | org no Docker Hub                                          | ✅ (default `etusdigital`) |
+| `IMAGE_TAG`                        | tag das imagens (`latest` ou sha7)                         | ✅                         |
+| `TRAEFIK_NETWORK_NAME`             | nome da rede overlay externa                               | ✅ (default `bmsNet`)      |
+| `POSTGRES_PASSWORD`                | `openssl rand -base64 24`                                  | ✅                         |
+| `RABBITMQ_USER`                    | qualquer string                                            | ✅ (default `bms`)         |
+| `RABBITMQ_PASSWORD`                | `openssl rand -base64 24`                                  | ✅                         |
+| `CLICKHOUSE_PASSWORD`              | `openssl rand -base64 24`                                  | ✅                         |
+| `MINIO_ROOT_USER`                  | qualquer string                                            | ✅ (default `bmsadmin`)    |
+| `MINIO_ROOT_PASSWORD`              | `openssl rand -base64 24`                                  | ✅                         |
+| `JWT_SECRET`                       | `openssl rand -base64 48`                                  | ✅                         |
+| `CRON_SECRET`                      | `openssl rand -base64 32`                                  | ✅                         |
+| `INTERNAL_AUTH_TOKEN`              | `openssl rand -base64 32`                                  | ✅                         |
+| `CH_UI_SECRET_KEY`                 | `openssl rand -base64 32`                                  | ✅                         |
+| `ENTERPRISE_IMPORT_ENCRYPTION_KEY` | `openssl rand -base64 32` (AES-256)                        | ✅                         |
+| `BOOTSTRAP_ADMIN_EMAIL`            | email do primeiro super-admin                              | ✅                         |
+| `BOOTSTRAP_ADMIN_PASSWORD`         | `openssl rand -base64 18`                                  | ✅                         |
 
 Veja [`infra/swarm/secrets.env.example`](./secrets.env.example) pro template comentado.
 
@@ -227,6 +228,7 @@ Veja [`infra/swarm/secrets.env.example`](./secrets.env.example) pro template com
 ### 5.1. Criar stack no Portainer
 
 **Portainer → Stacks → Add stack**:
+
 - **Name**: `bms`
 - **Build method**: Web editor
 - **Web editor**: cola o conteúdo de [`infra/swarm/stack.bms.yml`](./stack.bms.yml)
@@ -253,6 +255,7 @@ Aguarda ~2 minutos pro pull das imagens e startup dos serviços.
 **Portainer → Stacks → bms → Services**:
 
 Todos devem estar `1/1` exceto:
+
 - `bms_bms-config-init` → `0/1` (one-shot, rodou e saiu — normal)
 - `bms_minio-bootstrap` → `0/1` (one-shot, rodou e saiu — normal)
 
@@ -291,6 +294,7 @@ docker exec $(docker ps -q -f name=bms_clickhouse | head -1) \
 ```
 
 Esperado (5 tabelas):
+
 ```
 events_logs_v2
 events_queue
@@ -330,6 +334,7 @@ Acessa `https://${FRONTEND_HOST}/setup` no browser. O wizard:
 - **Webhook URL**: `https://${FRONTEND_HOST}/bms/events?platform=sendgrid&account=1`
 
 No SendGrid console:
+
 - Configura o webhook URL acima na seção **Mail Settings → Event Webhook**
 - Marca todos os eventos (delivered, open, click, bounce, dropped, spam_report, unsubscribe)
 
@@ -351,6 +356,7 @@ Baixe o `dbip-city-lite.mmdb` mais recente em https://db-ip.com/db/lite.
 ### 8.1. Portainer dá erro 500 ao fazer Update do stack
 
 Mensagem típica:
+
 ```
 invalid interpolation format for x-backend-env.X:
 required variable X is missing a value: must set X
@@ -359,6 +365,7 @@ required variable X is missing a value: must set X
 **Causa**: alguma env `${VAR:?must set ...}` do stack file não está nas Environment variables do Portainer Stack.
 
 **Fix**:
+
 1. Portainer → Stacks → bms → Editor
 2. Rola até **Environment variables**
 3. Adiciona TODAS as envs obrigatórias da [§4.3](#43-lista-de-referência-todas-as-envs)
@@ -381,6 +388,7 @@ ERR error="service \"X\" error: port is missing" providerName=swarm
 **Fix neste stack**: msgops-api tem rota Traefik direta (`bms-api` router com `StripPrefix /api`), sem passar pelo nginx. O timeout vem do Traefik websecure (600s).
 
 Se ainda der 504:
+
 1. Confere que o `stack.traefik.yml` tem os flags de `respondingTimeouts.readTimeout=600s` etc (§3.3).
 2. Confere que o stack do BMS tem o service `msgops-api` com as labels `traefik.http.routers.bms-api.*`.
 3. Confere os logs do msgops-api — pode ser que a operação interna esteja travada (DB lock, chamada externa pendurada).
@@ -390,6 +398,7 @@ Se ainda der 504:
 **Causa**: `ENTERPRISE_IMPORT_ENABLED` não está `true` no env do msgops-api.
 
 Código relevante (`apps/msgops-api/src/modules/enterprise-import/enterprise-import.guard.ts`):
+
 ```ts
 if (process.env.ENTERPRISE_IMPORT_ENABLED === 'true') return true;
 throw new NotFoundException();
@@ -413,7 +422,7 @@ ssh manager
 mkdir -p /tmp/bms-eimport-build && cd /tmp/bms-eimport-build
 tar xzf /tmp/bms-eimport.tar.gz
 docker build -f apps/enterprise-import/Dockerfile \
-  -t evoapicloud/bms-enterprise-import:latest .
+  -t etusdigital/bms-enterprise-import:latest .
 
 # deploy o stack com --resolve-image=never pra usar a imagem local:
 docker stack deploy --resolve-image=never -c stack.bms.yml bms
@@ -482,6 +491,7 @@ Devem aparecer todas as 5 tabelas (ver §6.4).
 **Não é problema deste deploy.** Ver issue [EVO-1464](https://linear.app/evoai/issue/EVO-1464). A API do Enterprise (`bms-api.bri.us`) retorna emails mascarados (`lucas***@gmail.com`) no endpoint `GET /contacts`, e o worker `enterprise-import` grava esse valor literal no Postgres. Quando o `send-email` dispara, o servidor SMTP remoto rejeita o "endereço" com `User unknown` → bounce.
 
 **Mitigação imediata**: pausar campanhas que usem contatos importados:
+
 ```sql
 UPDATE contacts SET is_active = false WHERE email LIKE '%***%';
 ```

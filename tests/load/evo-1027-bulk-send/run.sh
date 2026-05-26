@@ -22,7 +22,7 @@
 #
 # Env:
 #   PG_DSN                     postgres://postgres:postgres@localhost:55432/msgops
-#   BMS_NETWORK                bms-monorepo-open-source2_default
+#   BMS_NETWORK                bms-open2_default
 #   PACKER_INTERNAL            campaign-packer:3000
 #   K6_IMAGE                   grafana/k6:latest
 #   DRAIN_TIMEOUT_S            900  (15 min)
@@ -34,7 +34,7 @@ SCENARIO_DIR="$REPO_ROOT/tests/load/evo-1027-bulk-send"
 SHARED_DIR="$REPO_ROOT/tests/load/_shared"
 
 PG_DSN="${PG_DSN:-postgres://postgres:postgres@localhost:55432/msgops}"
-BMS_NETWORK="${BMS_NETWORK:-bms-monorepo-open-source2_default}"
+BMS_NETWORK="${BMS_NETWORK:-bms-open2_default}"
 PACKER_INTERNAL="${PACKER_INTERNAL:-campaign-packer:3000}"
 K6_IMAGE="${K6_IMAGE:-grafana/k6:latest}"
 DRAIN_TIMEOUT_S="${DRAIN_TIMEOUT_S:-900}"

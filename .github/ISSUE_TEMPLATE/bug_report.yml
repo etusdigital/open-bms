@@ -1,0 +1,92 @@
+name: 🐛 Bug report
+description: Report a reproducible bug in Open BMS
+title: '[Bug] '
+labels: ['bug', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill out the form
+        below — the more detail you give, the faster we can reproduce and fix.
+
+        ⚠️ **Security issues**: do not file them here. See
+        [SECURITY.md](https://github.com/etusdigital/bms-open/blob/main/SECURITY.md).
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences describing what's wrong.
+      placeholder: 'Campaigns stop sending after the first batch when the SendGrid account is on free tier.'
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimum sequence that triggers the bug. Be precise.
+      placeholder: |
+        1. Create a campaign with > 100 recipients
+        2. Trigger send via "Send now"
+        3. Observe `send-email` service logs
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include error messages, stack traces or screenshots.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment target
+      options:
+        - Local (docker compose)
+        - Docker Swarm (production)
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment details
+      description: |
+        Versions, OS, anything that might be relevant.
+      placeholder: |
+        - Open BMS version / commit:
+        - Node version:
+        - Docker version:
+        - OS:
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Paste relevant log output. Strip secrets before submitting.
+      render: shell
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Pre-submission checklist
+      options:
+        - label: I searched existing issues and didn't find a duplicate
+          required: true
+        - label: I stripped any secrets, tokens or PII from the logs above
+          required: true

@@ -1,5 +1,16 @@
 {
-  "name": "etus-retention-backoffice",
+  "name": "bms-open",
+  "version": "0.0.0",
+  "description": "Open BMS — open-source messaging operations platform by Etus Digital.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/etusdigital/bms-open.git"
+  },
+  "homepage": "https://github.com/etusdigital/bms-open#readme",
+  "bugs": {
+    "url": "https://github.com/etusdigital/bms-open/issues"
+  },
   "private": true,
   "scripts": {
     "dev": "turbo dev",

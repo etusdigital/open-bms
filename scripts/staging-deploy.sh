@@ -7,14 +7,14 @@
 #   MANAGER=other-host bash scripts/staging-deploy.sh
 #
 # Pré-requisitos:
-#   - docker login feito com credenciais do evoapicloud
+#   - docker login feito com credenciais do etusdigital
 #   - SSH configurado para o alias `evolution_manager` (ou definir MANAGER=<host>)
 
 set -euo pipefail
 
 SWARM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../infra/swarm" && pwd)"
 MANAGER="${MANAGER:-evolution_manager}"
-REGISTRY="${REGISTRY:-evoapicloud}"
+REGISTRY="${REGISTRY:-etusdigital}"
 SHA="$(git rev-parse --short=7 HEAD)"
 TAG="${IMAGE_TAG:-bms-staging-${SHA}}"
 ENV_FILE="/opt/bms-staging/.env"

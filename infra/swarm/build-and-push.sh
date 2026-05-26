@@ -2,11 +2,11 @@
 # Build & push BMS Open Source images for staging deploy.
 #
 # Builds 13 service images, tags them as
-# evoapicloud/bms-<app>:bms-staging-<sha7>, also tags
+# etusdigital/bms-<app>:bms-staging-<sha7>, also tags
 # bms-staging-latest, and pushes both tags to Docker Hub.
 #
 # Pre-req: `docker login` already done with credentials that can push to
-# the evoapicloud namespace.
+# the etusdigital namespace.
 #
 # Usage (do repo root ou de qualquer cwd):
 #   bash infra/swarm/build-and-push.sh
@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-REGISTRY="${REGISTRY:-evoapicloud}"
+REGISTRY="${REGISTRY:-etusdigital}"
 SHA="$(git rev-parse --short=7 HEAD)"
 TAG="${IMAGE_TAG:-bms-staging-${SHA}}"
 

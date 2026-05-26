@@ -266,7 +266,7 @@ services:
   # === apps ===
 
   msgops-api:
-    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-msgops-api:${IMAGE_TAG:?must set IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-etusdigital}/bms-msgops-api:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
       <<: *backend-env
       SERVER_PORT: '5001'
@@ -302,7 +302,7 @@ services:
           memory: 768M
 
   frontend-react:
-    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-frontend-react:${IMAGE_TAG:?must set IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-etusdigital}/bms-frontend-react:${IMAGE_TAG:?must set IMAGE_TAG}
     networks: [internal]
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1/']
@@ -317,7 +317,7 @@ services:
           memory: 256M
 
   event-receiver:
-    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-event-receiver:${IMAGE_TAG:?must set IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-etusdigital}/bms-event-receiver:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
       <<: *backend-env
       PORT: '3011'
@@ -329,7 +329,7 @@ services:
           memory: 512M
 
   event-process:
-    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-event-process:${IMAGE_TAG:?must set IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-etusdigital}/bms-event-process:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -360,7 +360,7 @@ services:
           memory: 768M
 
   send-email:
-    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-send-email:${IMAGE_TAG:?must set IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-etusdigital}/bms-send-email:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -399,7 +399,7 @@ services:
           memory: 128M
 
   send-push:
-    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-send-push:${IMAGE_TAG:?must set IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-etusdigital}/bms-send-push:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -415,7 +415,7 @@ services:
           memory: 384M
 
   send-whatsapp:
-    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-send-whatsapp:${IMAGE_TAG:?must set IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-etusdigital}/bms-send-whatsapp:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -428,7 +428,7 @@ services:
           memory: 384M
 
   twilio-messaging:
-    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-twilio-messaging:${IMAGE_TAG:?must set IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-etusdigital}/bms-twilio-messaging:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -441,7 +441,7 @@ services:
           memory: 384M
 
   campaign-events-tracker:
-    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-campaign-events-tracker:${IMAGE_TAG:?must set IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-etusdigital}/bms-campaign-events-tracker:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -454,7 +454,7 @@ services:
           memory: 384M
 
   campaign-packer:
-    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-campaign-packer:${IMAGE_TAG:?must set IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-etusdigital}/bms-campaign-packer:${IMAGE_TAG:?must set IMAGE_TAG}
     # Publica em 127.0.0.1:53000 do manager pra k6 disparar via SSH tunnel.
     ports:
       - target: 3000
@@ -472,7 +472,7 @@ services:
           memory: 512M
 
   tracker:
-    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-tracker:${IMAGE_TAG:?must set IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-etusdigital}/bms-tracker:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -484,7 +484,7 @@ services:
           memory: 512M
 
   tag-process:
-    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-tag-process:${IMAGE_TAG:?must set IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-etusdigital}/bms-tag-process:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -498,7 +498,7 @@ services:
           memory: 512M
 
   message-trigger:
-    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-message-trigger:${IMAGE_TAG:?must set IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-etusdigital}/bms-message-trigger:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
       <<: *backend-env
       PORT: '3000'
@@ -511,7 +511,7 @@ services:
           memory: 512M
 
   geolocation:
-    image: ${IMAGE_REGISTRY:-evoapicloud}/bms-geolocation:${IMAGE_TAG:?must set IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-etusdigital}/bms-geolocation:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
       <<: *backend-env
       PORT: '50051'

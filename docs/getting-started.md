@@ -30,7 +30,7 @@ docker compose -f docker-compose.dev.yml up -d
 ```bash
 # 1. Clonar o repositório
 git clone <url-do-repositório>
-cd bms-monorepo-open-source
+cd bms-open
 
 # 2. Instalar dependências
 pnpm install
