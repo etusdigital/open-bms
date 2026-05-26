@@ -1,8 +1,7 @@
 import { buildWhereClauses, FilterParseError, parseActivityQuery } from './filter-parser';
 
 const DEFAULT_OPTS = {
-  defaultDaysWithAccount: 30,
-  defaultDaysWithoutAccount: 7,
+  defaultDays: 7,
   capDays: 90,
   fixedMessageType: 'email',
 };
@@ -73,12 +72,15 @@ describe('buildWhereClauses', () => {
     expect(whereSql).toContain("provider = 'o''hai'");
   });
 
-  it('default range is 7 days without account, 30 with account', () => {
-    const noAccount = buildWhereClauses(parseActivityQuery(''), DEFAULT_OPTS);
-    const withAccount = buildWhereClauses(parseActivityQuery('account:42'), DEFAULT_OPTS);
-    const noAfter = new Date(noAccount.appliedRange.after).getTime();
-    const withAfter = new Date(withAccount.appliedRange.after).getTime();
-    expect(withAfter).toBeLessThan(noAfter);
+  it('default range is 7 days', () => {
+    const { appliedRange } = buildWhereClauses(parseActivityQuery(''), DEFAULT_OPTS);
+    const spanDays = (new Date(appliedRange.before).getTime() - new Date(appliedRange.after).getTime()) / 86_400_000;
+    expect(spanDays).toBeGreaterThan(6.9);
+    expect(spanDays).toBeLessThan(7.1);
+  });
+
+  it('rejects after >= before', () => {
+    expect(() => buildWhereClauses(parseActivityQuery('after:2026-05-25 before:2026-05-20'), DEFAULT_OPTS)).toThrow(FilterParseError);
   });
 
   it('clamps after to 90-day cap', () => {

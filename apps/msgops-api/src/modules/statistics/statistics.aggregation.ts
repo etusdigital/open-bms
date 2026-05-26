@@ -371,10 +371,6 @@ export class StatisticsAggregationService implements OnModuleInit, OnModuleDestr
           click_position, email_provider, browser, os, device, country, region
         ) VALUES ${valuesIndex}`;
 
-    if (date) {
-      console.log(parameters);
-    }
-
     // ON CONFLICT (account_id, date, event_type, type, event_id, message_id, automation_id, campaign_id, is_test_ab)
     // DO UPDATE SET
     //   processed = EXCLUDED.processed,

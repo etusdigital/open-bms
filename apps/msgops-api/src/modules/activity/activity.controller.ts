@@ -21,9 +21,6 @@ export class ActivityController {
       if (err instanceof FilterParseError) {
         throw new BadRequestException(err.message);
       }
-      if (err instanceof Error && err.message.startsWith('Invalid cursor')) {
-        throw new BadRequestException(err.message);
-      }
       throw err;
     }
   }

@@ -25,6 +25,7 @@ export default function ActivityPage() {
   const search = useSearch({ from: '/_authenticated/_layout/super-admin/activity/' });
   const navigate = useNavigate({ from: '/super-admin/activity' });
   const q = search.q ?? '';
+  const page = search.page ?? 1;
 
   const filters = useMemo(() => parseQ(q), [q]);
 
@@ -32,15 +33,21 @@ export default function ActivityPage() {
     (next: ReturnType<typeof parseQ>) => {
       const nextQ = serializeQ(next);
       if (nextQ === q) return;
-      navigate({ search: (prev) => ({ ...prev, q: nextQ || undefined }), replace: true });
+      navigate({ search: () => ({ q: nextQ || undefined, page: undefined }), replace: true });
     },
     [navigate, q],
   );
 
-  const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useActivityEvents(q);
+  const goToPage = (next: number) => {
+    navigate({ search: (prev) => ({ ...prev, page: next > 1 ? next : undefined }), replace: false });
+  };
 
-  const events = data?.pages.flatMap((p) => p.events) ?? [];
-  const appliedRange = data?.pages[0]?.appliedRange;
+  const { data, isLoading, isError, error, isFetching } = useActivityEvents(q, page);
+  const events = data?.events ?? [];
+  const hasNext = data?.hasNext ?? false;
+  const appliedRange = data?.appliedRange;
+  const errorMessage =
+    (error as { response?: { data?: { message?: string } } } | null)?.response?.data?.message ?? 'Failed to load events';
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -50,7 +57,7 @@ export default function ActivityPage() {
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <div>
-          {isLoading ? 'Loading…' : `${events.length}${hasNextPage ? '+' : ''} results`}
+          {isLoading ? 'Loading…' : `Page ${page} · ${events.length} results${hasNext ? '+' : ''}`}
         </div>
         {appliedRange && (
           <div>
@@ -59,11 +66,7 @@ export default function ActivityPage() {
         )}
       </div>
 
-      {isError && (
-        <div className="text-sm text-red-600">
-          {(error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to load events'}
-        </div>
-      )}
+      {isError && <div className="text-sm text-red-600">{errorMessage}</div>}
 
       <div className="rounded-md border">
         <Table>
@@ -93,13 +96,15 @@ export default function ActivityPage() {
         </Table>
       </div>
 
-      {hasNextPage && (
-        <div className="flex justify-center">
-          <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
-            {isFetchingNextPage ? 'Loading…' : 'Load more'}
-          </Button>
-        </div>
-      )}
+      <div className="flex items-center justify-between">
+        <Button variant="outline" size="sm" onClick={() => goToPage(page - 1)} disabled={page <= 1 || isFetching}>
+          Previous
+        </Button>
+        <span className="text-xs text-muted-foreground">Page {page}</span>
+        <Button variant="outline" size="sm" onClick={() => goToPage(page + 1)} disabled={!hasNext || isFetching}>
+          Next
+        </Button>
+      </div>
     </div>
   );
 }

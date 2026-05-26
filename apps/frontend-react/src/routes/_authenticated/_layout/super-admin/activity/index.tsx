@@ -5,6 +5,7 @@ import ActivityPage from '@/features/super-admin/activity/activity-page';
 
 const searchSchema = z.object({
   q: z.string().optional(),
+  page: z.coerce.number().int().min(1).optional(),
 });
 
 export const Route = createFileRoute('/_authenticated/_layout/super-admin/activity/')({

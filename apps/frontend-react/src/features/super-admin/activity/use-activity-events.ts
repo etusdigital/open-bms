@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 
 export interface ActivityEvent {
@@ -29,22 +29,23 @@ export interface ActivityEvent {
 
 export interface ActivityPage {
   events: ActivityEvent[];
-  nextCursor: string | null;
+  page: number;
+  limit: number;
+  hasNext: boolean;
   appliedRange: { after: string; before: string };
 }
 
-export function useActivityEvents(q: string) {
-  return useInfiniteQuery({
-    queryKey: ['activity', q],
-    queryFn: async ({ pageParam, signal }) => {
+export function useActivityEvents(q: string, page: number) {
+  return useQuery({
+    queryKey: ['activity', q, page],
+    queryFn: async ({ signal }) => {
       const { data } = await apiClient.get<ActivityPage>('/admin/activity/events', {
-        params: { q: q || undefined, cursor: pageParam || undefined, limit: 50 },
+        params: { q: q || undefined, page, limit: 50 },
         signal,
       });
       return data;
     },
-    initialPageParam: '' as string,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: 15_000,
+    placeholderData: keepPreviousData,
   });
 }

@@ -18,10 +18,16 @@ export interface ActivityFilter {
 }
 
 export interface BuildOptions {
-  defaultDaysWithAccount: number;
-  defaultDaysWithoutAccount: number;
+  defaultDays: number;
   capDays: number;
   fixedMessageType: string;
+  /**
+   * Pre-resolved account_id sets keyed by the original `account:` value. Names
+   * are resolved upstream (Postgres ILIKE) so the parser stays pure-SQL and
+   * free of repository deps. `null` for a key means "no match" → emit a
+   * predicate that returns 0 rows.
+   */
+  accountIdResolutions?: Map<string, number[] | null>;
 }
 
 export interface BuildResult {
@@ -81,6 +87,21 @@ export function parseActivityQuery(q: string): ActivityFilter {
   return { tokens, freeText };
 }
 
+/**
+ * Account tokens that need a Postgres lookup (anything non-numeric is treated
+ * as a name fragment). Numeric values stay in-query.
+ */
+export function extractAccountNameLookups(filter: ActivityFilter): string[] {
+  const names = new Set<string>();
+  for (const t of filter.tokens) {
+    if (t.key !== 'account') continue;
+    for (const v of t.values) {
+      if (!/^\d+$/.test(v)) names.add(v);
+    }
+  }
+  return Array.from(names);
+}
+
 function quoteList(values: string[]): string {
   return values.map((v) => `'${escape(v)}'`).join(', ');
 }
@@ -101,6 +122,32 @@ function buildContactClause(values: string[], negate: boolean): string {
   if (uuids.length) ors.push(`uuid IN (${quoteList(uuids)})`);
   const joined = ors.length === 1 ? ors[0] : `(${ors.join(' OR ')})`;
   return negate ? `NOT ${joined}` : joined;
+}
+
+function buildAccountClause(values: string[], negate: boolean, resolutions?: Map<string, number[] | null>): string {
+  const ids = new Set<number>();
+  let anyUnresolved = false;
+  for (const v of values) {
+    if (/^\d+$/.test(v)) {
+      ids.add(Number(v));
+      continue;
+    }
+    const resolved = resolutions?.get(v);
+    if (!resolved || resolved.length === 0) {
+      anyUnresolved = true;
+      continue;
+    }
+    for (const id of resolved) ids.add(id);
+  }
+  if (ids.size === 0) {
+    // Positive: nothing matched → force empty result. Negative: nothing to
+    // exclude → no-op (true).
+    if (negate) return '1=1';
+    return anyUnresolved ? 'account_id IN (-1)' : '1=0';
+  }
+  const list = Array.from(ids).join(', ');
+  if (ids.size === 1) return `account_id ${negate ? '!=' : '='} ${list}`;
+  return `account_id ${negate ? 'NOT IN' : 'IN'} (${list})`;
 }
 
 function buildIntColumnClause(column: string, values: string[], negate: boolean): string {
@@ -125,7 +172,9 @@ function buildStringColumnClause(column: string, values: string[], negate: boole
 }
 
 function parseDate(value: string, tokenName: string): dayjs.Dayjs {
-  const d = dayjs(value);
+  // Parse explicitly in UTC so date-only values (YYYY-MM-DD) and bare
+  // timestamps without offset don't get shifted by the container's local TZ.
+  const d = dayjs.utc(value);
   if (!d.isValid()) {
     throw new FilterParseError(`Token "${tokenName}" expects ISO date/datetime, got "${value}"`);
   }
@@ -136,13 +185,11 @@ export function buildWhereClauses(filter: ActivityFilter, opts: BuildOptions): B
   const where: string[] = [`message_type = '${escape(opts.fixedMessageType)}'`];
   let afterDate: dayjs.Dayjs | null = null;
   let beforeDate: dayjs.Dayjs | null = null;
-  let hasAccount = false;
 
   for (const t of filter.tokens) {
     switch (t.key) {
       case 'account':
-        hasAccount = true;
-        where.push(buildIntColumnClause('account_id', t.values, t.negate));
+        where.push(buildAccountClause(t.values, t.negate, opts.accountIdResolutions));
         break;
       case 'campaign':
         where.push(buildIntColumnClause('campaign_id', t.values, t.negate));
@@ -169,11 +216,10 @@ export function buildWhereClauses(filter: ActivityFilter, opts: BuildOptions): B
     }
   }
 
-  const now = dayjs();
+  const now = dayjs.utc();
   const cap = now.subtract(opts.capDays, 'day');
   if (!afterDate && !beforeDate) {
-    const days = hasAccount ? opts.defaultDaysWithAccount : opts.defaultDaysWithoutAccount;
-    afterDate = now.subtract(days, 'day');
+    afterDate = now.subtract(opts.defaultDays, 'day');
     beforeDate = now;
   } else if (!afterDate) {
     afterDate = cap;
@@ -183,8 +229,10 @@ export function buildWhereClauses(filter: ActivityFilter, opts: BuildOptions): B
 
   if (afterDate.isBefore(cap)) afterDate = cap;
 
-  // `time` is stored UTC in ClickHouse (server TZ also UTC), so always format
-  // in UTC — otherwise a container in a non-UTC TZ silently shrinks the window.
+  if (!afterDate.isBefore(beforeDate)) {
+    throw new FilterParseError(`"after" must be earlier than "before"`);
+  }
+
   const afterUtc = afterDate.utc();
   const beforeUtc = beforeDate.utc();
   // Bound `time_date` (partition key) for pruning and `time` for precision.
