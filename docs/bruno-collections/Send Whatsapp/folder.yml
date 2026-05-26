@@ -1,7 +1,0 @@
-info:
-  name: Send Whatsapp
-  type: folder
-  seq: 14
-
-request:
-  auth: none

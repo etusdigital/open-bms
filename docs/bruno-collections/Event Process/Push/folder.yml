@@ -1,7 +1,0 @@
-info:
-  name: Push
-  type: folder
-  seq: 4
-
-request:
-  auth: none

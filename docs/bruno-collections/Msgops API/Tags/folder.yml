@@ -1,7 +1,0 @@
-info:
-  name: Tags
-  type: folder
-  seq: 19
-
-request:
-  auth: inherit

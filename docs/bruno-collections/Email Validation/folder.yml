@@ -1,7 +1,0 @@
-info:
-  name: Email Validation
-  type: folder
-  seq: 12
-
-request:
-  auth: none

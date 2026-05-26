@@ -1,7 +1,0 @@
-info:
-  name: Lead Receive
-  type: folder
-  seq: 10
-
-request:
-  auth: none

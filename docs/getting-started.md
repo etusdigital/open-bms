@@ -1,173 +1,113 @@
-# Getting Started — BMS Platform
+# Getting Started
 
-BMS é a plataforma de mensageria multi-canal da Etus. Este guia cobre os passos necessários para rodar o projeto localmente e configurá-lo pela primeira vez.
+Open BMS is a multi-channel messaging operations platform. This guide walks you
+through running it locally for development.
 
-## Pré-requisitos
+## Prerequisites
 
-| Dependência | Versão mínima | Observação                                              |
-| ----------- | ------------- | ------------------------------------------------------- |
-| Node.js     | 20            | `node --version`                                        |
-| pnpm        | 9             | `corepack enable && corepack prepare pnpm@9 --activate` |
-| PostgreSQL  | 14+           | banco operacional (`msgops`)                            |
-| Redis       | 6+            | cache e filas                                           |
-| ClickHouse  | 23+           | analytics (opcional para dev local)                     |
-| RabbitMQ    | 3.12+         | mensageria assíncrona                                   |
-| S3 / MinIO  | —             | armazenamento de assets (MinIO para dev)                |
+| Dependency | Minimum version | How to check                                             |
+| ---------- | --------------- | -------------------------------------------------------- |
+| Node.js    | 24              | `node --version`                                         |
+| pnpm       | 10              | `corepack enable && corepack prepare pnpm@10 --activate` |
+| Docker     | 24 + Compose v2 | `docker compose version`                                 |
 
-### Subir infraestrutura local com Docker
-
-```bash
-# PostgreSQL + Redis + RabbitMQ + MinIO
-docker compose -f docker-compose.dev.yml up -d
-```
-
-> Se não existir um `docker-compose.dev.yml`, suba cada serviço individualmente ou ajuste conforme seu ambiente.
+The compose file boots PostgreSQL, Redis, RabbitMQ, ClickHouse and MinIO — you
+do not need to install them on the host.
 
 ---
 
-## Instalação
+## 1. Clone and install
 
 ```bash
-# 1. Clonar o repositório
-git clone <url-do-repositório>
+git clone https://github.com/etusdigital/bms-open.git
 cd bms-open
-
-# 2. Instalar dependências
 pnpm install
-
-# 3. Copiar arquivos de variáveis de ambiente
-cp apps/msgops-api/.env.example apps/msgops-api/.env
 ```
 
----
-
-## Variáveis de ambiente essenciais
-
-Edite `apps/msgops-api/.env` e preencha pelo menos:
-
-```env
-# Banco de dados
-TYPEORM_HOST=127.0.0.1
-TYPEORM_PORT=5432
-TYPEORM_USERNAME=postgres
-TYPEORM_PASSWORD=sua-senha
-TYPEORM_DATABASE=msgops
-
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-
-# RabbitMQ
-AMQP_URL=amqp://guest:guest@localhost:5672
-
-# S3 / MinIO
-S3_ENDPOINT=http://localhost:9000
-S3_ACCESS_KEY_ID=minioadmin
-S3_SECRET_ACCESS_KEY=minioadmin
-S3_BUCKET=bms-assets
-S3_REGION=us-east-1
-
-# ClickHouse (pode deixar vazio em dev se não usar analytics)
-CLICKHOUSE_HOST=http://localhost:8123
-CLICKHOUSE_USERNAME=default
-CLICKHOUSE_PASSWORD=
-CLICKHOUSE_DATABASE=BMS
-
-# Auth local (padrão)
-AUTH_PROVIDER=local
-JWT_SECRET=<gere com: openssl rand -hex 32>
-JWT_ACCESS_TTL=3600
-JWT_REFRESH_TTL=2592000
-JWT_AUDIENCE=bms-msgops-api
-
-# URL do frontend (para CORS)
-FRONTEND_URL=http://localhost:5173
-CORS_ORIGINS=http://localhost:5173
-```
-
----
-
-## Subir em modo desenvolvimento
+## 2. Boot the infrastructure
 
 ```bash
-# Todos os apps
-pnpm dev
-
-# Apenas o backend
-pnpm --filter msgops-api dev
-
-# Apenas o frontend React (operator + super-admin)
-pnpm --filter frontend-react dev
-
-# Apenas o frontend Vue 2 (operador legado)
-pnpm --filter msg-ops serve
+docker compose up -d
 ```
 
----
+This starts Postgres, Redis, RabbitMQ, ClickHouse, MinIO and all the BMS
+services. Use `docker compose ps` to confirm everything is healthy.
 
-## Primeiro boot — Setup Wizard
-
-Na **primeira execução**, a tabela `users` estará vazia. O sistema redireciona automaticamente para o assistente de configuração em `/setup`.
-
-### Passo 1 — Conta de administrador
-
-- **O quê**: cria o super-admin da plataforma.
-- **Dados**: nome, e-mail e senha (mínimo 8 caracteres).
-- **Backend**: persiste o usuário na tabela `users` com `role = super_admin`.  
-  Usa advisory lock para serializar submissões concorrentes.
-
-> **Alternativa via env vars** (sem UI): defina `BOOTSTRAP_ADMIN_EMAIL` e `BOOTSTRAP_ADMIN_PASSWORD` antes do primeiro boot — o sistema criará o admin automaticamente.
-
-### Passo 2 — Servidor SMTP
-
-- **O quê**: configura o servidor SMTP usado para envios transacionais.
-- **Dados**: host, porta, usuário, senha, endereço `From`.
-- **Teste**: o botão "Testar SMTP" envia um e-mail de teste para o endereço do admin criado no passo 1. Limitado a 5 tentativas por minuto por IP.
-- **Backend**: persiste em `system_config` com chave `smtp_settings`.
-
-### Passo 3 — URL base da plataforma
-
-- **O quê**: define a URL pública do sistema.
-- **Dados**: `baseUrl` (ex.: `https://app.empresa.com`).
-- **Uso**: links em e-mails, redirecionamentos e integrações externas.
-- **Backend**: persiste em `system_config` com chave `domain_settings`.
-
-### Passo 4 — IP Pool e primeira conta
-
-- **O quê**: cria a conta-mãe e o pool de IPs de envio.
-- **Dados**: nome da conta, nome do pool, e-mail/nome do remetente, reply-to, limite de envio, lista de IPs.
-- **Skip**: é possível pular esta etapa e configurar depois pelas telas de administração.
-- **Backend**: cria registros nas tabelas `accounts`, `pools` e `user_accounts` (vincula o admin como master user).
-
-### Passo 5 — Verificação de serviços
-
-- **O quê**: verifica se todos os serviços de infraestrutura estão acessíveis.
-- **Serviços checados** (em paralelo, timeout de 5 s cada):
-
-  | Serviço    | Probe               | Variável de controle   |
-  | ---------- | ------------------- | ---------------------- |
-  | PostgreSQL | `SELECT 1`          | `TYPEORM_*`            |
-  | Redis      | `PING`              | `REDIS_*`              |
-  | ClickHouse | `SELECT 1`          | `CLICKHOUSE_*`         |
-  | RabbitMQ   | TCP connect + close | `AMQP_URL`             |
-  | S3 / MinIO | `HeadBucket`        | `S3_*`                 |
-  | SMTP       | `STARTTLS verify`   | configurado no passo 2 |
-
-- **Concluir**: habilitado apenas quando todos retornam `ok: true`.  
-  É possível pular com aviso caso algum serviço esteja propositalmente desabilitado.
-- **Backend**: na conclusão, grava atomicamente:
-  - `system_config[setup_wizard_step]` → `{ currentStep: 5, completed: true }`
-  - `system_config[setup_complete]` → `{ complete: true, completedAt: <ISO> }`
-
----
-
-## Verificar o health-check manualmente
+Alternative: bring up only the infra services and run the app code on the host
+via `pnpm dev`:
 
 ```bash
-# Enquanto o wizard não estiver concluído
+make infra      # boots only postgres, redis, rabbitmq, clickhouse
+pnpm dev        # runs all apps in watch mode
+```
+
+## 3. Open the UI
+
+- Frontend: <http://localhost:5001>
+- ClickHouse console (ch-ui): <http://localhost:3488>
+- RabbitMQ management: <http://localhost:15672>
+- MinIO console: <http://localhost:9001>
+
+## 4. First boot — Setup Wizard
+
+On a fresh install the `users` table is empty, and the app redirects you to
+`/setup`. The wizard walks through these steps:
+
+### Step 1 — Admin account
+
+Creates the platform's super-admin user (name, email, password ≥ 8 chars).
+Persists into `users` with `role = super_admin`. An advisory lock serializes
+concurrent submissions.
+
+> **Alternative (no UI)**: set `BOOTSTRAP_ADMIN_EMAIL` and
+> `BOOTSTRAP_ADMIN_PASSWORD` before the first boot — the admin is created
+> automatically.
+
+### Step 2 — SMTP server
+
+Configures the SMTP server used for transactional emails (host, port, user,
+password, From address). The "Test SMTP" button sends a test email to the
+admin's address (rate-limited to 5 attempts per minute per IP). Stored in
+`system_config` under the `smtp_settings` key.
+
+### Step 3 — Base URL
+
+Public URL of the platform (e.g. `https://app.example.com`). Used in email
+links, redirects and external integrations. Stored in `system_config` under
+`domain_settings`.
+
+### Step 4 — IP pool and first account
+
+Creates the parent account and the sending IP pool: account name, pool name,
+sender email + name, reply-to, send limit, and IP list. You can skip this
+step and configure later from the admin UI.
+
+### Step 5 — Service health check
+
+Verifies that every infra dependency is reachable. Probes run in parallel with
+a 5 s timeout each:
+
+| Service    | Probe               | Env vars             |
+| ---------- | ------------------- | -------------------- |
+| PostgreSQL | `SELECT 1`          | `TYPEORM_*`          |
+| Redis      | `PING`              | `REDIS_*`            |
+| ClickHouse | `SELECT 1`          | `CLICKHOUSE_*`       |
+| RabbitMQ   | TCP connect + close | `AMQP_URL`           |
+| S3 / MinIO | `HeadBucket`        | `S3_*`               |
+| SMTP       | `STARTTLS verify`   | configured in step 2 |
+
+"Finish" is only enabled when every probe returns `ok: true`. You can skip
+specific probes when a service is intentionally disabled.
+
+---
+
+## Manual health check
+
+```bash
+# Before the wizard completes:
 curl -s http://localhost:5001/setup/health-check | jq .
 
-# Resposta esperada (todos ok)
+# Expected payload (all ok):
 {
   "postgres":   { "ok": true, "latencyMs": 4 },
   "redis":      { "ok": true, "latencyMs": 1 },
@@ -179,24 +119,47 @@ curl -s http://localhost:5001/setup/health-check | jq .
 }
 ```
 
-Ver `docs/health-check-endpoint.md` para mais exemplos e interpretação de erros.
+See [`reference/health-check-endpoint.md`](./reference/health-check-endpoint.md)
+for examples and error interpretation.
 
 ---
 
-## Outros comandos úteis
+## Common commands
 
 ```bash
-pnpm build          # Build completo do monorepo
-pnpm type-check     # Verificação de tipos TypeScript
-pnpm lint           # Lint (ESLint + Prettier) em todos os apps
-pnpm clean          # Limpa artefatos de build
+pnpm dev                 # Watch mode for all apps
+pnpm build               # Build everything
+pnpm type-check          # tsc --noEmit across the workspace
+pnpm lint                # ESLint
+pnpm test                # Unit tests
+pnpm clean               # Remove build artifacts
+```
+
+Per-app:
+
+```bash
+pnpm --filter msgops-api dev
+pnpm --filter frontend-react dev
+pnpm --filter @msgops/segment-query-builder test
+```
+
+`Makefile` has convenience targets (`make help` to list):
+
+```bash
+make up                  # docker compose up -d --build
+make down                # docker compose down (keeps volumes)
+make migrate             # Run TypeORM migrations against compose postgres
+make db-shell            # psql into compose postgres
+make logs-api            # Tail msgops-api logs
+make clean               # down + remove volumes (DESTROYS DATA)
 ```
 
 ---
 
-## Auth0 (opcional)
+## Authentication providers
 
-Por padrão `AUTH_PROVIDER=local`. Para usar Auth0:
+Default is `AUTH_PROVIDER=local` (JWT issued by msgops-api). To switch to
+Auth0:
 
 ```env
 AUTH_PROVIDER=auth0
@@ -208,12 +171,20 @@ IDP_ISSUER=https://<tenant>.us.auth0.com/
 IDP_AUDIENCE=<api-audience>
 ```
 
-Com Auth0 ativo, a criação de usuário no passo 1 do wizard delega para a Management API do Auth0.
+When Auth0 is active, step 1 of the wizard delegates user creation to the
+Auth0 Management API instead of writing directly to `users`.
 
 ---
 
-## Documentação adicional
+## Where to go next
 
-- [`docs/health-check-endpoint.md`](./health-check-endpoint.md) — detalhes do endpoint de health-check
-- [`apps/msgops-api/.env.example`](../apps/msgops-api/.env.example) — todas as variáveis de ambiente disponíveis
-- [`CLAUDE.md`](../CLAUDE.md) — convenções de código e arquitetura do monorepo
+| Goal                                | Doc                                                                          |
+| ----------------------------------- | ---------------------------------------------------------------------------- |
+| Deploy to production (Docker Swarm) | [`../infra/swarm/DEPLOY.md`](../infra/swarm/DEPLOY.md)                       |
+| Operate email providers             | [`operations/email-providers.md`](./operations/email-providers.md)           |
+| Refresh the GeoIP database          | [`operations/geodb.md`](./operations/geodb.md)                               |
+| ClickHouse schema reference         | [`reference/clickhouse-schema.md`](./reference/clickhouse-schema.md)         |
+| Health-check endpoint contract      | [`reference/health-check-endpoint.md`](./reference/health-check-endpoint.md) |
+
+The full list of environment variables lives in
+[`../.env.example`](../.env.example) and in each `apps/<app>/.env.example`.

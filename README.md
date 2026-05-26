@@ -1,7 +1,7 @@
 <h1 align="center">Open BMS</h1>
 
 <p align="center">
-  Open-source messaging operations platform — multi-channel campaigns, segmentation and analytics. By Etus Digital.
+  Open-source messaging operations platform — multi-channel campaigns, segmentation and analytics. By Etus Media Holding LTDA.
 </p>
 
 <p align="center">
@@ -196,4 +196,4 @@ IP geolocation data provided by [DB-IP.com](https://db-ip.com) under the
 Source code is licensed under the [Apache License 2.0](./LICENSE).
 Trademarks and brand assets are governed by [`TRADEMARKS.md`](./TRADEMARKS.md).
 
-© 2026 Etus Digital
+© 2026 Etus Media Holding LTDA

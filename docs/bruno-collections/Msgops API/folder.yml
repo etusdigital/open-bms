@@ -1,9 +1,0 @@
-info:
-  name: Msgops API
-  type: folder
-  seq: 3
-
-request:
-  auth:
-    type: bearer
-    token: '{{msgops-api-token}}'

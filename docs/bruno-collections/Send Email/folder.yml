@@ -1,7 +1,0 @@
-info:
-  name: Send Email
-  type: folder
-  seq: 7
-
-request:
-  auth: none

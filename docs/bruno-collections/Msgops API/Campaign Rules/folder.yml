@@ -1,7 +1,0 @@
-info:
-  name: Campaign Rules
-  type: folder
-  seq: 7
-
-request:
-  auth: inherit

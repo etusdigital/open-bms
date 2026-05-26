@@ -2,8 +2,8 @@
 
 Version 1.0, 2026.05.26
 
-"Etus Digital", "Etus" and "Open BMS" are trademarks of Etus Digital. The
-"Open BMS" wordmark and the Open BMS logo are trademarks of Etus Digital.
+"Etus Media Holding LTDA", "Etus" and "Open BMS" are trademarks of Etus Media Holding LTDA. The
+"Open BMS" wordmark and the Open BMS logo are trademarks of Etus Media Holding LTDA.
 
 ## 1. Scope and purpose
 
@@ -12,10 +12,10 @@ intended to protect users from confusion and to preserve the official Open BMS
 visual identity.
 
 This policy applies to any use of:
-(a) the product names and marks "Etus Digital", "Etus" and "Open BMS";
+(a) the product names and marks "Etus Media Holding LTDA", "Etus" and "Open BMS";
 (b) the official logo and wordmark: the "Open BMS" wordmark and any
 associated icon;
-(c) the copyright line "© 2026 Etus Digital"; and
+(c) the copyright line "© 2026 Etus Media Holding LTDA"; and
 (d) any materials that implement or express the Open BMS official look and
 feel, including the Protected Visual Identity Elements listed in Section 3.
 
@@ -27,7 +27,7 @@ and brand assets.
 
 2.1. You may truthfully refer to Open BMS to describe that your software is
 based on, compatible with, or derived from this project, provided that such use
-does not imply endorsement by Etus Digital.
+does not imply endorsement by Etus Media Holding LTDA.
 
 2.2. You may distribute and publicly host unmodified official builds of Open BMS
 that include Open BMS brand assets, provided that you comply with Section 3 and
@@ -39,10 +39,10 @@ provided that the use is accurate and does not create confusion.
 ## 3. Protected Visual Identity Elements (Brand Assets)
 
 The following are the "Protected Visual Identity Elements":
-(a) Product names and marks: "Etus Digital", "Etus" and "Open BMS";
+(a) Product names and marks: "Etus Media Holding LTDA", "Etus" and "Open BMS";
 (b) Official logo and wordmark: the "Open BMS" wordmark and any associated icon;
-(c) Copyright line: "© 2026 Etus Digital";
-(d) Official palette, typography and visual tokens as published by Etus Digital.
+(c) Copyright line: "© 2026 Etus Media Holding LTDA";
+(d) Official palette, typography and visual tokens as published by Etus Media Holding LTDA.
 The current values are maintained in the source repository under
 `apps/frontend-react/src/styles` and any matching design tokens.
 
@@ -73,7 +73,7 @@ Open BMS logo or wordmark.
 ## 5. Permission requests
 
 Any use not expressly permitted by this policy requires prior written permission
-from Etus Digital. Contact: **raphael.petronilho@etus.com.br**.
+from Etus Media Holding LTDA. Contact: **raphael.petronilho@etus.com.br**.
 
 ## 6. Enforcement and termination
 
@@ -84,4 +84,4 @@ assets from your distribution and any public hosting.
 ## 7. Disclaimer
 
 This policy is provided "as is" and does not grant any rights beyond what is
-expressly stated. All rights not expressly granted are reserved by Etus Digital.
+expressly stated. All rights not expressly granted are reserved by Etus Media Holding LTDA.

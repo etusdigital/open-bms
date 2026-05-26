@@ -1,6 +1,6 @@
 # Security Policy
 
-Etus Digital takes the security of Open BMS seriously. We appreciate your
+Etus Media Holding LTDA takes the security of Open BMS seriously. We appreciate your
 efforts to responsibly disclose any vulnerabilities you find.
 
 ## Reporting a Vulnerability
@@ -60,7 +60,7 @@ vulnerabilities will be:
 
 - Credited in the security advisory (with permission)
 - Listed in our acknowledgments page (when available)
-- Eligible for public recognition via Etus Digital channels
+- Eligible for public recognition via Etus Media Holding LTDA channels
 
 ---
 

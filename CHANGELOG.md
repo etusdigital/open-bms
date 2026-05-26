@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial open-source release of the BMS platform under Etus Digital.
+- Initial open-source release of the BMS platform under Etus Media Holding LTDA.
 - Apache 2.0 LICENSE, NOTICE, SECURITY policy, Code of Conduct and
   Trademark policy.
 - GitHub issue and PR templates.

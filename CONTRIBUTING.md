@@ -117,4 +117,4 @@ Thanks for helping make Open BMS better!
 
 ---
 
-© 2026 Etus Digital
+© 2026 Etus Media Holding LTDA
