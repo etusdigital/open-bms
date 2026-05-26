@@ -137,8 +137,9 @@ export class UsersController {
     const providerId = this.getProviderId(authUser);
     const currentUser = await this.userService.findOneByProviderId(providerId);
 
+    // super_admin bypasses master-id scoping: orphan users (no userAccount rows) are invisible via findOneByMasterId.
     const isSuperAdmin = req?.authzContext?.isSuperAdmin === true;
-    if (!isSuperAdmin && currentUser.id && currentUser.id !== Number(id)) {
+    if (!isSuperAdmin && currentUser.id !== Number(id)) {
       return this.userService.findOneByMasterId(Number(id), currentUser.id);
     }
 
