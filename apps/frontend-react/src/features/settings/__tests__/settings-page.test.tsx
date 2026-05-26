@@ -179,24 +179,11 @@ describe('SettingsPage', () => {
       expect(screen.getByRole('button', { name: 'Email Providers' })).toBeInTheDocument();
     });
 
-    it('switches to email providers tab and renders the default provider section', async () => {
+    it('switches to email providers tab and renders the listing CTA', async () => {
       await renderPage();
       fireEvent.click(screen.getByRole('button', { name: 'Email Providers' }));
       await waitFor(() => {
-        expect(screen.getByText(/Default Email Provider/i)).toBeInTheDocument();
-      });
-    });
-
-    it('renders all 5 provider cards in email providers tab with their data-testid', async () => {
-      await renderPage();
-      fireEvent.click(screen.getByRole('button', { name: 'Email Providers' }));
-      await waitFor(() => {
-        // Wiring sanity: each card actually mounted (data-testid set by ProviderCard / AmazonSesCard).
-        expect(screen.getByTestId('provider-card-mailersend')).toBeInTheDocument();
-        expect(screen.getByTestId('provider-card-sparkpost')).toBeInTheDocument();
-        expect(screen.getByTestId('provider-card-resend')).toBeInTheDocument();
-        expect(screen.getByTestId('provider-card-mandrill')).toBeInTheDocument();
-        expect(screen.getByTestId('provider-card-ses')).toBeInTheDocument();
+        expect(screen.getByTestId('add-provider-cta')).toBeInTheDocument();
       });
     });
   });
