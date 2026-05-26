@@ -15,8 +15,13 @@ set -euo pipefail
 : "${RABBITMQ_HOST_PORT:=rabbitmq:5672}"
 : "${RABBITMQ_USER:=guest}"
 : "${RABBITMQ_PASSWORD:=guest}"
+# ClickHouse creds: the entrypoint exports these to initdb scripts. Defaults
+# keep a passwordless setup working; when CLICKHOUSE_PASSWORD is set the bare
+# `default` user is no longer accepted, so pass it explicitly.
+: "${CLICKHOUSE_USER:=default}"
+: "${CLICKHOUSE_PASSWORD:=}"
 
-clickhouse-client --multiquery <<SQL
+clickhouse-client --user "${CLICKHOUSE_USER}" --password "${CLICKHOUSE_PASSWORD}" --multiquery <<SQL
 CREATE TABLE IF NOT EXISTS BMS.events_queue
 (
     \`time\` DateTime64(3, 'UTC'),

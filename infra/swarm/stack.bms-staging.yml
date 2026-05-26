@@ -11,6 +11,7 @@
 #   1. scp data/geo/dbip-city-lite.mmdb manager1:/opt/bms-staging/data/geo/
 #   2. mkdir -p /opt/bms-staging/data/geo (já implícito no scp)
 #   3. DNS Cloudflare: bms-staging.evo-ai.co → IP do manager
+#      e ch-ui-bms-staging.evo-ai.co → IP do manager (console do ClickHouse)
 #   4. SendGrid API key + webhook URL configurados via super-admin UI APÓS primeiro boot
 #
 # Deploy:
@@ -59,7 +60,7 @@ x-backend-env: &backend-env
   CLICKHOUSE_HOST: http://clickhouse:8123
   CLICKHOUSE_DATABASE: BMS
   CLICKHOUSE_USERNAME: default
-  CLICKHOUSE_PASSWORD: ''
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?must set CLICKHOUSE_PASSWORD}
   INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN:?must set INTERNAL_AUTH_TOKEN}
   S3_ENDPOINT: http://minio:9000
   S3_REGION: us-east-1
@@ -197,9 +198,11 @@ services:
     environment:
       CLICKHOUSE_DB: BMS
       CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: ''
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?must set CLICKHOUSE_PASSWORD}
+      # SKIP_USER_SETUP removed: with it set the entrypoint ignored
+      # CLICKHOUSE_PASSWORD and the `default` user stayed open. Letting user
+      # setup run applies the password to `default` on every container start.
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: '1'
-      CLICKHOUSE_SKIP_USER_SETUP: '1'
       # Consumed by the 02-events-rabbitmq.sh init script to wire the
       # RabbitMQ-engine table. Without these the script falls back to
       # guest/guest and the analytics pipeline never authenticates.
@@ -215,7 +218,9 @@ services:
     configs:
       - source: clickhouse-init-01
         target: /docker-entrypoint-initdb.d/01-init-bms.sql
-      - source: clickhouse-init-02
+      # -auth suffix: Swarm configs are immutable, so the content change
+      # (clickhouse-client now passes --user/--password) needs a new name.
+      - source: clickhouse-init-02-auth
         target: /docker-entrypoint-initdb.d/02-events-rabbitmq.sh
         mode: 0755
       - source: clickhouse-users-experimental
@@ -232,6 +237,52 @@ services:
       resources:
         limits:
           memory: 4G
+
+  # CH-UI: web console for the analytics ClickHouse.
+  # Browser → Traefik (basic-auth) → ch-ui (3488). The ch-ui server opens the
+  # ClickHouse connection itself over the `internal` network, so ClickHouse
+  # stays unexposed — only ch-ui is reachable from outside.
+  # Prereq: DNS Cloudflare ch-ui-bms-staging.evo-ai.co → IP do manager.
+  ch-ui:
+    image: ghcr.io/caioricciuti/ch-ui:v2.1.1
+    environment:
+      NODE_ENV: production
+      PORT: '3488'
+      APP_URL: https://ch-ui-bms-staging.evo-ai.co
+      ALLOWED_ORIGINS: https://ch-ui-bms-staging.evo-ai.co
+      # Signs ch-ui session cookies — without it ch-ui falls back to a
+      # hardcoded default key. ch-ui has its own login/user accounts.
+      APP_SECRET_KEY: ${CH_UI_SECRET_KEY:?must set CH_UI_SECRET_KEY}
+      # Seeds only the host — ch-ui's client takes user/pass as separate
+      # fields, not from the URL. On first login, open the seeded "BMS
+      # Staging" connection and enter user `default` + CLICKHOUSE_PASSWORD;
+      # ch-ui persists it in its own SQLite (ch-ui-data volume).
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CONNECTION_NAME: BMS Staging
+    volumes:
+      - ch-ui-data:/app/data
+    networks: [internal, network_public]
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:3488/health']
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    deploy:
+      <<: *restart-policy
+      resources:
+        limits:
+          memory: 256M
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=network_public
+        - traefik.http.routers.bms-ch-ui.rule=Host(`ch-ui-bms-staging.evo-ai.co`)
+        - traefik.http.routers.bms-ch-ui.entrypoints=websecure
+        - traefik.http.routers.bms-ch-ui.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.bms-ch-ui.priority=20
+        # No edge basic-auth: ch-ui v2 has its own login/user accounts
+        # (APP_SECRET_KEY-signed sessions) — that is the only gate.
+        - traefik.http.services.bms-ch-ui.loadbalancer.server.port=3488
 
   bms-config-init:
     image: alpine:3.20
@@ -506,6 +557,7 @@ volumes:
   rabbitmq-data:
   minio-data:
   clickhouse-data:
+  ch-ui-data:
   bms-config:
 
 networks:
@@ -521,7 +573,7 @@ configs:
   # Caminhos relativos a este arquivo (infra/swarm/stack.bms-staging.yml).
   clickhouse-init-01:
     file: ../clickhouse-init/01-init-bms.sql
-  clickhouse-init-02:
+  clickhouse-init-02-auth:
     file: ../clickhouse-init/02-events-rabbitmq.sh
   clickhouse-users-experimental:
     file: ../clickhouse-config/users.d/00-experimental.xml
