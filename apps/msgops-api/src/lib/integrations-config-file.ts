@@ -155,3 +155,51 @@ export function writeMandrillEnvFile(dto: MandrillSystemSettings): void {
   if (dto.webhookUrlBase) lines.push(`MANDRILL_WEBHOOK_URL_BASE=${dto.webhookUrlBase}`);
   writeEnvFile(mandrillEnvFilePath(), lines);
 }
+
+// ---------- WhatsApp Meta (Cloud API direct mode) ----------
+
+export interface WhatsappMetaSystemSettings {
+  appId: string;
+  appSecret: string;
+  configId: string;
+  verifyToken: string;
+  graphVersion?: string;
+}
+
+export function whatsappMetaEnvFilePath(): string {
+  return bmsConfigFilePath('whatsapp-meta.env');
+}
+
+export function writeWhatsappMetaEnvFile(dto: WhatsappMetaSystemSettings): void {
+  const lines: string[] = [
+    `WHATSAPP_APP_ID=${dto.appId}`,
+    `WHATSAPP_APP_SECRET=${dto.appSecret}`,
+    `WHATSAPP_CONFIG_ID=${dto.configId}`,
+    `WHATSAPP_VERIFY_TOKEN=${dto.verifyToken}`,
+  ];
+  if (dto.graphVersion) lines.push(`WHATSAPP_GRAPH_VERSION=${dto.graphVersion}`);
+  writeEnvFile(whatsappMetaEnvFilePath(), lines);
+}
+
+// ---------- WhatsApp EvoHub (turnkey mode) ----------
+
+export interface WhatsappHubSystemSettings {
+  enabled: boolean;
+  url: string;
+  apiKey: string;
+  webhookSecret: string;
+}
+
+export function whatsappHubEnvFilePath(): string {
+  return bmsConfigFilePath('whatsapp-hub.env');
+}
+
+export function writeWhatsappHubEnvFile(dto: WhatsappHubSystemSettings): void {
+  const lines: string[] = [
+    `EVOLUTION_HUB_ENABLED=${dto.enabled ? 'true' : 'false'}`,
+    `EVOLUTION_HUB_URL=${dto.url}`,
+    `EVOLUTION_HUB_API_KEY=${dto.apiKey}`,
+    `EVOLUTION_HUB_WEBHOOK_SECRET=${dto.webhookSecret}`,
+  ];
+  writeEnvFile(whatsappHubEnvFilePath(), lines);
+}
