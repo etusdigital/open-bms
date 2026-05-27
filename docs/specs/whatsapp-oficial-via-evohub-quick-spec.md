@@ -372,8 +372,8 @@ WHATSAPP_PROVIDER              ← DELETE
 | 7.3  | ✅ Concluída | `feature/whatsapp-cloud-meta-evohub` · `d1ea236+9402abd`         |
 | 7.8  | ✅ Concluída | `feature/whatsapp-cloud-meta-evohub` · `7adcc68+5f8bdf0+f2973fb` |
 | 4    | ✅ Concluída | `feature/whatsapp-cloud-meta-evohub` · `429bff1`                 |
-| 7.4  | ✅ Concluída | `feature/whatsapp-cloud-meta-evohub` · `429bff1` + fixes         |
-| 5    | ⏳ Pendente  |                                                                  |
+| 7.4  | ✅ Concluída | `feature/whatsapp-cloud-meta-evohub` · `429bff1` + `3e90a82`     |
+| 5    | ✅ Concluída | `feature/whatsapp-cloud-meta-evohub` · (próximo commit)          |
 | 6    | ⏳ Pendente  |                                                                  |
 | 7.6  | ⏳ Pendente  |                                                                  |
 | 8    | ⏳ Pendente  |                                                                  |

@@ -21,8 +21,9 @@ import { AppService } from './app.service';
 import { EventPublisherService } from './event-publisher.service';
 import { MsgopsService } from './msgops/msgops.service';
 import { Utils } from './utils/index.utils';
+import { WhatsappChannelResolverService } from './providers/whatsapp-channel-resolver.service';
 
-describe('AppService', () => {
+describe('AppService (Wave 5 — WhatsApp Cloud)', () => {
   let service: AppService;
 
   const mockEventPublisher = {
@@ -34,7 +35,13 @@ describe('AppService', () => {
     createShortLink: jest.fn().mockResolvedValue('https://short.link/abc123'),
   };
 
-  const mockUtils = {};
+  const mockProvider = {
+    sendTemplate: jest.fn().mockResolvedValue({ messaging_product: 'whatsapp', messages: [{ id: 'wamid.OK' }] }),
+  };
+
+  const mockResolver = {
+    buildProvider: jest.fn().mockResolvedValue({ provider: mockProvider, channel: { id: 99, mode: 'meta' } }),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -42,7 +49,8 @@ describe('AppService', () => {
         AppService,
         { provide: EventPublisherService, useValue: mockEventPublisher },
         { provide: MsgopsService, useValue: mockMsgopsService },
-        { provide: Utils, useValue: mockUtils },
+        { provide: Utils, useValue: {} },
+        { provide: WhatsappChannelResolverService, useValue: mockResolver },
       ],
     }).compile();
 
@@ -50,48 +58,117 @@ describe('AppService', () => {
     jest.clearAllMocks();
   });
 
-  describe('processCampaign — Wave 2 stub', () => {
-    it('returns 503 without invoking any provider (WhatsApp Cloud lands in Wave 5)', async () => {
-      const result = await service.processCampaign({
-        account: { id: 7, name: 'Acme', accountConfigs: [] } as any,
-        message: { id: 1, name: 'msg', type: 'whatsapp', content: '' } as any,
+  describe('processCampaign', () => {
+    it('returns 400 when account.id is missing', async () => {
+      const r = await service.processCampaign({ account: {}, message: { id: 1, providerMessageId: 't' } } as any);
+      expect(r.status).toBe(400);
+      expect(mockResolver.buildProvider).not.toHaveBeenCalled();
+    });
+
+    it('returns 422 when the message has no providerMessageId (template not synced)', async () => {
+      const r = await service.processCampaign({
+        account: { id: 7, accountConfigs: [] },
+        message: { id: 1, name: 'msg', type: 'whatsapp' },
         contacts: [],
       } as any);
+      expect(r.status).toBe(422);
+      expect(mockResolver.buildProvider).not.toHaveBeenCalled();
+    });
 
-      expect(result).toEqual({ status: 503, message: expect.stringMatching(/Wave 5/) });
-      expect(mockEventPublisher.publish).not.toHaveBeenCalled();
+    it('returns 400 when channel resolution fails (no active channel)', async () => {
+      mockResolver.buildProvider.mockRejectedValueOnce(new Error('No active WhatsApp channel for account 7'));
+      const r = await service.processCampaign({
+        account: { id: 7, accountConfigs: [] },
+        message: { id: 1, providerMessageId: 'order_update', type: 'whatsapp' },
+        contacts: [{ id: 1, hasWhatsapp: true, whatsapp: '5511' }],
+      } as any);
+      expect(r.status).toBe(400);
+    });
+
+    it('sends one template per contact and emits a campaign tracker', async () => {
+      const r = await service.processCampaign({
+        account: { id: 7, accountConfigs: [{ name: 'default_language', value: 'pt_BR' }] },
+        message: { id: 1, name: 'msg', type: 'whatsapp', providerMessageId: 'order_update' },
+        contacts: [
+          { id: 1, hasWhatsapp: true, whatsapp: '+5511999990001' },
+          { id: 2, hasWhatsapp: true, whatsapp: '+5511999990002' },
+          { id: 3, hasWhatsapp: false }, // skipped
+        ],
+        campaign: { id: 99, name: 'camp', type: 'simple' },
+        campaign_id: 99,
+      } as any);
+
+      expect(r.status).toBe(201);
+      expect(r.sent).toBe(3);
+      expect(mockProvider.sendTemplate).toHaveBeenCalledTimes(2);
+      expect(mockProvider.sendTemplate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          templateName: 'order_update',
+          languageCode: 'pt_BR',
+        }),
+      );
+      // tracker emitted
+      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
+        'bms.campaigns',
+        'campaign.tracked',
+        expect.objectContaining({ service: 'MSGOPS_SEND_BATCH_WHATSAPP', event: 'SENT_WHATSAPP_BATCH' }),
+      );
     });
   });
 
-  describe('processAutomation — Wave 2 stub', () => {
-    it('returns 503 and forwards to next step when next.pubName is set', async () => {
+  describe('processAutomation', () => {
+    it('skips to invalidContact path when contact has no WhatsApp', async () => {
       const next = { pubName: 'bms.triggers/trigger.process', data: { foo: 'bar' } } as any;
-
-      const result = await service.processAutomation({
-        account: { id: 7, accountConfigs: [] } as any,
-        contact: { id: 1, hasWhatsapp: true, whatsapp: '+55119...' } as any,
-        message: { id: 1, type: 'whatsapp' } as any,
-        next,
-      } as any);
-
-      expect(result.status).toBe(503);
-      expect(mockEventPublisher.publish).toHaveBeenCalledWith('bms.triggers', 'trigger.process', next.data);
-    });
-
-    it('redirects to invalidContact path when contact has no WhatsApp', async () => {
-      const next = { pubName: 'bms.triggers/trigger.process', data: { foo: 'bar' } } as any;
-
-      const result = await service.processAutomation({
-        account: { id: 7 } as any,
-        contact: { id: 1, hasWhatsapp: false } as any,
-        message: { id: 1 } as any,
+      const r = await service.processAutomation({
+        account: { id: 7 },
+        contact: { id: 1, hasWhatsapp: false },
+        message: { id: 1, providerMessageId: 't' },
         messageId: 1,
         next,
       } as any);
-
-      expect(result.status).toBe(true);
-      expect(result.message).toMatch(/Invalid contact/);
+      expect(r.status).toBe(true);
+      expect(r.message).toMatch(/Invalid contact/);
+      expect(mockProvider.sendTemplate).not.toHaveBeenCalled();
       expect(mockEventPublisher.publish).toHaveBeenCalledWith('bms.triggers', 'trigger.process', next.data);
+    });
+
+    it('returns 422 when template is missing', async () => {
+      const r = await service.processAutomation({
+        account: { id: 7 },
+        contact: { id: 1, hasWhatsapp: true, whatsapp: '5511' },
+        message: { id: 1 },
+        messageId: 1,
+      } as any);
+      expect(r.status).toBe(422);
+    });
+
+    it('sends template and forwards to next step on success', async () => {
+      const next = { pubName: 'bms.triggers/trigger.process', data: { foo: 'bar' } } as any;
+      const r = await service.processAutomation({
+        account: { id: 7, accountConfigs: [] },
+        contact: { id: 1, hasWhatsapp: true, whatsapp: '5511' },
+        message: { id: 1, providerMessageId: 'welcome', type: 'whatsapp' },
+        messageId: 1,
+        automationId: 5,
+        next,
+      } as any);
+      expect(r.status).toBe(true);
+      expect(mockProvider.sendTemplate).toHaveBeenCalledWith(expect.objectContaining({ templateName: 'welcome', languageCode: 'pt_BR' }));
+      expect(mockEventPublisher.publish).toHaveBeenCalledWith('bms.triggers', 'trigger.process', next.data);
+    });
+
+    it('does NOT forward to next step when the send fails', async () => {
+      mockProvider.sendTemplate.mockRejectedValueOnce(new Error('Meta returned 400 Invalid Number'));
+      const next = { pubName: 'bms.triggers/trigger.process', data: { foo: 'bar' } } as any;
+      const r = await service.processAutomation({
+        account: { id: 7, accountConfigs: [] },
+        contact: { id: 1, hasWhatsapp: true, whatsapp: '5511' },
+        message: { id: 1, providerMessageId: 'welcome' },
+        messageId: 1,
+        next,
+      } as any);
+      expect(r.status).toBe(502);
+      expect(mockEventPublisher.publish).not.toHaveBeenCalledWith('bms.triggers', 'trigger.process', next.data);
     });
   });
 
@@ -125,7 +202,6 @@ describe('AppService', () => {
         account: { id: 1 } as any,
       });
       expect(result).toBe('https://short.link/abc123');
-      expect(mockMsgopsService.createShortLink).toHaveBeenCalled();
       const [calledUrl] = mockMsgopsService.createShortLink.mock.calls[0];
       expect(calledUrl).toContain('a=1');
       expect(calledUrl).toContain('utm_source=bms');
