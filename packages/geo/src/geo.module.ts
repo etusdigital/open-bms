@@ -63,9 +63,12 @@ function buildRedisProvider(): Provider {
         port: parseInt(process.env.REDIS_PORT || '6379', 10),
         password: process.env.REDIS_PASSWORD || undefined,
         // Don't crash on boot if Redis is briefly unavailable — the provider
-        // logs and falls back to direct lookups.
+        // logs and falls back to direct lookups. retryStrategy garante novo
+        // DNS lookup quando a overlay do Swarm ainda não publicou o host.
         lazyConnect: false,
-        maxRetriesPerRequest: 2,
+        enableReadyCheck: false,
+        maxRetriesPerRequest: null,
+        retryStrategy: (times: number) => Math.min(times * 200, 5000),
       });
     },
   };
