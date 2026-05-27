@@ -29,8 +29,10 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.0.0",
     "@aws-sdk/client-sesv2": "^3.1044.0",
+    "@bms/evolution-hub": "workspace:*",
     "@bms/geo": "workspace:*",
     "@bms/messaging": "workspace:*",
+    "@bms/whatsapp-cloud": "workspace:*",
     "@clickhouse/client": "^1.15.0",
     "@grpc/grpc-js": "^1.14.3",
     "@grpc/proto-loader": "^0.8.0",

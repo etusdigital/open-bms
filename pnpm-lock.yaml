@@ -1136,12 +1136,18 @@ importers:
       '@aws-sdk/client-sesv2':
         specifier: ^3.1044.0
         version: 3.1044.0
+      '@bms/evolution-hub':
+        specifier: workspace:*
+        version: link:../../packages/evolution-hub
       '@bms/geo':
         specifier: workspace:*
         version: link:../../packages/geo
       '@bms/messaging':
         specifier: workspace:*
         version: link:../../packages/messaging
+      '@bms/whatsapp-cloud':
+        specifier: workspace:*
+        version: link:../../packages/whatsapp-cloud
       '@clickhouse/client':
         specifier: ^1.15.0
         version: 1.18.2

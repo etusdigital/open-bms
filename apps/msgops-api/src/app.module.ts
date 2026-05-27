@@ -33,6 +33,8 @@ import { AdminIntegrationsModule } from './modules/admin-integrations/admin-inte
 import { EnterpriseImportModule } from './modules/enterprise-import/enterprise-import.module';
 import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
 import { WhatsappModeResolverModule } from './modules/whatsapp-mode-resolver/whatsapp-mode-resolver.module';
+import { WhatsappChannelsModule } from './modules/whatsapp-channels/whatsapp-channels.module';
+import { WhatsappWebhooksModule } from './modules/whatsapp-webhooks/whatsapp-webhooks.module';
 import { MessagingModule } from './providers/messaging/messaging.module';
 import { QueueModule } from './providers/queue/queue.module';
 import { SystemConfigCacheModule } from './providers/system-config-cache.module';
@@ -79,6 +81,8 @@ import { SystemConfigCacheModule } from './providers/system-config-cache.module'
     EnterpriseImportModule,
     WhatsappModeResolverModule,
     FeatureFlagsModule,
+    WhatsappChannelsModule,
+    WhatsappWebhooksModule,
   ],
   providers: [AuditSubscriber],
 })
