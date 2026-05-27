@@ -13,6 +13,15 @@ export interface FeatureFlags {
    * + restart — `staleTime: Infinity` is safe.
    */
   evolution_hub_enabled: boolean;
+
+  /** Public Meta App id (NOT a secret). Empty string while admin has not configured the Meta App tab. */
+  whatsapp_app_id: string;
+
+  /** Public Embedded Signup config id. Empty string while not configured. */
+  whatsapp_config_id: string;
+
+  /** Default Graph API version, e.g. v18.0. */
+  whatsapp_graph_version: string;
 }
 
 export async function fetchFeatureFlags(): Promise<FeatureFlags> {

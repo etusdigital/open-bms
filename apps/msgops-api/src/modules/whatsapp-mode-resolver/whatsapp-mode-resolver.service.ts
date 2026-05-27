@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { SystemConfigCacheProvider } from '../../providers/system-config-cache.provider';
 
 export type WhatsappMode = 'meta' | 'evohub';
 
@@ -21,37 +22,52 @@ export interface ResolvableChannel {
   channelToken: string | null;
 }
 
+interface HubSystemSettings {
+  enabled?: boolean;
+  apiKey?: string;
+  webhookSecret?: string;
+}
+
+const HUB_KEY = 'whatsapp_hub_system_settings';
+
 /**
- * Wave 3 — mode resolver.
+ * Wave 3 — mode resolver (Wave 7.8 hardening).
  *
- * Centralises the rule "is this install in Meta-direct or EvoHub-proxy mode?".
- * The mode is install-wide (driven by EVOLUTION_HUB_ENABLED), matching the
- * Evo CRM behaviour referenced in the spec §2.1/§2.2.
+ * Source of truth for "is this install in Meta-direct or EvoHub-proxy mode?"
+ * is the `system_config` row written by Super Admin → WhatsApp (EvoHub).
+ * We read through the SystemConfigCacheProvider (Redis, 60s TTL, invalidated
+ * on save) so flipping the toggle in the admin UI reflects in seconds without
+ * a process restart.
  *
- * resolveChannel() is the function the WhatsappCloudProvider (wave 5) and
- * WhatsappTemplateSyncService (wave 6) will call before sending or syncing —
- * it returns the { baseUrl, bearerToken, phoneNumberId } triple that makes
- * one provider work for both modes.
+ * Falls back to process.env.EVOLUTION_HUB_ENABLED only when the DB row
+ * has not been populated yet — useful for fresh installs.
  */
 @Injectable()
 export class WhatsappModeResolverService {
-  resolveMode(): WhatsappMode {
-    return this.isHubEnabled() ? 'evohub' : 'meta';
+  constructor(private readonly cache: SystemConfigCacheProvider) {}
+
+  async resolveMode(): Promise<WhatsappMode> {
+    return (await this.isHubEnabled()) ? 'evohub' : 'meta';
   }
 
-  isHubEnabled(): boolean {
-    const raw = (process.env.EVOLUTION_HUB_ENABLED ?? '').toString().trim().toLowerCase();
-    return raw === 'true' || raw === '1' || raw === 'yes';
+  async isHubEnabled(): Promise<boolean> {
+    const cfg = await this.cache.get<HubSystemSettings>(HUB_KEY);
+    if (cfg && typeof cfg.enabled === 'boolean') return cfg.enabled;
+    return this.readEnvFlag();
   }
 
-  resolveChannel(channel: ResolvableChannel): ResolvedWhatsappChannelConfig {
-    const mode = this.resolveMode();
+  /** Synchronous env-only check — used by callers that cannot await (e.g. controllers in setup paths). */
+  isHubEnabledFromEnv(): boolean {
+    return this.readEnvFlag();
+  }
+
+  async resolveChannel(channel: ResolvableChannel): Promise<ResolvedWhatsappChannelConfig> {
+    const mode = await this.resolveMode();
 
     if (channel.mode !== mode) {
       // Channel was created under a different install mode (e.g. install
-      // started in meta mode, channel persisted, then EVOLUTION_HUB_ENABLED
-      // flipped on). The send path should refuse the channel rather than
-      // silently use mismatched credentials.
+      // started in meta mode, channel persisted, then EvoHub got enabled).
+      // Refuse the channel rather than silently use mismatched credentials.
       throw new Error(`WhatsApp channel mode (${channel.mode}) does not match install mode (${mode}). Reconnect the channel under the active mode.`);
     }
 
@@ -63,9 +79,6 @@ export class WhatsappModeResolverService {
       if (!channel.channelToken) {
         throw new Error('EvoHub channel is missing channel_token — wait for channel_connected webhook.');
       }
-      // EvoHub endpoint is fixed at https://api.evohub.ai — matches HUB_API_URL
-      // in evo-ai-crm-community/lib/meta_base_url.rb. EVOLUTION_HUB_URL stays
-      // available as an emergency override for dev / staging Hub mocks.
       const hubUrl = (process.env.EVOLUTION_HUB_URL ?? 'https://api.evohub.ai').replace(/\/+$/, '');
       const graphVersion = process.env.WHATSAPP_GRAPH_VERSION ?? 'v18.0';
       return {
@@ -87,5 +100,10 @@ export class WhatsappModeResolverService {
       bearerToken: channel.accessToken,
       phoneNumberId: channel.phoneNumberId,
     };
+  }
+
+  private readEnvFlag(): boolean {
+    const raw = (process.env.EVOLUTION_HUB_ENABLED ?? '').toString().trim().toLowerCase();
+    return raw === 'true' || raw === '1' || raw === 'yes';
   }
 }

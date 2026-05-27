@@ -9,6 +9,17 @@ export interface FeatureFlagsDto {
    * connect buttons. Source of truth: EVOLUTION_HUB_ENABLED env var.
    */
   evolution_hub_enabled: boolean;
+
+  /**
+   * Public Meta App identifiers (NOT secrets) that the frontend needs to
+   * initialize the Facebook SDK and call FB.login with the Embedded Signup
+   * config. Both are read off process.env, populated by the Super Admin →
+   * WhatsApp (Meta App) tab. Empty string when not configured yet — the UI
+   * uses this to surface a "configure credentials first" hint.
+   */
+  whatsapp_app_id: string;
+  whatsapp_config_id: string;
+  whatsapp_graph_version: string;
 }
 
 /**
@@ -25,9 +36,12 @@ export class FeatureFlagsController {
 
   @Get()
   @PublicRoute()
-  getFlags(): FeatureFlagsDto {
+  async getFlags(): Promise<FeatureFlagsDto> {
     return {
-      evolution_hub_enabled: this.resolver.isHubEnabled(),
+      evolution_hub_enabled: await this.resolver.isHubEnabled(),
+      whatsapp_app_id: process.env.WHATSAPP_APP_ID ?? '',
+      whatsapp_config_id: process.env.WHATSAPP_CONFIG_ID ?? '',
+      whatsapp_graph_version: process.env.WHATSAPP_GRAPH_VERSION ?? 'v18.0',
     };
   }
 }

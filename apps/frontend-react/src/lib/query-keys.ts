@@ -62,4 +62,9 @@ export const queryKeys = {
   featureFlags: {
     all: ['feature-flags'] as const,
   },
+  whatsappChannels: {
+    all: ['whatsapp-channels'] as const,
+    list: (accountId: number) => ['whatsapp-channels', 'list', { accountId }] as const,
+    detail: (accountId: number, id: number) => ['whatsapp-channels', 'detail', { accountId, id }] as const,
+  },
 } as const;

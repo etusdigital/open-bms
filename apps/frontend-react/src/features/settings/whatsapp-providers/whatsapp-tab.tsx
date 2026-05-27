@@ -3,23 +3,23 @@ import { useEvolutionHubEnabled } from '@/features/feature-flags/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ChannelsList, HubConnectButton, MetaConnectButton } from '@/features/whatsapp-channels';
+import { useAccountId } from '../use-settings';
 
 /**
- * Wave 7.3 — Settings → WhatsApp tab (preview).
+ * Wave 7.4 — Settings → WhatsApp tab with functional connect flow.
  *
- * Mirrors the per-account configuration model used by Email Providers: each
- * account manages its own WhatsApp channels from this tab. The flag-driven
- * branch (Meta direct vs EvoHub) is install-wide; the channels themselves
- * are per-account.
- *
- * Buttons are disabled placeholders for Wave 7.4 — once channel CRUD,
- * MetaConnectButton (FB SDK) and HubConnectButton (public_link polling)
- * land, they take over.
+ * - Card "Modo de instalação" mirrors the install-wide flag (Meta direct
+ *   vs EvoHub) so admins know which connect path will run.
+ * - The connect card hosts MetaConnectButton (FB.login + Embedded Signup)
+ *   or HubConnectButton (public_link in a new tab) depending on the flag.
+ * - The list card is always visible and refreshes when channels are added
+ *   or deleted; pending EvoHub channels poll status until they flip.
  */
 export function WhatsAppTab() {
   const { t } = useTranslation();
+  const accountId = useAccountId();
   const { enabled, isLoading, isError } = useEvolutionHubEnabled();
 
   return (
@@ -44,9 +44,15 @@ export function WhatsAppTab() {
               <Skeleton className="h-10 w-48" />
             </div>
           ) : enabled ? (
-            <HubModePreview />
+            <>
+              <p className="text-sm">{t('settings.whatsapp.hubDescription')}</p>
+              <HubConnectButton accountId={accountId} />
+            </>
           ) : (
-            <MetaModePreview />
+            <>
+              <p className="text-sm">{t('settings.whatsapp.metaDescription')}</p>
+              <MetaConnectButton accountId={accountId} />
+            </>
           )}
         </CardContent>
       </Card>
@@ -54,38 +60,12 @@ export function WhatsAppTab() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{t('settings.whatsapp.channelsTitle')}</CardTitle>
-          <CardDescription>{t('settings.whatsapp.channelsDescription')}</CardDescription>
+          <CardDescription>{t('settings.whatsapp.channelsListDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground text-sm italic">{t('settings.whatsapp.channelsEmpty')}</p>
+          <ChannelsList accountId={accountId} />
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function MetaModePreview() {
-  const { t } = useTranslation();
-  return (
-    <div className="space-y-3">
-      <p className="text-sm">{t('settings.whatsapp.metaDescription')}</p>
-      <Button size="lg" disabled className="bg-[#1877f2] text-white hover:bg-[#1877f2]/90">
-        {t('settings.whatsapp.metaButton')}
-      </Button>
-      <p className="text-muted-foreground text-xs">{t('settings.whatsapp.metaButtonHint')}</p>
-    </div>
-  );
-}
-
-function HubModePreview() {
-  const { t } = useTranslation();
-  return (
-    <div className="space-y-3">
-      <p className="text-sm">{t('settings.whatsapp.hubDescription')}</p>
-      <Button size="lg" disabled>
-        {t('settings.whatsapp.hubButton')}
-      </Button>
-      <p className="text-muted-foreground text-xs">{t('settings.whatsapp.hubButtonHint')}</p>
     </div>
   );
 }

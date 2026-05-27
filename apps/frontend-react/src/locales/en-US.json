@@ -1687,14 +1687,9 @@
       "flagsErrorTitle": "Failed to load feature flags",
       "flagsErrorBody": "Public endpoint GET /feature-flags did not respond. Check whether msgops-api is up.",
       "metaDescription": "Direct connection to Meta via Embedded Signup. The admin connects their own Meta App + WABA and BMS talks straight to graph.facebook.com.",
-      "metaButton": "Sign in with Facebook (Wave 7.4)",
-      "metaButtonHint": "Button becomes functional once MetaConnectButton + FB SDK loader land (Wave 7.4).",
       "hubDescription": "Connection through EvoHub. The Hub provides a shared Meta App and manages Embedded Signup; BMS talks to Meta via api.evohub.ai/meta/*.",
-      "hubButton": "Connect via EvoHub (Wave 7.4)",
-      "hubButtonHint": "Button becomes functional once HubConnectButton + status polling land (Wave 7.4).",
       "channelsTitle": "Connected channels",
-      "channelsDescription": "The channel list activates in Wave 4 (Channels API).",
-      "channelsEmpty": "No channels registered yet — CRUD lands when POST /accounts/:id/whatsapp-channels ships."
+      "channelsListDescription": "Each channel is a WhatsApp number bound to this account. Status refreshes as the Hub fires the connection webhook."
     },
     "poolHelp": "Configure the account's default IP pool — pool, limits and IPs.",
     "poolIdentityMovedHelp": "Sender identity (name, email, reply-to) has moved to the Senders page. Configure and sync verified senders there.",
@@ -1909,6 +1904,35 @@
     "apiKeysStatus": "Status",
     "apiKeysLastUsed": "Last used",
     "apiKeysRevokedBadge": "Revoked"
+  },
+  "whatsappChannels": {
+    "channelName": "Channel name",
+    "channelNameHelp": "Shown in the channel list. This is a label, not the phone number itself.",
+    "nameRequired": "Please give the channel a name.",
+    "metaButton": "Sign in with Facebook",
+    "hubButton": "Connect via EvoHub",
+    "loadingSdk": "Loading Facebook SDK…",
+    "metaNotConfiguredTitle": "Meta App credentials not configured",
+    "metaNotConfiguredBody": "Ask the Super Admin to fill in App ID, App Secret, Config ID and Verify Token under Super Admin → WhatsApp (Meta App).",
+    "loginCancelled": "Facebook login was cancelled.",
+    "embeddedSignupIncomplete": "Embedded Signup did not return phone_number_id / waba_id. Please try again.",
+    "connectedOk": "Channel connected.",
+    "connectError": "Failed to connect the channel.",
+    "hubOpenedSignup": "EvoHub Embedded Signup opened in a new tab.",
+    "hubNoPublicLink": "Channel created, but EvoHub did not return a signup link.",
+    "deletedOk": "Channel removed.",
+    "deleteError": "Failed to remove the channel.",
+    "deleteTitle": "Remove WhatsApp channel",
+    "deleteDescription": "Are you sure you want to remove the channel \"{{name}}\"? This cannot be undone.",
+    "deleteAria": "Remove channel",
+    "empty": "No channels connected yet. Use the button above to connect the first one.",
+    "noPhoneYet": "Waiting for signup to complete…",
+    "status": {
+      "pending": "Pending",
+      "active": "Active",
+      "disconnected": "Disconnected",
+      "error": "Error"
+    }
   },
   "integrations": {
     "pageTitle": "Integrations",
