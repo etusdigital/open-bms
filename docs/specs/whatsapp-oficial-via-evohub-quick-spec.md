@@ -364,22 +364,35 @@ WHATSAPP_PROVIDER              ← DELETE
 
 ### Progresso de Execução
 
-| Onda | Status       | Branch / Commit                                       |
-| ---- | ------------ | ----------------------------------------------------- |
-| 1    | ✅ Concluída | `feature/whatsapp-cloud-meta-evohub` · `cdcc223`      |
-| 2    | ✅ Concluída | `feature/whatsapp-cloud-meta-evohub` · próximo commit |
-| 3    | ⏳ Pendente  |                                                       |
-| 4    | ⏳ Pendente  |                                                       |
-| 5    | ⏳ Pendente  |                                                       |
-| 6    | ⏳ Pendente  |                                                       |
-| 7    | ⏳ Pendente  |                                                       |
-| 8    | ⏳ Pendente  |                                                       |
+| Onda | Status       | Branch / Commit                                          |
+| ---- | ------------ | -------------------------------------------------------- |
+| 1    | ✅ Concluída | `feature/whatsapp-cloud-meta-evohub` · `cdcc223`         |
+| 2    | ✅ Concluída | `feature/whatsapp-cloud-meta-evohub` · `5594835`         |
+| 3    | ✅ Concluída | `feature/whatsapp-cloud-meta-evohub` · `78f0fb4`         |
+| 7.3  | ✅ Concluída | `feature/whatsapp-cloud-meta-evohub` · `d1ea236+9402abd` |
+| 4    | ⏳ Pendente  |                                                          |
+| 7.4  | ⏳ Pendente  |                                                          |
+| 7.8  | ⏳ Pendente  |                                                          |
+| 5    | ⏳ Pendente  |                                                          |
+| 6    | ⏳ Pendente  |                                                          |
+| 7.6  | ⏳ Pendente  |                                                          |
+| 8    | ⏳ Pendente  |                                                          |
 
 **Branch:** `feature/whatsapp-cloud-meta-evohub` (a partir de `main` = `588b63c`).
-**Desvios do spec:**
+
+**Estratégia de execução adotada:** a Onda 7 (frontend) foi fatiada e cada fatia entrega imediatamente após a onda backend correspondente, para validação visual contínua:
+
+- **7.3** ↔ Onda 3 — Settings → tab WhatsApp mostrando o modo de instalação (preview de botões)
+- **7.4** ↔ Onda 4 — botões Meta/Hub funcionais + lista de canais por conta
+- **7.8** ↔ Onda 4 (antecipado) — Super Admin → tabs Meta + Hub (segue o mesmo padrão de Email Providers em vez de só ENV)
+- **7.6** ↔ Onda 6 — editor de templates WhatsApp
+
+**Desvios do spec original:**
 
 - Migrations vivem em `apps/msgops-api/src/migrations/` (não em `packages/database/src/migrations/`) — esse é o padrão real do monorepo. Timestamp ajustado para `1781000000000` (> última migration existente `1780000000000`).
-- Ondas 2/3/5/6 deixam um stub `501 Not Implemented` no caminho de envio/aprovação WhatsApp até a Onda 5 (`WhatsappCloudProvider`) e Onda 6 (`WhatsappTemplateSyncService`) entrarem. O caminho Twilio (`WHATSAPP_PROVIDER=twilio`) permanece intocado durante a transição.
+- Ondas 2/3 deixam stubs (`501 Not Implemented` em template approval / `503 Service Unavailable` no envio) até as Ondas 5 (`WhatsappCloudProvider`) e 6 (`WhatsappTemplateSyncService`) entrarem. O caminho Twilio (`WHATSAPP_PROVIDER=twilio`) permanece intocado durante a transição.
+- A tela "Conectar WhatsApp" virou tab em `/settings` (per-account), alinhada ao padrão de Email Providers — não fica em menu próprio em Mensagens.
+- Configuração das credenciais Meta App / Hub vai migrar de ENV para o painel Super Admin (Onda 7.8), seguindo o padrão SendGrid/SES/Mandrill (persistência em `system_config` + cache + bootstrap de arquivo `.env`). ENVs continuam funcionando como fallback durante a migração.
 
 ### Onda 1 — Fundação ✅
 
@@ -444,14 +457,37 @@ WHATSAPP_PROVIDER              ← DELETE
 - `pnpm test` em `msgops-api` (filtrado para impactados): `messages.service.spec` 10/10, `accounts-service.spec` 25/25. ✅
 - `pnpm dev` na `msgops-api` local → boot completo: `[NestApplication] Nest application successfully started`. ✅
 
-### Onda 3 — Resolver + endpoint de feature flag
+### Onda 3 — Resolver + endpoint de feature flag ✅
 
-10. **`apps/msgops-api/src/services/whatsapp-mode-resolver.ts`**:
-    - `resolveMode(): 'meta' | 'evohub'` — lê `EVOLUTION_HUB_ENABLED`.
-    - `resolveChannel(channel): { baseUrl, bearerToken, phoneNumberId, mode }`.
+10. **`apps/msgops-api/src/modules/whatsapp-mode-resolver/whatsapp-mode-resolver.service.ts`**: ✅
+    - `resolveMode(): 'meta' | 'evohub'` lendo `EVOLUTION_HUB_ENABLED` (aceita `true/1/yes`, case-insensitive). ✅
+    - `isHubEnabled(): boolean` utilitário separado pra evitar branchs duplicadas. ✅
+    - `resolveChannel(channel): { mode, baseUrl, bearerToken, phoneNumberId }` — meta retorna `graph.facebook.com/{version}` + `access_token`; evohub retorna `{EVOLUTION_HUB_URL}/meta/{version}` + `channel_token`. ✅
+    - Drift detection: erro explícito se `channel.mode !== install mode` (env flipou após canal ter sido criado). ✅
+    - **19/19 tests verdes** cobrindo parsing de env, ambas URLs, drift e guards de token/phone faltando. ✅
 
-11. **`apps/msgops-api/src/modules/feature-flags/feature-flags.controller.ts`** (se ainda não existir):
-    - `GET /feature-flags` retorna pelo menos `{ evolution_hub_enabled: boolean }` para o frontend renderizar o botão correto.
+11. **`apps/msgops-api/src/modules/feature-flags/feature-flags.controller.ts`** ✅
+    - `GET /feature-flags` (`@PublicRoute`, sem Bearer) → `{ evolution_hub_enabled: boolean }`. ✅
+    - Validado live: `curl http://localhost:5001/feature-flags` → `{"evolution_hub_enabled":false}`. ✅
+
+12. **ENVs adicionadas em `apps/msgops-api/.env.example`**: ✅
+    - `EVOLUTION_HUB_ENABLED=false` (default), `EVOLUTION_HUB_URL=https://api.evohub.ai`, `WHATSAPP_GRAPH_VERSION=v18.0`. ✅
+    - Placeholders comentados pros segredos das ondas seguintes (`WHATSAPP_APP_ID/SECRET/CONFIG_ID/VERIFY_TOKEN`, `EVOLUTION_HUB_API_KEY`, `EVOLUTION_HUB_WEBHOOK_SECRET`). ✅
+
+### Onda 7.3 — Frontend (tab WhatsApp em Configurações) ✅
+
+13. **`apps/frontend-react/src/features/feature-flags/api.ts`**: ✅
+    - `useFeatureFlags()` query (TanStack, `staleTime: Infinity`, `refetchOnWindowFocus: false`). ✅
+    - `useEvolutionHubEnabled()` convenience hook. ✅
+    - Endpoint público — funciona antes do login. ✅
+
+14. **Tab "WhatsApp" em `/settings`** (`apps/frontend-react/src/features/settings/whatsapp-providers/whatsapp-tab.tsx`): ✅
+    - Adicionada ao lado de **Email Providers**, seguindo o mesmo padrão visual (card + descrição + ações). ✅
+    - Card "Modo de instalação" com Badge dinâmico (`Meta direto` vs `EvoHub`) baseado na flag. ✅
+    - Branch entre `MetaModePreview` (botão azul Facebook estilo `#1877f2`) e `HubModePreview` (botão padrão) — ambos desabilitados (aguardando Onda 7.4). ✅
+    - Card "Canais conectados" vazio (CRUD entra na Onda 4 + 7.4). ✅
+    - Tratamento de erro caso o endpoint `/feature-flags` falhe (Alert vermelho). ✅
+    - i18n completa em `pt-BR`, `en-US`, `es-ES` (chaves `settings.whatsapp.*`). ✅
 
 ### Onda 4 — API de canais + webhooks
 
