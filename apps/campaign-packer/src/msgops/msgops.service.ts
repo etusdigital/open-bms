@@ -144,6 +144,23 @@ export class MsgopsService {
     return campaign;
   }
 
+  /**
+   * Lean lookup used by processPage right before sending — includes
+   * soft-deleted rows so we can detect a cancellation that happened while
+   * the BullMQ job was sitting in the delayed queue. Returns null if the
+   * row was hard-deleted (which the API never does today, but the worker
+   * should be resilient anyway).
+   */
+  async getCampaignForProcessing(campaignId: number): Promise<{ id: number; status: number; deletedAt: Date | null } | null> {
+    const row = await this.campaignRepository.findOne({
+      where: { id: campaignId },
+      withDeleted: true,
+      select: { id: true, status: true, deletedAt: true } as any,
+    });
+    if (!row) return null;
+    return { id: row.id, status: row.status, deletedAt: row.deletedAt ?? null };
+  }
+
   async createContactsSend(campaign: CampaignEntity) {
     if (campaign.runSegment) {
       const tagsJson = JSON.parse(JSON.stringify(campaign.tags));

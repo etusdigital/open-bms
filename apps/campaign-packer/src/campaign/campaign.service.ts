@@ -184,6 +184,28 @@ export class CampaignService {
       this.logger.log(`[Process Page] Stop processing campaign: ${campaignBatch.campaign.id}`);
       return {};
     }
+
+    // Campaign-page jobs are scheduled in BullMQ with a delay (spread_sending,
+    // typically several minutes). If the operator deletes/cancels the campaign
+    // in that window, msgops-api soft-deletes the row and sets status=Stopped
+    // (4), but the delayed job is still in Redis — there is no easy way to
+    // cancel it from the API side because we never persist the BullMQ job id.
+    // Read fresh DB state right before sending so a deleted/stopped campaign
+    // gets ack-and-skip instead of going out to Meta / providers.
+    const fresh = await this.msgopsService.getCampaignForProcessing(campaignBatch.campaign.id);
+    if (!fresh) {
+      this.logger.log(`[Process Page] Campaign ${campaignBatch.campaign.id} not found (deleted) — skipping job.`);
+      return {};
+    }
+    if (fresh.deletedAt) {
+      this.logger.log(`[Process Page] Campaign ${campaignBatch.campaign.id} was deleted at ${fresh.deletedAt.toISOString()} — skipping job.`);
+      return {};
+    }
+    if (fresh.status === 4 /* CampaignsStatus.Stopped */ || fresh.status === 5 /* Completed */) {
+      this.logger.log(`[Process Page] Campaign ${campaignBatch.campaign.id} is in terminal state status=${fresh.status} — skipping job.`);
+      return {};
+    }
+
     this.validateData(campaignBatch);
 
     const { contactsLength } = await this.mountPackages(campaignBatch);
