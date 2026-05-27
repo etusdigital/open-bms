@@ -67,6 +67,10 @@ export const whatsappChannelsService = {
     const { data } = await apiClient.post<WhatsappChannelSummary>(`/accounts/${accountId}/whatsapp-channels/attach-existing`, payload);
     return data;
   },
+  async reconcile(accountId: number, channelId: number): Promise<WhatsappChannelSummary> {
+    const { data } = await apiClient.post<WhatsappChannelSummary>(`/accounts/${accountId}/whatsapp-channels/${channelId}/reconcile`);
+    return data;
+  },
   async delete(accountId: number, channelId: number): Promise<void> {
     await apiClient.delete(`/accounts/${accountId}/whatsapp-channels/${channelId}`);
   },
@@ -101,6 +105,22 @@ export function useDeleteWhatsappChannel(accountId: number | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (channelId: number) => whatsappChannelsService.delete(accountId!, channelId),
+    onSuccess: () => {
+      if (accountId != null) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.whatsappChannels.list(accountId) });
+      }
+    },
+  });
+}
+
+/**
+ * Force-refresh a channel state by pulling from the Hub directly — no
+ * webhook required. Operator-triggered for channels stuck on "Pendente".
+ */
+export function useReconcileChannel(accountId: number | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (channelId: number) => whatsappChannelsService.reconcile(accountId!, channelId),
     onSuccess: () => {
       if (accountId != null) {
         queryClient.invalidateQueries({ queryKey: queryKeys.whatsappChannels.list(accountId) });

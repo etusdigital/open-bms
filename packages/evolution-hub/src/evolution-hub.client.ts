@@ -107,8 +107,13 @@ export class EvolutionHubClient {
   }
 
   async listChannels(): Promise<ChannelSummary[]> {
-    const { data } = await this.http.get<ChannelSummary[]>('/api/v1/channels');
-    return data ?? [];
+    // Hub returns `{ channels: [...], count: N }` — see GetChannels handler in
+    // evolution-hub/backend/pkg/channel/handler/channel_handler.go:229.
+    // Old code that consumed `data` directly hit "remote.filter is not a
+    // function" because data is an object, not an array.
+    const { data } = await this.http.get<{ channels?: ChannelSummary[] } | ChannelSummary[]>('/api/v1/channels');
+    if (Array.isArray(data)) return data;
+    return data?.channels ?? [];
   }
 
   async getChannel(id: string): Promise<ChannelSummary> {
