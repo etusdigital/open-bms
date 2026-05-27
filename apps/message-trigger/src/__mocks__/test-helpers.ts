@@ -16,7 +16,10 @@ export const createAppServiceMocks = () => {
     get: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
-    exists: jest.fn(),
+    // `exists` defaults to a resolved 0 because receiveMessage calls it three
+    // times for stop-flag detection. Tests that need a flag to be set
+    // override per-call with mockResolvedValueOnce(1).
+    exists: jest.fn().mockResolvedValue(0),
   };
 
   const mockRedisService = {

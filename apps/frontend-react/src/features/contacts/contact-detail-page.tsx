@@ -101,9 +101,20 @@ export function ContactDetailPage({ contactUuid }: ContactDetailPageProps) {
         </div>
       </div>
 
-      {/* Two-column layout */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left column */}
+      {/* Two-column layout. On lg+ the right column is absolutely
+          positioned within this container so the GRID ROW HEIGHT is
+          driven purely by the left column's natural content (out-of-flow
+          children don't contribute to row sizing). The right column then
+          stretches via `inset-y-0` to fill that height — its inner
+          ContactHistoryCard uses h-full + flex-col + internal scroll so
+          the items area scrolls instead of pushing the page taller.
+
+          Width: each grid column = (100% - gap) / 2. With gap-6 (1.5rem
+          = 24px) that's calc(50% - 12px). On mobile (below lg) the grid
+          collapses to single-column and absolute positioning is dropped;
+          both children flow naturally and the page scrolls normally. */}
+      <div className="grid gap-6 lg:relative lg:grid-cols-2">
+        {/* Left column — its natural height defines the grid row */}
         <div className="space-y-6">
           {/* Contact Details */}
           <Card>
@@ -162,8 +173,11 @@ export function ContactDetailPage({ contactUuid }: ContactDetailPageProps) {
           <ContactCustomFieldsCard contactId={contact.id} accountId={accountId} customFields={customFields} />
         </div>
 
-        {/* Right column - Activity History */}
-        <ContactHistoryCard contactId={contact.id} />
+        {/* Right column - Activity History. Absolutely positioned on lg+
+            so it doesn't contribute to grid row sizing. */}
+        <div className="lg:absolute lg:inset-y-0 lg:right-0 lg:w-[calc(50%-12px)]">
+          <ContactHistoryCard contactId={contact.id} />
+        </div>
       </div>
 
       {/* Edit Dialog */}

@@ -67,13 +67,31 @@ export class AppService {
       leadStateMessage.startedAt,
     );
 
+    // Stop-flags checked on every step entry. Three distinct upstream
+    // signals can park a contact:
+    //   - leadRedisKey: written by msgops.service when contactAutomation is
+    //     marked canceled.
+    //   - removeAutomationKey: written by another automation's `removeAutomation`
+    //     step (`StepType.REMOVE_AUTOMATION`). When this is the signal that
+    //     stops us, the cancellation has never been recorded in ClickHouse,
+    //     so we emit `automation-canceled` ourselves before returning.
+    //   - automationTargetKey: written by tag-process targetAchieved. The
+    //     producer now emits `automation-completed` per matched automation,
+    //     so this flag is purely "stop the queued step" — we do NOT emit a
+    //     cancel event for it to avoid double-stamping.
     const leadRedisKey = `automation_to_stop:${leadStateMessage.contact.email}:${leadStateMessage.automation.name}:${leadStateMessage.startedAt}`;
     const removeAutomationKey = `automation:${leadStateMessage.automation.id}:remove_contact:${leadStateMessage.contact.id}`;
     const automationTargetKey = `automation_target_contact:${leadStateMessage.contact.id}:${leadStateMessage.id}`;
-    // DEL returns the count of keys actually removed; only the first concurrent
-    // delivery sees a non-zero value, so the stop branch runs exactly once.
-    const deleted = await this.redisClient.del([leadRedisKey, removeAutomationKey, automationTargetKey]);
-    if (deleted) {
+
+    const [leadHit, removeAutomationHit, targetHit] = await Promise.all([
+      this.redisClient.exists(leadRedisKey).then((v) => Number(v) > 0),
+      this.redisClient.exists(removeAutomationKey).then((v) => Number(v) > 0),
+      this.redisClient.exists(automationTargetKey).then((v) => Number(v) > 0),
+    ]);
+    const stopped = leadHit || removeAutomationHit || targetHit;
+
+    if (stopped) {
+      await this.redisClient.del([leadRedisKey, removeAutomationKey, automationTargetKey]);
       const messageErrorProcess = `Automation stopped:  - ${leadStateMessage.automation.title} - ${leadStateMessage.contact.email}`;
 
       this.trackerService.send(
@@ -89,6 +107,36 @@ export class AppService {
         },
         leadStateMessage.startedAt,
       );
+
+      // Persist the cancellation as an internal analytics event so the
+      // contact-history timeline shows it. Only emit for paths that didn't
+      // already emit their own lifecycle event upstream — see the comment
+      // block above where the keys are defined.
+      if (removeAutomationHit || leadHit) {
+        try {
+          await this.queuePublisher.sendInternalEvent({
+            timestamp: Date.now(),
+            event: 'automation-canceled',
+            contactId: leadStateMessage.contact.id,
+            email: leadStateMessage.contact.email,
+            uuid: leadStateMessage.contact.uuid,
+            accountId: leadStateMessage.account.id,
+            automationId: leadStateMessage.automation.id,
+            properties: {
+              reason: removeAutomationHit ? 'removed-by-automation' : 'stop-flag',
+              automationId: leadStateMessage.automation.id,
+              automationName: leadStateMessage.automation.name,
+              active_step: step?.id || 0,
+              active_step_type: step?.type || 'NOT FOUND',
+            },
+          });
+        } catch (e) {
+          // Swallow — analytics outage must not break the stop path.
+          // The PG-side cancellation already happened upstream.
+          console.error('Failed to emit automation-canceled for redis-flag stop:', e);
+        }
+      }
+
       return { status: true, message: messageErrorProcess };
     }
 
@@ -264,8 +312,18 @@ export class AppService {
   private async selectRandomMessage(step: Step, leadStateMessage: LeadStateMessage): Promise<Step> {
     try {
       const randomIndex = Math.floor(Math.random() * step.settings.messages.length);
-      await this.processStepToInternalEvent(leadStateMessage, { ...step.settings, stepId: step.id, stepType: step.type, randomIndex });
-      step.settings = step.settings.messages[randomIndex];
+      // Surface the picked message's id so msgops-api can batch-load its
+      // title for the contact-history timeline. Without it the consumer
+      // only knows "random message #N" which means nothing to a marketer.
+      const pickedMessage = step.settings.messages[randomIndex];
+      await this.processStepToInternalEvent(leadStateMessage, {
+        ...step.settings,
+        stepId: step.id,
+        stepType: step.type,
+        randomIndex,
+        messageId: pickedMessage?.id,
+      });
+      step.settings = pickedMessage;
       return step;
     } catch {
       throw new BadRequestException(`[${leadStateMessage.id}] : Error setting redis key for remove automation.`);
@@ -669,11 +727,18 @@ export class AppService {
       }
       const definedConditional = evaluateAtoms(atoms);
 
+      // `conditions` is the raw structured rule list (one entry per
+      // configured condition step — same shape as the trigger filter
+      // produced by tag-process). Downstream (msgops-api → frontend)
+      // decodes it to render "Conditional · email_provider == microsoft
+      // → TRUE branch". Replaces the previous `{ contactInfo }` payload
+      // which leaked the full contact. Old historical rows still carry
+      // that shape; msgops-api strips contactInfo defensively.
       await this.processStepToInternalEvent(leadStateMessage, {
         stepId: step.id,
         stepType: step.type,
+        conditions: stepTrue?.settings ?? [],
         resultLogic: definedConditional,
-        contactInfo: contact,
         stepConfig: step.settings,
       });
       if (definedConditional) {
@@ -780,7 +845,16 @@ export class AppService {
 
   private async definedTestAB(step: Step, leadStateMessage: LeadStateMessage) {
     let randomItem = Math.floor(Math.random() * step.settings.messages.length);
-    await this.processStepToInternalEvent(leadStateMessage, { ...step.settings, stepId: step.id, stepType: step.type, randomIndex: randomItem });
+    // Surface the picked variant's id (same rationale as selectRandomMessage).
+    // We emit the initially-picked index here, before the winner-override
+    // logic below; that way the timeline reflects the actual variant served.
+    await this.processStepToInternalEvent(leadStateMessage, {
+      ...step.settings,
+      stepId: step.id,
+      stepType: step.type,
+      randomIndex: randomItem,
+      messageId: step.settings.messages[randomItem]?.id,
+    });
     let isTestabMode = false;
     if (step.settings.status === StatusTestAb.FINISHED) {
       randomItem = step.settings.messages.findIndex((message) => {

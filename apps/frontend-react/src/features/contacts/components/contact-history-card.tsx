@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import i18n from '@/lib/i18n';
 import { useAppStore } from '@/stores/app-store';
 import { useContactHistory } from '../use-contact-history';
-import { getEventTime, getEventLabel } from '../contacts-utils';
+import { getEventTime, getEventLabel, formatBadgeEvent, formatBadgeChannel } from '../contacts-utils';
 import type { HistoryItem } from '../types';
 
 function getDatePreset(preset: string): { startDate: string; endDate: string } {
@@ -80,14 +80,19 @@ export const ContactHistoryCard = memo(function ContactHistoryCard({ contactId }
   }, [activityType, channel, datePreset, customStartDate, customEndDate]);
 
   const historyQuery = useContactHistory(contactId, filters);
-  const historyItems = historyQuery.data?.pages.flat() ?? [];
+  const historyItems = historyQuery.data?.pages.flatMap((p) => p.results) ?? [];
 
   return (
-    <Card>
+    // h-full + flex-col so the card fills its parent (which the page
+    // sizes via the grid layout — see contact-detail-page.tsx) and the
+    // inner items area can flex-fill + scroll. The CSS contract is:
+    // parent → fixed height; this card → h-full; items area inside
+    // CardContent → flex-1 + overflow-y-auto + min-h-0.
+    <Card className="flex h-full flex-col" data-testid="contact-history-card">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">{t('contacts.activityHistory')}</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex min-h-0 flex-1 flex-col">
         {/* Filters */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Select
@@ -202,12 +207,12 @@ export const ContactHistoryCard = memo(function ContactHistoryCard({ contactId }
                     </Badge>
                     {item.event && (
                       <Badge variant="secondary" className="text-xs">
-                        {item.event}
+                        {formatBadgeEvent(item, t)}
                       </Badge>
                     )}
                     {item.type === 'message' && item.message_type && (
                       <Badge variant="secondary" className="text-xs">
-                        {item.message_type}
+                        {formatBadgeChannel(item.message_type, t)}
                       </Badge>
                     )}
                   </div>
