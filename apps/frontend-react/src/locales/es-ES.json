@@ -1942,9 +1942,9 @@
     },
     "whatsappHub": {
       "scopeTitle": "Alcance: integración EvoHub (modo turnkey)",
-      "scopeNote": "Active cuando esta instalación use EvoHub como proxy hacia Meta. El Hub provee el Meta App compartido y el Embedded Signup gestionado. Tras guardar con 'Activo' encendido, reinicie msgops-api para que el modo surta efecto.",
+      "scopeNote": "Active cuando esta instalación use EvoHub como proxy hacia Meta. El Hub provee el Meta App compartido y el Embedded Signup gestionado.",
       "enabled": "Activar EvoHub",
-      "enabledHelp": "Cuando está activo, BMS usa EvoHub en lugar de Meta directo. Requiere reiniciar msgops-api.",
+      "enabledHelp": "Cuando está activo, BMS usa EvoHub en lugar de Meta directo.",
       "apiKey": "API Key del Hub",
       "apiKeyStored": "API Key actual",
       "apiKeyReplace": "Reemplazar API key (dejar vacío para mantener)",
