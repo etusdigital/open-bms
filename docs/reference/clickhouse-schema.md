@@ -116,7 +116,9 @@ tb_email_hourly_stats             (SummingMergeTree, hourly aggregates)
 
 ## tb_email_hourly_stats
 
-Pre-aggregated hourly email statistics. See `migrations/clickhouse/001_create_hourly_stats_table.sql`.
+Pre-aggregated hourly email statistics. The DDL ships in the Swarm config
+[`infra/clickhouse-init/01-init-bms.sql`](../../infra/clickhouse-init/01-init-bms.sql)
+and is mounted into the ClickHouse container at boot.
 
 ```sql
 ENGINE = SummingMergeTree()

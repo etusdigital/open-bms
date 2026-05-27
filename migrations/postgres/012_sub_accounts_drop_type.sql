@@ -1,1 +1,0 @@
-ALTER TABLE sub_accounts DROP COLUMN IF EXISTS type;
