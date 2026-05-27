@@ -78,11 +78,6 @@ export const MENU_ITEMS: NavItem[] = [
         route: '/templates',
         permission: 'messages:view',
       },
-      {
-        labelKey: 'sidebar.whatsappConnect',
-        route: '/messages/whatsapp/connect',
-        permission: 'messages:view',
-      },
     ],
   },
   {
