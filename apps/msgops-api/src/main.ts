@@ -69,7 +69,17 @@ async function bootstrap() {
 
   app.getHttpAdapter().getInstance().set('query parser', 'extended');
 
-  app.use(bodyParser.json({ limit: '16mb' }));
+  // Captures the raw body alongside the parsed JSON. Webhook controllers
+  // (e.g. POST /webhooks/meta and /webhooks/evolution-hub) need it to compute
+  // HMAC-SHA256 signatures from the exact bytes the sender hashed.
+  app.use(
+    bodyParser.json({
+      limit: '16mb',
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
   app.use(cookieParser());
   app.use(cors(createCorsOptions()));
 
