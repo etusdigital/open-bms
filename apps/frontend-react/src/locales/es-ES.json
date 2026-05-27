@@ -920,7 +920,8 @@
     "presetLast7Days": "Últimos 7 días",
     "presetLast15Days": "Últimos 15 días",
     "presetLast30Days": "Últimos 30 días",
-    "presetLastMonth": "Último mes"
+    "presetLastMonth": "Último mes",
+    "invalidFormFields": "Revise los campos destacados antes de guardar."
   },
   "messages": {
     "pageTitle": "Mensajes",
@@ -1098,7 +1099,10 @@
     "unsubscribeWarning1": "El pixel de vista previa y el de acción se insertarán automáticamente por el sistema;",
     "unsubscribeWarning2": "Cuando se declare un enlace, debe contener el valor del HREF;",
     "unsubscribeWarning3": "Cuando se dispare, el valor actual se incluirá en la redirección del enlace hacia TreasureData;",
-    "unsubscribeWarning4": "Las imágenes deben ser enlaces estáticos."
+    "unsubscribeWarning4": "Las imágenes deben ser enlaces estáticos.",
+    "s3RequiredAlert": "El almacenamiento S3 no está configurado. Los mensajes de email no pueden guardarse sin él.",
+    "s3RequiredAlertLink": "Configure S3 en Integraciones.",
+    "s3RequiredAlertNoAccess": "Contacte al administrador para configurar el almacenamiento S3."
   },
   "emailStatistics": {
     "pageTitle": "Email Statistics",
@@ -1602,7 +1606,9 @@
       "error_http_request": "El paso de petición HTTP tiene errores. Verifica la URL y la configuración.",
       "error_random_message": "El paso de varios mensajes tiene errores. Se requiere al menos 1 mensaje.",
       "error_testab": "El paso de prueba A/B tiene errores. Se requieren al menos 2 mensajes.",
-      "error_custom_field": "El paso de campo personalizado tiene errores."
+      "error_custom_field": "El paso de campo personalizado tiene errores.",
+      "missing_period": "Una regla de interacción en la condicional no tiene período. Revise las reglas.",
+      "empty_card": "La condicional no tiene reglas. Agregue al menos una regla o elimine la condicional."
     }
   },
   "leads": {
@@ -1929,7 +1935,8 @@
       "saveError": "Error al guardar los ajustes S3.",
       "loadError": "Error al cargar los ajustes S3.",
       "testOk": "Bucket accesible",
-      "testError": "Error al conectarse a S3"
+      "testError": "Error al conectarse a S3",
+      "secretRequiredOnEndpointChange": "Endpoint cambiado — nueva Secret Access Key obligatoria."
     },
     "fcm": {
       "serviceAccountJson": "Service Account JSON",
@@ -2189,6 +2196,41 @@
           "title": "Importación selectiva (avanzado)",
           "help": "Deja todo sin marcar para importar todo. Marca elementos para una reimportación puntual — los relacionados se incluyen y bloquean automáticamente. Actualiza los existentes y trae los nuevos.",
           "required": "incluido por dependencia"
+        },
+        "jobsList": {
+          "title": "Importaciones recientes",
+          "empty": "Aún no hay importaciones. Use el formulario arriba para crear la primera.",
+          "loadError": "Error al cargar importaciones: {{message}}",
+          "colJob": "Job",
+          "colAccount": "Cuenta destino",
+          "colStatus": "Estado",
+          "colCreated": "Creado en",
+          "view": "Ver →"
+        },
+        "reconcile": {
+          "title": "Reconciliar emails enmascarados",
+          "description": "La API de BMS Enterprise devuelve emails enmascarados (ej.: lucas***@gmail.com), entonces los contactos se importaron sin el email real. Suba el CSV exportado de BMS — con emails reales — para reemplazar los enmascarados por los reales.",
+          "selectCsv": "Seleccionar CSV",
+          "preview": "Previsualizar",
+          "previewing": "Calculando…",
+          "previewError": "Error al previsualizar la reconciliación",
+          "apply": "Aplicar corrección",
+          "applying": "Aplicando…",
+          "applyError": "Error al aplicar la reconciliación",
+          "applyDoneToast": "{{updated}} contactos actualizados · {{ambiguous}} ambiguos · {{noMatch}} sin coincidencia",
+          "fileReadError": "Error al leer el archivo CSV",
+          "statCsvRows": "Filas en el CSV",
+          "statContactsMasked": "Contactos enmascarados",
+          "statUniqueMatches": "Coincidencia única",
+          "statAmbiguous": "Coincidencia ambigua",
+          "statNoMatch": "Sin coincidencia",
+          "statAlreadyClean": "Ya corregidos",
+          "ambiguousTitle": "Coincidencias ambiguas — elija manualmente",
+          "ambiguousShown": "{{total}} contactos tienen múltiples candidatos en el CSV. Elija el correcto para cada uno (o saltar).",
+          "ambiguousShownLimited": "Mostrando {{shown}} de {{total}} casos ambiguos. Aplique y rehaga la previsualización para ver los próximos.",
+          "picked": "Elegido",
+          "skipThis": "Saltar este (dejar enmascarado)",
+          "skipped": "Saltado"
         }
       }
     },

@@ -9,10 +9,14 @@ import { SuppressionsPage } from '../suppressions-page';
 
 let mockSuppressedReturn: Record<string, unknown> = {};
 let mockBulkSuppressReturn: Record<string, unknown> = {};
+let mockBulkResubscribeReturn: Record<string, unknown> = {};
 
 vi.mock('../use-suppressions', () => ({
   useSuppressedList: () => mockSuppressedReturn,
   useBulkSuppress: () => mockBulkSuppressReturn,
+  // useBulkResubscribe foi adicionada ao componente sem update aqui — testes
+  // estouravam com "No 'useBulkResubscribe' export is defined on the mock".
+  useBulkResubscribe: () => mockBulkResubscribeReturn,
 }));
 
 vi.mock('@/hooks/use-list-search-params', async () => {
@@ -73,6 +77,10 @@ describe('SuppressionsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockBulkSuppressReturn = {
+      mutate: vi.fn(),
+      isPending: false,
+    };
+    mockBulkResubscribeReturn = {
       mutate: vi.fn(),
       isPending: false,
     };
