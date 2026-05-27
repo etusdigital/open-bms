@@ -70,6 +70,33 @@ export class EvolutionHubClient {
   }
 
   /**
+   * Creates a standalone webhook and (optionally) associates it with one or
+   * more existing channels in a single call. Used when the BMS wants to
+   * attach itself to a channel that's already connected through the Hub by
+   * another system — Embedded Signup is skipped, only the webhook is set up.
+   *
+   * Matches POST /api/v1/webhooks in the Go backend
+   * (evolution-hub/backend/pkg/webhook/handler/webhook_handler.go:86).
+   */
+  async createWebhook(input: {
+    name: string;
+    url: string;
+    events?: string[];
+    secret?: string;
+    channels?: string[];
+  }): Promise<{ id: string }> {
+    const { data } = await this.http.post<{ id: string }>('/api/v1/webhooks', {
+      name: input.name,
+      url: input.url,
+      events: input.events ?? [],
+      secret: input.secret,
+      channels: input.channels ?? [],
+    });
+    if (!data?.id) throw new Error('EvoHub createWebhook response missing id');
+    return { id: data.id };
+  }
+
+  /**
    * Deletes a webhook resource. The Hub's channel_webhooks join table is
    * cleaned up on DELETE /channels/:id (cascade), but the webhook row itself
    * stays orphaned. Call this after deleteChannel when you also created

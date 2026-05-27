@@ -182,6 +182,7 @@ Auth0 Management API instead of writing directly to `users`.
 | ----------------------------------- | ---------------------------------------------------------------------------- |
 | Deploy to production (Docker Swarm) | [`../infra/swarm/DEPLOY.md`](../infra/swarm/DEPLOY.md)                       |
 | Operate email providers             | [`operations/email-providers.md`](./operations/email-providers.md)           |
+| Operate WhatsApp (Meta + EvoHub)    | [`operations/whatsapp-cloud.md`](./operations/whatsapp-cloud.md)             |
 | Refresh the GeoIP database          | [`operations/geodb.md`](./operations/geodb.md)                               |
 | ClickHouse schema reference         | [`reference/clickhouse-schema.md`](./reference/clickhouse-schema.md)         |
 | Health-check endpoint contract      | [`reference/health-check-endpoint.md`](./reference/health-check-endpoint.md) |

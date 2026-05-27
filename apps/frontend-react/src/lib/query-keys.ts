@@ -66,5 +66,6 @@ export const queryKeys = {
     all: ['whatsapp-channels'] as const,
     list: (accountId: number) => ['whatsapp-channels', 'list', { accountId }] as const,
     detail: (accountId: number, id: number) => ['whatsapp-channels', 'detail', { accountId, id }] as const,
+    hubChannels: (accountId: number) => ['whatsapp-channels', 'hub-channels', { accountId }] as const,
   },
 } as const;

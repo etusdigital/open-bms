@@ -142,6 +142,153 @@ export class WhatsappChannelsService {
     return this.toSummary(saved);
   }
 
+  /**
+   * Lists every WhatsApp channel that exists on the Hub for the configured
+   * API key — used by the "Conectar canal existente" picker on the frontend.
+   * Returns the raw Hub shape so the operator can pick by WABA name / phone.
+   */
+  async listHubChannels(accountId: number): Promise<
+    Array<{
+      id: string;
+      name?: string;
+      status: string;
+      wabaName?: string;
+      displayPhoneNumber?: string;
+      phoneNumberId?: string;
+      wabaId?: string;
+      alreadyAttached: boolean;
+    }>
+  > {
+    this.assertSameAccount(accountId);
+    if (!(await this.resolver.isHubEnabled())) {
+      throw new HttpException('Install is in Meta direct mode — EvoHub is disabled.', HttpStatus.BAD_REQUEST);
+    }
+    const hub = this.buildHubClient();
+    if (!hub) {
+      throw new HttpException('EvoHub API key is not configured. Set it in Super Admin → WhatsApp (EvoHub).', HttpStatus.PRECONDITION_FAILED);
+    }
+
+    const remote = await hub.listChannels();
+    // Mark channels we already track locally so the frontend can disable them
+    // in the picker (cannot attach twice).
+    const localHubIds = new Set(
+      (
+        await this.repo.find({
+          where: { accountId, mode: 'evohub' },
+          select: ['hubChannelId'],
+        })
+      )
+        .map((r) => r.hubChannelId)
+        .filter(Boolean) as string[],
+    );
+
+    return remote
+      .filter((c) => (c.type ?? 'whatsapp') === 'whatsapp')
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        wabaName: c.meta_connection?.waba_name,
+        displayPhoneNumber: c.meta_connection?.phone_numbers?.[0]?.display_phone_number,
+        phoneNumberId: c.meta_connection?.phone_number_id,
+        wabaId: c.meta_connection?.waba_id,
+        alreadyAttached: localHubIds.has(c.id),
+      }));
+  }
+
+  /**
+   * Wires the BMS up to a WhatsApp channel that already exists on the Hub
+   * (created by another system, e.g. evo-ai CRM). No Embedded Signup: we
+   * just create a webhook on the Hub that points back to the BMS and
+   * persist a local row pre-populated with the channel's meta_connection.
+   *
+   * Same single-channel-per-account rule as createEvoHub — selecting an
+   * existing channel still consumes the slot.
+   */
+  async attachToExistingHubChannel(accountId: number, input: { hubChannelId: string; name?: string }): Promise<ChannelSummary> {
+    this.assertSameAccount(accountId);
+    if (!(await this.resolver.isHubEnabled())) {
+      throw new HttpException("Install is in Meta direct mode — use mode='meta' to create channels.", HttpStatus.BAD_REQUEST);
+    }
+    if (!input.hubChannelId) {
+      throw new BadRequestException('hubChannelId is required');
+    }
+
+    const existing = await this.repo.findOne({
+      where: [
+        { accountId, mode: 'evohub', status: 'active' },
+        { accountId, mode: 'evohub', status: 'pending' },
+      ],
+    });
+    if (existing) {
+      throw new HttpException('This account already has an EvoHub channel. Disconnect it before attaching to another one.', HttpStatus.CONFLICT);
+    }
+
+    const webhookSecret = process.env.EVOLUTION_HUB_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      throw new HttpException('EvoHub webhook secret is not configured. Set it in Super Admin → WhatsApp (EvoHub).', HttpStatus.PRECONDITION_FAILED);
+    }
+    const publicUrl = (process.env.BMS_PUBLIC_URL ?? '').replace(/\/+$/, '');
+    if (!publicUrl) {
+      throw new HttpException('BMS_PUBLIC_URL env is not set. Configure the public URL so the Hub can deliver webhooks back to BMS.', HttpStatus.PRECONDITION_FAILED);
+    }
+
+    const hub = this.buildHubClient();
+    if (!hub) {
+      throw new HttpException('EvoHub API key is not configured. Set it in Super Admin → WhatsApp (EvoHub).', HttpStatus.PRECONDITION_FAILED);
+    }
+
+    // Pull the channel meta first so we can hydrate the local row with
+    // waba_id/phone_number_id straight away (channel is already connected,
+    // no need to wait for a channel_connected webhook).
+    let hubChannel: Awaited<ReturnType<EvolutionHubClient['getChannel']>>;
+    try {
+      hubChannel = await hub.getChannel(input.hubChannelId);
+    } catch (err: any) {
+      this.logger.error(`evohub_get_channel_failed id=${input.hubChannelId} err=${err?.message ?? 'unknown'}`);
+      throw new HttpException(`EvoHub channel ${input.hubChannelId} not found or not accessible with the current API key.`, HttpStatus.NOT_FOUND);
+    }
+    const conn = hubChannel.meta_connection ?? {};
+    const phoneNumberId = conn.phone_number_id ?? conn.phone_numbers?.[0]?.id ?? null;
+    const wabaId = conn.waba_id ?? null;
+    const displayPhone = conn.phone_numbers?.find((p) => p.id === phoneNumberId)?.display_phone_number ?? conn.phone_numbers?.[0]?.display_phone_number ?? null;
+
+    let webhook: { id: string };
+    try {
+      webhook = await hub.createWebhook({
+        name: `BMS account ${accountId}`,
+        url: `${publicUrl}/webhooks/evolution-hub`,
+        events: HUB_WHATSAPP_EVENTS,
+        secret: webhookSecret,
+        channels: [input.hubChannelId],
+      });
+    } catch (err: any) {
+      this.logger.error(`evohub_create_webhook_failed account=${accountId} channel=${input.hubChannelId} err=${err?.message ?? 'unknown'}`);
+      throw new HttpException('Failed to create the BMS webhook on EvoHub for the selected channel.', HttpStatus.BAD_GATEWAY);
+    }
+
+    const status: 'active' | 'pending' = phoneNumberId && wabaId ? 'active' : 'pending';
+    const entity = this.repo.create({
+      accountId,
+      name: input.name ?? hubChannel.name ?? `EvoHub channel ${input.hubChannelId.slice(0, 8)}`,
+      mode: 'evohub',
+      status,
+      hubChannelId: input.hubChannelId,
+      channelToken: hubChannel.token ?? null,
+      phoneNumberId,
+      wabaId,
+      displayPhoneNumber: displayPhone,
+      evolutionHubMeta: {
+        created_at: new Date().toISOString(),
+        source: 'admin_ui_attach_existing',
+        webhook_id: webhook.id,
+        webhook_events: HUB_WHATSAPP_EVENTS,
+      },
+    });
+    const saved = await this.repo.save(entity);
+    return this.toSummary(saved);
+  }
+
   private async createEvoHub(accountId: number, dto: CreateWhatsappChannelDto): Promise<ChannelSummary> {
     if (!(await this.resolver.isHubEnabled())) {
       throw new HttpException("Install is in Meta direct mode — use mode='meta' to create channels.", HttpStatus.BAD_REQUEST);

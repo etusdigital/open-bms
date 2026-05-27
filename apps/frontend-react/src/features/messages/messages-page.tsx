@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from '@tanstack/react-router';
 import { getCoreRowModel, useReactTable } from '@tanstack/react-table';
-import { Mail, Plus } from 'lucide-react';
+import { Mail, Plus, RefreshCw } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,6 +22,7 @@ import {
   useDuplicateMessage,
   useSendersForSelect,
   useAutomationsForSelect,
+  useSyncTemplatesFromMeta,
   type MessagesListFilters,
 } from './use-messages';
 import { useMessagesColumns } from './messages-columns';
@@ -119,6 +120,7 @@ export default function MessagesPage({
   }, [automationsQuery.data]);
 
   const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
+  const syncTemplatesFromMeta = useSyncTemplatesFromMeta();
 
   const handleDelete = useCallback((message: Message) => {
     setDeleteTarget(message);
@@ -180,6 +182,17 @@ export default function MessagesPage({
     <>
       <ListPage.Root>
         <ListPage.Header title={t('sidebar.messages')}>
+          {messageType === 'whatsapp' && canCreate && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => syncTemplatesFromMeta.mutate()}
+              disabled={syncTemplatesFromMeta.isPending}
+            >
+              <RefreshCw className={cn('mr-1 h-4 w-4', syncTemplatesFromMeta.isPending && 'animate-spin')} />
+              {syncTemplatesFromMeta.isPending ? t('common.loading') : t('messages.syncFromMeta')}
+            </Button>
+          )}
           {canCreate && (
             <Button size="sm" asChild>
               <Link to={getCreateRoute(messageType)}>

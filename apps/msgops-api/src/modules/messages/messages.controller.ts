@@ -178,6 +178,15 @@ export class MessagesController {
     return this.messagesService.syncTemplateStatus(Number(id));
   }
 
+  @RequirePermission('messages:edit')
+  @Post('whatsapp/sync-from-meta')
+  @ApiOperation({
+    summary: 'Pull every template that exists on Meta (WABA) into BMS — creates missing rows, refreshes status/category on existing ones.',
+  })
+  async syncTemplatesFromMeta() {
+    return this.messagesService.syncTemplatesFromMeta();
+  }
+
   @CronRoute()
   @Post('template/webhook')
   @ApiOperation({ summary: 'Webhook to update message status' })

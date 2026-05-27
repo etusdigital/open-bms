@@ -329,6 +329,124 @@ export class MessagesService {
     return { status: result.status, metaStatus: result.metaStatus, rejectedReason: result.rejectedReason };
   }
 
+  /**
+   * Pulls every template that exists on Meta (WABA) into BMS as `messages`
+   * rows — closes the loop when templates were created on Business Manager
+   * directly (or by another tenant that shares the WABA).
+   *
+   * Existing rows are matched by `providerMessageId = template.name` and
+   * UPDATEd (status/category re-sync). Missing rows are INSERTed as
+   * already-approved (or whatever Meta says) so they're immediately usable
+   * in campaigns. The body is reconstructed from `components` so the
+   * preview page renders something meaningful.
+   */
+  async syncTemplatesFromMeta(): Promise<{ created: number; updated: number; skipped: number; total: number }> {
+    const accountId = this.cls.get<number>('accountId');
+    if (!accountId) throw new HttpException('Missing account context', HttpStatus.BAD_REQUEST);
+
+    const templates = await this.whatsappTemplateSync.listMetaTemplates(accountId);
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const tpl of templates) {
+      if (!tpl.name) {
+        skipped++;
+        continue;
+      }
+      const existing = await this.automationMessageRepository.findOne({
+        where: { accountId, providerMessageId: tpl.name },
+      });
+      const status = this.whatsappTemplateSync.normaliseStatus(tpl.status ?? 'PENDING');
+      const flattened = this.flattenMetaTemplateComponents(tpl);
+
+      if (existing) {
+        await this.automationMessageRepository.update(
+          { id: existing.id },
+          {
+            status,
+            templateCategory: (tpl.category ?? '').toUpperCase() || existing.templateCategory,
+          },
+        );
+        updated++;
+        continue;
+      }
+
+      // New row — minimal columns to be valid + show up in the list.
+      const row = this.automationMessageRepository.create({
+        accountId,
+        title: tpl.name.slice(0, 40),
+        name: tpl.name,
+        type: 'whatsapp',
+        status,
+        whatsappType: flattened.whatsappType,
+        templateCategory: ((tpl.category ?? '').toUpperCase() || 'MARKETING') as any,
+        callToActionText: flattened.callToActionText ?? '',
+        content: JSON.stringify(flattened.content),
+        providerMessageId: tpl.name,
+        // Columns marked NOT NULL on the entity — supply empty defaults.
+        subject: '',
+        previewText: '',
+        text: flattened.content.body ?? '',
+        fromMail: '',
+        fromName: '',
+        replyTo: '',
+        description: 'Importado da Meta',
+        image: '',
+        ippool: '',
+        priority: 'normal',
+      } as any);
+      await this.automationMessageRepository.save(row);
+      created++;
+    }
+
+    return { created, updated, skipped, total: templates.length };
+  }
+
+  /**
+   * Best-effort projection of Meta `components` back into the BMS shape
+   * (`{ headerType, headerContent, body, footer }` JSON + whatsappType +
+   * callToActionText). Anything unrecognised is preserved on body so
+   * nothing is silently lost.
+   */
+  private flattenMetaTemplateComponents(tpl: {
+    components?: Array<{ type: string; format?: string; text?: string; buttons?: Array<{ type?: string; text?: string; url?: string }> }>;
+  }): {
+    content: { headerType: string; headerContent: string; body: string; footer: string };
+    whatsappType: 'text' | 'call-to-action';
+    callToActionText?: string;
+  } {
+    const content = { headerType: 'none', headerContent: '', body: '', footer: '' };
+    let whatsappType: 'text' | 'call-to-action' = 'text';
+    let callToActionText: string | undefined;
+
+    for (const comp of tpl.components ?? []) {
+      switch (comp.type) {
+        case 'HEADER':
+          content.headerType = (comp.format ?? 'TEXT').toLowerCase();
+          content.headerContent = comp.text ?? '';
+          break;
+        case 'BODY':
+          content.body = comp.text ?? '';
+          break;
+        case 'FOOTER':
+          content.footer = comp.text ?? '';
+          break;
+        case 'BUTTONS': {
+          const urlButton = (comp.buttons ?? []).find((b) => (b.type ?? '').toUpperCase() === 'URL');
+          if (urlButton) {
+            whatsappType = 'call-to-action';
+            callToActionText = urlButton.text ?? '';
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    return { content, whatsappType, callToActionText };
+  }
+
   async createWhatsappTask(messageId, accountId) {
     const date = dayjs().tz('America/Sao_Paulo').add(30, 'second').format('YYYY-MM-DD HH:mm:ss');
     await this.scheduler.create(`${messageId}/${accountId}`, new Date(date), `${process.env.BRIUS_HOSTURL}/messages/monitor-whatsapp-message`, QUEUE_WHATSAPP_MESSAGE);
@@ -688,6 +806,7 @@ export class MessagesService {
       notificationSound: message.notificationSound,
       status: message.status,
       whatsappType: message.whatsappType,
+      templateCategory: message.templateCategory,
       callToActionText: message.callToActionText,
       providerMessageId: message.providerMessageId,
     });

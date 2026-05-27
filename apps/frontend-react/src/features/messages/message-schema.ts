@@ -74,6 +74,7 @@ export const whatsappFormSchema = z
     content: requiredString(MESSAGE_CONTENT_MAX),
     footer: optionalString(MESSAGE_DESCRIPTION_MAX),
     whatsappType: z.enum(['text', 'call-to-action']).optional().default('text'),
+    templateCategory: z.enum(['MARKETING', 'UTILITY']).optional().default('MARKETING'),
     callToActionText: optionalString(100),
     callToActionUrl: optionalString(MESSAGE_URL_MAX),
   })
