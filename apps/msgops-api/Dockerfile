@@ -11,6 +11,8 @@ COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/segment-query-builder/package.json ./packages/segment-query-builder/
 COPY packages/messaging/package.json ./packages/messaging/
 COPY packages/geo/package.json ./packages/geo/
+COPY packages/whatsapp-cloud/package.json ./packages/whatsapp-cloud/
+COPY packages/evolution-hub/package.json ./packages/evolution-hub/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --filter msgops-api... --ignore-scripts
 
@@ -19,6 +21,8 @@ COPY packages/typescript-config/ ./packages/typescript-config/
 COPY packages/segment-query-builder/ ./packages/segment-query-builder/
 COPY packages/messaging/ ./packages/messaging/
 COPY packages/geo/ ./packages/geo/
+COPY packages/whatsapp-cloud/ ./packages/whatsapp-cloud/
+COPY packages/evolution-hub/ ./packages/evolution-hub/
 COPY apps/msgops-api/ ./apps/msgops-api/
 RUN pnpm pkg delete scripts.prepare
 RUN pnpm --filter msgops-api exec pnpm pkg delete scripts.prepare
@@ -27,6 +31,11 @@ RUN pnpm --filter @bms/messaging build
 # @bms/geo's build copies src/geoip.proto into dist/ — required for the
 # admin-geoip module's gRPC client to resolve the proto at runtime.
 RUN pnpm --filter @bms/geo build
+# WhatsApp Cloud + EvoHub clients (Onda 1 do roadmap whatsapp-cloud-meta-evohub).
+# msgops-api importa de '@bms/whatsapp-cloud' e '@bms/evolution-hub'; o nest build
+# resolve tipos via dist/index.d.ts gerado por essas duas linhas.
+RUN pnpm --filter @bms/whatsapp-cloud build
+RUN pnpm --filter @bms/evolution-hub build
 RUN pnpm --filter msgops-api build
 
 FROM build AS deploy
