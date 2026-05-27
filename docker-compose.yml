@@ -345,20 +345,6 @@ services:
       PORT: '3011'
     depends_on: *infra-deps
 
-  event-receiver-probe:
-    build:
-      context: .
-      dockerfile: apps/event-receiver-probe/Dockerfile
-    container_name: event-receiver-probe
-    <<: *restart-policy
-    ports:
-      - '3012:3012'
-    environment:
-      <<: *backend-env
-      PORT: '3012'
-      BRIDGE_ENDPOINT: http://event-receiver-probe:3012
-    depends_on: *infra-deps
-
   event-process:
     build:
       context: .
