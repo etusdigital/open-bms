@@ -5,14 +5,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/etusdigital/bms-open/releases/latest"><img src="https://img.shields.io/github/v/release/etusdigital/bms-open?include_prereleases&label=version" alt="Latest version" /></a>
+  <a href="https://github.com/etusdigital/open-bms/releases/latest"><img src="https://img.shields.io/github/v/release/etusdigital/open-bms?include_prereleases&label=version" alt="Latest version" /></a>
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0" /></a>
-  <a href="https://github.com/etusdigital/bms-open/actions"><img src="https://github.com/etusdigital/bms-open/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/etusdigital/open-bms/actions"><img src="https://github.com/etusdigital/open-bms/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
 
 <p align="center">
   <a href="https://etus.com.br/open-bms">Website</a> &middot;
-  <a href="https://github.com/etusdigital/bms-open">Repository</a> &middot;
+  <a href="https://github.com/etusdigital/open-bms">Repository</a> &middot;
   <a href="./infra/swarm/DEPLOY.md">Deploy guide</a> &middot;
   <a href="./CONTRIBUTING.md">Contributing</a>
 </p>
@@ -77,8 +77,8 @@ ch-ui (ClickHouse web console).
 ### 1. Clone
 
 ```bash
-git clone https://github.com/etusdigital/bms-open.git
-cd bms-open
+git clone https://github.com/etusdigital/open-bms.git
+cd open-bms
 pnpm install
 ```
 

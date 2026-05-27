@@ -13,7 +13,7 @@ behavior will not be tolerated.
 
 ### Reporting Bugs
 
-1. Check existing [issues](https://github.com/etusdigital/bms-open/issues)
+1. Check existing [issues](https://github.com/etusdigital/open-bms/issues)
    to avoid duplicates.
 2. Open a new issue using the **Bug report** template with:
    - Clear, descriptive title
@@ -111,7 +111,7 @@ the process in [SECURITY.md](./SECURITY.md).
 ## Questions?
 
 - **Website**: [etus.com.br/open-bms](https://etus.com.br/open-bms)
-- **GitHub Discussions**: [github.com/etusdigital/bms-open/discussions](https://github.com/etusdigital/bms-open/discussions)
+- **GitHub Discussions**: [github.com/etusdigital/open-bms/discussions](https://github.com/etusdigital/open-bms/discussions)
 
 Thanks for helping make Open BMS better!
 

@@ -44,4 +44,4 @@ The `infra/swarm/` folder also contains the stack files and a working
 ---
 
 Missing something? Open a documentation issue using the
-[Feature request template](https://github.com/etusdigital/bms-open/issues/new?template=feature_request.yml).
+[Feature request template](https://github.com/etusdigital/open-bms/issues/new?template=feature_request.yml).

@@ -19,8 +19,8 @@ do not need to install them on the host.
 ## 1. Clone and install
 
 ```bash
-git clone https://github.com/etusdigital/bms-open.git
-cd bms-open
+git clone https://github.com/etusdigital/open-bms.git
+cd open-bms
 pnpm install
 ```
 

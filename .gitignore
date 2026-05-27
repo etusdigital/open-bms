@@ -7,8 +7,20 @@ coverage/
 # AI assistant / local tooling artifacts (never published)
 .claude/
 CLAUDE.md
+AGENTS.md
 _evo/
 _evo-output/
+.cursor/
+.cursorrules
+.cursorignore
+.windsurfrules
+.aider*
+
+# IDE artifacts
+.idea/
+.vscode/
+*.swp
+.eslintcache
 
 # Environment files — allow only .env.example
 .env

@@ -32,7 +32,7 @@ válido` and `Communication channels` fields — both the UI default and
 
 - Default Docker registry references migrated from `evoapicloud` to
   `etusdigital`.
-- Repository moved to `github.com/etusdigital/bms-open`.
+- Repository moved to `github.com/etusdigital/open-bms`.
 
 ---
 
