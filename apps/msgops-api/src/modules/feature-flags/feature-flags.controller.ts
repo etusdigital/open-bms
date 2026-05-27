@@ -20,6 +20,13 @@ export interface FeatureFlagsDto {
   whatsapp_app_id: string;
   whatsapp_config_id: string;
   whatsapp_graph_version: string;
+
+  /**
+   * Public URL the BMS backend is reachable at (BMS_PUBLIC_URL env).
+   * The frontend uses this to render the exact webhook URL that admins
+   * paste into Meta App. Falls back to empty when not set.
+   */
+  bms_public_url: string;
 }
 
 /**
@@ -42,6 +49,7 @@ export class FeatureFlagsController {
       whatsapp_app_id: process.env.WHATSAPP_APP_ID ?? '',
       whatsapp_config_id: process.env.WHATSAPP_CONFIG_ID ?? '',
       whatsapp_graph_version: process.env.WHATSAPP_GRAPH_VERSION ?? 'v18.0',
+      bms_public_url: (process.env.BMS_PUBLIC_URL ?? '').replace(/\/+$/, ''),
     };
   }
 }

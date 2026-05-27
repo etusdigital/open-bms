@@ -69,6 +69,16 @@ export class EvolutionHubClient {
     await this.http.delete(`/api/v1/channels/${encodeURIComponent(id)}`);
   }
 
+  /**
+   * Deletes a webhook resource. The Hub's channel_webhooks join table is
+   * cleaned up on DELETE /channels/:id (cascade), but the webhook row itself
+   * stays orphaned. Call this after deleteChannel when you also created
+   * the webhook through createChannel's single-shot.
+   */
+  async deleteWebhook(id: string): Promise<void> {
+    await this.http.delete(`/api/v1/webhooks/${encodeURIComponent(id)}`);
+  }
+
   async listChannels(): Promise<ChannelSummary[]> {
     const { data } = await this.http.get<ChannelSummary[]>('/api/v1/channels');
     return data ?? [];

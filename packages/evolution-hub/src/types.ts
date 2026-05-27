@@ -53,12 +53,26 @@ export interface CreateChannelResult {
   webhook_id?: string;
 }
 
+/** Shape of GET /api/v1/channels/:id — `meta_connection` is populated by the
+ * Hub from the channel metadata once Embedded Signup completes. */
 export interface ChannelSummary {
   id: string;
   status: string;
-  display_phone_number?: string;
-  phone_number_id?: string;
-  waba_id?: string;
+  name?: string;
+  type?: HubChannelType;
+  token?: string;
+  meta_connection?: {
+    waba_id?: string;
+    waba_name?: string;
+    business_id?: string;
+    business_name?: string;
+    phone_number_id?: string;
+    phone_numbers?: Array<{
+      id: string;
+      display_phone_number?: string;
+      verified_name?: string;
+    }>;
+  };
 }
 
 export interface HubPlan {

@@ -2,12 +2,20 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { Eye, EyeOff } from 'lucide-react';
+import { Copy, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useFeatureFlags } from '@/features/feature-flags/api';
 import { whatsappMetaGateway, type WhatsappMetaAdminSettings } from './whatsapp-meta-gateway';
+
+const META_WEBHOOK_EVENTS = ['messages', 'message_template_status_update', 'message_template_quality_update', 'message_template_components_update', 'account_update'];
+
+function buildWebhookUrl(bmsPublicUrl: string | undefined): string {
+  if (!bmsPublicUrl) return '';
+  return `${bmsPublicUrl.replace(/\/+$/, '')}/webhooks/meta`;
+}
 
 /**
  * Wave 7.8 — Meta App credentials configuration (WhatsApp Cloud direct mode).
@@ -187,6 +195,72 @@ export function WhatsappMetaTab() {
           {saving ? t('common.loading') : t('common.save')}
         </Button>
       </div>
+
+      <WebhookSetupGuide />
     </form>
+  );
+}
+
+function WebhookSetupGuide() {
+  const { t } = useTranslation();
+  const { data: flags } = useFeatureFlags();
+  const webhookUrl = buildWebhookUrl(flags?.bms_public_url);
+  const hasPublicUrl = !!webhookUrl;
+
+  async function copy(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(t('common.copied'));
+    } catch {
+      toast.error(t('common.copyFailed'));
+    }
+  }
+
+  return (
+    <div className="border-border space-y-4 rounded-md border bg-blue-50/40 p-4 dark:bg-blue-950/20">
+      <header className="space-y-1">
+        <p className="text-sm font-medium">{t('integrations.whatsappMeta.guide.title')}</p>
+        <p className="text-muted-foreground text-xs">{t('integrations.whatsappMeta.guide.intro')}</p>
+      </header>
+
+      <div className="space-y-2">
+        <Label className="text-xs">{t('integrations.whatsappMeta.guide.webhookUrlLabel')}</Label>
+        {hasPublicUrl ? (
+          <div className="flex items-center gap-2">
+            <code className="bg-muted flex-1 truncate rounded px-2 py-1.5 text-xs">{webhookUrl}</code>
+            <Button type="button" size="sm" variant="outline" onClick={() => copy(webhookUrl)}>
+              <Copy className="mr-1.5 h-3 w-3" />
+              {t('common.copy')}
+            </Button>
+          </div>
+        ) : (
+          <div className="rounded-md border-l-4 border-amber-500 bg-amber-50 px-3 py-2 text-xs dark:bg-amber-950/30">
+            <p className="font-medium text-amber-900 dark:text-amber-200">{t('integrations.whatsappMeta.guide.missingPublicUrlTitle')}</p>
+            <p className="mt-1 text-amber-800 dark:text-amber-300">{t('integrations.whatsappMeta.guide.missingPublicUrlBody')}</p>
+          </div>
+        )}
+        <p className="text-muted-foreground text-xs">{t('integrations.whatsappMeta.guide.webhookUrlHelp')}</p>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs">{t('integrations.whatsappMeta.guide.verifyTokenLabel')}</Label>
+        <p className="text-muted-foreground text-xs">{t('integrations.whatsappMeta.guide.verifyTokenHelp')}</p>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs">{t('integrations.whatsappMeta.guide.eventsLabel')}</Label>
+        <ul className="text-muted-foreground space-y-1 text-xs">
+          {META_WEBHOOK_EVENTS.map((event) => (
+            <li key={event} className="flex items-baseline gap-2">
+              <code className="bg-muted rounded px-1.5 py-0.5 text-[11px]">{event}</code>
+              <span>{t(`integrations.whatsappMeta.guide.eventDescriptions.${event}` as never)}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-muted-foreground text-xs italic">{t('integrations.whatsappMeta.guide.eventsHelp')}</p>
+      </div>
+
+      <p className="text-muted-foreground border-border border-t pt-3 text-xs">{t('integrations.whatsappMeta.guide.steps')}</p>
+    </div>
   );
 }

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChannelsList, HubConnectButton, MetaConnectButton } from '@/features/whatsapp-channels';
+import { ChannelsList, HubConnectButton, MetaConnectButton, useWhatsappChannels } from '@/features/whatsapp-channels';
 import { useAccountId } from '../use-settings';
 
 /**
@@ -12,15 +12,20 @@ import { useAccountId } from '../use-settings';
  *
  * - Card "Modo de instalação" mirrors the install-wide flag (Meta direct
  *   vs EvoHub) so admins know which connect path will run.
- * - The connect card hosts MetaConnectButton (FB.login + Embedded Signup)
- *   or HubConnectButton (public_link in a new tab) depending on the flag.
- * - The list card is always visible and refreshes when channels are added
- *   or deleted; pending EvoHub channels poll status until they flip.
+ * - In EvoHub mode the connect button is hidden when there is already a
+ *   live channel (active or pending), enforcing the single-channel rule:
+ *   the only way to reconnect is delete + create again. In Meta mode
+ *   multiple numbers / channels are allowed.
+ * - The list card is always visible and refreshes when channels are
+ *   added or deleted.
  */
 export function WhatsAppTab() {
   const { t } = useTranslation();
   const accountId = useAccountId();
   const { enabled, isLoading, isError } = useEvolutionHubEnabled();
+  const { data: channels } = useWhatsappChannels(accountId);
+
+  const hasLiveHubChannel = !!channels?.some((c) => c.mode === 'evohub' && (c.status === 'active' || c.status === 'pending'));
 
   return (
     <div className="space-y-6">
@@ -44,10 +49,17 @@ export function WhatsAppTab() {
               <Skeleton className="h-10 w-48" />
             </div>
           ) : enabled ? (
-            <>
-              <p className="text-sm">{t('settings.whatsapp.hubDescription')}</p>
-              <HubConnectButton accountId={accountId} />
-            </>
+            hasLiveHubChannel ? (
+              <Alert>
+                <AlertTitle>{t('settings.whatsapp.hubAlreadyConnectedTitle')}</AlertTitle>
+                <AlertDescription>{t('settings.whatsapp.hubAlreadyConnectedBody')}</AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <p className="text-sm">{t('settings.whatsapp.hubDescription')}</p>
+                <HubConnectButton accountId={accountId} />
+              </>
+            )
           ) : (
             <>
               <p className="text-sm">{t('settings.whatsapp.metaDescription')}</p>
