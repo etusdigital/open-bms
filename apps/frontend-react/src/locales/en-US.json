@@ -277,6 +277,7 @@
     "subscribedToday": "Subscribed today",
     "activeContacts": "Active contacts",
     "import": "Import",
+    "createContact": "New contact",
     "export": "Export",
     "entityName": "contact",
     "entityNamePlural": "contacts",
