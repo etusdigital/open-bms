@@ -31,6 +31,8 @@ import { AdminGeoIpModule } from './modules/admin-geoip/admin-geoip.module';
 import { ActivityModule } from './modules/activity/activity.module';
 import { AdminIntegrationsModule } from './modules/admin-integrations/admin-integrations.module';
 import { EnterpriseImportModule } from './modules/enterprise-import/enterprise-import.module';
+import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
+import { WhatsappModeResolverModule } from './modules/whatsapp-mode-resolver/whatsapp-mode-resolver.module';
 import { MessagingModule } from './providers/messaging/messaging.module';
 import { QueueModule } from './providers/queue/queue.module';
 import { SystemConfigCacheModule } from './providers/system-config-cache.module';
@@ -75,6 +77,8 @@ import { SystemConfigCacheModule } from './providers/system-config-cache.module'
     AdminIntegrationsModule,
     ActivityModule,
     EnterpriseImportModule,
+    WhatsappModeResolverModule,
+    FeatureFlagsModule,
   ],
   providers: [AuditSubscriber],
 })

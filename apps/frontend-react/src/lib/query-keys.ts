@@ -59,4 +59,7 @@ export const queryKeys = {
       detail: (id: number) => ['super-admin', 'users', 'detail', id] as const,
     },
   },
+  featureFlags: {
+    all: ['feature-flags'] as const,
+  },
 } as const;
