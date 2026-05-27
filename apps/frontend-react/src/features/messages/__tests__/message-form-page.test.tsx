@@ -1,10 +1,21 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderWithRouter } from '@/test-utils/render-with-router';
 import { authenticateStore } from '@/test-utils/authenticate-store';
 import '@/lib/i18n';
 import MessageFormPage from '../message-form-page';
 import type { Message } from '../types';
+
+// MessageFormPage uses useQuery directly (s3-configured-check) — renderWithRouter
+// não inclui QueryClientProvider, então envolvemos manualmente aqui.
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+});
+
+function renderForm(ui: React.ReactElement) {
+  return renderWithRouter(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 // Mock react-email-editor since Unlayer can't load in jsdom
 vi.mock('react-email-editor', () => ({
@@ -97,7 +108,7 @@ describe('MessageFormPage', () => {
       error: null,
     } as ReturnType<typeof useMessage>);
 
-    await renderWithRouter(<MessageFormPage messageId={5} messageType="email" />);
+    await renderForm(<MessageFormPage messageId={5} messageType="email" />);
 
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getByText(/esta mensagem está sendo usada em uma campanha/i)).toBeInTheDocument();
@@ -116,7 +127,7 @@ describe('MessageFormPage', () => {
       error: null,
     } as ReturnType<typeof useMessage>);
 
-    await renderWithRouter(<MessageFormPage messageId={5} messageType="email" />);
+    await renderForm(<MessageFormPage messageId={5} messageType="email" />);
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -134,7 +145,7 @@ describe('MessageFormPage', () => {
       error: null,
     } as ReturnType<typeof useMessage>);
 
-    await renderWithRouter(<MessageFormPage messageId={10} messageType="email" />);
+    await renderForm(<MessageFormPage messageId={10} messageType="email" />);
 
     // When templateUrl exists on the message, the view-in-browser button should render
     const buttons = screen.getAllByRole('button');
@@ -149,7 +160,7 @@ describe('MessageFormPage', () => {
       error: null,
     } as ReturnType<typeof useMessage>);
 
-    await renderWithRouter(<MessageFormPage messageType="email" />);
+    await renderForm(<MessageFormPage messageType="email" />);
 
     const buttons = screen.getAllByRole('button');
     const viewBtn = buttons.find((btn) => btn.querySelector('.lucide-external-link'));
@@ -163,7 +174,7 @@ describe('MessageFormPage', () => {
       error: null,
     } as ReturnType<typeof useMessage>);
 
-    await renderWithRouter(<MessageFormPage messageType="email" />);
+    await renderForm(<MessageFormPage messageType="email" />);
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -176,7 +187,7 @@ describe('MessageFormPage', () => {
         error: null,
       } as ReturnType<typeof useMessage>);
 
-      await renderWithRouter(<MessageFormPage messageType="transactional-email" />);
+      await renderForm(<MessageFormPage messageType="transactional-email" />);
 
       // The page header backLabel should reference the transactional label
       expect(screen.getByText(/Email Transacional/i)).toBeInTheDocument();
@@ -189,7 +200,7 @@ describe('MessageFormPage', () => {
         error: null,
       } as ReturnType<typeof useMessage>);
 
-      await renderWithRouter(<MessageFormPage messageType="transactional-email" />);
+      await renderForm(<MessageFormPage messageType="transactional-email" />);
 
       // The back link should point to the transactional listing page
       const backLink = screen
@@ -210,7 +221,7 @@ describe('MessageFormPage', () => {
         error: null,
       } as ReturnType<typeof useMessage>);
 
-      await renderWithRouter(<MessageFormPage messageId={123} messageType="transactional-email" />);
+      await renderForm(<MessageFormPage messageId={123} messageType="transactional-email" />);
 
       // Header still shows transactional label
       expect(screen.getByText(/Email Transacional/i)).toBeInTheDocument();
