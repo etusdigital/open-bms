@@ -222,9 +222,14 @@ export class ContactEntity {
     if (this.phone !== undefined) {
       this.hasPhone = !!this.phone;
       // WhatsApp Cloud has no number-check endpoint (the old Evolution
-      // integration provided one). Treat every phone as WA-capable; the
-      // send path surfaces Meta's per-message verdict.
+      // integration provided one). Treat every phone as WA-capable and copy
+      // the number into `whatsapp` so the send-whatsapp app can read it
+      // (it uses contact.whatsapp as the destination, not contact.phone).
+      // The send path surfaces Meta's per-message verdict.
       this.hasWhatsapp = !!this.phone;
+      if (this.phone && !this.whatsapp) {
+        this.whatsapp = this.phone;
+      }
     }
   }
 
