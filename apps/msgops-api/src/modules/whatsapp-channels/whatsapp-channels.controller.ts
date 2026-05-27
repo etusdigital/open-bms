@@ -39,6 +39,14 @@ export class WhatsappChannelsController {
     return this.service.attachToExistingHubChannel(accountId, payload);
   }
 
+  @Post(':channelId/reconcile')
+  @ApiOperation({
+    summary: 'Force-refresh channel state from the Hub (without waiting for the channel_connected webhook). Pulls phone_number_id / waba_id / status via getChannel.',
+  })
+  reconcile(@Param('accountId', ParseIntPipe) accountId: number, @Param('channelId', ParseIntPipe) channelId: number): Promise<ChannelSummary> {
+    return this.service.reconcileFromHub(accountId, channelId);
+  }
+
   @Delete(':channelId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Disconnect / delete a WhatsApp channel (best-effort Hub cleanup if mode=evohub)' })

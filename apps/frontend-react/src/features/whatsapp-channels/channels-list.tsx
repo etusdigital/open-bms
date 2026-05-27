@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { Trash2 } from 'lucide-react';
+import { RefreshCw, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { type WhatsappChannelStatus, useDeleteWhatsappChannel, useWhatsappChannels, type WhatsappChannelSummary } from './api';
+import { cn } from '@/lib/utils';
+import { type WhatsappChannelStatus, useDeleteWhatsappChannel, useReconcileChannel, useWhatsappChannels, type WhatsappChannelSummary } from './api';
 
 interface Props {
   accountId: number;
@@ -31,7 +32,22 @@ export function ChannelsList({ accountId }: Props) {
   const { t } = useTranslation();
   const { data: channels, isLoading } = useWhatsappChannels(accountId);
   const deleteChannel = useDeleteWhatsappChannel(accountId);
+  const reconcileChannel = useReconcileChannel(accountId);
   const [pendingDelete, setPendingDelete] = useState<WhatsappChannelSummary | null>(null);
+
+  async function handleReconcile(channel: WhatsappChannelSummary) {
+    try {
+      const updated = await reconcileChannel.mutateAsync(channel.id);
+      if (updated.status === 'active') {
+        toast.success(t('whatsappChannels.reconcileSuccessActive'));
+      } else {
+        toast.info(t('whatsappChannels.reconcileSuccessPending'));
+      }
+    } catch (err) {
+      const msg = axios.isAxiosError(err) && err.response?.data?.message ? String(err.response.data.message) : t('whatsappChannels.reconcileError');
+      toast.error(msg);
+    }
+  }
 
   async function confirmDelete() {
     if (!pendingDelete) return;
@@ -74,9 +90,23 @@ export function ChannelsList({ accountId }: Props) {
               </div>
               <p className="text-muted-foreground mt-1 truncate text-xs">{channel.displayPhoneNumber ?? channel.phoneNumberId ?? t('whatsappChannels.noPhoneYet')}</p>
             </div>
-            <Button variant="ghost" size="icon" aria-label={t('whatsappChannels.deleteAria')} onClick={() => setPendingDelete(channel)} disabled={deleteChannel.isPending}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {channel.mode === 'evohub' && channel.status !== 'active' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label={t('whatsappChannels.reconcileAria')}
+                  onClick={() => handleReconcile(channel)}
+                  disabled={reconcileChannel.isPending}
+                >
+                  <RefreshCw className={cn('mr-1 h-3.5 w-3.5', reconcileChannel.isPending && 'animate-spin')} />
+                  {t('whatsappChannels.reconcileButton')}
+                </Button>
+              )}
+              <Button variant="ghost" size="icon" aria-label={t('whatsappChannels.deleteAria')} onClick={() => setPendingDelete(channel)} disabled={deleteChannel.isPending}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
           </li>
         ))}
       </ul>

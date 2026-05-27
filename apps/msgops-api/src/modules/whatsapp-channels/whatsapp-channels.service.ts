@@ -106,6 +106,60 @@ export class WhatsappChannelsService {
     await this.repo.delete({ id: channelId });
   }
 
+  /**
+   * Pulls the current state of an EvoHub channel directly from the Hub and
+   * updates the local row — no webhook needed. Used by the "Sincronizar"
+   * button on the UI when a channel is stuck on "Pendente" (webhook missed,
+   * delayed, or the URL was wrong when the webhook resource was created).
+   *
+   * Resolves `phone_number_id`, `waba_id`, `display_phone_number` and
+   * `status` from `hub.getChannel().meta_connection`. If the Hub already
+   * knows the Meta data, the local row becomes `active` and the UI flips.
+   */
+  async reconcileFromHub(accountId: number, channelId: number): Promise<ChannelSummary> {
+    this.assertSameAccount(accountId);
+    const row = await this.repo.findOne({ where: { id: channelId, accountId } });
+    if (!row) throw new NotFoundException(`WhatsApp channel ${channelId} not found`);
+    if (row.mode !== 'evohub') {
+      throw new HttpException('Reconcile is only available for EvoHub channels.', HttpStatus.BAD_REQUEST);
+    }
+    if (!row.hubChannelId) {
+      throw new HttpException(`Channel ${channelId} has no hub_channel_id — recreate it.`, HttpStatus.PRECONDITION_FAILED);
+    }
+    const hub = this.buildHubClient();
+    if (!hub) {
+      throw new HttpException('EvoHub API key is not configured. Set it in Super Admin → WhatsApp (EvoHub).', HttpStatus.PRECONDITION_FAILED);
+    }
+
+    let remote: Awaited<ReturnType<EvolutionHubClient['getChannel']>>;
+    try {
+      remote = await hub.getChannel(row.hubChannelId);
+    } catch (err: any) {
+      this.logger.error(`evohub_reconcile_failed channel=${channelId} hub=${row.hubChannelId} err=${err?.message ?? 'unknown'}`);
+      throw new HttpException(`EvoHub channel ${row.hubChannelId} not reachable.`, HttpStatus.BAD_GATEWAY);
+    }
+    const mc = remote.meta_connection ?? {};
+    const phoneNumberId = mc.phone_number_id ?? mc.phone_numbers?.[0]?.id ?? row.phoneNumberId;
+    const wabaId = mc.waba_id ?? row.wabaId;
+    const displayPhone = mc.phone_numbers?.find((p) => p.id === phoneNumberId)?.display_phone_number ?? mc.phone_numbers?.[0]?.display_phone_number ?? row.displayPhoneNumber;
+
+    row.phoneNumberId = phoneNumberId;
+    row.wabaId = wabaId;
+    row.displayPhoneNumber = displayPhone;
+    // Hub channel status `connected` (or any value once Meta data is present)
+    // → active. Stays pending only if the Hub itself still considers it
+    // pending AND we don't have Meta data yet.
+    if (phoneNumberId && wabaId) {
+      row.status = 'active';
+    } else if ((remote.status ?? '').toLowerCase() === 'disconnected') {
+      row.status = 'disconnected';
+    }
+    row.lastEventAt = new Date();
+    row.evolutionHubMeta = { ...(row.evolutionHubMeta ?? {}), last_reconciled_at: new Date().toISOString(), last_reconciled_status: remote.status };
+    const saved = await this.repo.save(row);
+    return this.toSummary(saved);
+  }
+
   private async createMeta(accountId: number, dto: CreateWhatsappChannelDto): Promise<ChannelSummary> {
     if (await this.resolver.isHubEnabled()) {
       throw new HttpException("Install is in EvoHub mode — use mode='evohub' to create channels.", HttpStatus.BAD_REQUEST);
@@ -257,7 +311,7 @@ export class WhatsappChannelsService {
     try {
       webhook = await hub.createWebhook({
         name: `BMS account ${accountId}`,
-        url: `${publicUrl}/webhooks/evolution-hub`,
+        url: `${publicUrl}/api/webhooks/evolution-hub`,
         events: HUB_WHATSAPP_EVENTS,
         secret: webhookSecret,
         channels: [input.hubChannelId],
@@ -330,7 +384,7 @@ export class WhatsappChannelsService {
         // Single-shot: Hub creates the channel AND a webhook bound to it,
         // scoped to WhatsApp events only. No need for a separate POST to
         // /webhooks/:id/associate later.
-        webhook_url: `${publicUrl}/webhooks/evolution-hub`,
+        webhook_url: `${publicUrl}/api/webhooks/evolution-hub`,
         webhook_secret: webhookSecret,
         webhook_events: HUB_WHATSAPP_EVENTS,
       });
