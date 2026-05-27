@@ -13,9 +13,6 @@ export class WhatsappHubSystemSettingsDto {
   @JoiSchema(Joi.boolean().optional())
   enabled?: boolean;
 
-  @JoiSchema(Joi.string().uri().optional().allow(''))
-  url?: string;
-
   @JoiSchema(Joi.string().trim().optional().allow(''))
   apiKey?: string;
 
@@ -25,7 +22,6 @@ export class WhatsappHubSystemSettingsDto {
 
 export const whatsappHubSystemSettingsSaveSchema = Joi.object<WhatsappHubSystemSettingsDto>({
   enabled: Joi.boolean().required(),
-  url: Joi.string().uri().required(),
   apiKey: Joi.when('enabled', {
     is: true,
     then: Joi.string().trim().min(8).required(),

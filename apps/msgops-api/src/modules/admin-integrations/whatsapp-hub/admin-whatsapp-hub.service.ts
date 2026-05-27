@@ -12,7 +12,6 @@ export const WHATSAPP_HUB_KEY = 'whatsapp_hub_system_settings';
 
 export interface WhatsappHubSystemAdminSettings {
   enabled: boolean;
-  url?: string;
   apiKeyMasked?: string;
   webhookSecretMasked?: string;
 }
@@ -52,7 +51,7 @@ export class AdminWhatsappHubService implements OnModuleInit {
 
   async getSettings(): Promise<WhatsappHubSystemAdminSettings | null> {
     const raw = await this.readRaw();
-    if (!raw) return { enabled: false, url: process.env.EVOLUTION_HUB_URL ?? 'https://api.evohub.ai' };
+    if (!raw) return { enabled: false };
     return this.toPublic(raw);
   }
 
@@ -60,7 +59,6 @@ export class AdminWhatsappHubService implements OnModuleInit {
     const existing = await this.readRaw();
     const merged: WhatsappHubSystemSettings = {
       enabled: payload.enabled ?? existing?.enabled ?? false,
-      url: payload.url ?? existing?.url ?? 'https://api.evohub.ai',
       apiKey: payload.apiKey ?? existing?.apiKey ?? '',
       webhookSecret: payload.webhookSecret ?? existing?.webhookSecret ?? '',
     };
@@ -88,7 +86,6 @@ export class AdminWhatsappHubService implements OnModuleInit {
   private toPublic(raw: WhatsappHubSystemSettings): WhatsappHubSystemAdminSettings {
     return {
       enabled: raw.enabled,
-      url: raw.url,
       apiKeyMasked: maskCredential(raw.apiKey),
       webhookSecretMasked: maskCredential(raw.webhookSecret),
     };

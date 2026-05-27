@@ -23,7 +23,6 @@ export function WhatsappHubTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [enabled, setEnabled] = useState(false);
-  const [url, setUrl] = useState('https://api.evohub.ai');
   const [apiKey, setApiKey] = useState('');
   const [webhookSecret, setWebhookSecret] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -38,7 +37,6 @@ export function WhatsappHubTab() {
         if (data) {
           setSettings(data);
           setEnabled(data.enabled);
-          setUrl(data.url ?? 'https://api.evohub.ai');
         }
         setLoading(false);
       })
@@ -56,7 +54,7 @@ export function WhatsappHubTab() {
   const hasApiKey = !!settings?.apiKeyMasked;
   const hasSecret = !!settings?.webhookSecretMasked;
   // Validation only enforced when enabling; turning it OFF should always be allowed.
-  const isValid = !enabled || (!!url && (hasApiKey || !!apiKey) && (hasSecret || !!webhookSecret));
+  const isValid = !enabled || ((hasApiKey || !!apiKey) && (hasSecret || !!webhookSecret));
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -65,7 +63,6 @@ export function WhatsappHubTab() {
     try {
       const updated = await whatsappHubGateway.save({
         enabled,
-        url,
         ...(apiKey ? { apiKey } : {}),
         ...(webhookSecret ? { webhookSecret } : {}),
       });
@@ -109,9 +106,9 @@ export function WhatsappHubTab() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="wa-hub-url">{t('integrations.whatsappHub.url')}</Label>
-        <Input id="wa-hub-url" placeholder="https://api.evohub.ai" value={url} onChange={(e) => setUrl(e.target.value)} disabled={saving} />
-        <p className="text-muted-foreground text-xs">{t('integrations.whatsappHub.urlHelp')}</p>
+        <Label>{t('integrations.whatsappHub.endpointLabel')}</Label>
+        <div className="bg-muted text-muted-foreground rounded-md px-3 py-2 font-mono text-xs">https://api.evohub.ai</div>
+        <p className="text-muted-foreground text-xs">{t('integrations.whatsappHub.endpointHelp')}</p>
       </div>
 
       <div className="space-y-2">

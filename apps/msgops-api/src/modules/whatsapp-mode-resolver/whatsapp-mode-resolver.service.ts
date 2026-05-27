@@ -63,6 +63,9 @@ export class WhatsappModeResolverService {
       if (!channel.channelToken) {
         throw new Error('EvoHub channel is missing channel_token — wait for channel_connected webhook.');
       }
+      // EvoHub endpoint is fixed at https://api.evohub.ai — matches HUB_API_URL
+      // in evo-ai-crm-community/lib/meta_base_url.rb. EVOLUTION_HUB_URL stays
+      // available as an emergency override for dev / staging Hub mocks.
       const hubUrl = (process.env.EVOLUTION_HUB_URL ?? 'https://api.evohub.ai').replace(/\/+$/, '');
       const graphVersion = process.env.WHATSAPP_GRAPH_VERSION ?? 'v18.0';
       return {

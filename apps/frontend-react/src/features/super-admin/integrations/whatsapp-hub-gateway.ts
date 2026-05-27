@@ -2,14 +2,12 @@ import { apiClient } from '@/lib/api-client';
 
 export interface WhatsappHubAdminSettings {
   enabled: boolean;
-  url?: string;
   apiKeyMasked?: string;
   webhookSecretMasked?: string;
 }
 
 export interface WhatsappHubSavePayload {
   enabled?: boolean;
-  url?: string;
   apiKey?: string;
   webhookSecret?: string;
 }

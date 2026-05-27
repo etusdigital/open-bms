@@ -182,10 +182,15 @@ export function writeWhatsappMetaEnvFile(dto: WhatsappMetaSystemSettings): void 
 }
 
 // ---------- WhatsApp EvoHub (turnkey mode) ----------
+//
+// Base URL is fixed at https://api.evohub.ai — same convention as the CRM
+// (HUB_API_URL constant in evo-ai-crm-community/lib/meta_base_url.rb). Not
+// exposed in the admin UI. The EVOLUTION_HUB_URL env var stays available as
+// an emergency override for dev / staging Hub mocks but is never written by
+// the admin save flow.
 
 export interface WhatsappHubSystemSettings {
   enabled: boolean;
-  url: string;
   apiKey: string;
   webhookSecret: string;
 }
@@ -195,11 +200,6 @@ export function whatsappHubEnvFilePath(): string {
 }
 
 export function writeWhatsappHubEnvFile(dto: WhatsappHubSystemSettings): void {
-  const lines: string[] = [
-    `EVOLUTION_HUB_ENABLED=${dto.enabled ? 'true' : 'false'}`,
-    `EVOLUTION_HUB_URL=${dto.url}`,
-    `EVOLUTION_HUB_API_KEY=${dto.apiKey}`,
-    `EVOLUTION_HUB_WEBHOOK_SECRET=${dto.webhookSecret}`,
-  ];
+  const lines: string[] = [`EVOLUTION_HUB_ENABLED=${dto.enabled ? 'true' : 'false'}`, `EVOLUTION_HUB_API_KEY=${dto.apiKey}`, `EVOLUTION_HUB_WEBHOOK_SECRET=${dto.webhookSecret}`];
   writeEnvFile(whatsappHubEnvFilePath(), lines);
 }
