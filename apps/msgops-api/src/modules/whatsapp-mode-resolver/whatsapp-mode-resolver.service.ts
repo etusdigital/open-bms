@@ -79,11 +79,15 @@ export class WhatsappModeResolverService {
       if (!channel.channelToken) {
         throw new Error('EvoHub channel is missing channel_token — wait for channel_connected webhook.');
       }
+      // IMPORTANT: the Hub's /meta proxy strips and re-applies the API version
+      // internally; including /vNN.0 in the path makes it return 404
+      // "Unknown path components" from Meta. Match the CRM contract
+      // (evo-ai-crm-community/lib/meta_base_url.rb#for): for evohub mode the
+      // baseUrl ends at /meta — no version segment.
       const hubUrl = (process.env.EVOLUTION_HUB_URL ?? 'https://api.evohub.ai').replace(/\/+$/, '');
-      const graphVersion = process.env.WHATSAPP_GRAPH_VERSION ?? 'v18.0';
       return {
         mode,
-        baseUrl: `${hubUrl}/meta/${graphVersion}`,
+        baseUrl: `${hubUrl}/meta`,
         bearerToken: channel.channelToken,
         phoneNumberId: channel.phoneNumberId,
       };
