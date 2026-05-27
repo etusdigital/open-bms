@@ -35,6 +35,17 @@ export interface CreateEvoHubChannelPayload {
 
 export type CreateChannelPayload = CreateMetaChannelPayload | CreateEvoHubChannelPayload;
 
+export interface HubChannelOption {
+  id: string;
+  name?: string;
+  status: string;
+  wabaName?: string;
+  displayPhoneNumber?: string;
+  phoneNumberId?: string;
+  wabaId?: string;
+  alreadyAttached: boolean;
+}
+
 export const whatsappChannelsService = {
   async list(accountId: number): Promise<WhatsappChannelSummary[]> {
     const { data } = await apiClient.get<WhatsappChannelSummary[]>(`/accounts/${accountId}/whatsapp-channels`);
@@ -46,6 +57,14 @@ export const whatsappChannelsService = {
   },
   async create(accountId: number, payload: CreateChannelPayload): Promise<WhatsappChannelSummary> {
     const { data } = await apiClient.post<WhatsappChannelSummary>(`/accounts/${accountId}/whatsapp-channels`, payload);
+    return data;
+  },
+  async listHubChannels(accountId: number): Promise<HubChannelOption[]> {
+    const { data } = await apiClient.get<HubChannelOption[]>(`/accounts/${accountId}/whatsapp-channels/hub-channels/available`);
+    return data;
+  },
+  async attachExisting(accountId: number, payload: { hubChannelId: string; name?: string }): Promise<WhatsappChannelSummary> {
+    const { data } = await apiClient.post<WhatsappChannelSummary>(`/accounts/${accountId}/whatsapp-channels/attach-existing`, payload);
     return data;
   },
   async delete(accountId: number, channelId: number): Promise<void> {

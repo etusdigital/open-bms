@@ -22,10 +22,11 @@ The `infra/swarm/` folder also contains the stack files and a working
 
 ## 🛠 Operations
 
-| Doc                                                       | Audience                                                           |
-| --------------------------------------------------------- | ------------------------------------------------------------------ |
-| [Email providers](./operations/email-providers.md)        | Configuring SendGrid, SparkPost, SES, Mailersend, Resend, Mandrill |
-| [GeoIP database (DB-IP / MaxMind)](./operations/geodb.md) | Setting up GeoIP enrichment and the monthly refresh                |
+| Doc                                                              | Audience                                                           |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------ |
+| [Email providers](./operations/email-providers.md)               | Configuring SendGrid, SparkPost, SES, Mailersend, Resend, Mandrill |
+| [WhatsApp Cloud (Meta + EvoHub)](./operations/whatsapp-cloud.md) | Setup do Meta App, EvoHub, templates, webhooks, troubleshoot       |
+| [GeoIP database (DB-IP / MaxMind)](./operations/geodb.md)        | Setting up GeoIP enrichment and the monthly refresh                |
 
 ## 📚 Reference
 

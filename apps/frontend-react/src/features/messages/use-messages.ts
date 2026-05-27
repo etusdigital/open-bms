@@ -186,6 +186,29 @@ export function useSyncTemplateStatus() {
   });
 }
 
+/**
+ * Pull every template that exists on Meta (WABA) into BMS. Creates missing
+ * rows, refreshes status/category on existing ones, idempotent — safe to
+ * click multiple times.
+ */
+export function useSyncTemplatesFromMeta() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (): Promise<{ created: number; updated: number; skipped: number; total: number }> => {
+      const { data } = await apiClient.post<{ created: number; updated: number; skipped: number; total: number }>('/messages/whatsapp/sync-from-meta');
+      return data;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messages.all });
+      toast.success(i18n.t('messages.syncFromMetaResult', { created: result.created, updated: result.updated, total: result.total }));
+    },
+    onError: (error) => {
+      toast.error(extractApiErrorMessage(error) ?? i18n.t('messages.syncFromMetaError'));
+    },
+  });
+}
+
 export function useLabelsAll() {
   const auth = useAppStore((s) => s.auth);
   const accountId = auth.status === 'authenticated' ? auth.account.id : 0;

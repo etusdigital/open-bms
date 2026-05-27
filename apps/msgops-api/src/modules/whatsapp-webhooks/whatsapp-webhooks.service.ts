@@ -123,7 +123,12 @@ export class WhatsappWebhooksService {
    */
   async processHubEvent(body: any): Promise<void> {
     const event = (body?.event ?? '').toString();
-    this.logger.log(`evohub_webhook_event event=${event || 'unknown'}`);
+    // The Hub uses two payload shapes on the same endpoint:
+    //   - Lifecycle events: { event: 'channel_connected', data: {...} }
+    //   - Meta-forwarded events: { object: 'whatsapp_business_account', entry: [...] }
+    // Identify the kind explicitly so the log is honest about what happened.
+    const kind = event ? event : body?.object === 'whatsapp_business_account' ? 'meta_forward' : 'unknown';
+    this.logger.log(`evohub_webhook_event kind=${kind}`);
 
     if (event === 'channel_connected') {
       await this.applyHubChannelConnected(body);
@@ -136,7 +141,9 @@ export class WhatsappWebhooksService {
     if (body?.object === 'whatsapp_business_account') {
       // Forwarded Meta event — same handling as direct mode.
       await this.processMetaEvent(body);
+      return;
     }
+    this.logger.warn(`evohub_webhook_event_unrecognised body=${JSON.stringify(body).slice(0, 300)}`);
   }
 
   private async applyHubChannelConnected(body: any): Promise<void> {

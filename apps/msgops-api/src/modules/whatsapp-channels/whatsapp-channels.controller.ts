@@ -27,6 +27,18 @@ export class WhatsappChannelsController {
     return this.service.create(accountId, payload);
   }
 
+  @Get('hub-channels/available')
+  @ApiOperation({ summary: 'List EvoHub channels accessible by the configured API key (for the "attach existing" picker)' })
+  listHubChannels(@Param('accountId', ParseIntPipe) accountId: number) {
+    return this.service.listHubChannels(accountId);
+  }
+
+  @Post('attach-existing')
+  @ApiOperation({ summary: 'Attach BMS to an existing EvoHub channel — creates only the webhook, skips Embedded Signup' })
+  attachExisting(@Param('accountId', ParseIntPipe) accountId: number, @Body() payload: { hubChannelId: string; name?: string }): Promise<ChannelSummary> {
+    return this.service.attachToExistingHubChannel(accountId, payload);
+  }
+
   @Delete(':channelId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Disconnect / delete a WhatsApp channel (best-effort Hub cleanup if mode=evohub)' })

@@ -219,6 +219,26 @@ Cole esse bloco num terminal local (ou no manager via SSH) — ele imprime um `.
 | `BOOTSTRAP_ADMIN_EMAIL`            | email do primeiro super-admin                              | ✅                         |
 | `BOOTSTRAP_ADMIN_PASSWORD`         | `openssl rand -base64 18`                                  | ✅                         |
 
+**WhatsApp Cloud (Meta direta + EvoHub)** — todas opcionais no boot. As credenciais reais
+(APP_ID, APP_SECRET, HUB_API_KEY etc.) são configuradas pela UI **depois** do deploy em
+Super Admin → Integrações → WhatsApp (Meta App) e WhatsApp (EvoHub). O backend lê primeiro
+do `system_config` (DB) e cai pra env só como fallback. Guia operacional completo:
+[`docs/operations/whatsapp-cloud.md`](../../docs/operations/whatsapp-cloud.md).
+
+| Nome                           | Como obter                                        | Obrigatória?                    |
+| ------------------------------ | ------------------------------------------------- | ------------------------------- |
+| `WHATSAPP_PROVIDER`            | `cloud` ou `twilio`                               | default `cloud`                 |
+| `WHATSAPP_GRAPH_VERSION`       | versão da Graph API Meta                          | default `v18.0`                 |
+| `BMS_PUBLIC_URL`               | URL pública do webhook                            | default `${FRONTEND_URL}`       |
+| `EVOLUTION_HUB_ENABLED`        | `true` se for usar EvoHub no lugar do Meta direto | default `false`                 |
+| `EVOLUTION_HUB_URL`            | base URL do Hub                                   | default `https://api.evohub.ai` |
+| `WHATSAPP_APP_ID`              | Meta App ID — preencher pela UI                   | ❌ (UI)                         |
+| `WHATSAPP_APP_SECRET`          | Meta App Secret — preencher pela UI               | ❌ (UI)                         |
+| `WHATSAPP_CONFIG_ID`           | Embedded Signup Config ID — preencher pela UI     | ❌ (UI)                         |
+| `WHATSAPP_VERIFY_TOKEN`        | Token GET webhook Meta — preencher pela UI        | ❌ (UI)                         |
+| `EVOLUTION_HUB_API_KEY`        | Bearer tenant no Hub — preencher pela UI          | ❌ (UI)                         |
+| `EVOLUTION_HUB_WEBHOOK_SECRET` | HMAC-SHA256 Hub ↔ BMS — preencher pela UI         | ❌ (UI)                         |
+
 Veja [`infra/swarm/secrets.env.example`](./secrets.env.example) pro template comentado.
 
 ---
@@ -348,6 +368,25 @@ docker cp /caminho/dbip-city-lite.mmdb \
 ```
 
 Baixe o `dbip-city-lite.mmdb` mais recente em https://db-ip.com/db/lite.
+
+### 7.4. Configurar WhatsApp (Meta direta ou EvoHub)
+
+Diferente das envs comuns, as credenciais do WhatsApp são salvas pela UI no banco
+(`system_config`) — você **não** preenche no stack. Após o boot:
+
+1. Logue como super-admin → **Integrações** → **WhatsApp (Meta App)**.
+2. Preencha `App ID`, `App Secret`, `Config ID` e `Verify Token` do seu Meta App.
+3. Configure o webhook na Meta Developer Console apontando para `https://${FRONTEND_HOST}/api/webhooks/meta` e use o mesmo `Verify Token` que setou aqui.
+4. Salve. Toggle `WHATSAPP_PROVIDER` (em system_config) já está `cloud` por default — não precisa mexer.
+
+**Para usar EvoHub no lugar do Meta direto** (clientes que não querem Meta App próprio):
+
+1. Em **Integrações** → **WhatsApp (EvoHub)** habilite "Modo EvoHub".
+2. Preencha `API Key` e `Webhook Secret` da sua conta no EvoHub.
+3. Cada conta tenant pode então em **Configurações** → **WhatsApp** clicar **Conectar via EvoHub** para o Embedded Signup OU **Usar canal existente** para anexar a um canal já conectado.
+
+Guia operacional completo (troubleshoot, signature mismatch, BMS_PUBLIC_URL split, etc.):
+[`docs/operations/whatsapp-cloud.md`](../../docs/operations/whatsapp-cloud.md).
 
 ---
 
@@ -501,6 +540,29 @@ UPDATE contacts SET is_active = false WHERE email LIKE '%***%';
 ### 8.11. Segmentos ficam com Total = 0 após salvar
 
 Ver issue [EVO-1463](https://linear.app/evoai/issue/EVO-1463). Bug do segment builder no frontend — campos `Email válido` e `Canais de comunicação` não persistem o default. Workaround: editar o segmento e clicar **explicitamente** no dropdown VALOR antes de salvar.
+
+### 8.12. POST `/api/messages` em WhatsApp retorna 412 "BMS_PUBLIC_URL env is not set"
+
+Quando você tenta conectar um canal EvoHub (`POST /accounts/:id/whatsapp-channels`) ou anexar a um existente, o backend precisa saber a URL pública que o Hub vai chamar de volta com webhooks.
+
+**Fix**: setar `BMS_PUBLIC_URL` nas envs do stack. Default herda de `FRONTEND_URL`. Se você está num cenário split (webhook num subdomínio dedicado), seta explícito (ex: `https://webhooks.bms.exemplo.ai`). Update the stack.
+
+### 8.13. Webhook EvoHub chega como `evohub_webhook_event kind=unknown`
+
+Significa que o payload não tem `event` (ciclo de vida) nem `object: whatsapp_business_account` (event Meta encaminhado). Provavelmente um payload novo que o Hub começou a mandar. Olha o log seguinte `evohub_webhook_event_unrecognised body=...` pra ver o shape e abre uma issue.
+
+### 8.14. Campanha WhatsApp dispara mas `Contacts: 0` no log do campaign-packer
+
+`contacts.has_whatsapp = false` para todos os contatos. Bases migradas de Evolution não tinham essa coluna populada — a migration `1781200000000-backfill-has-whatsapp-from-has-phone.ts` faz UPDATE one-shot, mas só corre uma vez.
+
+**Fix**: confirma que a migration rodou:
+
+```bash
+docker exec -it $(docker ps -q -f name=bms_postgres) psql -U postgres -d msgops -c \
+  "SELECT name FROM migrations WHERE name LIKE '%has_whatsapp%';"
+```
+
+Se não houver, sobe o `msgops-api` para forçar o `TYPEORM_MIGRATIONS_RUN=true`. Contatos novos via API/CSV já saem com `has_whatsapp=true` automaticamente (hook `BeforeInsert`).
 
 ---
 

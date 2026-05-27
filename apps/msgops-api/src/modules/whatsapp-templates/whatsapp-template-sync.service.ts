@@ -9,6 +9,8 @@ import { MessageDto } from '../messages/messages.dto';
 
 const CATEGORY_AUTH = 'AUTHENTICATION';
 const CATEGORY_MARKETING = 'MARKETING';
+const CATEGORY_UTILITY = 'UTILITY';
+const VALID_CATEGORIES = new Set([CATEGORY_MARKETING, CATEGORY_UTILITY]);
 
 export interface TemplateSyncResult {
   /** Template name accepted by Meta (snake_case, used as providerMessageId). */
@@ -29,6 +31,21 @@ export interface TemplateStatusFetchResult {
   rejectedReason?: string;
 }
 
+export interface MetaTemplateListItem {
+  id?: string;
+  name: string;
+  status: string;
+  language?: string;
+  category?: string;
+  rejected_reason?: string;
+  components?: Array<{
+    type: 'HEADER' | 'BODY' | 'FOOTER' | 'BUTTONS';
+    format?: 'TEXT' | 'IMAGE' | 'VIDEO';
+    text?: string;
+    buttons?: Array<{ type?: string; text?: string; url?: string }>;
+  }>;
+}
+
 interface MetaTemplateComponent {
   type: 'HEADER' | 'BODY' | 'FOOTER' | 'BUTTONS';
   format?: 'TEXT' | 'IMAGE' | 'VIDEO';
@@ -42,7 +59,7 @@ interface MetaTemplateComponent {
 
 interface MetaCreateTemplatePayload {
   name: string;
-  category: typeof CATEGORY_AUTH | typeof CATEGORY_MARKETING;
+  category: typeof CATEGORY_AUTH | typeof CATEGORY_MARKETING | typeof CATEGORY_UTILITY;
   allow_category_change: boolean;
   language: string;
   components: MetaTemplateComponent[];
@@ -193,6 +210,69 @@ export class WhatsappTemplateSyncService {
   }
 
   /**
+   * Lists every template that exists on Meta for the account's active WABA.
+   *
+   * Used by the "Sincronizar templates" button on the messages list so the
+   * operator can pull templates created directly on Business Manager into
+   * BMS (e.g. legacy templates, templates created by another team).
+   *
+   * Paginates via Meta's cursor (`paging.next`) — caps at 500 templates
+   * to avoid runaway calls; raise if it ever bites.
+   */
+  async listMetaTemplates(accountId: number): Promise<MetaTemplateListItem[]> {
+    if (!accountId) throw new BadRequestException('Cannot list templates: missing account id');
+
+    const channel = await this.channels.findOne({
+      where: { accountId, status: 'active' },
+      order: { lastEventAt: 'DESC', updatedAt: 'DESC' },
+    });
+    if (!channel) {
+      throw new HttpException(`No active WhatsApp channel for account ${accountId}.`, HttpStatus.PRECONDITION_FAILED);
+    }
+    if (!channel.wabaId) {
+      throw new HttpException(`WhatsApp channel ${channel.id} is missing waba_id — reconnect.`, HttpStatus.PRECONDITION_FAILED);
+    }
+
+    const resolved = await this.resolver.resolveChannel({
+      mode: channel.mode,
+      phoneNumberId: channel.phoneNumberId,
+      accessToken: channel.accessToken,
+      channelToken: channel.channelToken,
+    });
+
+    const collected: MetaTemplateListItem[] = [];
+    let nextUrl: string | null = `${resolved.baseUrl}/${channel.wabaId}/message_templates`;
+    let params: Record<string, string> | undefined = {
+      fields: 'name,status,id,rejected_reason,language,category,components',
+      limit: '100',
+    };
+    const HARD_CAP = 500;
+
+    while (nextUrl && collected.length < HARD_CAP) {
+      let response;
+      try {
+        response = await axios.get(nextUrl, {
+          params,
+          headers: { Authorization: `Bearer ${resolved.bearerToken}` },
+          timeout: 15_000,
+        });
+      } catch (err) {
+        const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+        const body = axios.isAxiosError(err) ? err.response?.data : undefined;
+        this.logger.error(`wa_template_list_failed account=${accountId} status=${status ?? '?'} body=${this.safe(body)}`);
+        throw new HttpException(this.metaErrorMessage(body) ?? 'Meta refused the template list query.', status === 400 ? HttpStatus.BAD_REQUEST : HttpStatus.BAD_GATEWAY);
+      }
+      const rows: MetaTemplateListItem[] = response.data?.data ?? [];
+      collected.push(...rows);
+      // `paging.next` is a fully-qualified URL with the cursor embedded —
+      // pass it through without re-injecting our params.
+      nextUrl = response.data?.paging?.next ?? null;
+      params = undefined;
+    }
+    return collected;
+  }
+
+  /**
    * Maps Meta's verdict to the BMS Message.status taxonomy
    * (matches apps/msgops-api/src/modules/messages/messages.interface.ts).
    *  PENDING / IN_APPEAL   → sent_approval (UI badge "Aprovação enviada")
@@ -272,9 +352,15 @@ export class WhatsappTemplateSyncService {
       });
     }
 
+    // Operator-chosen category from the messages.template_category column.
+    // Legacy rows (pre-1781100000000 migration) have null here, so default to
+    // MARKETING to match prior behavior.
+    const requested = (messageDto.templateCategory ?? '').toUpperCase();
+    const category = VALID_CATEGORIES.has(requested) ? (requested as 'MARKETING' | 'UTILITY') : CATEGORY_MARKETING;
+
     return {
       name,
-      category: CATEGORY_MARKETING,
+      category,
       allow_category_change: false,
       language,
       components,

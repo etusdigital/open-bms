@@ -128,6 +128,14 @@ export class MessageDto implements Labelable {
   @JoiSchema(Joi.string().allow(null).optional())
   callToActionText?: string;
 
+  @JoiSchema(
+    Joi.string()
+      .allow(null, '')
+      .optional()
+      .valid(...['MARKETING', 'UTILITY']),
+  )
+  templateCategory?: string;
+
   @JoiSchema(Joi.string().allow(null).optional())
   providerMessageId?: string;
 
