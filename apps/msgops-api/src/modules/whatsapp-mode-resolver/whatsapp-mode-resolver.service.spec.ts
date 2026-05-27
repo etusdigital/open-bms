@@ -98,11 +98,11 @@ describe('WhatsappModeResolverService', () => {
   });
 
   describe('resolveChannel — evohub mode', () => {
-    it('returns Hub /meta/{version} URL and channel_token', async () => {
+    it('returns Hub /meta URL (without version segment) and channel_token', async () => {
       const cache = buildCache({ whatsapp_hub_system_settings: { enabled: true } });
       const svc = new WhatsappModeResolverService(cache);
       const cfg = await svc.resolveChannel({ mode: 'evohub', phoneNumberId: '222', accessToken: null, channelToken: 'hub-tok' });
-      expect(cfg).toEqual({ mode: 'evohub', baseUrl: 'https://api.evohub.ai/meta/v18.0', bearerToken: 'hub-tok', phoneNumberId: '222' });
+      expect(cfg).toEqual({ mode: 'evohub', baseUrl: 'https://api.evohub.ai/meta', bearerToken: 'hub-tok', phoneNumberId: '222' });
     });
 
     it('honours EVOLUTION_HUB_URL override and strips trailing slash', async () => {
@@ -110,7 +110,7 @@ describe('WhatsappModeResolverService', () => {
       const cache = buildCache({ whatsapp_hub_system_settings: { enabled: true } });
       const svc = new WhatsappModeResolverService(cache);
       const cfg = await svc.resolveChannel({ mode: 'evohub', phoneNumberId: '222', accessToken: null, channelToken: 'hub-tok' });
-      expect(cfg.baseUrl).toBe('https://hub.local/meta/v18.0');
+      expect(cfg.baseUrl).toBe('https://hub.local/meta');
     });
 
     it('throws when channel_token is missing', async () => {

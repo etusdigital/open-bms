@@ -35,15 +35,18 @@ export class WhatsappChannelResolverService {
       throw new NotFoundException(`WhatsApp channel ${channel.id} is active but missing phone_number_id — reconnect.`);
     }
 
-    const graphVersion = process.env.WHATSAPP_GRAPH_VERSION ?? 'v18.0';
     let baseUrl: string;
     let bearerToken: string | null;
 
     if (channel.mode === 'evohub') {
+      // Hub's /meta proxy applies the API version internally; we MUST NOT
+      // include /vNN.0 in the path (Meta returns 404 "Unknown path components"
+      // through the proxy otherwise). Mirrors evo-ai-crm-community/lib/meta_base_url.rb.
       const hubUrl = (process.env.EVOLUTION_HUB_URL ?? 'https://api.evohub.ai').replace(/\/+$/, '');
-      baseUrl = `${hubUrl}/meta/${graphVersion}`;
+      baseUrl = `${hubUrl}/meta`;
       bearerToken = channel.channelToken;
     } else {
+      const graphVersion = process.env.WHATSAPP_GRAPH_VERSION ?? 'v18.0';
       baseUrl = `https://graph.facebook.com/${graphVersion}`;
       bearerToken = channel.accessToken;
     }
