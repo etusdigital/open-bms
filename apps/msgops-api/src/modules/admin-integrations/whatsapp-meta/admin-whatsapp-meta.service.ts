@@ -37,9 +37,19 @@ export class AdminWhatsappMetaService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    if (existsSync(whatsappMetaEnvFilePath())) return;
     const raw = await this.readRaw();
     if (!raw) return;
+
+    // Mirror DB → process.env at boot. The dotenv loader runs before this,
+    // so without this hydration the channel-create flow would call Meta with
+    // stale / missing credentials on the first request after a save.
+    if (raw.appId) process.env.WHATSAPP_APP_ID = raw.appId;
+    if (raw.appSecret) process.env.WHATSAPP_APP_SECRET = raw.appSecret;
+    if (raw.configId) process.env.WHATSAPP_CONFIG_ID = raw.configId;
+    if (raw.verifyToken) process.env.WHATSAPP_VERIFY_TOKEN = raw.verifyToken;
+    if (raw.graphVersion) process.env.WHATSAPP_GRAPH_VERSION = raw.graphVersion;
+
+    if (existsSync(whatsappMetaEnvFilePath())) return;
     try {
       writeWhatsappMetaEnvFile(raw);
       this.logger.log(`[WhatsappMeta] bootstrapped ${whatsappMetaEnvFilePath()} from system_config`);
@@ -76,6 +86,16 @@ export class AdminWhatsappMetaService implements OnModuleInit {
     } catch (err: any) {
       this.logger.warn(`[WhatsappMeta] could not write env file: ${err?.message ?? 'unknown'}`);
     }
+
+    // Mirror to process.env so the channel-create flow (which reads
+    // WHATSAPP_APP_ID/SECRET to exchange the FB.login `code` for an
+    // access_token) and the webhook signature check (HMAC with App Secret)
+    // pick up the new values without a process restart.
+    process.env.WHATSAPP_APP_ID = finalValue.appId;
+    process.env.WHATSAPP_APP_SECRET = finalValue.appSecret;
+    process.env.WHATSAPP_CONFIG_ID = finalValue.configId;
+    process.env.WHATSAPP_VERIFY_TOKEN = finalValue.verifyToken;
+    if (finalValue.graphVersion) process.env.WHATSAPP_GRAPH_VERSION = finalValue.graphVersion;
 
     return this.toPublic(finalValue);
   }

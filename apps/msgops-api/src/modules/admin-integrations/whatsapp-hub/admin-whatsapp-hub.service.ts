@@ -38,9 +38,18 @@ export class AdminWhatsappHubService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    if (existsSync(whatsappHubEnvFilePath())) return;
     const raw = await this.readRaw();
     if (!raw) return;
+
+    // Always mirror DB → process.env at boot. Even when the env file is
+    // already on disk, the dotenv loader has already evaluated it; without
+    // this hydration the resolver / webhook handlers would see stale values
+    // on the first boot after a save.
+    process.env.EVOLUTION_HUB_ENABLED = raw.enabled ? 'true' : 'false';
+    if (raw.apiKey) process.env.EVOLUTION_HUB_API_KEY = raw.apiKey;
+    if (raw.webhookSecret) process.env.EVOLUTION_HUB_WEBHOOK_SECRET = raw.webhookSecret;
+
+    if (existsSync(whatsappHubEnvFilePath())) return;
     try {
       writeWhatsappHubEnvFile(raw);
       this.logger.log(`[WhatsappHub] bootstrapped ${whatsappHubEnvFilePath()} from system_config`);
@@ -75,6 +84,15 @@ export class AdminWhatsappHubService implements OnModuleInit {
     } catch (err: any) {
       this.logger.warn(`[WhatsappHub] could not write env file: ${err?.message ?? 'unknown'}`);
     }
+
+    // Mirror to process.env so callers that still read from it (Meta App
+    // credentials at create-channel time, webhook signature verification,
+    // etc.) pick up the new values without a process restart. The resolver
+    // reads via SystemConfigCacheProvider, which we just invalidated, so
+    // mode flips are picked up by it on the next call.
+    process.env.EVOLUTION_HUB_ENABLED = finalValue.enabled ? 'true' : 'false';
+    process.env.EVOLUTION_HUB_API_KEY = finalValue.apiKey;
+    process.env.EVOLUTION_HUB_WEBHOOK_SECRET = finalValue.webhookSecret;
 
     return this.toPublic(finalValue);
   }
