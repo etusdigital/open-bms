@@ -297,6 +297,38 @@ export class MessagesService {
     return null;
   }
 
+  /**
+   * Operator-triggered template status refresh. Useful when:
+   *   - the Meta webhook never fires (dev tunnels, missed delivery, hub
+   *     proxy mid-deploy);
+   *   - the operator wants confirmation in seconds instead of waiting.
+   *
+   * Resolves the channel, polls
+   * `GET {baseUrl}/{waba_id}/message_templates?name=...`, persists the
+   * normalised status on the messages row.
+   */
+  async syncTemplateStatus(id: number): Promise<{
+    status: 'approved' | 'rejected' | 'sent_approval';
+    metaStatus: string;
+    rejectedReason?: string;
+  }> {
+    const message = await this.automationMessageRepository.findOne({ where: { id } });
+    if (!message) {
+      throw new HttpException(`Message ${id} not found`, HttpStatus.NOT_FOUND);
+    }
+    if (!message.providerMessageId) {
+      throw new HttpException(`Message ${id} has no providerMessageId — submit the template for approval before syncing status.`, HttpStatus.PRECONDITION_FAILED);
+    }
+
+    const result = await this.whatsappTemplateSync.fetchTemplateStatus(message.accountId, message.providerMessageId);
+
+    if (message.status !== result.status) {
+      await this.automationMessageRepository.update({ id }, { status: result.status });
+    }
+
+    return { status: result.status, metaStatus: result.metaStatus, rejectedReason: result.rejectedReason };
+  }
+
   async createWhatsappTask(messageId, accountId) {
     const date = dayjs().tz('America/Sao_Paulo').add(30, 'second').format('YYYY-MM-DD HH:mm:ss');
     await this.scheduler.create(`${messageId}/${accountId}`, new Date(date), `${process.env.BRIUS_HOSTURL}/messages/monitor-whatsapp-message`, QUEUE_WHATSAPP_MESSAGE);

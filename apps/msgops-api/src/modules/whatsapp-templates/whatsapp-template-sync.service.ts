@@ -19,6 +19,16 @@ export interface TemplateSyncResult {
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | string;
 }
 
+export interface TemplateStatusFetchResult {
+  name: string;
+  /** Raw verdict returned by Meta — APPROVED / REJECTED / PENDING / PAUSED / DISABLED. */
+  metaStatus: string;
+  /** BMS-side Message.status — see normaliseStatus(). */
+  status: 'approved' | 'rejected' | 'sent_approval';
+  metaTemplateId?: string;
+  rejectedReason?: string;
+}
+
 interface MetaTemplateComponent {
   type: 'HEADER' | 'BODY' | 'FOOTER' | 'BUTTONS';
   format?: 'TEXT' | 'IMAGE' | 'VIDEO';
@@ -117,6 +127,91 @@ export class WhatsappTemplateSyncService {
       metaTemplateId: data.id,
       status: data.status ?? 'PENDING',
     };
+  }
+
+  /**
+   * On-demand poll of Meta to learn the current verdict of a template.
+   *
+   * Same channel-resolution path as syncMessageToMeta, then a GET to
+   * `/{waba_id}/message_templates?name=...` which returns
+   * `{ data: [{ id, status, language, rejected_reason? }] }`.
+   *
+   * The webhook handler (Onda 4) does the same job reactively when Meta
+   * pings us — this method gives the operator a button to force the
+   * resolution without waiting for the webhook (and survives a missed
+   * webhook delivery).
+   */
+  async fetchTemplateStatus(accountId: number, templateName: string): Promise<TemplateStatusFetchResult> {
+    if (!accountId) throw new BadRequestException('Cannot sync template status: missing account id');
+    if (!templateName) throw new BadRequestException('Cannot sync template status: missing template name');
+
+    const channel = await this.channels.findOne({
+      where: { accountId, status: 'active' },
+      order: { lastEventAt: 'DESC', updatedAt: 'DESC' },
+    });
+    if (!channel) {
+      throw new HttpException(`No active WhatsApp channel for account ${accountId}.`, HttpStatus.PRECONDITION_FAILED);
+    }
+    if (!channel.wabaId) {
+      throw new HttpException(`WhatsApp channel ${channel.id} is missing waba_id — reconnect.`, HttpStatus.PRECONDITION_FAILED);
+    }
+
+    const resolved = await this.resolver.resolveChannel({
+      mode: channel.mode,
+      phoneNumberId: channel.phoneNumberId,
+      accessToken: channel.accessToken,
+      channelToken: channel.channelToken,
+    });
+
+    let response;
+    try {
+      response = await axios.get(`${resolved.baseUrl}/${channel.wabaId}/message_templates`, {
+        params: { name: templateName, fields: 'name,status,id,rejected_reason,language,category' },
+        headers: { Authorization: `Bearer ${resolved.bearerToken}` },
+        timeout: 15_000,
+      });
+    } catch (err) {
+      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+      const body = axios.isAxiosError(err) ? err.response?.data : undefined;
+      this.logger.error(`wa_template_status_fetch_failed account=${accountId} name=${templateName} status=${status ?? '?'} body=${this.safe(body)}`);
+      throw new HttpException(this.metaErrorMessage(body) ?? 'Meta refused the template status query.', status === 400 ? HttpStatus.BAD_REQUEST : HttpStatus.BAD_GATEWAY);
+    }
+
+    const rows: Array<{ id?: string; name?: string; status?: string; rejected_reason?: string }> = response.data?.data ?? [];
+    const match = rows.find((r) => r.name === templateName) ?? rows[0];
+    if (!match) {
+      throw new HttpException(`Template "${templateName}" not found on Meta (waba_id=${channel.wabaId}).`, HttpStatus.NOT_FOUND);
+    }
+    const metaStatus = (match.status ?? 'PENDING').toUpperCase();
+    return {
+      name: match.name ?? templateName,
+      metaStatus,
+      status: this.normaliseStatus(metaStatus),
+      metaTemplateId: match.id,
+      rejectedReason: match.rejected_reason,
+    };
+  }
+
+  /**
+   * Maps Meta's verdict to the BMS Message.status taxonomy
+   * (matches apps/msgops-api/src/modules/messages/messages.interface.ts).
+   *  PENDING / IN_APPEAL   → sent_approval (UI badge "Aprovação enviada")
+   *  APPROVED              → approved
+   *  REJECTED / PAUSED /
+   *  DISABLED / PENDING_DELETION → rejected
+   */
+  normaliseStatus(metaStatus: string): 'approved' | 'rejected' | 'sent_approval' {
+    switch (metaStatus.toUpperCase()) {
+      case 'APPROVED':
+        return 'approved';
+      case 'REJECTED':
+      case 'PAUSED':
+      case 'DISABLED':
+      case 'PENDING_DELETION':
+        return 'rejected';
+      default:
+        return 'sent_approval';
+    }
   }
 
   /**
