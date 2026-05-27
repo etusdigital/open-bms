@@ -156,6 +156,36 @@ export function useDuplicateMessage() {
   });
 }
 
+interface SyncTemplateStatusResult {
+  status: 'approved' | 'rejected' | 'sent_approval';
+  metaStatus: string;
+  rejectedReason?: string;
+}
+
+/**
+ * Force a Meta poll to refresh the template approval status — useful when the
+ * Meta webhook never fired (dev tunnels, missed delivery, hub proxy mid-deploy)
+ * or the operator just wants a result in seconds.
+ */
+export function useSyncTemplateStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number): Promise<SyncTemplateStatusResult> => {
+      const { data } = await apiClient.post<SyncTemplateStatusResult>(`/messages/${id}/sync-template-status`);
+      return data;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messages.all });
+      const key = `messages.syncStatus_${result.status}` as const;
+      toast.success(i18n.t(key, { meta: result.metaStatus }));
+    },
+    onError: (error) => {
+      toast.error(extractApiErrorMessage(error) ?? i18n.t('messages.syncStatusError'));
+    },
+  });
+}
+
 export function useLabelsAll() {
   const auth = useAppStore((s) => s.auth);
   const accountId = auth.status === 'authenticated' ? auth.account.id : 0;
