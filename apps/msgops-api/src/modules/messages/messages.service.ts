@@ -14,6 +14,7 @@ import { hasEmojiCharacters, replaceSpecialChars } from '../../utils/utils.servi
 import { MessageStatus, WhatsappMessageType } from './messages.interface';
 import { AccountsService } from '../accounts/accounts.service';
 import { TwilioHandler } from 'src/handlers/twilio/twilio.handler';
+import { WhatsappTemplateSyncService } from '../whatsapp-templates/whatsapp-template-sync.service';
 import dayjs from 'dayjs';
 import { SchedulerService } from 'src/providers/queue/scheduler.service';
 import { QUEUE_WHATSAPP_MESSAGE } from 'src/providers/queue/queue.constants';
@@ -45,6 +46,7 @@ export class MessagesService {
     private readonly testsService: TestsService,
     private readonly redisService: RedisService,
     private readonly twilioHandler: TwilioHandler,
+    private readonly whatsappTemplateSync: WhatsappTemplateSyncService,
     private readonly scheduler: SchedulerService,
     private readonly accountService: AccountsService,
     private readonly campaignsService: CampaignsService,
@@ -157,7 +159,8 @@ export class MessagesService {
         messageDto.providerMessageId = await this.approveTwillio(messageDto, messageName);
         await this.createWhatsappTask(messageDto.providerMessageId, message.accountId);
       } else {
-        throw new HttpException('WhatsApp template approval via Cloud API is being wired up — use Twilio (WHATSAPP_PROVIDER=twilio) for now.', HttpStatus.NOT_IMPLEMENTED);
+        const result = await this.whatsappTemplateSync.syncMessageToMeta(messageDto, messageName);
+        messageDto.providerMessageId = result.name;
       }
       messageDto.status = MessageStatus.SENTAPPROVAL;
     }
@@ -369,7 +372,8 @@ export class MessagesService {
         messageDto.providerMessageId = await this.approveTwillio(messageDto, messageName);
         await this.createWhatsappTask(messageDto.providerMessageId, messageDto.account.id);
       } else {
-        throw new HttpException('WhatsApp template approval via Cloud API is being wired up — use Twilio (WHATSAPP_PROVIDER=twilio) for now.', HttpStatus.NOT_IMPLEMENTED);
+        const result = await this.whatsappTemplateSync.syncMessageToMeta(messageDto, messageName);
+        messageDto.providerMessageId = result.name;
       }
       messageDto.status = MessageStatus.SENTAPPROVAL;
     }

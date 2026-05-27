@@ -18,6 +18,7 @@ import { EmailsLabelsEntity } from '../../entities/emails-labels.entity';
 import { OpenAIProvider } from 'src/providers/openai.provider';
 import { LabelsIntegrationModule } from '../labels/labels-integration.module';
 import { BucketsService } from '../buckets/buckets.service';
+import { WhatsappTemplatesModule } from '../whatsapp-templates/whatsapp-templates.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { BucketsService } from '../buckets/buckets.service';
     AccountsModule,
     CampaignModule,
     LabelsIntegrationModule,
+    WhatsappTemplatesModule,
     TypeOrmModule.forFeature([MessageEntity, AutomationEntity, AuditEntity, EmailsLabelsEntity]),
     RedisModule.register({
       host: process.env.REDIS_HOST,

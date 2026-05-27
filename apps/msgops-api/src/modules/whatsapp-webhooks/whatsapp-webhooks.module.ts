@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappChannelEntity } from '../../entities/whatsapp-channel.entity';
+import { MessageEntity } from '../../entities/message.entity';
 import { RedisModule } from '../../providers/redis.provider';
 import { WhatsappWebhooksService } from './whatsapp-webhooks.service';
 import { MetaWebhookController } from './meta-webhook.controller';
@@ -8,7 +9,7 @@ import { EvolutionHubWebhookController } from './evolution-hub-webhook.controlle
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WhatsappChannelEntity]),
+    TypeOrmModule.forFeature([WhatsappChannelEntity, MessageEntity]),
     RedisModule.register({
       host: process.env.REDIS_HOST,
       port: parseInt(process.env.REDIS_PORT ?? '6379'),
