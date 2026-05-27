@@ -13,7 +13,6 @@ import { RedisService } from '../../../providers/redis.provider';
 import { SendgridHandler } from '../../../handlers/email/sendgrid/sendgrid.handler';
 import { S3StorageProvider } from '../../../providers/s3-storage.provider';
 import { SchedulerService } from 'src/providers/queue/scheduler.service';
-import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
 import { AccountCacheService } from '../account-cache.service';
 
 describe('AccountsService — findWithCleanConfigs', () => {
@@ -42,7 +41,6 @@ describe('AccountsService — findWithCleanConfigs', () => {
         { provide: SchedulerService, useValue: {} },
         { provide: ClsService, useValue: { get: jest.fn() } },
         { provide: HttpService, useValue: {} },
-        { provide: EvolutionHandler, useValue: {} },
         { provide: AccountCacheService, useValue: {} },
       ],
     }).compile();
@@ -121,7 +119,6 @@ describe('AccountsService — updateAccountConfig — default_email_provider cro
         { provide: SchedulerService, useValue: {} },
         { provide: ClsService, useValue: clsService },
         { provide: HttpService, useValue: {} },
-        { provide: EvolutionHandler, useValue: {} },
         { provide: AccountCacheService, useValue: {} },
       ],
     }).compile();
@@ -248,7 +245,6 @@ describe('AccountsService.create — skipDefaults', () => {
         { provide: SchedulerService, useValue: scheduler },
         { provide: ClsService, useValue: { get: jest.fn() } },
         { provide: HttpService, useValue: {} },
-        { provide: EvolutionHandler, useValue: {} },
         { provide: AccountCacheService, useValue: { invalidateAccountCacheAsync: jest.fn() } },
       ],
     }).compile();

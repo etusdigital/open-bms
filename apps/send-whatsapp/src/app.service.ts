@@ -1,10 +1,9 @@
-import { Injectable } from '@nestjs/common';
-import { Account, CampaignMessage, CampaignMessageType, AutomationMessage, Contact } from './interfaces';
+import { Injectable, Logger } from '@nestjs/common';
+import { Account, CampaignMessage, AutomationMessage, Contact } from './interfaces';
 import { EXCHANGES } from '@bms/messaging';
 import { EventPublisherService } from './event-publisher.service';
 import { MsgopsService } from './msgops/msgops.service';
 import { Utils } from './utils/index.utils';
-import { EvolutionProvider } from './providers/evolution.provider';
 
 interface CreateRedirectLinkOptions {
   url: string;
@@ -17,6 +16,8 @@ interface CreateRedirectLinkOptions {
 
 @Injectable()
 export class AppService {
+  private readonly logger = new Logger(AppService.name);
+
   constructor(
     private readonly eventPublisher: EventPublisherService,
     private readonly msgopsService: MsgopsService,
@@ -27,92 +28,37 @@ export class AppService {
     return 'Hello World!';
   }
 
+  // WhatsApp sending via Evolution API has been removed. The replacement
+  // WhatsappCloudProvider (Meta Cloud API + EvoHub proxy mode) is wired up
+  // in Wave 5; until it lands, campaign and automation publishes for WhatsApp
+  // are acknowledged but not delivered, and an explicit log lets ops know.
   async processCampaign(campaignMessage: CampaignMessage) {
-    console.log('Log - campaignMessage', JSON.stringify(campaignMessage));
-    const { account, message } = campaignMessage;
-    const evolutionInstanceName = this.configByName(account, 'whatsapp_number_id');
-    const evolutionApiKey = this.configByName(account, 'whatsapp_access_token');
-    const language = this.configByName(account, 'default_language') || 'pt_BR';
-    const evolutionProvider = new EvolutionProvider(evolutionInstanceName, evolutionApiKey);
-
-    if (!evolutionInstanceName || !evolutionApiKey) {
-      return { status: 400, message: 'Invalid account configuration' };
-    }
-
-    const domain = this.configByName(account, 'default_domain');
-    const response = await Promise.all(
-      campaignMessage.contacts.map(async (contact) => {
-        const shortUtms = `platform=evolution&message_type=${message.type}&type=campaign&contactId=${contact.id}&uuid=${contact.uuid}&account=${account.id}&id=${message.name}&message=${message.id}&campaign_type=${campaignMessage.campaign?.type}&campaign=${campaignMessage.campaign?.id}&domain=${domain}`;
-        const defaultUtmCampaign = `${campaignMessage.campaign?.name || campaignMessage.campaign_name}_e1_${message.id}`;
-        const utmsCallback = shortUtms + `&utmcampaign=${defaultUtmCampaign}`;
-
-        const shortCode = message.url
-          ? await this.createRedirectLink({
-              url: message.url,
-              utmsDefault: shortUtms,
-              type: message.type,
-              utmCampaign: defaultUtmCampaign,
-              baseUrl: '',
-              account,
-            })
-          : null;
-        return await evolutionProvider.sendWhatsappTemplate(message.providerMessageId, language, contact.whatsapp, utmsCallback, shortCode);
-      }),
-    );
-    // await this.processResponse(response);
-    const trackerKey = campaignMessage.message.type == CampaignMessageType.WHATSAPP ? 'SENT_WHATSAPP_BATCH' : 'SENT_SMS_BATCH';
-    await this.sendTracker(trackerKey, campaignMessage, response.length);
-    return { status: 201, message: 'ok' };
+    const accountId = campaignMessage?.account?.id;
+    const messageId = campaignMessage?.message?.id;
+    this.logger.warn(`processCampaign: WhatsApp Cloud provider not yet wired (Wave 5); skipping account=${accountId} message=${messageId}`);
+    return { status: 503, message: 'WhatsApp Cloud provider not yet wired (Wave 5)' };
   }
 
   async processAutomation(automationMessage: AutomationMessage) {
-    const { account, contact, message } = automationMessage;
-    const evolutionInstanceName = this.configByName(account, 'whatsapp_number_id');
-    const evolutionApiKey = this.configByName(account, 'whatsapp_access_token');
-    const language = this.configByName(account, 'default_language') || 'pt_BR';
-    const evolutionProvider = new EvolutionProvider(evolutionInstanceName, evolutionApiKey);
+    const { contact, message } = automationMessage;
 
-    if (!evolutionInstanceName || !evolutionApiKey) {
-      return { status: 400, message: 'Invalid account configuration' };
-    }
-
-    const domain = this.configByName(account, 'default_domain');
-    const shortUtms = `platform=evolution&message_type=${message.type}&type=automation&contactId=${contact.id}&uuid=${contact.uuid}&account=${account.id}&id=${message.name}&message=${message.id}&automation=${automationMessage.automationId}&automationName=${automationMessage.automationName}&automationType=${automationMessage.automationType}&domain=${domain}&utm_content=${automationMessage.utmContent}`;
-    const defaultUtmCampaign = `${automationMessage.utmCampaign}`;
-    const utmCallback = shortUtms + `&utmcampaign=${defaultUtmCampaign}`;
-
-    if (!contact.hasWhatsapp) {
+    if (!contact?.hasWhatsapp) {
       return await this.invalidContact(contact, automationMessage);
     }
-    const shortCode = message.url
-      ? await this.createRedirectLink({
-          url: message.url,
-          utmsDefault: shortUtms,
-          type: message.type,
-          utmCampaign: defaultUtmCampaign,
-          baseUrl: '',
-          account,
-        })
-      : null;
-    await evolutionProvider.sendWhatsappTemplate(message.providerMessageId, language, contact.whatsapp, utmCallback, shortCode, contact.code);
 
-    if (!automationMessage.next || !automationMessage.next?.pubName) {
-      const messageNextError = `[${automationMessage.messageId}] This message does not have the next filled in.`;
-      return { status: true, message: messageNextError };
+    this.logger.warn(`processAutomation: WhatsApp Cloud provider not yet wired (Wave 5); skipping account=${automationMessage?.account?.id} message=${message?.id}`);
+
+    if (automationMessage.next?.pubName) {
+      await this.eventPublisher.publish(EXCHANGES.triggers, 'trigger.process', automationMessage.next.data);
     }
 
-    await this.eventPublisher.publish(EXCHANGES.triggers, 'trigger.process', automationMessage.next.data);
-
-    return {
-      status: true,
-      message: `Message published to bms.triggers/trigger.process.`,
-    };
+    return { status: 503, message: 'WhatsApp Cloud provider not yet wired (Wave 5)' };
   }
 
   async invalidContact(contact: Contact, automationMessage: AutomationMessage) {
-    const messageNextError = `[${automationMessage.messageId}] Invalid contact: ${contact.id}.`;
-    console.log(messageNextError);
-    if (automationMessage.next && automationMessage.next?.pubName) {
+    const messageNextError = `[${automationMessage.messageId}] Invalid contact: ${contact?.id}.`;
+    this.logger.warn(messageNextError);
+    if (automationMessage.next?.pubName) {
       await this.eventPublisher.publish(EXCHANGES.triggers, 'trigger.process', automationMessage.next.data);
     }
     return { status: true, message: messageNextError };
@@ -127,14 +73,10 @@ export class AppService {
     return account.accountConfigs[key];
   }
 
-  // async processResponse(response: any): Promise<void> {
-  //TODO: event definition
-  // }
-
   async sendTracker(event: string, campaignMessage: CampaignMessage, totalSent: number, data?: any) {
     const tracker = {
       campaign_id: campaignMessage.campaign_id,
-      service: 'MSGOPS_SEND_BATCH_EVOLUTION',
+      service: 'MSGOPS_SEND_BATCH_WHATSAPP',
       event: event,
       timestamp: new Date().getTime(),
       audiences: [],
