@@ -17,3 +17,7 @@ export { RoutingRule } from './routing-rule.entity';
 export { MsgopsSegment } from './msgops-segment.entity';
 export { Label } from './label.entity';
 export { Message } from './message.entity';
+export { WhatsappChannel } from './whatsapp-channel.entity';
+export type { WhatsappChannelMode, WhatsappChannelStatus } from './whatsapp-channel.entity';
+export { WhatsappTemplate } from './whatsapp-template.entity';
+export type { WhatsappTemplateCategory, WhatsappTemplateMetaStatus, WhatsappTemplateMeta } from './whatsapp-template.entity';
