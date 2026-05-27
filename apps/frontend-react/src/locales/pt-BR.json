@@ -129,6 +129,9 @@
     "cancel": "Cancelar",
     "date": "Data",
     "confirm": "Confirmar",
+    "copy": "Copiar",
+    "copied": "Copiado!",
+    "copyFailed": "Falha ao copiar",
     "retry": "Tentar novamente",
     "previous": "Anterior",
     "next": "Próximo",
@@ -1688,6 +1691,8 @@
       "flagsErrorBody": "O endpoint público GET /feature-flags não respondeu. Verifique se o msgops-api está no ar.",
       "metaDescription": "Conexão direto com a Meta via Embedded Signup. O administrador conecta sua própria conta Meta App + WABA e o BMS fala direto com graph.facebook.com.",
       "hubDescription": "Conexão via EvoHub. O Hub provê o Meta App compartilhado e gerencia o Embedded Signup; o BMS fala com a Meta via api.evohub.ai/meta/*.",
+      "hubAlreadyConnectedTitle": "EvoHub: canal já conectado",
+      "hubAlreadyConnectedBody": "Esta conta já tem um canal EvoHub ativo. No modo EvoHub o BMS suporta apenas um canal por conta — para reconectar, remova o canal atual na lista abaixo e clique em Conectar de novo.",
       "channelsTitle": "Canais conectados",
       "channelsListDescription": "Cada canal representa um número WhatsApp ligado a esta conta. Status atualiza automaticamente quando o Hub envia o webhook de conexão."
     },
@@ -1962,7 +1967,27 @@
       "graphVersionHelp": "Padrão: v18.0. Mude apenas se quiser fixar uma versão diferente.",
       "loadError": "Falha ao carregar credenciais Meta App.",
       "saveOk": "Credenciais Meta App salvas.",
-      "saveError": "Falha ao salvar credenciais Meta App."
+      "saveError": "Falha ao salvar credenciais Meta App.",
+      "guide": {
+        "title": "Como configurar o webhook no Meta App",
+        "intro": "Você precisa cadastrar o webhook abaixo no painel do Meta for Developers (Produto WhatsApp → Configuration → Webhooks → Edit). O App ID, App Secret e Verify Token acima precisam estar salvos antes.",
+        "webhookUrlLabel": "URL do webhook (Callback URL)",
+        "webhookUrlHelp": "Cole exatamente esta URL no campo Callback URL do Meta App. Em dev, o BMS_PUBLIC_URL aponta para um túnel (ngrok / cloudflare-tunnel) capaz de receber chamadas externas.",
+        "missingPublicUrlTitle": "BMS_PUBLIC_URL não configurada",
+        "missingPublicUrlBody": "Defina a variável BMS_PUBLIC_URL no .env do msgops-api (em dev, use a URL do seu ngrok apontando para a porta 5001) e reinicie o serviço para que esta URL apareça aqui.",
+        "verifyTokenLabel": "Verify Token",
+        "verifyTokenHelp": "Use exatamente o mesmo valor que você cadastrou em \"Verify Token (webhook)\" acima. O Meta envia um GET com este token e o BMS responde com o challenge se baterem.",
+        "eventsLabel": "Eventos a marcar (WhatsApp Business Account)",
+        "eventsHelp": "Marque apenas estes eventos. Outros (flows, smb_*, history) geram tráfego sem ação correspondente no BMS.",
+        "steps": "Sequência: 1) Salve as credenciais acima. 2) No Meta App → WhatsApp → Configuration, cole a URL e o Verify Token e clique em Verify and save. 3) Em Webhook fields, marque os 5 eventos listados. 4) Pronto — quando uma conta conectar via Embedded Signup, eventos chegam em /webhooks/meta.",
+        "eventDescriptions": {
+          "messages": "Status de entrega (sent / delivered / read / failed) das mensagens enviadas.",
+          "message_template_status_update": "Aprovação Meta dos templates (PENDING / APPROVED / REJECTED).",
+          "message_template_quality_update": "Health score do template (HIGH / MEDIUM / LOW).",
+          "message_template_components_update": "Mudanças autorizadas pela Meta na estrutura do template.",
+          "account_update": "Status da WABA (ban, suspensão, review)."
+        }
+      }
     },
     "whatsappHub": {
       "scopeTitle": "Escopo: integração EvoHub (modo turnkey)",
@@ -1979,7 +2004,12 @@
       "webhookSecretHelp": "Segredo HMAC-SHA256 usado pelo Hub pra assinar webhooks de canal. Mínimo 16 caracteres.",
       "loadError": "Falha ao carregar configuração do EvoHub.",
       "saveOk": "Configuração do EvoHub salva.",
-      "saveError": "Falha ao salvar configuração do EvoHub."
+      "saveError": "Falha ao salvar configuração do EvoHub.",
+      "guide": {
+        "title": "Configuração automática",
+        "body": "Você NÃO precisa cadastrar webhook nem eventos no painel do EvoHub. Quando uma conta clica em \"Conectar via EvoHub\", o BMS chama POST /api/v1/channels do Hub passando o webhook_url, o webhook_secret e a lista de eventos do WhatsApp. O Hub cria o canal e o webhook associado em uma única operação.",
+        "publicUrlReminder": "Para isso funcionar, a variável BMS_PUBLIC_URL precisa apontar para um endpoint que o Hub consiga alcançar (em dev: ngrok ou cloudflare-tunnel na porta 5001 do msgops-api)."
+      }
     },
     "sendgridPlatform": {
       "scopeTitle": "Escopo: plataforma BMS (não afeta envios de campanha)",

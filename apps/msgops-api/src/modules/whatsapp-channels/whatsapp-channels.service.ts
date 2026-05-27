@@ -81,11 +81,25 @@ export class WhatsappChannelsService {
     // local row — the user is explicit about removing the channel, and the
     // alternative (orphan local row pointing at a dead Hub channel) is worse.
     if (row.mode === 'evohub' && row.hubChannelId) {
-      try {
-        const hub = this.buildHubClient();
-        if (hub) await hub.deleteChannel(row.hubChannelId);
-      } catch (err: any) {
-        this.logger.warn(`evohub_delete_channel_failed id=${row.hubChannelId} err=${err?.message ?? 'unknown'}`);
+      const hub = this.buildHubClient();
+      if (hub) {
+        try {
+          await hub.deleteChannel(row.hubChannelId);
+        } catch (err: any) {
+          this.logger.warn(`evohub_delete_channel_failed id=${row.hubChannelId} err=${err?.message ?? 'unknown'}`);
+        }
+        // The Hub's DELETE /channels/:id only cascades the channel_webhooks
+        // join table — the webhook resource itself stays orphaned. We saved
+        // the webhook_id in evolution_hub_meta at create time; delete it
+        // explicitly here so we do not leave junk webhooks on the Hub.
+        const webhookId = (row.evolutionHubMeta as { webhook_id?: string } | null)?.webhook_id;
+        if (webhookId) {
+          try {
+            await hub.deleteWebhook(webhookId);
+          } catch (err: any) {
+            this.logger.warn(`evohub_delete_webhook_failed id=${webhookId} err=${err?.message ?? 'unknown'}`);
+          }
+        }
       }
     }
 
@@ -131,6 +145,19 @@ export class WhatsappChannelsService {
   private async createEvoHub(accountId: number, dto: CreateWhatsappChannelDto): Promise<ChannelSummary> {
     if (!(await this.resolver.isHubEnabled())) {
       throw new HttpException("Install is in Meta direct mode — use mode='meta' to create channels.", HttpStatus.BAD_REQUEST);
+    }
+
+    // EvoHub: one channel per account. If the account already has a channel
+    // that is alive (active or still pending signup), refuse the create and
+    // let the user reconnect by deleting the existing one first.
+    const existing = await this.repo.findOne({
+      where: [
+        { accountId, mode: 'evohub', status: 'active' },
+        { accountId, mode: 'evohub', status: 'pending' },
+      ],
+    });
+    if (existing) {
+      throw new HttpException('This account already has an EvoHub channel. Disconnect it before creating a new one.', HttpStatus.CONFLICT);
     }
 
     const webhookSecret = process.env.EVOLUTION_HUB_WEBHOOK_SECRET;

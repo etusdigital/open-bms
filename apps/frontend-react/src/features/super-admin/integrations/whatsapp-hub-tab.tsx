@@ -172,6 +172,19 @@ export function WhatsappHubTab() {
           {saving ? t('common.loading') : t('common.save')}
         </Button>
       </div>
+
+      <HubAutoSetupNote />
     </form>
+  );
+}
+
+function HubAutoSetupNote() {
+  const { t } = useTranslation();
+  return (
+    <div className="border-border space-y-2 rounded-md border bg-blue-50/40 p-4 dark:bg-blue-950/20">
+      <p className="text-sm font-medium">{t('integrations.whatsappHub.guide.title')}</p>
+      <p className="text-muted-foreground text-xs">{t('integrations.whatsappHub.guide.body')}</p>
+      <p className="text-muted-foreground text-xs">{t('integrations.whatsappHub.guide.publicUrlReminder')}</p>
+    </div>
   );
 }

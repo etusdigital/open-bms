@@ -22,6 +22,9 @@ export interface FeatureFlags {
 
   /** Default Graph API version, e.g. v18.0. */
   whatsapp_graph_version: string;
+
+  /** Public URL the BMS backend is reachable at. Used by Super Admin guides to render the webhook URL admins paste into Meta App. */
+  bms_public_url: string;
 }
 
 export async function fetchFeatureFlags(): Promise<FeatureFlags> {

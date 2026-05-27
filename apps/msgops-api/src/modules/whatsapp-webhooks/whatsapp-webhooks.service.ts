@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { createHash } from 'node:crypto';
+import { EvolutionHubClient } from '@bms/evolution-hub';
 import { RedisService } from '../../providers/redis.provider';
 import { WhatsappChannelEntity } from '../../entities/whatsapp-channel.entity';
 
@@ -109,14 +110,55 @@ export class WhatsappWebhooksService {
       this.logger.warn(`hub_channel_connected_unknown id=${hubChannelId}`);
       return;
     }
+
+    // Hub's channel_connected event ONLY carries identity fields (id, name,
+    // status, type, user_id, external_id). The actual Meta data
+    // (phone_number_id, waba_id, display_phone_number) lives under
+    // `meta_connection` in the channel resource. Fetch it now so the UI can
+    // surface the connected number — otherwise the row sits as "active" with
+    // the "waiting for signup" hint forever.
+    const meta = await this.fetchHubChannelMeta(String(hubChannelId));
+
     const data = body?.data ?? body?.channel ?? {};
-    row.phoneNumberId = data.phone_number_id ?? row.phoneNumberId;
-    row.wabaId = data.waba_id ?? row.wabaId;
-    row.displayPhoneNumber = data.display_phone_number ?? row.displayPhoneNumber;
+    row.phoneNumberId = meta.phoneNumberId ?? data.phone_number_id ?? row.phoneNumberId;
+    row.wabaId = meta.wabaId ?? data.waba_id ?? row.wabaId;
+    row.displayPhoneNumber = meta.displayPhoneNumber ?? data.display_phone_number ?? row.displayPhoneNumber;
+    row.businessId = meta.businessId ?? row.businessId;
     row.status = 'active';
     row.lastEventAt = new Date();
     row.evolutionHubMeta = { ...(row.evolutionHubMeta ?? {}), last_connected_event: data };
     await this.channels.save(row);
+  }
+
+  /**
+   * Pulls the full channel resource from the Hub so we can populate
+   * phone_number_id / waba_id / display_phone_number. Best-effort — failures
+   * are logged and we fall back to the (incomplete) webhook payload.
+   */
+  private async fetchHubChannelMeta(hubChannelId: string): Promise<{
+    phoneNumberId?: string;
+    wabaId?: string;
+    businessId?: string;
+    displayPhoneNumber?: string;
+  }> {
+    const apiKey = process.env.EVOLUTION_HUB_API_KEY;
+    if (!apiKey) return {};
+    try {
+      const hub = new EvolutionHubClient({ apiKey, baseUrl: process.env.EVOLUTION_HUB_URL ?? 'https://api.evohub.ai' });
+      const channel = await hub.getChannel(hubChannelId);
+      const mc = channel.meta_connection;
+      if (!mc) return {};
+      const phone = mc.phone_numbers?.[0];
+      return {
+        phoneNumberId: mc.phone_number_id,
+        wabaId: mc.waba_id,
+        businessId: mc.business_id,
+        displayPhoneNumber: phone?.display_phone_number,
+      };
+    } catch (err: any) {
+      this.logger.warn(`hub_fetch_channel_meta_failed id=${hubChannelId} err=${err?.message ?? 'unknown'}`);
+      return {};
+    }
   }
 
   private async applyHubChannelDisconnected(body: any): Promise<void> {
