@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "declarationMap": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "target": "es2022",
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "baseUrl": "./",
+    "skipLibCheck": true,
+    "strict": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.spec.ts"]
+}

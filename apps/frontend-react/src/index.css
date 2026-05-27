@@ -1,0 +1,166 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+
+  /* Etus brand greens */
+  --etus-50: #e7ffdf;
+  --etus-100: #bdfba6;
+  --etus-200: #8df768;
+  --etus-300: #3be476;
+  --etus-400: #018d4c;
+
+  /* Light theme */
+  --background: #fbfaf9;
+  --foreground: #151514;
+  --card: #ffffff;
+  --card-foreground: #151514;
+  --popover: #ffffff;
+  --popover-foreground: #151514;
+  --primary: #3be476;
+  --primary-foreground: #151514;
+  --secondary: #f3f2ef;
+  --secondary-foreground: #3e3e3c;
+  --muted: #f3f2ef;
+  --muted-foreground: #908e89;
+  --accent: #e7ffdf;
+  --accent-foreground: #151514;
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: #ffffff;
+  --border: #ebe9e5;
+  --input: #ebe9e5;
+  --ring: #3be476;
+  --chart-1: #3be476;
+  --chart-2: #3be476;
+  --chart-3: #018d4c;
+  --chart-4: #8df768;
+  --chart-5: #bdfba6;
+
+  /* Sidebar */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #3e3e3c;
+  --sidebar-primary: #3be476;
+  --sidebar-primary-foreground: #151514;
+  --sidebar-accent: #e7ffdf;
+  --sidebar-accent-foreground: #151514;
+  --sidebar-border: #ebe9e5;
+  --sidebar-ring: #3be476;
+  --sidebar-muted: #908e89;
+
+  --radius: 0.5rem;
+  --sidebar-width: 16rem;
+  --sidebar-width-icon: 3.5rem;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: #151514;
+  --foreground: #ebe9e5;
+  --card: #1e1e1c;
+  --card-foreground: #ebe9e5;
+  --popover: #1e1e1c;
+  --popover-foreground: #ebe9e5;
+  --primary: #3be476;
+  --primary-foreground: #151514;
+  --secondary: #2a2a28;
+  --secondary-foreground: #d6d4d1;
+  --muted: #2a2a28;
+  --muted-foreground: #908e89;
+  --accent: #1a3a1a;
+  --accent-foreground: #e7ffdf;
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: #ffffff;
+  --border: #3e3e3c;
+  --input: #3e3e3c;
+  --ring: #3be476;
+
+  --sidebar: #1e1e1c;
+  --sidebar-foreground: #d6d4d1;
+  --sidebar-primary: #3be476;
+  --sidebar-primary-foreground: #151514;
+  --sidebar-accent: #1a3a1a;
+  --sidebar-accent-foreground: #e7ffdf;
+  --sidebar-border: #3e3e3c;
+  --sidebar-ring: #3be476;
+  --sidebar-muted: #6e6d68;
+}
+
+@theme inline {
+  --color-etus-50: var(--etus-50);
+  --color-etus-100: var(--etus-100);
+  --color-etus-200: var(--etus-200);
+  --color-etus-300: var(--etus-300);
+  --color-etus-400: var(--etus-400);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-muted: var(--sidebar-muted);
+
+  --radius: 0.5rem;
+  --sidebar-width: 16rem;
+  --sidebar-width-icon: 3.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@keyframes trophy-bounce {
+  0%,
+  20%,
+  50%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-5px);
+  }
+  60% {
+    transform: translateY(-3px);
+  }
+}
+
+@utility animate-trophy {
+  animation: trophy-bounce 2s infinite;
+}

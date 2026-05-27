@@ -1,0 +1,12 @@
+{
+  "name": "@retention/test-config",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./vitest-setup": "./vitest-setup.ts"
+  },
+  "dependencies": {
+    "@testing-library/jest-dom": "^6.6.3"
+  }
+}

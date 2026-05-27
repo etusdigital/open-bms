@@ -1,0 +1,11 @@
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  X-XSS-Protection: 0
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-eval' 'sha256-Rkwe3gi+B2K1r5LZ87OicuEa1422sJXtRsh8KmDDAnc=' blob: https://*.clarity.ms https://*.unlayer.com https://*.cloudfront.net; style-src 'self' 'unsafe-inline' https://*.unlayer.com https://*.cloudfront.net; img-src 'self' data: https: blob:; font-src 'self' data: https://*.cloudfront.net; connect-src 'self' https://bms-api.bri.us https://msgops-api-stg.etus.digital https://auth.bri.us https://*.auth0.com https://*.sentry.io https://*.ingest.sentry.io https://*.clarity.ms https://*.unlayer.com; frame-src https://*.auth0.com https://*.unlayer.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

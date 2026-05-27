@@ -1,0 +1,40 @@
+{
+  "contact": {
+    "email": "contact@example.com",
+    "firstName": "Example Contact",
+    "phone": "5511999999999",
+    "grupo": "grupo1",
+    "beneficio": "beneficio1",
+    "renda": "renda1"
+  },
+  "tagId": "tag-shun-test1",
+  "createdAt": 1623938903117,
+  "automation": {
+    "id": "automation-shun-test1",
+    "type": "retargeting",
+    "activeStep": {
+      "postion": "0",
+      "id": "automation-shun-test1-step1",
+      "type": "email",
+      "config": "Email"
+    },
+    "steps": {
+      "ippool": "string",
+      "subject": "string",
+      "location": {
+        "bucketName": "string",
+        "fileName": "string"
+      },
+      "from": {
+        "firstName": "string",
+        "email": "string"
+      },
+      "to": {
+        "firstName": "string",
+        "email": "string"
+      }
+    }
+  },
+  "startedAt": 1623938910990,
+  "activeStepId": "activeStepId-shun-test1"
+}
