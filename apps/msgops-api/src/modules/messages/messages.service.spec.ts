@@ -86,6 +86,7 @@ describe('MessagesService - Unlayer Migration', () => {
     })),
   };
   const mockTwilioHandler = {};
+  const mockWhatsappTemplateSync = { syncMessageToMeta: jest.fn().mockResolvedValue({ name: 'mocked', status: 'PENDING' }) };
   const mockSchedulerService = {};
   const mockAccountService = {};
   const mockCampaignsService = {
@@ -111,6 +112,7 @@ describe('MessagesService - Unlayer Migration', () => {
         { provide: TestsService, useValue: mockTestsService },
         { provide: RedisService, useValue: mockRedisService },
         { provide: TwilioHandler, useValue: mockTwilioHandler },
+        { provide: (await import('../whatsapp-templates/whatsapp-template-sync.service')).WhatsappTemplateSyncService, useValue: mockWhatsappTemplateSync },
         { provide: SchedulerService, useValue: mockSchedulerService },
         { provide: AccountsService, useValue: mockAccountService },
         { provide: CampaignsService, useValue: mockCampaignsService },

@@ -31,12 +31,14 @@ import { OpenAIProvider } from 'src/providers/openai.provider';
 import { SlackProvider } from 'src/providers/slack.provider';
 import { LabelsIntegrationModule } from '../labels/labels-integration.module';
 import { BucketsService } from '../buckets/buckets.service';
+import { WhatsappTemplatesModule } from '../whatsapp-templates/whatsapp-templates.module';
 
 @Module({
   imports: [
     AccountsModule,
     HttpModule,
     LabelsIntegrationModule,
+    WhatsappTemplatesModule,
     TypeOrmModule.forFeature([
       AccountEntity,
       AccountConfigEntity,

@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { EvolutionHubClient } from '@bms/evolution-hub';
 import { RedisService } from '../../providers/redis.provider';
 import { WhatsappChannelEntity } from '../../entities/whatsapp-channel.entity';
+import { MessageEntity } from '../../entities/message.entity';
 
 const DEDUP_TTL_SECONDS = 300; // 5 min — matches CRM evolution_hub_events_job.
 
@@ -21,6 +22,7 @@ export class WhatsappWebhooksService {
 
   constructor(
     @InjectRepository(WhatsappChannelEntity) private readonly channels: Repository<WhatsappChannelEntity>,
+    @InjectRepository(MessageEntity) private readonly messages: Repository<MessageEntity>,
     private readonly redis: RedisService,
   ) {}
 
@@ -58,14 +60,14 @@ export class WhatsappWebhooksService {
   async processMetaEvent(body: any): Promise<void> {
     this.logger.log(`meta_webhook_event object=${body?.object ?? 'unknown'} entries=${(body?.entry ?? []).length}`);
 
-    // Channel lifecycle for Meta direct is handled synchronously at create
-    // time (FB.login returns the IDs). The only thing that can flip a channel
-    // to 'disconnected' here is a webhook saying the access_token was
-    // revoked — we surface that explicitly so the UI can prompt reconnect.
     const entries: any[] = Array.isArray(body?.entry) ? body.entry : [];
     for (const entry of entries) {
       const changes: any[] = Array.isArray(entry?.changes) ? entry.changes : [];
       for (const change of changes) {
+        if (change?.field === 'message_template_status_update') {
+          await this.applyTemplateStatusUpdate(change.value);
+          continue;
+        }
         if (change?.field === 'phone_number_quality_update' || change?.field === 'account_review_update') {
           // Future-friendly hook; nothing to do yet.
           continue;
@@ -74,6 +76,44 @@ export class WhatsappWebhooksService {
           this.logger.warn(`meta_webhook_error_event entry=${entry?.id ?? '?'} errors=${JSON.stringify(change.value.errors).slice(0, 200)}`);
         }
       }
+    }
+  }
+
+  /**
+   * Wave 6 — `message_template_status_update` payload:
+   *   { event: 'APPROVED'|'REJECTED'|'PAUSED'|'PENDING_DELETION',
+   *     message_template_id: '1234567890', message_template_name: 'order_update',
+   *     message_template_language: 'pt_BR', reason?: 'TAG_CONTENT_MISMATCH' }
+   *
+   * We persist the new status on the BMS message that originated the template
+   * (matched by providerMessageId). The send path (wave 5) reads message.status
+   * to know if it's safe to dispatch.
+   */
+  private async applyTemplateStatusUpdate(value: any): Promise<void> {
+    const templateName: string | undefined = value?.message_template_name;
+    const event: string | undefined = value?.event;
+    if (!templateName || !event) {
+      this.logger.warn(`template_status_event_incomplete event=${event ?? '?'} name=${templateName ?? '?'}`);
+      return;
+    }
+    const normalised = this.normaliseMetaStatus(event);
+    const result = await this.messages.createQueryBuilder().update().set({ status: normalised }).where('provider_message_id = :name', { name: templateName }).execute();
+    this.logger.log(`template_status_update name=${templateName} event=${event} normalised=${normalised} affected=${result.affected ?? 0}`);
+  }
+
+  /** Maps the Meta event verb to the BMS message status taxonomy. */
+  private normaliseMetaStatus(event: string): string {
+    switch (event.toUpperCase()) {
+      case 'APPROVED':
+        return 'approved';
+      case 'REJECTED':
+        return 'rejected';
+      case 'PAUSED':
+      case 'DISABLED':
+      case 'PENDING_DELETION':
+        return 'rejected';
+      default:
+        return 'pending';
     }
   }
 
