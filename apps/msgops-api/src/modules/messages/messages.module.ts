@@ -10,7 +10,6 @@ import { MessagesService } from './messages.service';
 import { AuditEntity } from '../../entities/audit.entity';
 import { AuditService } from '../../utils/audits/audit.service';
 import { RedisModule } from '../../providers/redis.provider';
-import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
 import { AccountsModule } from '../accounts/accounts.module';
 import { CampaignModule } from '../campaigns/campaigns.module';
 import { TwilioHandler } from 'src/handlers/twilio/twilio.handler';
@@ -34,7 +33,7 @@ import { BucketsService } from '../buckets/buckets.service';
       password: process.env.REDIS_PASSWORD,
     }),
   ],
-  providers: [MessagesService, S3StorageProvider, BucketsService, AuditService, TwilioHandler, EvolutionHandler, ValidLinksService, OpenAIProvider],
+  providers: [MessagesService, S3StorageProvider, BucketsService, AuditService, TwilioHandler, ValidLinksService, OpenAIProvider],
   controllers: [MessagesController],
   exports: [MessagesService],
 })

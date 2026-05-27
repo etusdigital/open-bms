@@ -14,7 +14,6 @@ import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import { TestsService } from '../tests/tests.service';
 import { RedisService } from '../../providers/redis.provider';
 import { TwilioHandler } from '../../handlers/twilio/twilio.handler';
-import { EvolutionHandler } from '../../handlers/evolution/evolution.handler';
 import { SchedulerService } from '../../providers/queue/scheduler.service';
 import { AccountsService } from '../accounts/accounts.service';
 import { CampaignsService } from '../campaigns/campaigns.service';
@@ -87,7 +86,6 @@ describe('MessagesService - Unlayer Migration', () => {
     })),
   };
   const mockTwilioHandler = {};
-  const mockEvolutionHandler = {};
   const mockSchedulerService = {};
   const mockAccountService = {};
   const mockCampaignsService = {
@@ -113,7 +111,6 @@ describe('MessagesService - Unlayer Migration', () => {
         { provide: TestsService, useValue: mockTestsService },
         { provide: RedisService, useValue: mockRedisService },
         { provide: TwilioHandler, useValue: mockTwilioHandler },
-        { provide: EvolutionHandler, useValue: mockEvolutionHandler },
         { provide: SchedulerService, useValue: mockSchedulerService },
         { provide: AccountsService, useValue: mockAccountService },
         { provide: CampaignsService, useValue: mockCampaignsService },

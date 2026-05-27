@@ -20,7 +20,6 @@ import { AuditService } from './../../utils/audits/audit.service';
 import { AccountsModule } from '../accounts/accounts.module';
 import { AccountConfigEntity } from '../../entities/account-config.entity';
 import { AccountConfigsProvider } from '../../providers/account-configs.provider';
-import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
 import { ContactEntity } from 'src/entities/contact.entity';
 import { ContactDeviceEntity } from 'src/entities/contact-device.entity';
 import { CampaignContactEntity } from 'src/entities/campaign-contact.entity';
@@ -66,7 +65,6 @@ import { BucketsService } from '../buckets/buckets.service';
     S3StorageProvider,
     AuditService,
     TwilioHandler,
-    EvolutionHandler,
     OpenAIProvider,
     SlackProvider,
     BucketsService,

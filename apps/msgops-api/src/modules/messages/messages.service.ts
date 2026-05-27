@@ -14,7 +14,6 @@ import { hasEmojiCharacters, replaceSpecialChars } from '../../utils/utils.servi
 import { MessageStatus, WhatsappMessageType } from './messages.interface';
 import { AccountsService } from '../accounts/accounts.service';
 import { TwilioHandler } from 'src/handlers/twilio/twilio.handler';
-import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
 import dayjs from 'dayjs';
 import { SchedulerService } from 'src/providers/queue/scheduler.service';
 import { QUEUE_WHATSAPP_MESSAGE } from 'src/providers/queue/queue.constants';
@@ -46,7 +45,6 @@ export class MessagesService {
     private readonly testsService: TestsService,
     private readonly redisService: RedisService,
     private readonly twilioHandler: TwilioHandler,
-    private readonly evolutionHandler: EvolutionHandler,
     private readonly scheduler: SchedulerService,
     private readonly accountService: AccountsService,
     private readonly campaignsService: CampaignsService,
@@ -159,7 +157,7 @@ export class MessagesService {
         messageDto.providerMessageId = await this.approveTwillio(messageDto, messageName);
         await this.createWhatsappTask(messageDto.providerMessageId, message.accountId);
       } else {
-        messageDto.providerMessageId = await this.approveEvolution(messageDto, messageName);
+        throw new HttpException('WhatsApp template approval via Cloud API is being wired up — use Twilio (WHATSAPP_PROVIDER=twilio) for now.', HttpStatus.NOT_IMPLEMENTED);
       }
       messageDto.status = MessageStatus.SENTAPPROVAL;
     }
@@ -280,108 +278,6 @@ export class MessagesService {
     return messageId;
   }
 
-  async approveEvolution(messageDto: MessageDto, name: string) {
-    const account = await this.accountService.findOne(messageDto.accountId || messageDto.account.id);
-    const language = account.configByName('default_language')?.value || 'pt_BR';
-    const instanceName = account.configByName('whatsapp_number_id')?.value;
-    const token = account.configByName('whatsapp_access_token')?.value;
-    const webhookUrl = process.env.TEMPLATE_WEBHOOK_URL;
-    const baseUrl = account.configByName('shortlink_base_url');
-    name = name.replace(/-/g, '_');
-
-    if (!instanceName || !token) {
-      throw new HttpException('Instance name or token not found', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-
-    const message = {
-      name: name,
-      category: messageDto.type === '2FA-whatsapp' ? 'AUTHENTICATION' : 'MARKETING',
-      allowCategoryChange: false,
-      language: language,
-      webhookUrl: webhookUrl,
-      components: [],
-    };
-
-    const content = JSON.parse(messageDto.content);
-
-    if (content.headerType === 'text') {
-      message.components.push({
-        type: 'HEADER',
-        format: 'TEXT',
-        text: content.headerContent,
-      });
-    }
-
-    if (content.headerType === 'image') {
-      message.components.push({
-        type: 'HEADER',
-        format: 'IMAGE',
-        url: content.headerContent,
-      });
-    }
-
-    if (content.headerType === 'video') {
-      message.components.push({
-        type: 'HEADER',
-        format: 'VIDEO',
-        url: content.headerContent,
-      });
-    }
-
-    message.components.push({
-      type: 'BODY',
-      text: content.body,
-    });
-
-    if (content.footer) {
-      message.components.push({
-        type: 'FOOTER',
-        text: content.footer,
-      });
-    }
-
-    if (messageDto.whatsappType === WhatsappMessageType.CALLTOACTION) {
-      message.components.push({
-        type: 'BUTTONS',
-        buttons: [
-          {
-            type: 'URL',
-            text: messageDto.callToActionText,
-            url: `${baseUrl.value}{{1}}`,
-            example: {
-              url: baseUrl.value,
-            },
-          },
-        ],
-      });
-    }
-
-    if (messageDto.type === '2FA-whatsapp') {
-      message.components = [
-        {
-          type: 'BODY',
-          add_security_recommendation: true,
-        },
-        {
-          type: 'FOOTER',
-          code_expiration_minutes: 10,
-        },
-        {
-          type: 'BUTTONS',
-          buttons: [
-            {
-              type: 'OTP',
-              otp_type: 'COPY_CODE',
-            },
-          ],
-        },
-      ];
-    }
-    const responseCreate = await this.evolutionHandler.createMessage(message, instanceName, token);
-
-    return responseCreate.name;
-  }
-
   async updateStatusMessage(data: any) {
     const status = data.event.toLowerCase();
     const messageId = data.message_template_name;
@@ -473,7 +369,7 @@ export class MessagesService {
         messageDto.providerMessageId = await this.approveTwillio(messageDto, messageName);
         await this.createWhatsappTask(messageDto.providerMessageId, messageDto.account.id);
       } else {
-        messageDto.providerMessageId = await this.approveEvolution(messageDto, messageName);
+        throw new HttpException('WhatsApp template approval via Cloud API is being wired up — use Twilio (WHATSAPP_PROVIDER=twilio) for now.', HttpStatus.NOT_IMPLEMENTED);
       }
       messageDto.status = MessageStatus.SENTAPPROVAL;
     }
