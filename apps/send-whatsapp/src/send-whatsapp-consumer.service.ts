@@ -11,14 +11,23 @@ interface QueueBinding {
   bridgePath: string;
 }
 
-// EVO-952 Onda 2 — só caminho automation (publisher live em message-trigger).
-// Campaign batch (Post('/campaign')) fica para Onda 4 — docs/migration/evo-952-wave-2-decisions.md §1/§5.
+// Two AMQP sources funnel into the WhatsApp send path:
+//   - bms.whatsapp/whatsapp.send (message-trigger → automation flow, single contact)
+//   - bms.campaigns/campaign.send (campaign-packer → campaign batch, n contacts)
+// Each binding has its own queue + bridge HTTP endpoint, matching the same
+// pattern used by send-email (see send-email-consumer.service.ts).
 const BINDINGS: QueueBinding[] = [
   {
     exchange: EXCHANGES.whatsapp,
     routingKey: 'whatsapp.send',
     queue: 'send-whatsapp.whatsapp.send',
     bridgePath: '/internal/whatsapp/automation',
+  },
+  {
+    exchange: EXCHANGES.campaigns,
+    routingKey: 'campaign.send',
+    queue: 'send-whatsapp.campaign.send',
+    bridgePath: '/internal/campaigns/send',
   },
 ];
 
