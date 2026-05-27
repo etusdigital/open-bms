@@ -642,20 +642,35 @@ export class AppService {
       const redisClient = await this.redisService.getOrThrow();
       await Promise.all(redisKeys.map((key) => redisClient.set(key, 'true', 'EX', 60 * 60 * 24))); // 24 hours
       const contact = await this.msgopsService.findContactsUUID([data.contactId], data.accountId);
-      await this.queuePublisher.publishAnalyticsEvent({
-        timestamp: Date.now(),
-        event: `automation-${Status.completed}`,
-        automationId: data.automationId,
-        accountId: account.id,
-        properties: {
-          reason: 'completed target',
-          automationId: data.automationId,
-          automationName: completedAutomations[0].automationTitle,
-        },
-        ...(contact.length
-          ? { contactId: contact[0].id, uuid: contact[0].uuid, email: contact[0].email }
-          : { contactId: data.contactId }),
-      });
+      const contactAttributes = contact.length
+        ? { contactId: contact[0].id, uuid: contact[0].uuid, email: contact[0].email }
+        : { contactId: data.contactId };
+
+      // Emit `automation-completed` once per automation that hit the
+      // target. Previously this only emitted for `data.automationId`, leaving
+      // the other matched automations marked completed in PG but invisible
+      // in the contact-history timeline.
+      await Promise.all(
+        completedAutomations.map((completed) =>
+          this.queuePublisher.publishAnalyticsEvent({
+            timestamp: Date.now(),
+            event: `automation-${Status.completed}`,
+            automationId: completed.automationId,
+            accountId: account.id,
+            properties: {
+              reason: 'completed target',
+              automationId: completed.automationId,
+              automationName: completed.automationTitle,
+              // Surface whether this row corresponds to the automation that
+              // triggered the target check, vs. one of the siblings that
+              // shared the same target. Useful for analytics that want to
+              // distinguish primary-vs-cascade completions.
+              triggeredBy: completed.automationId === data.automationId ? 'target-trigger' : 'cascade',
+            },
+            ...contactAttributes,
+          }),
+        ),
+      );
     }
   }
 
