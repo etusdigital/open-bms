@@ -14,7 +14,7 @@ import { hasEmojiCharacters, replaceSpecialChars } from '../../utils/utils.servi
 import { MessageStatus, WhatsappMessageType } from './messages.interface';
 import { AccountsService } from '../accounts/accounts.service';
 import { TwilioHandler } from 'src/handlers/twilio/twilio.handler';
-import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
+import { WhatsappTemplateSyncService } from '../whatsapp-templates/whatsapp-template-sync.service';
 import dayjs from 'dayjs';
 import { SchedulerService } from 'src/providers/queue/scheduler.service';
 import { QUEUE_WHATSAPP_MESSAGE } from 'src/providers/queue/queue.constants';
@@ -46,7 +46,7 @@ export class MessagesService {
     private readonly testsService: TestsService,
     private readonly redisService: RedisService,
     private readonly twilioHandler: TwilioHandler,
-    private readonly evolutionHandler: EvolutionHandler,
+    private readonly whatsappTemplateSync: WhatsappTemplateSyncService,
     private readonly scheduler: SchedulerService,
     private readonly accountService: AccountsService,
     private readonly campaignsService: CampaignsService,
@@ -159,7 +159,8 @@ export class MessagesService {
         messageDto.providerMessageId = await this.approveTwillio(messageDto, messageName);
         await this.createWhatsappTask(messageDto.providerMessageId, message.accountId);
       } else {
-        messageDto.providerMessageId = await this.approveEvolution(messageDto, messageName);
+        const result = await this.whatsappTemplateSync.syncMessageToMeta(messageDto, messageName);
+        messageDto.providerMessageId = result.name;
       }
       messageDto.status = MessageStatus.SENTAPPROVAL;
     }
@@ -280,108 +281,6 @@ export class MessagesService {
     return messageId;
   }
 
-  async approveEvolution(messageDto: MessageDto, name: string) {
-    const account = await this.accountService.findOne(messageDto.accountId || messageDto.account.id);
-    const language = account.configByName('default_language')?.value || 'pt_BR';
-    const instanceName = account.configByName('whatsapp_number_id')?.value;
-    const token = account.configByName('whatsapp_access_token')?.value;
-    const webhookUrl = process.env.TEMPLATE_WEBHOOK_URL;
-    const baseUrl = account.configByName('shortlink_base_url');
-    name = name.replace(/-/g, '_');
-
-    if (!instanceName || !token) {
-      throw new HttpException('Instance name or token not found', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-
-    const message = {
-      name: name,
-      category: messageDto.type === '2FA-whatsapp' ? 'AUTHENTICATION' : 'MARKETING',
-      allowCategoryChange: false,
-      language: language,
-      webhookUrl: webhookUrl,
-      components: [],
-    };
-
-    const content = JSON.parse(messageDto.content);
-
-    if (content.headerType === 'text') {
-      message.components.push({
-        type: 'HEADER',
-        format: 'TEXT',
-        text: content.headerContent,
-      });
-    }
-
-    if (content.headerType === 'image') {
-      message.components.push({
-        type: 'HEADER',
-        format: 'IMAGE',
-        url: content.headerContent,
-      });
-    }
-
-    if (content.headerType === 'video') {
-      message.components.push({
-        type: 'HEADER',
-        format: 'VIDEO',
-        url: content.headerContent,
-      });
-    }
-
-    message.components.push({
-      type: 'BODY',
-      text: content.body,
-    });
-
-    if (content.footer) {
-      message.components.push({
-        type: 'FOOTER',
-        text: content.footer,
-      });
-    }
-
-    if (messageDto.whatsappType === WhatsappMessageType.CALLTOACTION) {
-      message.components.push({
-        type: 'BUTTONS',
-        buttons: [
-          {
-            type: 'URL',
-            text: messageDto.callToActionText,
-            url: `${baseUrl.value}{{1}}`,
-            example: {
-              url: baseUrl.value,
-            },
-          },
-        ],
-      });
-    }
-
-    if (messageDto.type === '2FA-whatsapp') {
-      message.components = [
-        {
-          type: 'BODY',
-          add_security_recommendation: true,
-        },
-        {
-          type: 'FOOTER',
-          code_expiration_minutes: 10,
-        },
-        {
-          type: 'BUTTONS',
-          buttons: [
-            {
-              type: 'OTP',
-              otp_type: 'COPY_CODE',
-            },
-          ],
-        },
-      ];
-    }
-    const responseCreate = await this.evolutionHandler.createMessage(message, instanceName, token);
-
-    return responseCreate.name;
-  }
-
   async updateStatusMessage(data: any) {
     const status = data.event.toLowerCase();
     const messageId = data.message_template_name;
@@ -396,6 +295,156 @@ export class MessagesService {
     }
 
     return null;
+  }
+
+  /**
+   * Operator-triggered template status refresh. Useful when:
+   *   - the Meta webhook never fires (dev tunnels, missed delivery, hub
+   *     proxy mid-deploy);
+   *   - the operator wants confirmation in seconds instead of waiting.
+   *
+   * Resolves the channel, polls
+   * `GET {baseUrl}/{waba_id}/message_templates?name=...`, persists the
+   * normalised status on the messages row.
+   */
+  async syncTemplateStatus(id: number): Promise<{
+    status: 'approved' | 'rejected' | 'sent_approval';
+    metaStatus: string;
+    rejectedReason?: string;
+  }> {
+    const message = await this.automationMessageRepository.findOne({ where: { id } });
+    if (!message) {
+      throw new HttpException(`Message ${id} not found`, HttpStatus.NOT_FOUND);
+    }
+    if (!message.providerMessageId) {
+      throw new HttpException(`Message ${id} has no providerMessageId — submit the template for approval before syncing status.`, HttpStatus.PRECONDITION_FAILED);
+    }
+
+    const result = await this.whatsappTemplateSync.fetchTemplateStatus(message.accountId, message.providerMessageId);
+
+    if (message.status !== result.status) {
+      await this.automationMessageRepository.update({ id }, { status: result.status });
+    }
+
+    return { status: result.status, metaStatus: result.metaStatus, rejectedReason: result.rejectedReason };
+  }
+
+  /**
+   * Pulls every template that exists on Meta (WABA) into BMS as `messages`
+   * rows — closes the loop when templates were created on Business Manager
+   * directly (or by another tenant that shares the WABA).
+   *
+   * Existing rows are matched by `providerMessageId = template.name` and
+   * UPDATEd (status/category re-sync). Missing rows are INSERTed as
+   * already-approved (or whatever Meta says) so they're immediately usable
+   * in campaigns. The body is reconstructed from `components` so the
+   * preview page renders something meaningful.
+   */
+  async syncTemplatesFromMeta(): Promise<{ created: number; updated: number; skipped: number; total: number }> {
+    const accountId = this.cls.get<number>('accountId');
+    if (!accountId) throw new HttpException('Missing account context', HttpStatus.BAD_REQUEST);
+
+    const templates = await this.whatsappTemplateSync.listMetaTemplates(accountId);
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const tpl of templates) {
+      if (!tpl.name) {
+        skipped++;
+        continue;
+      }
+      const existing = await this.automationMessageRepository.findOne({
+        where: { accountId, providerMessageId: tpl.name },
+      });
+      const status = this.whatsappTemplateSync.normaliseStatus(tpl.status ?? 'PENDING');
+      const flattened = this.flattenMetaTemplateComponents(tpl);
+
+      if (existing) {
+        await this.automationMessageRepository.update(
+          { id: existing.id },
+          {
+            status,
+            templateCategory: (tpl.category ?? '').toUpperCase() || existing.templateCategory,
+          },
+        );
+        updated++;
+        continue;
+      }
+
+      // New row — minimal columns to be valid + show up in the list.
+      const row = this.automationMessageRepository.create({
+        accountId,
+        title: tpl.name.slice(0, 40),
+        name: tpl.name,
+        type: 'whatsapp',
+        status,
+        whatsappType: flattened.whatsappType,
+        templateCategory: ((tpl.category ?? '').toUpperCase() || 'MARKETING') as any,
+        callToActionText: flattened.callToActionText ?? '',
+        content: JSON.stringify(flattened.content),
+        providerMessageId: tpl.name,
+        // Columns marked NOT NULL on the entity — supply empty defaults.
+        subject: '',
+        previewText: '',
+        text: flattened.content.body ?? '',
+        fromMail: '',
+        fromName: '',
+        replyTo: '',
+        description: 'Importado da Meta',
+        image: '',
+        ippool: '',
+        priority: 'normal',
+      } as any);
+      await this.automationMessageRepository.save(row);
+      created++;
+    }
+
+    return { created, updated, skipped, total: templates.length };
+  }
+
+  /**
+   * Best-effort projection of Meta `components` back into the BMS shape
+   * (`{ headerType, headerContent, body, footer }` JSON + whatsappType +
+   * callToActionText). Anything unrecognised is preserved on body so
+   * nothing is silently lost.
+   */
+  private flattenMetaTemplateComponents(tpl: {
+    components?: Array<{ type: string; format?: string; text?: string; buttons?: Array<{ type?: string; text?: string; url?: string }> }>;
+  }): {
+    content: { headerType: string; headerContent: string; body: string; footer: string };
+    whatsappType: 'text' | 'call-to-action';
+    callToActionText?: string;
+  } {
+    const content = { headerType: 'none', headerContent: '', body: '', footer: '' };
+    let whatsappType: 'text' | 'call-to-action' = 'text';
+    let callToActionText: string | undefined;
+
+    for (const comp of tpl.components ?? []) {
+      switch (comp.type) {
+        case 'HEADER':
+          content.headerType = (comp.format ?? 'TEXT').toLowerCase();
+          content.headerContent = comp.text ?? '';
+          break;
+        case 'BODY':
+          content.body = comp.text ?? '';
+          break;
+        case 'FOOTER':
+          content.footer = comp.text ?? '';
+          break;
+        case 'BUTTONS': {
+          const urlButton = (comp.buttons ?? []).find((b) => (b.type ?? '').toUpperCase() === 'URL');
+          if (urlButton) {
+            whatsappType = 'call-to-action';
+            callToActionText = urlButton.text ?? '';
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    return { content, whatsappType, callToActionText };
   }
 
   async createWhatsappTask(messageId, accountId) {
@@ -473,7 +522,8 @@ export class MessagesService {
         messageDto.providerMessageId = await this.approveTwillio(messageDto, messageName);
         await this.createWhatsappTask(messageDto.providerMessageId, messageDto.account.id);
       } else {
-        messageDto.providerMessageId = await this.approveEvolution(messageDto, messageName);
+        const result = await this.whatsappTemplateSync.syncMessageToMeta(messageDto, messageName);
+        messageDto.providerMessageId = result.name;
       }
       messageDto.status = MessageStatus.SENTAPPROVAL;
     }
@@ -756,6 +806,7 @@ export class MessagesService {
       notificationSound: message.notificationSound,
       status: message.status,
       whatsappType: message.whatsappType,
+      templateCategory: message.templateCategory,
       callToActionText: message.callToActionText,
       providerMessageId: message.providerMessageId,
     });

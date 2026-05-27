@@ -7,6 +7,8 @@ import { MessagingModule } from './messaging.module';
 import { SendWhatsappConsumerService } from './send-whatsapp-consumer.service';
 import { MsgopsModule } from './msgops/msgops.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { WhatsappChannelEntity } from './entities/whatsapp-channel.entity';
+import { WhatsappChannelResolverService } from './providers/whatsapp-channel-resolver.service';
 
 @Module({
   imports: [
@@ -22,9 +24,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: false,
     }),
+    TypeOrmModule.forFeature([WhatsappChannelEntity]),
     MsgopsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, SendWhatsappConsumerService, Utils],
+  providers: [AppService, SendWhatsappConsumerService, Utils, WhatsappChannelResolverService],
 })
 export class AppModule {}

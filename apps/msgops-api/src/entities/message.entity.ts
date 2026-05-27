@@ -112,6 +112,9 @@ export class MessageEntity {
   @Column('varchar', { name: 'call_to_action_text', length: 100 })
   callToActionText: string;
 
+  @Column('varchar', { name: 'template_category', length: 32, nullable: true })
+  templateCategory: string | null;
+
   @Column('varchar', { name: 'provider_message_id', length: 100 })
   providerMessageId: string;
 

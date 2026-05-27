@@ -15,7 +15,6 @@ import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import { AuditEntity } from '../../entities/audit.entity';
 import { AuditService } from './../../utils/audits/audit.service';
 import { UtilsModule } from '../../utils/utils.module';
-import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
 import { AccountsModule } from '../accounts/accounts.module';
 import { FormatterUtils } from 'src/utils/pubSub/formatter.utils';
 import { ActiveCampaignProvider } from 'src/providers/active-campaign.provider';
@@ -26,6 +25,7 @@ import { OpenAIProvider } from 'src/providers/openai.provider';
 import { AutomationTargetEntity } from 'src/entities/automation-target.entity';
 import { LabelsIntegrationModule } from '../labels/labels-integration.module';
 import { BucketsService } from '../buckets/buckets.service';
+import { WhatsappTemplatesModule } from '../whatsapp-templates/whatsapp-templates.module';
 
 @Module({
   imports: [
@@ -35,6 +35,7 @@ import { BucketsService } from '../buckets/buckets.service';
     TestsModule,
     UtilsModule,
     LabelsIntegrationModule,
+    WhatsappTemplatesModule,
     TypeOrmModule.forFeature([AccountConfigEntity, AutomationEntity, MessageEntity, AuditEntity, EmailsLabelsEntity, AutomationTargetEntity]),
     RedisModule.register({
       host: process.env.REDIS_HOST,
@@ -49,7 +50,6 @@ import { BucketsService } from '../buckets/buckets.service';
     S3StorageProvider,
     AuditService,
     TwilioHandler,
-    EvolutionHandler,
     FormatterUtils,
     ActiveCampaignProvider,
     OpenAIProvider,

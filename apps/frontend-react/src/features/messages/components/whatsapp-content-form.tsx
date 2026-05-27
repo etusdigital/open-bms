@@ -253,6 +253,30 @@ export function WhatsAppContentForm({ disabled }: WhatsAppContentFormProps) {
           )}
         />
 
+        {/* Template Category — sent to Meta as `category` on submit */}
+        <FormField
+          control={form.control}
+          name="templateCategory"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t('messages.templateCategory')}</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value ?? 'MARKETING'}>
+                <FormControl>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="MARKETING">{t('messages.templateCategoryMarketing')}</SelectItem>
+                  <SelectItem value="UTILITY">{t('messages.templateCategoryUtility')}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-xs">{t('messages.templateCategoryHelp')}</p>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         {/* Content Type */}
         <FormField
           control={form.control}

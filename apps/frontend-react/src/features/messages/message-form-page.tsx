@@ -131,6 +131,7 @@ export default function MessageFormPage({ messageId, messageType, onSuccess }: M
           content_json: messageQuery.data.content_json ?? '',
           url: messageQuery.data.url ?? '',
           whatsappType: messageQuery.data.whatsappType ?? '',
+          templateCategory: messageQuery.data.templateCategory ?? 'MARKETING',
           callToActionText: messageQuery.data.callToActionText ?? '',
           callToActionUrl: messageQuery.data.callToActionUrl ?? '',
           image: messageQuery.data.image ?? '',

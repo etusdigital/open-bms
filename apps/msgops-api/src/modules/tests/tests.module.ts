@@ -20,7 +20,6 @@ import { AuditService } from './../../utils/audits/audit.service';
 import { AccountsModule } from '../accounts/accounts.module';
 import { AccountConfigEntity } from '../../entities/account-config.entity';
 import { AccountConfigsProvider } from '../../providers/account-configs.provider';
-import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
 import { ContactEntity } from 'src/entities/contact.entity';
 import { ContactDeviceEntity } from 'src/entities/contact-device.entity';
 import { CampaignContactEntity } from 'src/entities/campaign-contact.entity';
@@ -32,12 +31,14 @@ import { OpenAIProvider } from 'src/providers/openai.provider';
 import { SlackProvider } from 'src/providers/slack.provider';
 import { LabelsIntegrationModule } from '../labels/labels-integration.module';
 import { BucketsService } from '../buckets/buckets.service';
+import { WhatsappTemplatesModule } from '../whatsapp-templates/whatsapp-templates.module';
 
 @Module({
   imports: [
     AccountsModule,
     HttpModule,
     LabelsIntegrationModule,
+    WhatsappTemplatesModule,
     TypeOrmModule.forFeature([
       AccountEntity,
       AccountConfigEntity,
@@ -66,7 +67,6 @@ import { BucketsService } from '../buckets/buckets.service';
     S3StorageProvider,
     AuditService,
     TwilioHandler,
-    EvolutionHandler,
     OpenAIProvider,
     SlackProvider,
     BucketsService,

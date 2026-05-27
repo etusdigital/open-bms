@@ -3,6 +3,8 @@ export const INTEGRATIONS_TABS = [
   's3',
   'fcm',
   'geoip',
+  'whatsappMeta',
+  'whatsappHub',
 ] as const;
 
 export type IntegrationsTab = (typeof INTEGRATIONS_TABS)[number];

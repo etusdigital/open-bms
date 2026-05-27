@@ -156,6 +156,59 @@ export function useDuplicateMessage() {
   });
 }
 
+interface SyncTemplateStatusResult {
+  status: 'approved' | 'rejected' | 'sent_approval';
+  metaStatus: string;
+  rejectedReason?: string;
+}
+
+/**
+ * Force a Meta poll to refresh the template approval status — useful when the
+ * Meta webhook never fired (dev tunnels, missed delivery, hub proxy mid-deploy)
+ * or the operator just wants a result in seconds.
+ */
+export function useSyncTemplateStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number): Promise<SyncTemplateStatusResult> => {
+      const { data } = await apiClient.post<SyncTemplateStatusResult>(`/messages/${id}/sync-template-status`);
+      return data;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messages.all });
+      const key = `messages.syncStatus_${result.status}` as const;
+      toast.success(i18n.t(key, { meta: result.metaStatus }));
+    },
+    onError: (error) => {
+      toast.error(extractApiErrorMessage(error) ?? i18n.t('messages.syncStatusError'));
+    },
+  });
+}
+
+/**
+ * Pull every template that exists on Meta (WABA) into BMS. Creates missing
+ * rows, refreshes status/category on existing ones, idempotent — safe to
+ * click multiple times.
+ */
+export function useSyncTemplatesFromMeta() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (): Promise<{ created: number; updated: number; skipped: number; total: number }> => {
+      const { data } = await apiClient.post<{ created: number; updated: number; skipped: number; total: number }>('/messages/whatsapp/sync-from-meta');
+      return data;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messages.all });
+      toast.success(i18n.t('messages.syncFromMetaResult', { created: result.created, updated: result.updated, total: result.total }));
+    },
+    onError: (error) => {
+      toast.error(extractApiErrorMessage(error) ?? i18n.t('messages.syncFromMetaError'));
+    },
+  });
+}
+
 export function useLabelsAll() {
   const auth = useAppStore((s) => s.auth);
   const accountId = auth.status === 'authenticated' ? auth.account.id : 0;

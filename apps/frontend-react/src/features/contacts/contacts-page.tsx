@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from '@tanstack/react-router';
 import { getCoreRowModel, useReactTable, type RowSelectionState } from '@tanstack/react-table';
-import { Users, Upload } from 'lucide-react';
+import { Users, Upload, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -15,7 +15,8 @@ import { ListPage } from '@/components/list-page';
 import { useListSearchParams } from '@/hooks/use-list-search-params';
 import type { ContactsSearchParams } from './contacts-search-schema';
 import { usePermissions } from '@/hooks/use-permissions';
-import { useContactsList, useContactDashboard, useContactsTotal, useDeleteContact } from './use-contacts';
+import { useContactsList, useContactDashboard, useContactsTotal, useDeleteContact, useCreateContact } from './use-contacts';
+import { ContactEditDialog } from './contact-edit-dialog';
 import { useContactsColumns, selectColumn } from './contacts-columns';
 import { ContactsFilterBar } from './components/contacts-filter-bar';
 import { BulkActionsBar } from './components/bulk-actions-bar';
@@ -31,6 +32,9 @@ export default function ContactsPage({ searchParams }: ContactsPageProps) {
   const { t } = useTranslation();
   const { can } = usePermissions();
   const canImport = can('audience:contacts_import');
+  const canCreate = can('audience:contacts_view');
+  const createContact = useCreateContact();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const { pagination, sorting, setPagination, setSorting, setSearch } = useListSearchParams(searchParams);
 
@@ -127,14 +131,22 @@ export default function ContactsPage({ searchParams }: ContactsPageProps) {
     <TooltipProvider>
       <ListPage.Root>
         <ListPage.Header title={t('contacts.pageTitle')}>
-          {canImport && (
-            <Button size="sm" asChild>
-              <Link to="/contacts/import">
-                <Upload className="mr-1 h-4 w-4" />
-                {t('contacts.import')}
-              </Link>
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {canCreate && (
+              <Button size="sm" variant="outline" onClick={() => setCreateDialogOpen(true)}>
+                <UserPlus className="mr-1 h-4 w-4" />
+                {t('contacts.createContact')}
+              </Button>
+            )}
+            {canImport && (
+              <Button size="sm" asChild>
+                <Link to="/contacts/import">
+                  <Upload className="mr-1 h-4 w-4" />
+                  {t('contacts.import')}
+                </Link>
+              </Button>
+            )}
+          </div>
         </ListPage.Header>
 
         {/* Dashboard Cards */}
@@ -225,6 +237,19 @@ export default function ContactsPage({ searchParams }: ContactsPageProps) {
         })}
         onConfirm={confirmDelete}
         loading={deleteContact.isPending}
+      />
+
+      <ContactEditDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        titleKey="contacts.createContact"
+        isPending={createContact.isPending}
+        defaultValues={{ firstName: '', lastName: '', email: '', phone: '', city: '', region: '', country: '', isActive: true }}
+        onSubmit={(values) =>
+          createContact.mutate(values, {
+            onSuccess: () => setCreateDialogOpen(false),
+          })
+        }
       />
     </TooltipProvider>
   );

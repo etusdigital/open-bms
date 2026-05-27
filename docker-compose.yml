@@ -89,6 +89,22 @@ x-backend-env: &backend-env
   TOPIC_NAME_HTTP_REQUEST: ${TOPIC_NAME_HTTP_REQUEST:-http-request}
   TOPIC_NAME_TAG_PROCESS: ${TOPIC_NAME_TAG_PROCESS:-tag-process}
   TOPIC_NAME_EVENT_PROCESS: ${TOPIC_NAME_EVENT_PROCESS:-event-process}
+  # WhatsApp Cloud (Meta direct or via EvoHub). Substitui Evolution API.
+  # Credenciais reais (APP_ID/SECRET, HUB_API_KEY etc.) são configuradas via
+  # Super Admin → Integrações → WhatsApp e persistidas em system_config; o
+  # backend lê DB primeiro e cai pra env só como fallback. Em dev local com
+  # ngrok, set BMS_PUBLIC_URL ao domínio do túnel para receber webhooks.
+  WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-cloud}
+  WHATSAPP_GRAPH_VERSION: ${WHATSAPP_GRAPH_VERSION:-v18.0}
+  WHATSAPP_APP_ID: ${WHATSAPP_APP_ID:-}
+  WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+  WHATSAPP_CONFIG_ID: ${WHATSAPP_CONFIG_ID:-}
+  WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+  EVOLUTION_HUB_ENABLED: ${EVOLUTION_HUB_ENABLED:-false}
+  EVOLUTION_HUB_URL: ${EVOLUTION_HUB_URL:-https://api.evohub.ai}
+  EVOLUTION_HUB_API_KEY: ${EVOLUTION_HUB_API_KEY:-}
+  EVOLUTION_HUB_WEBHOOK_SECRET: ${EVOLUTION_HUB_WEBHOOK_SECRET:-}
+  BMS_PUBLIC_URL: ${BMS_PUBLIC_URL:-${FRONTEND_URL:-http://localhost:8080}}
 
 x-infra-deps: &infra-deps
   postgres:
@@ -343,20 +359,6 @@ services:
     environment:
       <<: *backend-env
       PORT: '3011'
-    depends_on: *infra-deps
-
-  event-receiver-probe:
-    build:
-      context: .
-      dockerfile: apps/event-receiver-probe/Dockerfile
-    container_name: event-receiver-probe
-    <<: *restart-policy
-    ports:
-      - '3012:3012'
-    environment:
-      <<: *backend-env
-      PORT: '3012'
-      BRIDGE_ENDPOINT: http://event-receiver-probe:3012
     depends_on: *infra-deps
 
   event-process:

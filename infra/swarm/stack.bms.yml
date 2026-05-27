@@ -64,6 +64,24 @@
 #    MINIO_ROOT_USER                     default: bmsadmin
 #    TRAEFIK_NETWORK_NAME                default: bmsNet
 #                                         (rede overlay externa onde Traefik vive)
+#    BMS_PUBLIC_URL                      default: ${FRONTEND_URL}
+#                                         URL pública que a Meta / EvoHub usa pra entregar
+#                                         webhooks. Só sobrescreva se for diferente do FRONTEND_URL.
+#    WHATSAPP_PROVIDER                   default: cloud
+#                                         'cloud' (Meta direta ou via EvoHub) ou 'twilio' (legacy).
+#    WHATSAPP_GRAPH_VERSION              default: v18.0
+#    EVOLUTION_HUB_URL                   default: https://api.evohub.ai
+#    EVOLUTION_HUB_ENABLED               default: false
+#
+#  WhatsApp Cloud / EvoHub credentials (TODAS opcionais — configuradas via
+#  Super Admin → Integrações → WhatsApp após primeiro boot. Persistidas em
+#  system_config; ENV só serve de fallback se a UI nunca foi configurada):
+#    WHATSAPP_APP_ID                     Meta App ID (modo Meta direto)
+#    WHATSAPP_APP_SECRET                 Meta App Secret
+#    WHATSAPP_CONFIG_ID                  Embedded Signup Config ID
+#    WHATSAPP_VERIFY_TOKEN               Token GET webhook Meta
+#    EVOLUTION_HUB_API_KEY               Bearer tenant no Hub
+#    EVOLUTION_HUB_WEBHOOK_SECRET        HMAC-SHA256 Hub ↔ BMS
 #
 # -----------------------------------------------------------------------------
 #  DEPLOY VIA PORTAINER
@@ -203,6 +221,27 @@ x-backend-env: &backend-env
   TOPIC_NAME_HTTP_REQUEST: ${TOPIC_NAME_HTTP_REQUEST:-http-request}
   TOPIC_NAME_TAG_PROCESS: ${TOPIC_NAME_TAG_PROCESS:-tag-process}
   TOPIC_NAME_EVENT_PROCESS: ${TOPIC_NAME_EVENT_PROCESS:-event-process}
+  # WhatsApp Cloud (Meta direct ou via EvoHub) — substitui a integração antiga
+  # Evolution API. Detalhes operacionais: docs/operations/whatsapp-cloud.md.
+  #
+  # Credenciais reais (APP_ID/SECRET, HUB_API_KEY etc.) ficam vazias aqui de
+  # propósito: o Super Admin → Integrações → WhatsApp persiste tudo em
+  # system_config (DB) e o backend lê de lá primeiro; env só é fallback se
+  # a UI ainda não foi configurada. Não defina como :? — quebraria o boot.
+  WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-cloud}
+  WHATSAPP_GRAPH_VERSION: ${WHATSAPP_GRAPH_VERSION:-v18.0}
+  WHATSAPP_APP_ID: ${WHATSAPP_APP_ID:-}
+  WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+  WHATSAPP_CONFIG_ID: ${WHATSAPP_CONFIG_ID:-}
+  WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+  EVOLUTION_HUB_ENABLED: ${EVOLUTION_HUB_ENABLED:-false}
+  EVOLUTION_HUB_URL: ${EVOLUTION_HUB_URL:-https://api.evohub.ai}
+  EVOLUTION_HUB_API_KEY: ${EVOLUTION_HUB_API_KEY:-}
+  EVOLUTION_HUB_WEBHOOK_SECRET: ${EVOLUTION_HUB_WEBHOOK_SECRET:-}
+  # URL pública que Meta / EvoHub usam para entregar webhooks de volta ao BMS.
+  # Default = FRONTEND_URL (mesma URL do app). Sobrescreva só se houver split
+  # entre URL do app e URL do webhook (ex: webhook num subdomínio dedicado).
+  BMS_PUBLIC_URL: ${BMS_PUBLIC_URL:-${FRONTEND_URL}}
 
 services:
   # === infra ===

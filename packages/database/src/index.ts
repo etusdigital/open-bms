@@ -20,6 +20,8 @@ import { RoutingRule } from './entities/routing-rule.entity';
 import { MsgopsSegment } from './entities/msgops-segment.entity';
 import { Label } from './entities/label.entity';
 import { Message } from './entities/message.entity';
+import { WhatsappChannel } from './entities/whatsapp-channel.entity';
+import { WhatsappTemplate } from './entities/whatsapp-template.entity';
 
 export const entities = [
   Account,
@@ -39,4 +41,6 @@ export const entities = [
   MsgopsSegment,
   Label,
   Message,
+  WhatsappChannel,
+  WhatsappTemplate,
 ];

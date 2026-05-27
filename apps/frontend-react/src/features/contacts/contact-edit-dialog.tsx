@@ -14,9 +14,11 @@ interface ContactEditDialogProps {
   onSubmit: (data: ContactEditValues) => void;
   isPending: boolean;
   defaultValues: ContactEditValues;
+  /** Override the dialog title for reuse (e.g. "novo contato"). */
+  titleKey?: string;
 }
 
-export function ContactEditDialog({ open, onOpenChange, onSubmit, isPending, defaultValues }: ContactEditDialogProps) {
+export function ContactEditDialog({ open, onOpenChange, onSubmit, isPending, defaultValues, titleKey = 'contacts.editDetails' }: ContactEditDialogProps) {
   const { t } = useTranslation();
 
   const form = useForm<ContactEditValues>({
@@ -28,7 +30,7 @@ export function ContactEditDialog({ open, onOpenChange, onSubmit, isPending, def
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>{t('contacts.editDetails')}</DialogTitle>
+          <DialogTitle>{t(titleKey as never)}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
