@@ -277,6 +277,7 @@
     "subscribedToday": "Inscritos hoje",
     "activeContacts": "Contatos ativos",
     "import": "Importar",
+    "createContact": "Novo contato",
     "export": "Exportar",
     "entityName": "contato",
     "entityNamePlural": "contatos",

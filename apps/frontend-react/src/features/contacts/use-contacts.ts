@@ -174,6 +174,31 @@ export function useUpdateContact(uuid: string) {
   });
 }
 
+/**
+ * Creates a contact via POST /contacts. The server treats the call as a
+ * soft upsert by email (returns the existing row patched with new fields
+ * when the email is already in use), but the UI only opens this dialog for
+ * "novo contato" — duplicates surface in the list with the toast still
+ * marking it as success.
+ */
+export function useCreateContact() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: ContactEditValues) => {
+      const { data: result } = await apiClient.post<Contact>('/contacts', data);
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.contacts.all });
+      toast.success(i18n.t('common.createSuccess', { entity: i18n.t('contacts.entityName') }));
+    },
+    onError: (error) => {
+      toast.error(extractApiErrorMessage(error) ?? i18n.t('common.createError', { entity: i18n.t('contacts.entityName') }));
+    },
+  });
+}
+
 export function useImportContacts() {
   const queryClient = useQueryClient();
 
