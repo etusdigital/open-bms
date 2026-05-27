@@ -16,13 +16,47 @@ import { AdminSesController } from './amazon-ses/admin-ses.controller';
 import { AdminSesService } from './amazon-ses/admin-ses.service';
 import { AdminMandrillController } from './mandrill/admin-mandrill.controller';
 import { AdminMandrillService } from './mandrill/admin-mandrill.service';
+import { AdminWhatsappMetaController } from './whatsapp-meta/admin-whatsapp-meta.controller';
+import { AdminWhatsappMetaService } from './whatsapp-meta/admin-whatsapp-meta.service';
+import { AdminWhatsappHubController } from './whatsapp-hub/admin-whatsapp-hub.controller';
+import { AdminWhatsappHubService } from './whatsapp-hub/admin-whatsapp-hub.service';
 
 // SystemConfigCacheProvider is supplied by the global SystemConfigCacheModule
 // registered at app boot — no need to re-import here.
 @Module({
   imports: [TypeOrmModule.forFeature([SystemConfigEntity])],
-  controllers: [AdminS3Controller, AdminSendgridController, AdminFcmController, AdminMailerSendController, AdminResendController, AdminSesController, AdminMandrillController],
-  providers: [AdminS3Service, AdminSendgridService, AdminFcmService, AdminMailerSendService, AdminResendService, AdminSesService, AdminMandrillService],
-  exports: [AdminS3Service, AdminSendgridService, AdminFcmService, AdminMailerSendService, AdminResendService, AdminSesService, AdminMandrillService],
+  controllers: [
+    AdminS3Controller,
+    AdminSendgridController,
+    AdminFcmController,
+    AdminMailerSendController,
+    AdminResendController,
+    AdminSesController,
+    AdminMandrillController,
+    AdminWhatsappMetaController,
+    AdminWhatsappHubController,
+  ],
+  providers: [
+    AdminS3Service,
+    AdminSendgridService,
+    AdminFcmService,
+    AdminMailerSendService,
+    AdminResendService,
+    AdminSesService,
+    AdminMandrillService,
+    AdminWhatsappMetaService,
+    AdminWhatsappHubService,
+  ],
+  exports: [
+    AdminS3Service,
+    AdminSendgridService,
+    AdminFcmService,
+    AdminMailerSendService,
+    AdminResendService,
+    AdminSesService,
+    AdminMandrillService,
+    AdminWhatsappMetaService,
+    AdminWhatsappHubService,
+  ],
 })
 export class AdminIntegrationsModule {}
