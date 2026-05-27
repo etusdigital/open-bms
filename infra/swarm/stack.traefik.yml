@@ -1,0 +1,155 @@
+# =============================================================================
+#  Traefik v3 — Ingress controller pro BMS (Portainer-ready)
+# =============================================================================
+#
+#  Guia completo: infra/swarm/DEPLOY.md
+#
+# -----------------------------------------------------------------------------
+#  PRÉ-REQUISITOS
+# -----------------------------------------------------------------------------
+#
+#  1) Docker Swarm inicializado no manager.
+#  2) Rede overlay externa pra Traefik conversar com os apps:
+#       docker network create --driver overlay --attachable bmsNet
+#  3) Volume nomeado pros certificados Let's Encrypt:
+#       docker volume create volume_swarm_certificates
+#  4) Porta 80/443 livres no host (não tenha outro proxy na frente).
+#
+# -----------------------------------------------------------------------------
+#  VARIÁVEIS DE AMBIENTE
+# -----------------------------------------------------------------------------
+#
+#    LETSENCRYPT_EMAIL          ex.: admin@exemplo.com
+#                                (Let's Encrypt usa pra alertas de cert)
+#    TRAEFIK_NETWORK_NAME       default: bmsNet
+#                                (mesma rede usada pelo stack do BMS)
+#
+# -----------------------------------------------------------------------------
+#  DEPLOY VIA PORTAINER
+# -----------------------------------------------------------------------------
+#
+#  Stacks → Add stack → cola este YAML → setar LETSENCRYPT_EMAIL → Deploy.
+#
+# -----------------------------------------------------------------------------
+#  DEPLOY VIA CLI
+# -----------------------------------------------------------------------------
+#
+#  export LETSENCRYPT_EMAIL=admin@exemplo.com
+#  docker stack deploy -c stack.traefik.yml traefik
+#
+# -----------------------------------------------------------------------------
+#  POR QUE ESSAS CONFIGS?
+# -----------------------------------------------------------------------------
+#
+#  • PROVIDER ÚNICO `swarm` (não combinar com `docker`):
+#    Na v3, providers `docker` e `swarm` são SEPARADOS (na v2 eram fundidos).
+#    Manter os dois ligados faz o provider `docker` tentar descobrir portas em
+#    services Swarm, gritando errors "port is missing" infinitamente nos logs.
+#
+#  • TIMEOUTS 600s no entrypoint `websecure`:
+#    Operações longas do msgops-api (import enterprise, exports bulk) podem
+#    levar minutos. Default 60s do Traefik mata essas requests com 504.
+#
+#  • `forwardingTimeouts.responseHeaderTimeout=600s`:
+#    Timeout Traefik → upstream (msgops-api etc). Sem isso, o Traefik desiste
+#    de esperar header de resposta em 60s mesmo com entrypoint a 600s.
+#
+#  • `accesslog.format=json`:
+#    Logs estruturados pra grep/jq quando der problema. Common format esconde
+#    upstream e latência detalhada.
+#
+#  • `redirect-https@swarm` (não `@docker`):
+#    Namespace muda quando provider muda. Sem isso, redirect HTTP→HTTPS quebra.
+#
+# =============================================================================
+
+version: "3.7"
+
+services:
+  traefik:
+    image: traefik:v3.5.3
+    command:
+      - "--api.dashboard=true"
+
+      # Provider único: swarm. NÃO adicionar --providers.docker.* aqui — gera
+      # erros "port is missing" no log e mistura discovery dos dois providers.
+      - "--providers.swarm.endpoint=unix:///var/run/docker.sock"
+      - "--providers.swarm.exposedbydefault=false"
+      - "--providers.swarm.network=${TRAEFIK_NETWORK_NAME:-bmsNet}"
+
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.address=:443"
+
+      # Timeouts longos no websecure (600s = 10 min) pra cobrir operações longas
+      # do msgops-api (import enterprise, exports). Sem isso, requests > 60s
+      # dão 504 Gateway Timeout.
+      - "--entrypoints.web.transport.respondingTimeouts.idleTimeout=3600s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=600s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=600s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=600s"
+
+      # Timeouts Traefik → upstream. Sem responseHeaderTimeout=600s o Traefik
+      # mata a request mesmo com entrypoint configurado.
+      - "--serversTransport.forwardingTimeouts.dialTimeout=10s"
+      - "--serversTransport.forwardingTimeouts.responseHeaderTimeout=600s"
+      - "--serversTransport.forwardingTimeouts.idleConnTimeout=90s"
+
+      # Let's Encrypt via HTTP-01 challenge
+      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencryptresolver.acme.storage=/etc/traefik/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencryptresolver.acme.email=${LETSENCRYPT_EMAIL:?must set LETSENCRYPT_EMAIL}"
+
+      # Logging — INFO + JSON access log estruturado
+      - "--log.level=INFO"
+      - "--log.format=common"
+      - "--log.filePath=/var/log/traefik/traefik.log"
+      - "--accesslog=true"
+      - "--accesslog.format=json"
+      - "--accesslog.filepath=/var/log/traefik/access-log"
+
+    volumes:
+      - vol_certificates:/etc/traefik/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    networks:
+      - network_public
+
+    ports:
+      - target: 80
+        published: 80
+        mode: host
+      - target: 443
+        published: 443
+        mode: host
+
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - "traefik.enable=true"
+        # Middleware global de redirect HTTP → HTTPS
+        - "traefik.http.middlewares.redirect-https.redirectscheme.scheme=https"
+        - "traefik.http.middlewares.redirect-https.redirectscheme.permanent=true"
+        # Catchall HTTP — qualquer host bate aqui e é redirecionado pra HTTPS
+        - "traefik.http.routers.http-catchall.rule=Host(`{host:.+}`)"
+        - "traefik.http.routers.http-catchall.entrypoints=web"
+        # @swarm (não @docker): namespace do provider único usado acima.
+        - "traefik.http.routers.http-catchall.middlewares=redirect-https@swarm"
+        - "traefik.http.routers.http-catchall.priority=1"
+
+volumes:
+  vol_certificates:
+    external: true
+    name: volume_swarm_certificates
+
+networks:
+  network_public:
+    external: true
+    attachable: true
+    name: ${TRAEFIK_NETWORK_NAME:-bmsNet}

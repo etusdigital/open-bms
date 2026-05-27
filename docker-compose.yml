@@ -1,0 +1,640 @@
+# BMS OpenSource v0.1.0 — docker-compose
+# 15 apps + 5 infra services. Apps Enterprise-only não estão neste repo.
+# Defaults (postgres/postgres, guest/guest, minioadmin/minioadmin) são DEV-ONLY.
+# Para produção, sobrescreva via .env e veja docs/deployment.md (sizing guide).
+#
+# Per-app .env files (apps/*/.env) são opcionais: o anchor *backend-env já
+# fornece defaults de dev suficientes para `git clone && docker compose up`
+# funcionar out-of-the-box. Crie .env apenas para overrides locais.
+
+x-backend-env: &backend-env
+  NODE_ENV: development
+  TYPEORM_HOST: postgres
+  TYPEORM_PORT: '5432'
+  TYPEORM_USERNAME: postgres
+  TYPEORM_PASSWORD: postgres
+  TYPEORM_DATABASE: msgops
+  TYPEORM_MIGRATIONS_RUN: 'true'
+  TYPEORM_SYNCHRONIZE: 'false'
+  TYPEORM_SSL: 'false'
+  REDIS_HOST: redis
+  REDIS_PORT: '6379'
+  RABBITMQ_HOST_PORT: rabbitmq:5672
+  RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+  RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
+  AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@rabbitmq:5672
+  CLICKHOUSE_HOST: http://clickhouse:8123
+  CLICKHOUSE_DATABASE: BMS
+  CLICKHOUSE_USERNAME: default
+  CLICKHOUSE_PASSWORD: ''
+  INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN:-INSECURE_DEV_ONLY_internal-token-do-not-use-in-prod}
+  S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_BUCKET: ${S3_BUCKET:-msgops-dev}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-minioadmin}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-minioadmin}
+  # Auth (dev defaults — DO NOT use these in production; override via .env or
+  # process env). JWT_SECRET below is an obvious sentinel so `git clone &&
+  # docker compose up` boots; msgops-api refuses to start with NODE_ENV=production
+  # and the INSECURE_DEV_ONLY_ prefix still in place. Rotate via
+  # `openssl rand -hex 32` for any real deploy.
+  AUTH_PROVIDER: ${AUTH_PROVIDER:-local}
+  JWT_SECRET: ${JWT_SECRET:-INSECURE_DEV_ONLY_jwt-secret-rotate-with-openssl-rand-hex-32}
+  CRON_SECRET: ${CRON_SECRET:-INSECURE_DEV_ONLY_cron-secret-rotate-with-openssl-rand-hex-32}
+  JWT_AUDIENCE: ${JWT_AUDIENCE:-bms-msgops-api}
+  JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-3600}
+  JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-2592000}
+  # Swagger path (also the msgops-api healthcheck target — keep in sync).
+  API_DOCS: /api-docs
+  FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+  # Vendor SDKs constructed eagerly in Nest DI (SparkPostHandler, OpenAIProvider)
+  # refuse empty keys at boot. Placeholders keep the OSS stack bootable; calls
+  # will fail cleanly at runtime if exercised without real keys.
+  SPARKPOST_API_KEY: ${SPARKPOST_API_KEY:-dev-placeholder-not-a-real-key}
+  OPEN_AI_KEY: ${OPEN_AI_KEY:-dev-placeholder-not-a-real-key}
+  # send-email's mail.service has hardcoded SaaS-customer key lookups (account.id
+  # === 1 hits "plusdin-campaigns") that throw when the map is empty. The seeded
+  # OSS admin account is id=1, so any test campaign trips the throw. Provide
+  # placeholders here; SDK calls land on sendgrid-mock, which accepts any key.
+  SENDGRID_API_KEY: ${SENDGRID_API_KEY:-dev-placeholder-not-a-real-key}
+  SENDGRID_KEYS_MAP: ${SENDGRID_KEYS_MAP:-{"plusdin-campaigns":"dev","plusdin-transactional":"dev","plusdin-automations":"dev","plusdin-novo-campaigns":"dev","plusdin-novo-transactional":"dev","plusdin-novo-automations":"dev","oseucartao":"dev","unum-in-automation":"dev"}}
+  # campaign-packer batches contacts in pages of this size; parseInt(undefined)
+  # → NaN ends up in the SQL math, so a default is required.
+  LIMIT_CONTACT_BATCH: ${LIMIT_CONTACT_BATCH:-1000}
+  # Scheduler endpoints — campaign-packer and tag-process internal URLs.
+  # Without these, msgops-api scheduler jobs throw "Failed to parse URL" and
+  # die silently in the dead-letter queue, leaving campaigns stuck in Sending.
+  CAMPAIGN_TRIGGER_ENDPOINT: ${CAMPAIGN_TRIGGER_ENDPOINT:-http://campaign-packer:3000/create-contacts-send}
+  CAMPAIGN_TEST_AB_ENDPOINT: ${CAMPAIGN_TEST_AB_ENDPOINT:-http://campaign-packer:3000/create-test}
+  CAMPAIGN_RESULT_TEST_AB_ENDPOINT: ${CAMPAIGN_RESULT_TEST_AB_ENDPOINT:-http://campaign-packer:3000/result-test}
+  GOOGLE_TASK_QUEUE: ${GOOGLE_TASK_QUEUE:-bms-scheduler-campaign-trigger}
+  GOOGLE_TASK_QUEUE_TEST_AB: ${GOOGLE_TASK_QUEUE_TEST_AB:-bms-scheduler-campaign-testab}
+  GOOGLE_TASK_SEGMENT: ${GOOGLE_TASK_SEGMENT:-bms-scheduler-segment}
+  GOOGLE_TASK_BMS_USAGE: ${GOOGLE_TASK_BMS_USAGE:-bms-scheduler-bms-usage}
+  GOOGLE_TASK_WHATSAPP_MESSAGE: ${GOOGLE_TASK_WHATSAPP_MESSAGE:-bms-scheduler-whatsapp-message}
+  TAG_PROCESS_ENDPOINT: ${TAG_PROCESS_ENDPOINT:-http://tag-process:3000/process-segment}
+  # campaign-packer calls tag-process directly (separate from the scheduler path above).
+  TAG_PROCESS_API: ${TAG_PROCESS_API:-http://tag-process:3000/process-segment/}
+  # message-trigger publishes to itself (next-step BullMQ delay) and to downstream
+  # workers by topic name. The QueuePublisher constructor maps each TOPIC_NAME_* →
+  # Queue with a fallback to the constant; the callers, however, look up by the env
+  # var directly, so leaving them unset breaks every step type. Defaults match the
+  # constants in apps/message-trigger/src/providers/queue/queue.publisher.ts.
+  TOPIC_NAME_MESSAGE_TRIGGER: ${TOPIC_NAME_MESSAGE_TRIGGER:-message-trigger}
+  TOPIC_NAME_SEND_EMAIL: ${TOPIC_NAME_SEND_EMAIL:-send-email}
+  TOPIC_NAME_SEND_PUSH: ${TOPIC_NAME_SEND_PUSH:-send-push}
+  TOPIC_NAME_SEND_TWILIO: ${TOPIC_NAME_SEND_TWILIO:-send-twilio}
+  TOPIC_NAME_SEND_WHATSAPP: ${TOPIC_NAME_SEND_WHATSAPP:-send-whatsapp}
+  TOPIC_NAME_HTTP_REQUEST: ${TOPIC_NAME_HTTP_REQUEST:-http-request}
+  TOPIC_NAME_TAG_PROCESS: ${TOPIC_NAME_TAG_PROCESS:-tag-process}
+  TOPIC_NAME_EVENT_PROCESS: ${TOPIC_NAME_EVENT_PROCESS:-event-process}
+
+x-infra-deps: &infra-deps
+  postgres:
+    condition: service_healthy
+  postgres-init:
+    condition: service_completed_successfully
+  redis:
+    condition: service_healthy
+  rabbitmq:
+    condition: service_healthy
+  minio:
+    condition: service_healthy
+  clickhouse:
+    condition: service_healthy
+
+# Apps and infra share this restart policy. minio-bootstrap overrides to
+# `restart: 'no'` because it's a one-shot init job (running it again is a no-op
+# but the Exited(0) state is the success signal we want).
+x-restart-policy: &restart-policy
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    <<: *restart-policy
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: msgops
+    ports:
+      - '55432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot init: ensures the `msgops` database exists before any backend
+  # service connects. The postgres:16-alpine image only runs POSTGRES_DB on a
+  # FRESH volume — after a manual `DROP DATABASE msgops` (volume kept) a plain
+  # `make down && make up` would never recreate it, and a TypeORM migration
+  # cannot fix this (a migration runs *inside* the msgops connection — it
+  # can't create the database it connects to). This connects to the default
+  # `postgres` maintenance db and creates `msgops` if absent. Idempotent:
+  # a no-op on a fresh volume (POSTGRES_DB already created it) and on every
+  # subsequent boot where the db is present.
+  postgres-init:
+    image: postgres:16-alpine
+    container_name: postgres-init
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: postgres
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        psql -h postgres -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='msgops'" | grep -q 1 \
+          || psql -h postgres -U postgres -c "CREATE DATABASE msgops"
+        echo "postgres-init: database msgops ready"
+    restart: 'no'
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    <<: *restart-policy
+    ports:
+      - '56379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+    container_name: minio
+    <<: *restart-policy
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-minioadmin}
+    ports:
+      - '9100:9000'
+      - '9101:9001'
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:9000/minio/health/live || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio-bootstrap:
+    image: minio/mc:RELEASE.2025-01-17T23-25-50Z
+    container_name: minio-bootstrap
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        mc alias set local http://minio:9000 ${S3_ACCESS_KEY_ID:-minioadmin} ${S3_SECRET_ACCESS_KEY:-minioadmin} &&
+        mc mb --ignore-existing local/${S3_BUCKET:-msgops-dev} &&
+        echo "MinIO bucket ${S3_BUCKET:-msgops-dev} ready"
+    restart: 'no'
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq
+    <<: *restart-policy
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'check_port_connectivity']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    container_name: clickhouse
+    <<: *restart-policy
+    ports:
+      - '8123:8123'
+      - '9000:9000'
+    environment:
+      CLICKHOUSE_DB: BMS
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ''
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: '1'
+      CLICKHOUSE_SKIP_USER_SETUP: '1'
+      # Consumed by the 02-events-rabbitmq.sh init script to wire the
+      # RabbitMQ-engine table. The script reads RABBITMQ_USER/RABBITMQ_PASSWORD;
+      # map them from this compose's RABBITMQ_DEFAULT_* names so ClickHouse uses
+      # the same credentials as every other service. Without these the script
+      # falls back to guest/guest and the analytics pipeline never authenticates.
+      RABBITMQ_HOST_PORT: rabbitmq:5672
+      RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./infra/clickhouse-init:/docker-entrypoint-initdb.d
+      - ./infra/clickhouse-config/users.d:/etc/clickhouse-server/users.d
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:8123/ping']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  # One-shot init: runs as root before msgops-api starts and sets ownership
+  # of the bms-config volume to UID 1001 (nodejs) so msgops-api can write
+  # /data/config/geoip.env. Without this, Docker initialises named volumes
+  # as root-owned and the non-root container cannot write.
+  bms-config-init:
+    image: alpine:3.20
+    volumes:
+      - bms-config:/data/config
+    entrypoint: ['/bin/sh', '-c', 'chown 1001:1001 /data/config']
+    restart: 'no'
+
+  msgops-api:
+    build:
+      context: .
+      dockerfile: apps/msgops-api/Dockerfile
+    container_name: msgops-api
+    <<: *restart-policy
+    ports:
+      - '5001:5001'
+    env_file:
+      - path: apps/msgops-api/.env
+        required: false
+    environment:
+      <<: *backend-env
+      SERVER_PORT: '5001'
+      # Routes msgops-api SendGrid calls through the local mock by default so
+      # `docker compose up` boots a fully self-contained stack. Set
+      # SENDGRID_API_BASE_URL=https://api.sendgrid.com explicitly to talk to
+      # the real SendGrid in this environment.
+      SENDGRID_API_BASE_URL: ${SENDGRID_API_BASE_URL:-http://sendgrid-mock:3010}
+      # URL the SendGrid Event Webhook will POST events to. In this stack the
+      # sendgrid-mock fires synthetic events at this URL when /v3/mail/send is
+      # called, so it must point at event-receiver inside the compose network.
+      SENDGRID_WEBHOOK_URL_BASE: ${SENDGRID_WEBHOOK_URL_BASE:-http://event-receiver:3011/bms/events?platform=sendgrid}
+      # Shared config dir written by wizard, read by geolocation + sidecar.
+      BMS_CONFIG_DIR: /data/config
+    volumes:
+      - bms-config:/data/config
+    depends_on:
+      <<: *infra-deps
+      bms-config-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:5001/api-docs']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  sendgrid-mock:
+    build:
+      context: .
+      dockerfile: apps/sendgrid-mock/Dockerfile
+    container_name: sendgrid-mock
+    <<: *restart-policy
+    ports:
+      - '3010:3010'
+    environment:
+      PORT: '3010'
+      MOCK_EVENT_DELAY_MS: ${SENDGRID_MOCK_EVENT_DELAY_MS:-500}
+      # Probabilities [0,1] for each non-happy-path event. Defaults preserve
+      # the original behavior (every recipient: processed → delivered → open
+      # → click). Override to simulate realistic mixes during demos / load
+      # testing — e.g. SENDGRID_MOCK_BOUNCE_RATE=0.05 → 5% hard-bounce.
+      MOCK_DROPPED_RATE: ${SENDGRID_MOCK_DROPPED_RATE:-0}
+      MOCK_BOUNCE_RATE: ${SENDGRID_MOCK_BOUNCE_RATE:-0}
+      MOCK_DEFERRED_RATE: ${SENDGRID_MOCK_DEFERRED_RATE:-0}
+      MOCK_OPEN_RATE: ${SENDGRID_MOCK_OPEN_RATE:-1}
+      MOCK_CLICK_RATE: ${SENDGRID_MOCK_CLICK_RATE:-1}
+      MOCK_SPAM_RATE: ${SENDGRID_MOCK_SPAM_RATE:-0}
+      MOCK_UNSUBSCRIBE_RATE: ${SENDGRID_MOCK_UNSUBSCRIBE_RATE:-0}
+
+  event-receiver:
+    build:
+      context: .
+      dockerfile: apps/event-receiver/Dockerfile
+    container_name: event-receiver
+    <<: *restart-policy
+    ports:
+      - '3011:3011'
+    environment:
+      <<: *backend-env
+      PORT: '3011'
+    depends_on: *infra-deps
+
+  event-receiver-probe:
+    build:
+      context: .
+      dockerfile: apps/event-receiver-probe/Dockerfile
+    container_name: event-receiver-probe
+    <<: *restart-policy
+    ports:
+      - '3012:3012'
+    environment:
+      <<: *backend-env
+      PORT: '3012'
+      BRIDGE_ENDPOINT: http://event-receiver-probe:3012
+    depends_on: *infra-deps
+
+  event-process:
+    build:
+      context: .
+      dockerfile: apps/event-process/Dockerfile
+    container_name: event-process
+    <<: *restart-policy
+    env_file:
+      - path: apps/event-process/.env
+        required: false
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+      GEOIP_SERVICE_URL: geolocation:50051
+      GEO_GRPC_URL: geolocation:50051
+      GEO_ENRICHMENT_ENABLED: 'true'
+      GEO_PROVIDER: local
+    depends_on:
+      <<: *infra-deps
+      geolocation:
+        condition: service_started
+
+  campaign-packer:
+    build:
+      context: .
+      dockerfile: apps/campaign-packer/Dockerfile
+    container_name: campaign-packer
+    <<: *restart-policy
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  enterprise-import:
+    build:
+      context: .
+      dockerfile: apps/enterprise-import/Dockerfile
+    container_name: enterprise-import
+    <<: *restart-policy
+    env_file:
+      - path: apps/enterprise-import/.env
+        required: false
+    environment:
+      <<: *backend-env
+      PORT: '3001'
+    depends_on: *infra-deps
+
+  campaign-events-tracker:
+    build:
+      context: .
+      dockerfile: apps/campaign-events-tracker/Dockerfile
+    container_name: campaign-events-tracker
+    <<: *restart-policy
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+      BRIDGE_ENDPOINT: http://localhost:3000
+    depends_on: *infra-deps
+
+  send-email:
+    build:
+      context: .
+      dockerfile: apps/send-email/Dockerfile
+    container_name: send-email
+    <<: *restart-policy
+    env_file:
+      - path: apps/send-email/.env
+        required: false
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+      # Pin to the same PORT compose enforces — apps/send-email/.env declares
+      # 3005, which mismatches once compose overrides PORT to 3000 and breaks
+      # the AMQP→HTTP bridge fetch.
+      BRIDGE_ENDPOINT: http://localhost:3000
+      SENDGRID_API_BASE_URL: ${SENDGRID_API_BASE_URL:-http://sendgrid-mock:3010}
+      # Shared config dir written by msgops-api (s3.env, sendgrid.env).
+      BMS_CONFIG_DIR: /data/config
+    volumes:
+      - bms-config:/data/config:ro
+    depends_on:
+      <<: *infra-deps
+      msgops-api:
+        condition: service_healthy
+
+  send-push:
+    build:
+      context: .
+      dockerfile: apps/send-push/Dockerfile
+    container_name: send-push
+    <<: *restart-policy
+    env_file:
+      - path: apps/send-push/.env
+        required: false
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+      # Shared config dir written by msgops-api (fcm.env).
+      BMS_CONFIG_DIR: /data/config
+    volumes:
+      - bms-config:/data/config:ro
+    depends_on:
+      <<: *infra-deps
+      msgops-api:
+        condition: service_healthy
+
+  send-whatsapp:
+    build:
+      context: .
+      dockerfile: apps/send-whatsapp/Dockerfile
+    container_name: send-whatsapp
+    <<: *restart-policy
+    env_file:
+      - path: apps/send-whatsapp/.env
+        required: false
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  twilio-messaging:
+    build:
+      context: .
+      dockerfile: apps/twilio-messaging/Dockerfile
+    container_name: twilio-messaging
+    <<: *restart-policy
+    env_file:
+      - path: apps/twilio-messaging/.env
+        required: false
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  tag-process:
+    build:
+      context: .
+      dockerfile: apps/tag-process/Dockerfile
+    container_name: tag-process
+    <<: *restart-policy
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  message-trigger:
+    build:
+      context: .
+      dockerfile: apps/message-trigger/Dockerfile
+    container_name: message-trigger
+    <<: *restart-policy
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  tracker:
+    build:
+      context: .
+      dockerfile: apps/tracker/Dockerfile
+    container_name: tracker
+    <<: *restart-policy
+    env_file:
+      - path: apps/tracker/.env
+        required: false
+    environment:
+      <<: *backend-env
+      PORT: '3000'
+    depends_on: *infra-deps
+
+  geolocation:
+    build:
+      context: .
+      dockerfile: apps/geolocation/Dockerfile
+    container_name: geolocation
+    ports:
+      - '50051:50051'
+    <<: *restart-policy
+    # GEO_TIER, DBIP_API_KEY, MAXMIND_* live in apps/geolocation/.env so a
+    # single file drives both this service AND the geolocation-refresh sidecar
+    # below. The `environment:` block deliberately omits GEO_TIER — compose
+    # `environment:` overrides `env_file:` by precedence, so re-declaring it
+    # there would silently shadow the .env. GEO_MMDB_DIR stays here because
+    # it's infrastructure (must match the volume mount target).
+    env_file:
+      - path: apps/geolocation/.env
+        required: false
+    environment:
+      <<: *backend-env
+      PORT: '50051'
+      GEO_MMDB_DIR: /data/geo
+      BMS_CONFIG_DIR: /data/config
+    volumes:
+      - ./data/geo:/data/geo
+      - bms-config:/data/config:ro
+    depends_on: *infra-deps
+
+  # Monthly MMDB refresh. DB-IP releases new builds on the 1st of each month;
+  # this sidecar re-downloads immediately on container start, then schedules
+  # future runs via crond on "0 6 1 * *" (06:00 UTC on the 1st of each month).
+  # Using crond instead of `sleep 2592000` keeps the download aligned with the
+  # DB-IP release calendar regardless of when the container last started.
+  # The geolocation service watches ./data/geo and reloads its in-memory
+  # MMDBReader on mtime change — no restart or IPC needed.
+  geolocation-refresh:
+    image: node:20-alpine
+    container_name: geolocation-refresh
+    <<: *restart-policy
+    working_dir: /workspace
+    volumes:
+      - ./data/geo:/data/geo
+      - bms-config:/data/config:ro
+      - ./scripts:/workspace/scripts:ro
+      - ./package.json:/workspace/package.json:ro
+      - ./pnpm-lock.yaml:/workspace/pnpm-lock.yaml:ro
+    # Shares apps/geolocation/.env with the geolocation service above —
+    # GEO_TIER + DBIP_API_KEY + MAXMIND_* land here from a single source of
+    # truth. Compose `environment:` overrides `env_file:` by precedence, so
+    # NOTHING below may re-declare those user-toggleable vars (else .env
+    # silently stops working). Only infrastructure stays here.
+    env_file:
+      - path: apps/geolocation/.env
+        required: false
+    environment:
+      GEO_MMDB_DIR: /data/geo
+      BMS_CONFIG_DIR: /data/config
+      GEO_VALIDATE_RUNNER: tsx
+      SKIP_VALIDATION: ${GEO_REFRESH_SKIP_VALIDATION:-0}
+      NODE_PATH: /usr/local/lib/node_modules
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        apk add --no-cache bash curl >/dev/null
+        npm install -g --silent tsx mmdb-reader
+        # Download immediately on container start so the MMDB is always fresh
+        # after a recreate (e.g. tier change) without waiting for the next cron tick.
+        bash /workspace/scripts/download-geodb.sh \
+          || echo "[geolocation-refresh] initial refresh failed at $(date -Iseconds)"
+        # Run daily at 06:00 UTC. The download script compares the staged
+        # file MD5 against the current MMDB and exits early when they match,
+        # so non-release days cost only one download + compare. This also
+        # gives automatic retry if the release-day download fails (provider
+        # outage, bad file) without waiting a full extra month.
+        echo "0 6 * * * bash /workspace/scripts/download-geodb.sh >> /proc/1/fd/1 2>&1" | crontab -
+        exec crond -f -l 6
+
+  frontend-react:
+    build:
+      context: .
+      dockerfile: apps/frontend-react/Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: frontend-react
+    <<: *restart-policy
+    ports:
+      - '8080:80'
+    depends_on:
+      msgops-api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1/']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+volumes:
+  clickhouse-data:
+  rabbitmq-data:
+  postgres-data:
+  redis-data:
+  minio-data:
+  # geo-data: bind mount ./data/geo — run scripts/download-geodb.sh before first docker-compose up
+  # bms-config: named volume — initialised by bms-config-init (chown 1001:1001) before msgops-api starts.
+  # Contains geoip.env written by the wizard; read by geolocation + geolocation-refresh.
+  # Not a bind mount because msgops-api runs as UID 1001 (non-root) and bind mounts
+  # inherit host ownership, which would require manual chown on every new checkout.
+  bms-config:

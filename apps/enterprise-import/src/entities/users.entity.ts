@@ -1,0 +1,38 @@
+import { Column, CreateDateColumn, DeleteDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+
+@Entity('users')
+@Index('idx_users_provider_id', ['providerId'])
+export class UserEntity {
+  @PrimaryGeneratedColumn({ type: 'int', name: 'id' })
+  id: number;
+
+  @Column('varchar', { name: 'name', length: 255 })
+  name: string;
+
+  @Column('varchar', { name: 'email', length: 255 })
+  email: string;
+
+  @Column('varchar', { name: 'profile', length: 500 })
+  profile: string;
+
+  @Column('varchar', { name: 'provider_id', length: 500 })
+  providerId: string;
+
+  @Column('json', { name: 'settings' })
+  settings: Record<string, string>;
+
+  @Column('int', { name: 'global_role_id', nullable: true })
+  globalRoleId?: number;
+
+  @Column('varchar', { name: 'status', length: 20, default: 'active' })
+  status: string;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
+  deletedAt: Date;
+}

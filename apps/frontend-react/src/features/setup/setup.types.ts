@@ -1,0 +1,100 @@
+export interface SetupStatus {
+  configured: boolean;
+  currentStep: number;
+  baseUrl?: string;
+  // Backend feature flag — frontend hides the Enterprise step when false.
+  enterpriseImportEnabled?: boolean;
+  // Whether Enterprise import was already done/skipped (system_config). Source
+  // of truth for resume, since this step is UI-only with no backend step.
+  enterpriseImportDone?: boolean;
+  // Account created in step 1 (admin). When present, Step 2 offers importing
+  // into it (checkbox) instead of creating a new throwaway account.
+  step1Account?: { id: number; name: string };
+}
+
+export interface ServiceHealthResult {
+  ok: boolean;
+  latencyMs: number;
+  error?: string;
+}
+
+export interface HealthCheckResult {
+  postgres: ServiceHealthResult;
+  redis: ServiceHealthResult;
+  clickhouse: ServiceHealthResult;
+  rabbitmq: ServiceHealthResult;
+  s3: ServiceHealthResult;
+  smtp: ServiceHealthResult;
+  allOk: boolean;
+}
+
+export interface Step1Data {
+  name: string;
+  email: string;
+  password: string;
+  accountName: string;
+}
+
+export type Step2Data =
+  | { skip: true }
+  | {
+      skip?: false;
+      host: string;
+      port: number;
+      user: string;
+      pass: string;
+      from: string;
+    };
+
+export interface Step3Data {
+  baseUrl: string;
+}
+
+// SendGrid moved out of the setup wizard. The frontend auto-skips this step
+// after step 3 (Domínio); the backend keeps the slot for compatibility.
+export type Step4Data = { skip: true };
+
+// Account is now created in step1 alongside the admin. The frontend auto-skips
+// this step; backend keeps the slot for compatibility.
+export type Step5Data = { skip: true };
+
+export type Step6Data = { skip: true } | { skip?: false; skipReason?: string };
+
+export type AdvanceStepInput =
+  | { step: 1; data: Step1Data }
+  | { step: 2; data: Step2Data }
+  | { step: 3; data: Step3Data }
+  | { step: 4; data: Step4Data }
+  | { step: 5; data: Step5Data }
+  | { step: 6; data: Step6Data };
+
+// S3 wizard step — persists via POST /setup/s3, decoupled from advance().
+export interface S3SetupData {
+  endpoint?: string;
+  region?: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  useObjectAcls?: boolean;
+  assetsUrl?: string;
+}
+
+// GeoIP wizard step lives outside the 1..6 backend numbering. It persists a
+// single system_config blob via POST /setup/geoip, decoupled from advance().
+export type GeoIpSetupMode = 'disabled' | 'lite' | 'advanced';
+export type GeoIpSetupProvider = 'dbip-full' | 'maxmind' | 'ip-api' | 'ipinfo';
+
+export type GeoIpSetupData =
+  | { mode: 'disabled' }
+  | { mode: 'lite' }
+  | {
+      mode: 'advanced';
+      provider: 'dbip-full' | 'ip-api' | 'ipinfo';
+      apiKey: string;
+    }
+  | {
+      mode: 'advanced';
+      provider: 'maxmind';
+      accountId: string;
+      licenseKey: string;
+    };

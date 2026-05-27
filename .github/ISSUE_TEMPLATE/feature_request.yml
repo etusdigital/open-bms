@@ -1,0 +1,47 @@
+name: ✨ Feature request
+description: Suggest a new feature or improvement
+title: '[Feature] '
+labels: ['enhancement', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion! Before opening, check if there's already an
+        issue covering the same idea.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this solve? Who is affected?
+      placeholder: "When importing > 50k contacts via CSV, the page becomes unresponsive — there's no progress feedback."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you like it to work?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches did you think about and reject?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, related issues, links to other tools that do this well.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Pre-submission checklist
+      options:
+        - label: I searched existing issues and didn't find a duplicate
+          required: true

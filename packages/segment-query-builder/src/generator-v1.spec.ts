@@ -1,0 +1,354 @@
+import { generateSegmentQueryV1 } from './generator-v1';
+import { SegmentDtoLike, TagLike } from './types';
+
+const tag: TagLike = { id: 100, accountId: 1 };
+const timeZone = 'America/Sao_Paulo';
+
+describe('generateSegmentQueryV1', () => {
+  it('builds the INSERT scaffold with no steps', () => {
+    const dto: SegmentDtoLike = { steps: [] };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.query).toBe('INSERT INTO segment_process ( );');
+    expect(out.externalQuerySteps).toBeNull();
+  });
+
+  it('renders an email_provider step with the persisted operator', () => {
+    const dto: SegmentDtoLike = {
+      steps: [[{ type: 'user_field', user_field_key: 'email_provider', user_field_value: 'Gmail', conditional_user_field: '!=' }]],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.query).toContain("email_provider != 'Gmail'");
+  });
+
+  it('defaults email_provider to `=` when conditional_user_field is missing', () => {
+    // Steps saved by the React builder with the operator dropdown left
+    // untouched omit `conditional_user_field` — must not leak `undefined`.
+    const dto: SegmentDtoLike = {
+      steps: [[{ type: 'user_field', user_field_key: 'email_provider', user_field_value: 'Gmail' }]],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.query).toContain("email_provider = 'Gmail'");
+    expect(out.query).not.toContain('undefined');
+  });
+
+  it('renders a custom_field step inline with no external query', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'custom_field',
+            custom_field_id: 7,
+            custom_field_value: 'Gold',
+            conditional_custom_field: '=',
+            custom_field_type: 'text',
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.externalQuerySteps).toBeNull();
+    expect(out.query).toContain('SELECT 100, ct.id FROM contacts ct');
+    expect(out.query).toContain('ct.account_id = 1 AND ct.is_active');
+    expect(out.query).toContain('custom_field_id = 7');
+    expect(out.query).toContain("'gold'");
+    expect(out.query).toMatch(/;\s*$/);
+  });
+
+  it('emits a ClickHouse external step for page_view interactions', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'interation',
+            event_type: 'page_view',
+            page_view_filter: 'iLike',
+            page_view_value: 'pricing',
+            conditional_interation: 'yes',
+            time: '7',
+            custom_times_value: 1,
+            conditional_times_value: '>=',
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.externalQuerySteps).toHaveLength(1);
+    expect(out.externalQuerySteps![0].tableName).toBe('table_segment_page_view0_100');
+    expect(out.externalQuerySteps![0].query).toContain("event = 'page_view'");
+    expect(out.externalQuerySteps![0].query).toContain('account_id = 1');
+    expect(out.externalQuerySteps![0].query).toContain("'%pricing%'");
+    expect(out.query).toContain('ct.id IN (select contact_id from table_segment_page_view0_100)');
+  });
+
+  it('aggregates HAVING COUNT for custom_times_value > 1', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'interation',
+            event_type: 'email',
+            event: 'last_open_date',
+            conditional_interation: 'yes',
+            time: '30',
+            message: { id: 42 },
+            custom_times_value: 3,
+            conditional_times_value: '>=',
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.externalQuerySteps).toHaveLength(1);
+    expect(out.externalQuerySteps![0].query).toContain('GROUP BY contact_id');
+    expect(out.externalQuerySteps![0].query).toContain('HAVING COUNT(contact_id) >= 3');
+    expect(out.query).toContain('DROP TABLE table_segment0_100;');
+  });
+
+  it('defaults the HAVING operator to >= when conditional_times_value is missing (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'interation',
+            event_type: 'email',
+            event: 'last_open_date',
+            conditional_interation: 'yes',
+            time: '7',
+            message: 'any',
+            custom_times_value: 3,
+            // conditional_times_value intentionally omitted (segment created before the UI captured it)
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.externalQuerySteps![0].query).toContain('HAVING COUNT(contact_id) >= 3');
+    expect(out.externalQuerySteps![0].query).not.toContain('undefined');
+  });
+
+  it('defaults the HAVING operator for custom_event steps when conditional_times_value is missing (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'custom_event',
+            event: { name: 'purchase' },
+            conditional_event_type: 'in',
+            conditional_event_filter: '>',
+            time: '30',
+            custom_times_value: 2,
+            // conditional_times_value omitted
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+    const customEvent = out.externalQuerySteps!.find((s) => s.tableName.includes('custom_event'))!;
+
+    expect(customEvent.query).toContain('HAVING COUNT(contact_id) >= 2');
+    expect(customEvent.query).not.toContain('undefined');
+  });
+
+  it('defaults the HAVING operator for automation_state steps when conditional_times_value is missing (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          { type: 'automation_state', event: 'entered', time: 30, custom_times_value: 0 },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.query).toContain('HAVING COUNT(contact_id) >= 0');
+    expect(out.query).not.toContain('undefined');
+  });
+
+  it('defaults the HAVING count to 1 when custom_times_value is also missing (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          // automation_state emits HAVING unconditionally — no count field present
+          { type: 'automation_state', event: 'entered', time: 30 },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.query).toContain('HAVING COUNT(contact_id) >= 1');
+    expect(out.query).not.toContain('NaN');
+  });
+
+  it('preserves a valid non-default operator (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'interation',
+            event_type: 'email',
+            event: 'last_open_date',
+            conditional_interation: 'yes',
+            time: '30',
+            message: { id: 42 },
+            custom_times_value: 3,
+            conditional_times_value: '<',
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.externalQuerySteps![0].query).toContain('HAVING COUNT(contact_id) < 3');
+  });
+
+  it('coerces an unknown/unsafe operator to >= (EVO-1423)', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'interation',
+            event_type: 'email',
+            event: 'last_open_date',
+            conditional_interation: 'yes',
+            time: '30',
+            message: { id: 42 },
+            custom_times_value: 3,
+            conditional_times_value: 'OR 1=1 --',
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.externalQuerySteps![0].query).toContain('HAVING COUNT(contact_id) >= 3');
+    expect(out.externalQuerySteps![0].query).not.toContain('OR 1=1');
+  });
+
+  it('appends INTERSECT/EXCEPT clauses for tag steps', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          { type: 'tag', tag_id: 99, conditional_tag: 'in' },
+          { type: 'tag', tag_id: 88, conditional_tag: 'notIn' },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.query).toContain('INTERSECT');
+    expect(out.query).toContain('tag_id IN (99)');
+    expect(out.query).toContain('EXCEPT');
+    expect(out.query).toContain('tag_id IN (88)');
+  });
+
+  it('falls back to UTC when timeZone is undefined', () => {
+    const dto: SegmentDtoLike = {
+      steps: [
+        [
+          { type: 'conditionalCard', value: '' },
+          {
+            type: 'user_field',
+            user_field_key: 'created_at_date',
+            conditional_user_field: '-',
+            user_field_value: '30',
+          },
+        ],
+      ],
+    };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone: undefined });
+
+    expect(out.query).toContain("AT TIME ZONE 'UTC'");
+  });
+
+  it('appends LIMIT clause when contactsLimit is set', () => {
+    const dto: SegmentDtoLike = { steps: [], contactsLimit: 5000 };
+    const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+    expect(out.query).toContain('LIMIT 5000');
+  });
+
+  // EVO-1463 — user_field steps may reach this layer missing
+  // `conditional_user_field` and/or `user_field_value` (frontend bug where
+  // visual defaults of dropdowns weren't persisted). The generator must
+  // never crash with `Cannot read properties of undefined (reading
+  // 'toLowerCase')` — it should emit a valid no-op or apply a sane default.
+  describe('user_field defensive defaults (EVO-1463)', () => {
+    it('defaults is_email_deliverable to "true" when operator missing', () => {
+      const dto: SegmentDtoLike = {
+        steps: [[{ type: 'user_field', user_field_key: 'is_email_deliverable' }]],
+      };
+      const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+      expect(out.query).toContain('ct.is_valid');
+      expect(out.query).toContain('ct.is_unsubscribed = false');
+      expect(out.query).toContain('ct.has_bounced = false');
+    });
+
+    it('treats communication_channels without operator as TRUE (has channel)', () => {
+      const dto: SegmentDtoLike = {
+        steps: [[{ type: 'user_field', user_field_key: 'communication_channels', user_field_value: 'has_email' }]],
+      };
+      const out = generateSegmentQueryV1(tag, dto, { timeZone });
+
+      expect(out.query).toContain('ct.has_email = true');
+    });
+
+    it('emits no-op TRUE when communication_channels has no user_field_value', () => {
+      const dto: SegmentDtoLike = {
+        steps: [[{ type: 'user_field', user_field_key: 'communication_channels' }]],
+      };
+      // Crucially: must not throw — see crash logs from staging (2026-05-26).
+      expect(() => generateSegmentQueryV1(tag, dto, { timeZone })).not.toThrow();
+      const out = generateSegmentQueryV1(tag, dto, { timeZone });
+      expect(out.query).not.toContain('undefined');
+    });
+
+    it('does not throw when user_field_value is missing on the generic fallback', () => {
+      // last_vertical_type uses the generic `.toLowerCase()` branch — the
+      // original crash site. With the guard, this should emit a no-op.
+      const dto: SegmentDtoLike = {
+        steps: [[{ type: 'user_field', user_field_key: 'last_vertical_type', conditional_user_field: '=' }]],
+      };
+      expect(() => generateSegmentQueryV1(tag, dto, { timeZone })).not.toThrow();
+      const out = generateSegmentQueryV1(tag, dto, { timeZone });
+      expect(out.query).not.toContain('undefined');
+    });
+
+    it('does not throw when user_field_value is non-string', () => {
+      const dto: SegmentDtoLike = {
+        steps: [
+          [
+            {
+              type: 'user_field',
+              user_field_key: 'last_vertical_type',
+              conditional_user_field: '=',
+              user_field_value: 123 as unknown as string,
+            },
+          ],
+        ],
+      };
+      expect(() => generateSegmentQueryV1(tag, dto, { timeZone })).not.toThrow();
+    });
+
+    it('does not throw when user_field_key is missing', () => {
+      const dto: SegmentDtoLike = { steps: [[{ type: 'user_field' }]] };
+      expect(() => generateSegmentQueryV1(tag, dto, { timeZone })).not.toThrow();
+    });
+  });
+});
