@@ -34,12 +34,18 @@ export class RedisModule {
         {
           provide: 'REDIS_CLIENT_INSTANCE',
           useFactory: () => {
+            // Docker Swarm DNS race: overlay pode demorar para registrar o
+            // hostname `redis`. Sem retryStrategy + maxRetriesPerRequest=null
+            // o ioredis fica em loop de ENOTFOUND e nunca recupera (incidente
+            // visto em staging com send-whatsapp / campanhas paradas).
             return new Redis({
               host: options.host || 'localhost',
               port: options.port || 6379,
               password: options.password || undefined,
-              maxRetriesPerRequest: 3,
               lazyConnect: true,
+              enableReadyCheck: false,
+              maxRetriesPerRequest: null,
+              retryStrategy: (times: number) => Math.min(times * 200, 5000),
             });
           },
         },
