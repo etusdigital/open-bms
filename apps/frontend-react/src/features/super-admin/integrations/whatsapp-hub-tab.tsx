@@ -106,12 +106,6 @@ export function WhatsappHubTab() {
       </div>
 
       <div className="space-y-2">
-        <Label>{t('integrations.whatsappHub.endpointLabel')}</Label>
-        <div className="bg-muted text-muted-foreground rounded-md px-3 py-2 font-mono text-xs">https://api.evohub.ai</div>
-        <p className="text-muted-foreground text-xs">{t('integrations.whatsappHub.endpointHelp')}</p>
-      </div>
-
-      <div className="space-y-2">
         <Label htmlFor="wa-hub-api-key">{t('integrations.whatsappHub.apiKey')}</Label>
         {hasApiKey && (
           <div className="bg-muted rounded-md px-3 py-2 text-xs">

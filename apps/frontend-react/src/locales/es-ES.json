@@ -1945,8 +1945,6 @@
       "scopeNote": "Active cuando esta instalación use EvoHub como proxy hacia Meta. El Hub provee el Meta App compartido y el Embedded Signup gestionado. Tras guardar con 'Activo' encendido, reinicie msgops-api para que el modo surta efecto.",
       "enabled": "Activar EvoHub",
       "enabledHelp": "Cuando está activo, BMS usa EvoHub en lugar de Meta directo. Requiere reiniciar msgops-api.",
-      "endpointLabel": "Endpoint del EvoHub",
-      "endpointHelp": "Endpoint fijo del EvoHub — sigue el mismo patrón del Evo CRM. No es configurable.",
       "apiKey": "API Key del Hub",
       "apiKeyStored": "API Key actual",
       "apiKeyReplace": "Reemplazar API key (dejar vacío para mantener)",
@@ -1980,7 +1978,6 @@
     },
     "s3": {
       "endpoint": "Endpoint",
-      "endpointHelp": "Deja en blanco para AWS S3. Para MinIO/compat usa la URL completa.",
       "region": "Región",
       "bucket": "Bucket",
       "accessKeyId": "Access Key ID",
