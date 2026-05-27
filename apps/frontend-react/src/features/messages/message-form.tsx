@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import type { EditorRef } from 'react-email-editor';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react';
+import { AlertTriangle, Info, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ import { UnsavedChangesDialog } from '@/components/unsaved-changes-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { messageSchemas, MESSAGE_TITLE_MAX, MESSAGE_DESCRIPTION_MAX, type MessageFormValues } from './message-schema';
 import type { MessageType, MessageStatus } from './types';
-import { validateMessageName } from './use-messages';
+import { validateMessageName, useSyncTemplateStatus } from './use-messages';
 import { MessageTypeSelector } from './components/message-type-selector';
 import { MessageStatusBadge } from './components/message-status-badge';
 import { EmailContentForm } from './components/email-content-form';
@@ -55,6 +55,8 @@ export default function MessageForm({
   const isWhatsApp = messageType === 'whatsapp';
   const isReadOnly = isEditing && (!!campaignInUse || (isWhatsApp && !!messageStatus && messageStatus !== 'draft'));
   const schema = messageSchemas[messageType];
+  const syncTemplateStatus = useSyncTemplateStatus();
+  const canSyncTemplateStatus = isWhatsApp && isEditing && messageId != null && (messageStatus === 'send_approval' || messageStatus === 'sent_approval' || messageStatus === 'approved' || messageStatus === 'rejected');
   const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>(defaultLabelIds ?? []);
   const [noLinkConfirmOpen, setNoLinkConfirmOpen] = useState(false);
   const pendingSubmitRef = useRef<MessageFormValues | null>(null);
@@ -207,7 +209,20 @@ export default function MessageForm({
               )}
               {messageStatus === 'approved' && <CheckCircle className="h-4 w-4 shrink-0" />}
               {messageStatus === 'rejected' && <XCircle className="h-4 w-4 shrink-0" />}
-              {t(`messages.whatsappAlert_${messageStatus}`)}
+              <span className="flex-1">{t(`messages.whatsappAlert_${messageStatus}`)}</span>
+              {canSyncTemplateStatus && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => messageId != null && syncTemplateStatus.mutate(messageId)}
+                  disabled={syncTemplateStatus.isPending}
+                  className="shrink-0"
+                >
+                  <RefreshCw className={cn('mr-1.5 h-3.5 w-3.5', syncTemplateStatus.isPending && 'animate-spin')} />
+                  {syncTemplateStatus.isPending ? t('common.loading') : t('messages.syncStatusButton')}
+                </Button>
+              )}
             </div>
           )}
 

@@ -1076,6 +1076,7 @@ describe('ServicesService', () => {
       notificationSound: '',
       status: MessageStatus.DRAFT,
       whatsappType: '',
+      templateCategory: null,
       callToActionText: '',
       providerMessageId: '',
       createdAt: new Date(),

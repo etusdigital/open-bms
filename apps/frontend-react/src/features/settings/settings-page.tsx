@@ -9,6 +9,7 @@ import { selectIsSuperAdmin, useAppStore } from '@/stores/app-store';
 import { useAccountConfig, useAccountId, useTimezone, useUpdateAccountConfigs } from './use-settings';
 import { SETTINGS_TABS, type SettingsTab } from './types';
 import { EmailProvidersTab } from './email-providers';
+import { WhatsAppTab } from './whatsapp-providers';
 import { PoolTab } from './pool-tab';
 import { ApiKeysTab } from './api-keys-tab';
 import { usePermissions } from '@/hooks/use-permissions';
@@ -54,6 +55,7 @@ export default function SettingsPage() {
           {tab === 'general' && <GeneralTab />}
           {tab === 'email' && <EmailTab />}
           {tab === 'email_providers' && <EmailProvidersTab />}
+          {tab === 'whatsapp' && <WhatsAppTab />}
           {tab === 'api_keys' && <ApiKeysTab />}
           {tab === 'pool' && isSuperAdmin && <PoolTab />}
         </div>

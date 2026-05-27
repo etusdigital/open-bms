@@ -48,6 +48,7 @@ export interface Message {
   url?: string;
   image?: string;
   whatsappType?: string;
+  templateCategory?: string;
   callToActionText?: string;
   callToActionUrl?: string;
   headerType?: WhatsAppHeaderType;

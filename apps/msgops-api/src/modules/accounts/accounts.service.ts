@@ -16,7 +16,6 @@ import { SchedulerService } from 'src/providers/queue/scheduler.service';
 import { QUEUE_BMS_USAGE } from 'src/providers/queue/queue.constants';
 import dayjs from 'dayjs';
 import { ClsService } from 'nestjs-cls';
-import { EvolutionHandler } from 'src/handlers/evolution/evolution.handler';
 import { AccountCacheService } from './account-cache.service';
 import { AccountApiKeyEntity } from '../../entities/account-api-key.entity';
 import { RoleEntity } from '../../entities/role.entity';
@@ -44,7 +43,6 @@ export class AccountsService {
     private readonly scheduler: SchedulerService,
     private readonly cls: ClsService,
     private readonly httpService: HttpService,
-    private readonly evolutionHandler: EvolutionHandler,
     private readonly accountCacheService: AccountCacheService,
   ) {}
 
@@ -628,15 +626,10 @@ export class AccountsService {
         });
       }
 
-      const hasWhatsapp = accountProviders.find((provider) => provider.name === 'whatsapp_settings' && provider?.value?.isActive);
-
-      if (hasWhatsapp) {
-        const instance: any = await this.evolutionHandler.createInstance(accountProviders);
-
-        if (!instance) {
-          throw new HttpException('Error creating whatsapp instance', HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-      }
+      // WhatsApp channel provisioning was previously done here via Evolution API
+      // (legacy whatsapp_number_id / whatsapp_access_token in accounts_configs).
+      // It now happens through POST /accounts/:id/whatsapp-channels (Wave 4) backed
+      // by the new whatsapp_channels table.
 
       return await this.accountConfigRepository
         .createQueryBuilder('accounts_configs')

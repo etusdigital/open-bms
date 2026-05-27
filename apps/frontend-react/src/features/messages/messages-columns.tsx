@@ -105,6 +105,18 @@ export function useMessagesColumns({
           },
         },
         {
+          accessorKey: 'templateCategory',
+          header: t('messages.templateCategory'),
+          enableSorting: true,
+          cell: ({ row }) => {
+            const cat = row.original.templateCategory;
+            if (!cat) return t('messages.templateCategoryMarketing');
+            if (cat === 'MARKETING') return t('messages.templateCategoryMarketing');
+            if (cat === 'UTILITY') return t('messages.templateCategoryUtility');
+            return cat;
+          },
+        },
+        {
           accessorKey: 'whatsappType',
           header: t('messages.contentType'),
           enableSorting: true,

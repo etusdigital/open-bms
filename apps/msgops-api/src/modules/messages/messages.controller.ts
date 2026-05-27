@@ -169,6 +169,24 @@ export class MessagesController {
     return this.messagesService.monitorWhatsappMessage(messageId, Number(accountId));
   }
 
+  @RequirePermission('messages:edit')
+  @Post(':id/sync-template-status')
+  @ApiOperation({
+    summary: 'Force a Meta poll to refresh the template approval status (no waiting for the webhook)',
+  })
+  async syncTemplateStatus(@Param('id') id: number) {
+    return this.messagesService.syncTemplateStatus(Number(id));
+  }
+
+  @RequirePermission('messages:edit')
+  @Post('whatsapp/sync-from-meta')
+  @ApiOperation({
+    summary: 'Pull every template that exists on Meta (WABA) into BMS — creates missing rows, refreshes status/category on existing ones.',
+  })
+  async syncTemplatesFromMeta() {
+    return this.messagesService.syncTemplatesFromMeta();
+  }
+
   @CronRoute()
   @Post('template/webhook')
   @ApiOperation({ summary: 'Webhook to update message status' })
