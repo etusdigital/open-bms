@@ -701,6 +701,12 @@ export class CampaignsService {
       delete campaign.campaignMessage;
 
       campaign.title = `${campaign.title}-deleted-${campaign.id}`;
+      // Mark as stopped so any downstream job already enqueued in BullMQ
+      // (e.g. campaign-schedule-page in campaign-packer, which we cannot
+      // cancel from here because we never persisted the job id) can detect
+      // the cancellation when it fires and skip the work. Without this,
+      // jobs would still trigger sends for a deleted campaign.
+      campaign.status = CampaignsStatus.Stopped;
       campaign.deletedAt = new Date();
       await this.campaignRepository.save(campaign);
     } catch (e) {
