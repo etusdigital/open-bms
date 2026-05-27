@@ -9,6 +9,7 @@ import { MsgopsModule } from './msgops/msgops.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappChannelEntity } from './entities/whatsapp-channel.entity';
 import { WhatsappChannelResolverService } from './providers/whatsapp-channel-resolver.service';
+import { redisProvider } from './providers/redis/redis.provider';
 
 @Module({
   imports: [
@@ -28,6 +29,6 @@ import { WhatsappChannelResolverService } from './providers/whatsapp-channel-res
     MsgopsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, SendWhatsappConsumerService, Utils, WhatsappChannelResolverService],
+  providers: [AppService, SendWhatsappConsumerService, Utils, WhatsappChannelResolverService, redisProvider],
 })
 export class AppModule {}
