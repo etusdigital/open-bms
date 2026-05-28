@@ -793,12 +793,19 @@ export class AppService {
     delete message.content;
     const utmCampaign = `${name}_e${emailId}_${message.id}`;
 
+    // Forwarded so send-email can respect "Múltiplas vezes" / "Múltiplas
+    // vezes durante o período" triggers. The trigger's gating already ran
+    // in tag-process; send-email shouldn't redo it with its own 2h Redis key.
+    const applyFrequency = (leadStateMessage.automation as { triggers?: { settings?: { applyFrequency?: SendEmailMessage['applyFrequency'] } } })?.triggers?.settings
+      ?.applyFrequency;
+
     return {
       startedAt: startedAt,
       automationId: id,
       automationName: title,
       automationType: type,
       isRateLimit,
+      applyFrequency,
       utmCampaign,
       utmContent: leadStateMessage.automation.title,
       emailId: currentStep.settings.id,

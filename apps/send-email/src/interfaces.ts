@@ -105,6 +105,10 @@ export interface SendEmailMessage {
   automationName: string;
   automationType: 'email' | 'retargeting' | 'transactional';
   isRateLimit: boolean;
+  // 'multiply' / 'multiply-period' triggers bypass the (account, contact,
+  // template) Redis dedup, since tag-process already gated re-entry.
+  // Optional for back-compat with payloads from older builds.
+  applyFrequency?: 'unique' | 'multiply' | 'multiply-period';
   utmContent: string;
   utmCampaign: string;
   link?: string;

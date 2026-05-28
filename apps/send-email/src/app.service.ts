@@ -128,9 +128,17 @@ export class AppService {
       return { status: false, message: messageErrorProcess };
     }
 
-    // Check to see if the key already exists in redis, if so end the proccess
-    // Bypass for transactional emails
-    if (sendEmailMessage.automationType !== 'transactional') {
+    // Check to see if the key already exists in redis, if so end the proccess.
+    // Bypass for:
+    //   - transactional emails (every send is unique by definition)
+    //   - triggers set to "multiply" / "multiply-period" — tag-process already
+    //     enforced the entry policy upstream (unique vs. multiply vs. window),
+    //     so a key surviving here is just the 2h dedup from a previous send
+    //     and would silently swallow an intentional re-trigger.
+    const skipDedup =
+      sendEmailMessage.automationType === 'transactional' || sendEmailMessage.applyFrequency === 'multiply' || sendEmailMessage.applyFrequency === 'multiply-period';
+
+    if (!skipDedup) {
       const redisKey = await redisClient.get(leadRedisKey);
       if (redisKey) {
         const messageErrorProcess = `Duplicated message:  - ${sendEmailMessage.contact.email} - ${emailName}`;

@@ -165,6 +165,11 @@ export interface SendEmailMessage {
   automationName: string;
   automationType: 'email' | 'retargeting' | 'transactional';
   isRateLimit?: boolean;
+  // Forwarded from the trigger so send-email can decide whether the
+  // per-(account, contact, template) Redis dedup applies. 'multiply' /
+  // 'multiply-period' triggers are meant to re-send to the same contact;
+  // the gating already happened upstream in tag-process.
+  applyFrequency?: 'unique' | 'multiply' | 'multiply-period';
   utmContent: string;
   utmCampaign: string;
   emailId?: number;
