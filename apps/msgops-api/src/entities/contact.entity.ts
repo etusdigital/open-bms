@@ -235,12 +235,16 @@ export class ContactEntity {
         this.whatsapp = this.phone;
       }
     }
-    if (this.whatsapp !== undefined && this.whatsapp) {
+    if (this.whatsapp !== undefined) {
       // Apply digits-only on an explicit whatsapp value too, but never
       // auto-prepend the DDI here: callers that split phone ≠ whatsapp
       // are signaling intent, and silently mutating their number would be
       // surprising. Pre-formatted E.164 inputs already come with the DDI.
-      this.whatsapp = String(this.whatsapp).replace(/\D+/g, '');
+      this.whatsapp = this.whatsapp ? String(this.whatsapp).replace(/\D+/g, '') : '';
+      // Mirror the flag so the UI ("Não enviável" badge) and segmentation
+      // (campaigns filter by has_whatsapp) see the channel as available.
+      // Without this, a write that lands the number leaves the flag stale.
+      this.hasWhatsapp = !!this.whatsapp;
     }
   }
 
