@@ -220,17 +220,35 @@ export class ContactEntity {
     }
 
     if (this.phone !== undefined) {
+      // Normalize to digits-only before persisting so every downstream
+      // consumer sees the same shape. WhatsApp Cloud's POST /{phone_id}/messages
+      // rejects masks like "(31) 99574-3631"; CSV imports, the BMS lead pixel,
+      // and the in-app form all funnel through this listener.
+      // Auto-prepend the Brazilian DDI 55 when the number has 10-11 digits
+      // (legacy landline / mobile with or without the leading 9) — already-
+      // E.164 numbers (12+ digits) are left alone so foreign or pre-formatted
+      // inputs survive a round-trip.
+      this.phone = ContactEntity.normalizePhone(this.phone);
       this.hasPhone = !!this.phone;
-      // WhatsApp Cloud has no number-check endpoint (the old Evolution
-      // integration provided one). Treat every phone as WA-capable and copy
-      // the number into `whatsapp` so the send-whatsapp app can read it
-      // (it uses contact.whatsapp as the destination, not contact.phone).
-      // The send path surfaces Meta's per-message verdict.
       this.hasWhatsapp = !!this.phone;
       if (this.phone && !this.whatsapp) {
         this.whatsapp = this.phone;
       }
     }
+    if (this.whatsapp !== undefined && this.whatsapp) {
+      // Apply digits-only on an explicit whatsapp value too, but never
+      // auto-prepend the DDI here: callers that split phone ≠ whatsapp
+      // are signaling intent, and silently mutating their number would be
+      // surprising. Pre-formatted E.164 inputs already come with the DDI.
+      this.whatsapp = String(this.whatsapp).replace(/\D+/g, '');
+    }
+  }
+
+  static normalizePhone(input: string | null | undefined): string {
+    if (!input) return '';
+    const digits = String(input).replace(/\D+/g, '');
+    if (!digits) return '';
+    return digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
   }
 
   @AfterInsert()
