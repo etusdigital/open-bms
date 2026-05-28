@@ -273,6 +273,61 @@ export class WhatsappTemplateSyncService {
   }
 
   /**
+   * Deletes a template on Meta. Graph API:
+   *   DELETE /{waba_id}/message_templates?name={template_name}
+   * Meta tombstones the entry (status PENDING_DELETION → eventually removed).
+   *
+   * Safe to call when:
+   *   - the template was never synced (no `providerMessageId` upstream) — caller
+   *     should short-circuit before invoking this method.
+   *   - Meta returns 404 ("template not found"): treat as already-deleted, swallow.
+   *
+   * Throws on real failures (network, 5xx, auth) so the caller can keep the
+   * local row in place and the operator can retry.
+   */
+  async deleteTemplateFromMeta(accountId: number, templateName: string): Promise<void> {
+    if (!accountId) throw new BadRequestException('Cannot delete template: missing account id');
+    if (!templateName) throw new BadRequestException('Cannot delete template: missing template name');
+
+    const channel = await this.channels.findOne({
+      where: { accountId, status: 'active' },
+      order: { lastEventAt: 'DESC', updatedAt: 'DESC' },
+    });
+    if (!channel) {
+      throw new HttpException(`No active WhatsApp channel for account ${accountId}.`, HttpStatus.PRECONDITION_FAILED);
+    }
+    if (!channel.wabaId) {
+      throw new HttpException(`WhatsApp channel ${channel.id} is missing waba_id — reconnect.`, HttpStatus.PRECONDITION_FAILED);
+    }
+
+    const resolved = await this.resolver.resolveChannel({
+      mode: channel.mode,
+      phoneNumberId: channel.phoneNumberId,
+      accessToken: channel.accessToken,
+      channelToken: channel.channelToken,
+    });
+
+    try {
+      await axios.delete(`${resolved.baseUrl}/${channel.wabaId}/message_templates`, {
+        params: { name: templateName },
+        headers: { Authorization: `Bearer ${resolved.bearerToken}` },
+        timeout: 15_000,
+      });
+    } catch (err) {
+      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+      const body = axios.isAxiosError(err) ? err.response?.data : undefined;
+      // Meta returns 404 when the template was already deleted (or never
+      // existed). That's the desired end-state for us, so swallow it.
+      if (status === 404) {
+        this.logger.log(`wa_template_delete_already_gone account=${accountId} name=${templateName}`);
+        return;
+      }
+      this.logger.error(`wa_template_delete_failed account=${accountId} name=${templateName} status=${status ?? '?'} body=${this.safe(body)}`);
+      throw new HttpException(this.metaErrorMessage(body) ?? 'Meta refused the template delete.', status === 400 ? HttpStatus.BAD_REQUEST : HttpStatus.BAD_GATEWAY);
+    }
+  }
+
+  /**
    * Maps Meta's verdict to the BMS Message.status taxonomy
    * (matches apps/msgops-api/src/modules/messages/messages.interface.ts).
    *  PENDING / IN_APPEAL   → sent_approval (UI badge "Aprovação enviada")
