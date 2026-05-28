@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import MessageForm from './message-form';
 import { useMessage, useCreateMessage, useUpdateMessage, useDuplicateMessage, useLabelsAll } from './use-messages';
 import { ANY_MESSAGE_TYPE_LABELS, baseMessageType, type MessageType, type AnyMessageType } from './types';
-import type { MessageFormValues } from './message-schema';
+import type { MessageFormValues, WhatsAppFormValues } from './message-schema';
 import { s3Gateway } from '@/features/super-admin/integrations/s3-gateway';
 import { useAppStore, selectIsSuperAdmin } from '@/stores/app-store';
 
@@ -81,7 +81,14 @@ export default function MessageFormPage({ messageId, messageType, onSuccess }: M
       })
       .filter(Boolean);
 
-    const payload = { ...data, type: messageType, labels };
+    // WhatsApp form holds the button URL in `callToActionUrl`, but the
+    // backend MessageDto only has `url`. Joi's stripUnknown was silently
+    // dropping the value, so every call-to-action template landed with
+    // an empty url column and send-whatsapp couldn't build the button
+    // parameter Meta requires.
+    const isWhatsApp = messageType === 'whatsapp';
+    const whatsappUrl = isWhatsApp && 'callToActionUrl' in data ? (data as WhatsAppFormValues).callToActionUrl : undefined;
+    const payload = { ...data, type: messageType, labels, ...(whatsappUrl !== undefined ? { url: whatsappUrl } : {}) };
     mutation.mutate(payload as any, {
       onSuccess: (result) => {
         if (onSuccess && result?.id) {
@@ -133,7 +140,10 @@ export default function MessageFormPage({ messageId, messageType, onSuccess }: M
           whatsappType: messageQuery.data.whatsappType ?? '',
           templateCategory: messageQuery.data.templateCategory ?? 'MARKETING',
           callToActionText: messageQuery.data.callToActionText ?? '',
-          callToActionUrl: messageQuery.data.callToActionUrl ?? '',
+          // Backend persists the button URL in the `url` column (MessageDto.url).
+          // Older rows written before the rename may still carry it as
+          // callToActionUrl; fall back so editing pre-fix messages keeps working.
+          callToActionUrl: messageQuery.data.url ?? messageQuery.data.callToActionUrl ?? '',
           image: messageQuery.data.image ?? '',
         }
       : undefined;
