@@ -36,6 +36,7 @@ import { WhatsappModeResolverModule } from './modules/whatsapp-mode-resolver/wha
 import { WhatsappChannelsModule } from './modules/whatsapp-channels/whatsapp-channels.module';
 import { WhatsappWebhooksModule } from './modules/whatsapp-webhooks/whatsapp-webhooks.module';
 import { BmsLeadsModule } from './modules/bms-leads/bms-leads.module';
+import { TelemetryModule } from './modules/telemetry/telemetry.module';
 import { MessagingModule } from './providers/messaging/messaging.module';
 import { QueueModule } from './providers/queue/queue.module';
 import { SystemConfigCacheModule } from './providers/system-config-cache.module';
@@ -85,6 +86,7 @@ import { SystemConfigCacheModule } from './providers/system-config-cache.module'
     WhatsappChannelsModule,
     WhatsappWebhooksModule,
     BmsLeadsModule,
+    TelemetryModule,
   ],
   providers: [AuditSubscriber],
 })

@@ -10,6 +10,7 @@ import { AuthService } from './auth.service';
 import { AUTH_PROVIDER_TOKEN, IAuthProvider } from './providers/auth.provider.interface';
 import { Auth0AuthProvider } from './providers/auth0-auth.provider';
 import { LocalAuthProvider } from './providers/local-auth.provider';
+import { TelemetryModule } from '../telemetry/telemetry.module';
 
 const authProviderChoice = (process.env.AUTH_PROVIDER || 'local').toLowerCase();
 
@@ -20,7 +21,7 @@ if (authProviderChoice !== 'local' && authProviderChoice !== 'auth0') {
 const controllers = authProviderChoice === 'auth0' ? [] : [AuthController];
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UserEntity, UserCredentialsEntity, UserRefreshTokenEntity, SystemConfigEntity]), forwardRef(() => AuthzModule)],
+  imports: [TypeOrmModule.forFeature([UserEntity, UserCredentialsEntity, UserRefreshTokenEntity, SystemConfigEntity]), forwardRef(() => AuthzModule), TelemetryModule],
   controllers,
   providers: [
     LocalAuthProvider,

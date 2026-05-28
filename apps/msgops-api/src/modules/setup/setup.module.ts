@@ -12,6 +12,7 @@ import { ClickhouseProvider } from '../../providers/clickhouse.provider';
 import { SetupService } from './setup.service';
 import { SetupController } from './setup.controller';
 import { EnterpriseImportModule } from '../enterprise-import/enterprise-import.module';
+import { TelemetryModule } from '../telemetry/telemetry.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { EnterpriseImportModule } from '../enterprise-import/enterprise-import.m
     // EnterpriseImportModule does not import SetupModule back — no cycle, so
     // a direct import keeps DI deterministic.
     EnterpriseImportModule,
+    TelemetryModule,
   ],
   providers: [SetupService, ClickhouseProvider],
   controllers: [SetupController],
