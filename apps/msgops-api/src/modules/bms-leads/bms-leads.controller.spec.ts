@@ -59,6 +59,28 @@ describe('BmsLeadsController', () => {
     expect(contactsService.create).toHaveBeenCalledWith(expect.objectContaining({ firstName: '', lastName: '' }));
   });
 
+  it('passes phone through so ContactEntity @BeforeInsert mirrors it into whatsapp (send-whatsapp reads contact.whatsapp)', async () => {
+    const { controller, contactsService } = buildController();
+
+    await controller.register({
+      ...baseDto,
+      contact: { email: 'lead@dominio.com', phone: '+5511999999999' },
+    });
+
+    expect(contactsService.create).toHaveBeenCalledWith(expect.objectContaining({ phone: '+5511999999999' }));
+  });
+
+  it('honors an explicit whatsapp value distinct from phone (callers that already split the columns)', async () => {
+    const { controller, contactsService } = buildController();
+
+    await controller.register({
+      ...baseDto,
+      contact: { email: 'lead@dominio.com', phone: '+5511111111111', whatsapp: '+5511999999999' },
+    });
+
+    expect(contactsService.create).toHaveBeenCalledWith(expect.objectContaining({ phone: '+5511111111111', whatsapp: '+5511999999999' }));
+  });
+
   it('returns the minimal envelope { ok: true } — never leaks the contact row to the external webhook caller', async () => {
     const { controller, contactsService } = buildController();
     contactsService.create.mockResolvedValue({ id: 123, email: 'lead@dominio.com', accountId: 1, hashedEmail: 'leak' });
