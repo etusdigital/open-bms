@@ -493,6 +493,20 @@ export class MessagesService {
       throw new HttpException(`Can't delete message: ${automationMessage.name}. It is being used on automation(s): ${automationName}.`, HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
+    // Delete the template on Meta BEFORE the local soft-delete. Two reasons:
+    //   1) If Meta fails (network / token expired / weird state), we must NOT
+    //      mark the row deleted — operator would lose visibility on the entry
+    //      that's still alive upstream, and "sync from Meta" would resurrect
+    //      it under a new name, breaking the providerMessageId pointer.
+    //   2) Meta uses the `name` to address templates. After we suffix the
+    //      title with `-deleted-{id}`, the regenerated providerMessageId would
+    //      no longer match what's on Meta — making the DELETE impossible to
+    //      retry later.
+    // 404 from Meta (already gone) is swallowed inside deleteTemplateFromMeta.
+    if (['2FA-whatsapp', 'whatsapp'].includes(automationMessage.type) && automationMessage.providerMessageId && env.WHATSAPP_PROVIDER !== 'twilio') {
+      await this.whatsappTemplateSync.deleteTemplateFromMeta(automationMessage.accountId, automationMessage.providerMessageId);
+    }
+
     try {
       // await this.saveAudits(id, 'delete', null, null, currentUser, ipAddress, userAgent, this.cls.get('accountId') || automationMessage.accountId);
       automationMessage.title = `${automationMessage.title}-deleted-${automationMessage.id}`;
