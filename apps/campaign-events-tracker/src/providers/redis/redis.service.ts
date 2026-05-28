@@ -14,7 +14,17 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
-    await this.redis.connect();
+    // BullModule (registered before us in app.module.ts) already opened a
+    // connection on the shared ioredis instance, so calling connect() again
+    // throws "Redis is already connecting/connected". Treat that as success —
+    // the side effect we want (a live socket) is already in place. Any real
+    // failure (DNS, auth) surfaces via the boot ping in main.ts.
+    try {
+      await this.redis.connect();
+    } catch (err: any) {
+      const msg = err?.message ?? '';
+      if (!/already connect/i.test(msg)) throw err;
+    }
   }
 
   async onModuleDestroy() {
