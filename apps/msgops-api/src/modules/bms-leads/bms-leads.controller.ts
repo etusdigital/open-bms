@@ -27,6 +27,12 @@ export class BmsLeadsController {
       email: dto.contact.email,
       firstName: dto.contact.firstName ?? '',
       lastName: dto.contact.lastName ?? '',
+      // phone alone is enough for WhatsApp: ContactEntity @BeforeInsert
+      // mirrors phone → whatsapp when whatsapp is empty, and send-whatsapp
+      // reads contact.whatsapp as the destination. Pass through both so an
+      // explicit whatsapp value (different from phone) is honored.
+      phone: dto.contact.phone,
+      whatsapp: dto.contact.whatsapp,
       tagNames: [dto.tagName],
       // ContactDto requires these as non-optional but they're allowed to be
       // empty strings on insert — the @BeforeInsert listener fills derived

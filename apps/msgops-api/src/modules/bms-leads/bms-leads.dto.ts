@@ -11,6 +11,15 @@ export class BmsLeadContactDto {
 
   @JoiSchema(Joi.string().allow('').max(256).optional())
   lastName?: string;
+
+  // phone is enough on its own — ContactEntity @BeforeInsert mirrors it into
+  // `whatsapp` when whatsapp is empty, so send-whatsapp picks it up. Accept
+  // whatsapp explicitly too for callers that already split the columns.
+  @JoiSchema(Joi.string().allow('').max(64).optional())
+  phone?: string;
+
+  @JoiSchema(Joi.string().allow('').max(64).optional())
+  whatsapp?: string;
 }
 
 @JoiSchemaOptions({ stripUnknown: true })
@@ -20,6 +29,8 @@ export class BmsLeadDto {
       email: Joi.string().email().max(256).required(),
       firstName: Joi.string().allow('').max(256).optional(),
       lastName: Joi.string().allow('').max(256).optional(),
+      phone: Joi.string().allow('').max(64).optional(),
+      whatsapp: Joi.string().allow('').max(64).optional(),
     }).required(),
   )
   contact: BmsLeadContactDto;
