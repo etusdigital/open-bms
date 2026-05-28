@@ -19,6 +19,7 @@ import { RedisService } from '../../providers/redis.provider';
 import { ClickhouseProvider } from '../../providers/clickhouse.provider';
 import { SystemConfigCacheProvider } from '../../providers/system-config-cache.provider';
 import { EnterpriseImportService } from '../enterprise-import/enterprise-import.service';
+import { TelemetryService } from '../telemetry/telemetry.service';
 import { SetupService } from './setup.service';
 
 const SUPER_ADMIN_ROLE = { id: 42, code: ROLE_CODES.SUPER_ADMIN };
@@ -125,6 +126,15 @@ async function buildService(
       { provide: ClickhouseProvider, useValue: { runQuery: jest.fn().mockResolvedValue([]) } },
       { provide: SystemConfigCacheProvider, useValue: { get: jest.fn().mockResolvedValue(null), set: jest.fn(), invalidate: jest.fn() } },
       { provide: EnterpriseImportService, useValue: enterpriseImport },
+      {
+        provide: TelemetryService,
+        useValue: {
+          setOwnerEmail: jest.fn().mockResolvedValue(undefined),
+          emitInstall: jest.fn().mockResolvedValue(true),
+          maybeBackfillInstall: jest.fn().mockResolvedValue(undefined),
+          readState: jest.fn().mockResolvedValue(null),
+        },
+      },
     ],
   }).compile();
 
@@ -324,6 +334,15 @@ describe('SetupService', () => {
             useValue: {
               createInstanceImport: jest.fn().mockResolvedValue({ jobId: 'test-job' }),
               createAccountImport: jest.fn().mockResolvedValue({ accountId: 7, jobId: 'job-acc' }),
+            },
+          },
+          {
+            provide: TelemetryService,
+            useValue: {
+              setOwnerEmail: jest.fn().mockResolvedValue(undefined),
+              emitInstall: jest.fn().mockResolvedValue(true),
+              maybeBackfillInstall: jest.fn().mockResolvedValue(undefined),
+              readState: jest.fn().mockResolvedValue(null),
             },
           },
         ],

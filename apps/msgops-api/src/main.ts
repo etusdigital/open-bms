@@ -10,6 +10,7 @@ import bodyParser from 'body-parser';
 import cors from 'cors';
 import { createCorsOptions } from './cors.config';
 import { JoiPipe } from 'nestjs-joi';
+import { TelemetryService } from './modules/telemetry/telemetry.service';
 // Sentinel committed in docker-compose.yml so `git clone && docker compose up`
 // boots in dev. Refuse to start in production with these values — anyone who
 // pulled the OSS repo would otherwise share the same forge-friendly secret.
@@ -84,6 +85,13 @@ async function bootstrap() {
   app.use(cors(createCorsOptions()));
 
   app.useGlobalPipes(new JoiPipe());
+
+  // Initialize ETUS Open Telemetry SDK. Never blocks boot on failure.
+  try {
+    await app.get(TelemetryService).initOnBootstrap();
+  } catch (e) {
+    Sentry.captureException(e);
+  }
 
   await app.listen(process.env.SERVER_PORT);
 }

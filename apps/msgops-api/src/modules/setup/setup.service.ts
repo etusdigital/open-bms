@@ -31,6 +31,7 @@ import { S3_KEY } from '../admin-integrations/s3/admin-s3.service';
 import { EnterpriseImportService } from '../enterprise-import/enterprise-import.service';
 import { assertSafeEnterpriseBaseUrl } from '../enterprise-import/enterprise-import-url.util';
 import { ImportEnterpriseSetupDto } from './dtos/import-enterprise.dto';
+import { TelemetryService } from '../telemetry/telemetry.service';
 
 const WIZARD_KEY = 'setup_wizard_step';
 const SMTP_KEY = 'smtp_settings';
@@ -70,6 +71,7 @@ export class SetupService implements OnModuleInit {
     private readonly clickhouse: ClickhouseProvider,
     private readonly cache: SystemConfigCacheProvider,
     private readonly enterpriseImport: EnterpriseImportService,
+    private readonly telemetry: TelemetryService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -275,6 +277,10 @@ export class SetupService implements OnModuleInit {
       }
 
       await this.ensureAdminAccount(em, adminUserId, accountName);
+
+      // Persist the admin email locally for telemetry ownership tracking.
+      // This email is NEVER sent in any telemetry payload — only stored here.
+      await this.telemetry.setOwnerEmail(email, em);
 
       await this.upsertWizardTx(systemConfigRepo, { currentStep: 2, adminUserId });
     });
@@ -640,5 +646,12 @@ export class SetupService implements OnModuleInit {
         }),
       );
     });
+
+    // Emit the install lifecycle once. Idempotent; never throws.
+    try {
+      await this.telemetry.emitInstall();
+    } catch (e: any) {
+      this.logger.warn(`telemetry install emit failed: ${e?.message}`);
+    }
   }
 }

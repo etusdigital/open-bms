@@ -1151,6 +1151,9 @@ importers:
       '@clickhouse/client':
         specifier: ^1.15.0
         version: 1.18.2
+      '@etus/telemetry-sdk':
+        specifier: ^0.1.0
+        version: 0.1.0
       '@grpc/grpc-js':
         specifier: ^1.14.3
         version: 1.14.3
@@ -3638,6 +3641,10 @@ packages:
   '@eslint/plugin-kit@0.6.1':
     resolution: {integrity: sha512-iH1B076HoAshH1mLpHMgwdGeTs0CYwL0SPMkGuSebZrwBp16v415e9NZXg2jtrqPVQjf6IANe2Vtlr5KswtcZQ==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
+
+  '@etus/telemetry-sdk@0.1.0':
+    resolution: {integrity: sha512-LcR15Agwsf0HmG2QXQmHOeyR93aRlMR4t9O6WPHzmrrgKbH2aChrwwK0AJ5KJ1TOCdfwIv49D0ra/aSstORmMA==}
+    engines: {node: '>=20'}
 
   '@fast-csv/format@5.0.5':
     resolution: {integrity: sha512-0P9SJXXnqKdmuWlLaTelqbrfdgN37Mvrb369J6eNmqL41IEIZQmV4sNM4GgAK2Dz3aH04J0HKGDMJFkYObThTw==}
@@ -14867,6 +14874,8 @@ snapshots:
     dependencies:
       '@eslint/core': 1.2.1
       levn: 0.4.1
+
+  '@etus/telemetry-sdk@0.1.0': {}
 
   '@fast-csv/format@5.0.5':
     dependencies:

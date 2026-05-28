@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  Logger,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -18,6 +19,7 @@ import { SystemConfigEntity } from '../../entities/system-config.entity';
 import { RedisService } from '../../providers/redis.provider';
 import { AUTH_PROVIDER_TOKEN, AuthMeta, AuthTokens, IAuthProvider } from './providers/auth.provider.interface';
 import { AuthLoginResponse, AuthRefreshResponse, AuthUserResponse } from './dto/auth-response.dto';
+import { TelemetryService } from '../telemetry/telemetry.service';
 
 const PWD_RESET_TTL = 3600;
 const PWD_RESET_RATE_LIMIT_WINDOW = 3600;
@@ -27,6 +29,7 @@ const PWD_RESET_RATE_LIMIT_MAX = 3;
 export class AuthService {
   private cachedTransporter: nodemailer.Transporter | null = null;
   private cachedTransporterFingerprint = '';
+  private readonly logger = new Logger(AuthService.name);
 
   constructor(
     @Inject(AUTH_PROVIDER_TOKEN) private readonly provider: IAuthProvider,
@@ -34,12 +37,16 @@ export class AuthService {
     @InjectRepository(UserRefreshTokenEntity) private readonly refreshTokenRepository: Repository<UserRefreshTokenEntity>,
     @InjectRepository(SystemConfigEntity) private readonly systemConfigRepository: Repository<SystemConfigEntity>,
     private readonly redisService: RedisService,
+    private readonly telemetry: TelemetryService,
   ) {}
 
   async login(email: string, password: string, meta: AuthMeta): Promise<AuthLoginResponse & { refreshToken: string }> {
     this.assertCredentialLogin();
     const tokens = await this.provider.login!(email, password, meta);
     const user = await this.loadUserByEmail(email);
+    // Backfill telemetry install for instances that were configured before this
+    // feature existed. Fire-and-forget — must never block login.
+    this.telemetry.maybeBackfillInstall({ email: user.email, globalRoleId: user.globalRoleId }).catch((e) => this.logger.warn(`telemetry backfill failed: ${e?.message}`));
     return {
       ...this.toResponse(tokens, user),
       refreshToken: tokens.refreshToken,
