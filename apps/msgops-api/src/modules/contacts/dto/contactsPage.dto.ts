@@ -56,12 +56,17 @@ export class ContactsPageDto extends PageDto {
   @JoiSchema(Joi.bool().optional())
   public countOnly?: boolean;
 
+  // `.single()` coerces a scalar query value (`?activities=message`) into a
+  // 1-element array at the DTO boundary, so the service can always assume
+  // `string[]`. Without it, Express parses single-occurrence query params as
+  // strings and `params.activities.map(...)` / `.includes(...)` either crash
+  // or silently match the wrong substring.
   @ApiPropertyOptional()
-  @JoiSchema(Joi.optional())
+  @JoiSchema(Joi.array().items(Joi.string()).single().optional())
   public activities?: string[];
 
   @ApiPropertyOptional()
-  @JoiSchema(Joi.optional())
+  @JoiSchema(Joi.array().items(Joi.string()).single().optional())
   public channels?: string[];
 
   @ApiPropertyOptional()
