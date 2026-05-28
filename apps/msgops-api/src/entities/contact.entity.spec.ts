@@ -66,6 +66,18 @@ describe('ContactEntity.setUserDetails (phone/whatsapp listener)', () => {
 
     expect(e.phone).toBe('5511911111111');
     expect(e.whatsapp).toBe('5574999879409');
+    expect(e.hasWhatsapp).toBe(true);
+  });
+
+  it('sets has_whatsapp when only whatsapp is provided (no phone) — campaigns segment by this flag', () => {
+    // Repro of the prod bug: POST /bms/leads with only `whatsapp` would land
+    // the number but leave has_whatsapp=false, hiding the channel from the UI
+    // and excluding the contact from WhatsApp campaigns.
+    const e = makeEntity({ whatsapp: '5574999879409' });
+    e.setUserDetails();
+
+    expect(e.whatsapp).toBe('5574999879409');
+    expect(e.hasWhatsapp).toBe(true);
   });
 
   it('sets hasPhone/hasWhatsapp to false when phone is cleared', () => {
