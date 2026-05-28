@@ -48,7 +48,14 @@ export class EvolutionHubWebhookController {
       return { ok: true, skipped: 'duplicate' };
     }
 
-    await this.webhooks.processHubEvent(body);
+    // F1: release the body-dedup key on failure so a retry can reprocess
+    // (isDuplicate already SET it; a 5xx without release would lose the event).
+    try {
+      await this.webhooks.processHubEvent(body);
+    } catch (err) {
+      await this.webhooks.releaseDedupKey('evohub', deliveryKey);
+      throw err;
+    }
     return { ok: true };
   }
 }

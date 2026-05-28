@@ -172,6 +172,17 @@ export const MENU_ITEMS: NavItem[] = [
 export const SETTINGS_ITEM: NavItem = {
   labelKey: 'sidebar.settings',
   icon: Settings,
-  route: '/settings',
-  permission: 'account:settings_view',
+  children: [
+    {
+      labelKey: 'sidebar.settingsGeneral',
+      route: '/settings',
+      permission: 'account:settings_view',
+      exactMatch: true,
+    },
+    {
+      labelKey: 'account.users.menuTitle',
+      route: '/settings/users',
+      permission: 'account:users_view',
+    },
+  ],
 };

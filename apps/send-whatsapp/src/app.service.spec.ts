@@ -28,6 +28,7 @@ describe('AppService (Wave 5 — WhatsApp Cloud)', () => {
 
   const mockEventPublisher = {
     publish: jest.fn().mockResolvedValue(undefined),
+    publishWhatsappSend: jest.fn().mockResolvedValue(undefined),
     close: jest.fn().mockResolvedValue(undefined),
   };
 
@@ -114,6 +115,42 @@ describe('AppService (Wave 5 — WhatsApp Cloud)', () => {
         expect.objectContaining({ service: 'MSGOPS_SEND_BATCH_WHATSAPP', event: 'SENT_WHATSAPP_BATCH' }),
       );
     });
+
+    // AC1 — wamid is persisted via publishWhatsappSend after a successful send.
+    it('publishes the wamid→send mapping for each successful send', async () => {
+      await service.processCampaign({
+        account: { id: 7, accountConfigs: [{ name: 'default_language', value: 'pt_BR' }] },
+        message: { id: 11, name: 'msg', type: 'whatsapp', providerMessageId: 'order_update' },
+        contacts: [{ id: 42, uuid: 'u42', hasWhatsapp: true, whatsapp: '+5511999990001' }],
+        campaign: { id: 99, name: 'camp', type: 'simple' },
+        campaign_id: 99,
+      } as any);
+
+      expect(mockEventPublisher.publishWhatsappSend).toHaveBeenCalledTimes(1);
+      expect(mockEventPublisher.publishWhatsappSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          wamid: 'wamid.OK',
+          accountId: 7,
+          channelId: 99,
+          contactId: 42,
+          messageId: 11,
+          campaignId: 99,
+          templateName: 'order_update',
+        }),
+      );
+    });
+
+    it('does NOT publish a send mapping when Meta returns no wamid', async () => {
+      mockProvider.sendTemplate.mockResolvedValueOnce({ messaging_product: 'whatsapp', messages: [] });
+      await service.processCampaign({
+        account: { id: 7, accountConfigs: [] },
+        message: { id: 11, name: 'msg', type: 'whatsapp', providerMessageId: 'order_update' },
+        contacts: [{ id: 42, uuid: 'u42', hasWhatsapp: true, whatsapp: '+5511999990001' }],
+        campaign: { id: 99, name: 'camp', type: 'simple' },
+        campaign_id: 99,
+      } as any);
+      expect(mockEventPublisher.publishWhatsappSend).not.toHaveBeenCalled();
+    });
   });
 
   describe('processAutomation', () => {
@@ -155,6 +192,10 @@ describe('AppService (Wave 5 — WhatsApp Cloud)', () => {
       expect(r.status).toBe(true);
       expect(mockProvider.sendTemplate).toHaveBeenCalledWith(expect.objectContaining({ templateName: 'welcome', languageCode: 'pt_BR' }));
       expect(mockEventPublisher.publish).toHaveBeenCalledWith('bms.triggers', 'trigger.process', next.data);
+      // AC1 (automation path) — wamid mapping persisted with automationId.
+      expect(mockEventPublisher.publishWhatsappSend).toHaveBeenCalledWith(
+        expect.objectContaining({ wamid: 'wamid.OK', accountId: 7, channelId: 99, contactId: 1, messageId: 1, automationId: 5 }),
+      );
     });
 
     it('does NOT forward to next step when the send fails', async () => {

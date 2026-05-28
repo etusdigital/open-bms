@@ -2,6 +2,9 @@ import Joi from 'joi';
 import { JoiSchema } from 'nestjs-joi';
 import { PageDto } from '../../../dtos/filters/page.dto';
 import { Accounts } from './permission-accounts.dto';
+import { ROLE_CODES } from '../../authz/authz.constants';
+
+const VALID_ROLE_CODES = Object.values(ROLE_CODES);
 
 export class CreateUserDto extends PageDto {
   @JoiSchema(Joi.number().optional())
@@ -28,7 +31,11 @@ export class CreateUserDto extends PageDto {
   @JoiSchema(Joi.object().optional())
   settings?: Record<string, string>;
 
-  @JoiSchema(Joi.string().optional())
+  @JoiSchema(
+    Joi.string()
+      .valid(...VALID_ROLE_CODES)
+      .optional(),
+  )
   globalRoleCode?: string;
 
   @JoiSchema(Joi.date().optional())

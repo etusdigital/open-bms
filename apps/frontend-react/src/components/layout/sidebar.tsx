@@ -37,7 +37,8 @@ export function Sidebar() {
     [can, isSuperAdmin, permissions],
   );
 
-  const showSettings = !SETTINGS_ITEM.permission || can(SETTINGS_ITEM.permission);
+  // SETTINGS_ITEM is now a group (Geral + Usuários); SidebarNavGroup filters its
+  // children by permission and renders null when none are visible.
 
   return (
     <aside
@@ -76,8 +77,8 @@ export function Sidebar() {
 
       {/* Bottom section — fixed */}
       <div data-testid="sidebar-bottom" className={cn('shrink-0 pt-1 pb-3', collapsed ? 'px-1' : 'px-2')}>
-        {/* Settings */}
-        {showSettings && <SidebarNavLink item={SETTINGS_ITEM} collapsed={collapsed} />}
+        {/* Settings (group: Geral + Usuários) */}
+        <NavItemRenderer item={SETTINGS_ITEM} collapsed={collapsed} />
 
         <Separator className={cn('bg-sidebar-border my-2', collapsed ? 'mx-1' : 'mx-0')} />
 

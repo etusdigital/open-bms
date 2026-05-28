@@ -40,6 +40,7 @@
     "configs": "Configs",
     "labels": "Labels",
     "settings": "Settings",
+    "settingsGeneral": "General",
     "superAdmin": "Super Admin",
     "superAdminAccounts": "Accounts",
     "superAdminImportEnterprise": "Import from Enterprise",
@@ -2510,6 +2511,47 @@
       "uppercase": "Must include at least one uppercase letter",
       "digit": "Must include at least one digit",
       "mismatch": "Passwords do not match"
+    }
+  },
+  "account": {
+    "users": {
+      "menuTitle": "Users",
+      "pageTitle": "Account users",
+      "entityName": "user",
+      "entityNamePlural": "users",
+      "inviteButton": "Invite user",
+      "createTitle": "Invite user",
+      "editTitle": "Edit user",
+      "columns": {
+        "name": "Name",
+        "email": "Email",
+        "role": "Role"
+      },
+      "actions": {
+        "edit": "Edit",
+        "remove": "Remove from account"
+      },
+      "confirmRemove": {
+        "title": "Remove user from account",
+        "message": "Remove {{name}} from account {{account}}? The user will keep access to any other accounts they belong to.",
+        "bulkMessage": "Remove {{count}} user(s) from account {{account}}? They will keep access to any other accounts they belong to.",
+        "confirmButton": "Remove from account"
+      },
+      "toasts": {
+        "created": "User created successfully!",
+        "updated": "User updated successfully!",
+        "removed": "User removed from account.",
+        "errorGeneric": "Could not complete the operation."
+      },
+      "form": {
+        "passwordLabel": "Password",
+        "roleLabel": "Role",
+        "roleHelp": "Defines what the user can do in this account."
+      },
+      "errors": {
+        "cannotPromoteSuper": "Cannot assign the super_admin role.",
+        "cannotModifySelf": "You cannot change your own role or membership."
+      }
     }
   }
 }

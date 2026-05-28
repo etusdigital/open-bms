@@ -8,6 +8,7 @@ import { SesService } from './services/ses.service';
 import { MandrillService } from './services/mandrill.service';
 import { PushService } from './services/push.service';
 import { TwilioService } from './services/twilio.service';
+import { WhatsappCloudService } from './services/whatsapp-cloud.service';
 import { FormatterUtils } from '../utils/formatter.utils';
 import { MsgopsModule } from '../msgops/msgops.module';
 import { RedisModule } from '../providers/redis/redis.module';
@@ -29,6 +30,7 @@ import { InternalEventsService } from './services/internal-events.service';
     MandrillService,
     PushService,
     TwilioService,
+    WhatsappCloudService,
     InternalEventsService,
     CacheService,
     AnalyticsPublisherProvider,
@@ -43,6 +45,7 @@ import { InternalEventsService } from './services/internal-events.service';
     MandrillService,
     PushService,
     TwilioService,
+    WhatsappCloudService,
     InternalEventsService,
   ],
 })

@@ -1,5 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { AmqpPublisher, type ExchangeName } from '@bms/messaging';
+import { AmqpPublisher, EXCHANGES, type ExchangeName } from '@bms/messaging';
+
+export interface WhatsappSendPayload {
+  wamid: string;
+  accountId: number;
+  channelId: number;
+  contactId: number;
+  messageId: number;
+  campaignId?: number;
+  automationId?: number;
+  templateName?: string;
+  toNumber?: string;
+  utmCampaign?: string;
+  sentAt: string;
+}
 
 @Injectable()
 export class EventPublisherService {
@@ -34,6 +48,17 @@ export class EventPublisherService {
       payload,
       headers,
     });
+  }
+
+  /**
+   * Publishes the wamid→send mapping so msgops-api can persist it into
+   * whatsapp_message_sends (consumed by WhatsappSendPersisterService). Pub/sub
+   * keeps the services decoupled — send-whatsapp has no access to the msgops
+   * Postgres. Accepts a 1-2s delay before the first row appears (tradeoff vs a
+   * synchronous REST endpoint).
+   */
+  async publishWhatsappSend(payload: WhatsappSendPayload): Promise<void> {
+    await this.publish(EXCHANGES.events, 'whatsapp.sent.persist', payload as unknown as Record<string, any>);
   }
 
   async close(): Promise<void> {

@@ -97,49 +97,48 @@ export class UsersService {
     }
   }
 
-  async listPaginated(params: PageDto, userId: number): Promise<PaginationDto<UserEntity>> {
+  async listPaginated(params: PageDto, userId: number, activeAccountId?: number): Promise<PaginationDto<UserEntity>> {
     try {
-      const entityManager = this.userRepository.manager;
+      const ALLOWED_SORT_FIELDS: Record<string, string> = {
+        name: 'user.name',
+        email: 'user.email',
+        created_at: 'user.createdAt',
+        updated_at: 'user.updatedAt',
+      };
+      const sortBy = ALLOWED_SORT_FIELDS[params.sortBy] ?? ALLOWED_SORT_FIELDS.name;
+      const order = params.order?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
 
-      const ALLOWED_SORT_FIELDS = ['name', 'email', 'created_at', 'updated_at'];
-      const ALLOWED_ORDERS = ['ASC', 'DESC'];
-      const sortBy = ALLOWED_SORT_FIELDS.includes(params.sortBy) ? params.sortBy : 'name';
-      const order = ALLOWED_ORDERS.includes(params.order?.toUpperCase()) ? params.order.toUpperCase() : 'ASC';
+      // Account scope: when an active account is known (resolved server-side from the
+      // x-account-id header / first membership), scope strictly to it (AC-10 / F12).
+      // The roleOverride join is scoped to that same account so the "Função" column
+      // resolves (F2) and the join contributes at most one membership row per user
+      // (keeps getManyAndCount pagination correct).
+      // Fallback: if no active account is resolvable, scope to the UNION of the
+      // requester's accounts (legacy behavior) — documented limitation, role column
+      // may be empty when the active account can't be determined.
+      const qb = this.userRepository
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.userAccount', 'ua', activeAccountId ? 'ua.account_id = :activeAccountId' : '1=1', { activeAccountId })
+        .leftJoinAndSelect('ua.roleOverride', 'roleOverride')
+        .orderBy(sortBy, order as 'ASC' | 'DESC')
+        .skip((params.page - 1) * params.itemsPerPage)
+        .take(params.itemsPerPage);
 
-      const queryParams: any[] = [userId];
-      let paramIndex = 2;
-      let searchFilter = '';
-
-      if (params.search) {
-        searchFilter = `AND (name ILIKE $${paramIndex} OR email ILIKE $${paramIndex})`;
-        queryParams.push(`%${params.search}%`);
-        paramIndex++;
+      if (activeAccountId) {
+        qb.where('user.id IN (SELECT user_id FROM users_accounts WHERE account_id = :activeAccountId)', { activeAccountId });
+      } else {
+        qb.where('user.id IN (SELECT user_id FROM users_accounts WHERE account_id IN (SELECT account_id FROM users_accounts WHERE user_id = :userId))', { userId });
       }
 
-      const offset = (params.page - 1) * params.itemsPerPage;
-      queryParams.push(offset, params.itemsPerPage);
+      if (params.search) {
+        qb.andWhere('(user.name ILIKE :search OR user.email ILIKE :search)', { search: `%${params.search}%` });
+      }
 
-      const query = `
-        SELECT *, count(*) OVER() AS total FROM users WHERE id IN (
-          SELECT user_id FROM users_accounts WHERE account_id IN (
-            SELECT account_id FROM users_accounts WHERE user_id = $1
-            )
-          )
-          ${searchFilter}
-        ORDER BY ${sortBy} ${order}
-        OFFSET $${paramIndex} LIMIT $${paramIndex + 1}
-      `;
-
-      const results = await entityManager.query(query, queryParams);
-      results.forEach((user) => {
-        user['createdAt'] = user.created_at;
-        user['updatedAt'] = user.updated_at;
-        user['providerId'] = user.provider_id;
-      });
+      const [results, total] = await qb.getManyAndCount();
 
       return new PaginationDto<UserEntity>({
-        results: results,
-        total: results.length ? results[0].total : 0,
+        results,
+        total,
         page: params.page,
         itemsPerPage: params.itemsPerPage,
       });
@@ -221,10 +220,49 @@ export class UsersService {
         .createQueryBuilder('users')
         .leftJoinAndSelect('users.userAccount', 'userAccount')
         .leftJoinAndSelect('userAccount.account', 'accounts')
+        .leftJoinAndSelect('userAccount.roleOverride', 'roleOverride')
         .where('users.id = :id', { id })
         .andWhere('userAccount.account_id IN (:...accountIds)', { accountIds })
         .getOne();
     } catch (e) {
+      console.error(e);
+      throw new HttpException('User not found by id', HttpStatus.NOT_FOUND);
+    }
+  }
+
+  /**
+   * Account-scoped detail fetch for non-super admins (F1). Resolves the target user
+   * only if they share an account with the requester — gated by membership, NOT by
+   * the requester's is_master_user flag (account admins have isMasterUser=false, so
+   * findOneByMasterId would never find them). When an active account is resolvable
+   * (from x-account-id), scope strictly to it; otherwise scope to the union of the
+   * requester's accounts. Mirrors listPaginated scoping. Throws 404 when out of scope
+   * so the controller never returns 200+null.
+   */
+  async findOneInAccountScope(id: number, requesterUserId: number, activeAccountId?: number): Promise<UserEntity> {
+    try {
+      const qb = this.userRepository
+        .createQueryBuilder('users')
+        .leftJoinAndSelect('users.userAccount', 'userAccount')
+        .leftJoinAndSelect('userAccount.account', 'accounts')
+        .leftJoinAndSelect('userAccount.roleOverride', 'roleOverride')
+        .where('users.id = :id', { id });
+
+      if (activeAccountId) {
+        qb.andWhere('users.id IN (SELECT user_id FROM users_accounts WHERE account_id = :activeAccountId)', { activeAccountId });
+      } else {
+        qb.andWhere('users.id IN (SELECT user_id FROM users_accounts WHERE account_id IN (SELECT account_id FROM users_accounts WHERE user_id = :requesterUserId))', {
+          requesterUserId,
+        });
+      }
+
+      const user = await qb.getOne();
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+      return user;
+    } catch (e) {
+      if (e instanceof HttpException) throw e;
       console.error(e);
       throw new HttpException('User not found by id', HttpStatus.NOT_FOUND);
     }
@@ -244,7 +282,12 @@ export class UsersService {
     }
   }
 
-  async create(userDto: CreateUserDto) {
+  async create(userDto: CreateUserDto, requester?: { isSuperAdmin?: boolean }) {
+    // Defense-in-depth: only a super admin may mint another super_admin. The UI
+    // already omits the option, but a direct API call must be rejected too.
+    if (userDto.globalRoleCode === ROLE_CODES.SUPER_ADMIN && !requester?.isSuperAdmin) {
+      throw new ForbiddenException('Cannot assign super_admin role');
+    }
     try {
       // If a soft-deleted user exists with this email, restore it instead of
       // failing on the email uniqueness constraint. The auth provider already
@@ -319,8 +362,8 @@ export class UsersService {
     }
   }
 
-  async invite(userDto: CreateUserDto) {
-    return this.create(userDto);
+  async invite(userDto: CreateUserDto, requester?: { isSuperAdmin?: boolean }) {
+    return this.create(userDto, requester);
   }
 
   async updateProfile(providerId: string, profileDto: { name?: string; email?: string; profile?: string; settings?: Record<string, string> }): Promise<UserEntity> {
@@ -366,7 +409,16 @@ export class UsersService {
     return user;
   }
 
-  async update(id: number, userDto: CreateUserDto, userMasterId: number): Promise<UserEntity> {
+  async update(id: number, userDto: CreateUserDto, userMasterId: number, requester?: { isSuperAdmin?: boolean }): Promise<UserEntity> {
+    // Defense-in-depth: block promoting a user to super_admin unless the requester is super.
+    if (userDto.globalRoleCode === ROLE_CODES.SUPER_ADMIN && !requester?.isSuperAdmin) {
+      throw new ForbiddenException('Cannot assign super_admin role');
+    }
+    // Anti-self-modify: a non-super admin must not change their own global role/membership,
+    // which could lock them out of their own account. Super admins are exempt.
+    if (!requester?.isSuperAdmin && userMasterId !== undefined && Number(id) === Number(userMasterId) && (userDto.globalRoleCode || userDto.accounts)) {
+      throw new ForbiddenException('Cannot modify your own role/membership');
+    }
     try {
       const user = await this.userRepository.findOne({ where: { id } });
 
@@ -427,6 +479,9 @@ export class UsersService {
   }
 
   async addAccountMembership(userId: number, accountId: number, roleOverrideCode?: string | null) {
+    if (roleOverrideCode === ROLE_CODES.SUPER_ADMIN) {
+      throw new ForbiddenException('Cannot assign super_admin role');
+    }
     const overrideRoleId = await this.resolveAccountOverrideRoleId(roleOverrideCode);
 
     await this.userAccountRepository
@@ -441,7 +496,13 @@ export class UsersService {
     return this.userAccountRepository.find({ where: { userId, accountId } });
   }
 
-  async updateAccountRole(userId: number, accountId: number, roleOverrideCode?: string | null) {
+  async updateAccountRole(userId: number, accountId: number, roleOverrideCode?: string | null, requester?: { userId?: number; isSuperAdmin?: boolean }) {
+    if (roleOverrideCode === ROLE_CODES.SUPER_ADMIN) {
+      throw new ForbiddenException('Cannot assign super_admin role');
+    }
+    if (!requester?.isSuperAdmin && requester?.userId !== undefined && Number(userId) === Number(requester.userId)) {
+      throw new ForbiddenException('Cannot modify your own role/membership');
+    }
     const membership = await this.userAccountRepository.findOne({ where: { userId, accountId } });
     if (!membership) {
       throw new ForbiddenException('User does not belong to account');
@@ -459,7 +520,12 @@ export class UsersService {
     return this.userAccountRepository.find({ where: { userId, accountId } });
   }
 
-  async removeAccountMembership(userId: number, accountId: number) {
+  async removeAccountMembership(userId: number, accountId: number, requester?: { userId?: number; isSuperAdmin?: boolean }) {
+    // Anti-self-remove: a non-super admin must not remove their own membership and lock
+    // themselves out of the account they administer. Super admins are exempt.
+    if (!requester?.isSuperAdmin && requester?.userId !== undefined && Number(userId) === Number(requester.userId)) {
+      throw new ForbiddenException('Cannot modify your own role/membership');
+    }
     const membership = await this.userAccountRepository.findOne({ where: { userId, accountId } });
     if (!membership) {
       throw new ForbiddenException('User does not belong to account');
@@ -671,6 +737,12 @@ export class UsersService {
     try {
       const usersAccounts = [];
       for (const item of permissionsAccountsDto.accounts) {
+        // Defense-in-depth: never assign super_admin as an account override here either,
+        // matching addAccountMembership (F8). resolveAccountOverrideRoleId also rejects it
+        // (422), but we surface an explicit 403 for consistency with the membership paths.
+        if (item.roleOverrideCode === ROLE_CODES.SUPER_ADMIN) {
+          throw new ForbiddenException('Cannot assign super_admin role');
+        }
         const roleOverrideRoleId = await this.resolveAccountOverrideRoleId(item.roleOverrideCode);
         usersAccounts.push({ userId: permissionsAccountsDto.userId, accountId: item.accountId, isMasterUser: item.isMasterUser, roleOverrideRoleId });
       }
@@ -717,6 +789,7 @@ export class UsersService {
 
       await this.invalidateCacheForUser(permissionsAccountsDto.userId);
     } catch (e) {
+      if (e instanceof HttpException) throw e;
       console.error(e);
       throw new HttpException('Cannot permission accounts to user', HttpStatus.INTERNAL_SERVER_ERROR);
     }

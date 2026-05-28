@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
+import { HealthController } from './health.controller';
 import { AppService } from './app.service';
 import { FormatterUtils } from './utils/formatter.utils';
 import { MsgopsModule } from './msgops/msgops.module';
@@ -12,7 +13,7 @@ import { CampaignEventsConsumerService } from './campaign-events-consumer.servic
 
 @Module({
   imports: [MsgopsModule, TypeOrmModule.forRoot(typeOrmConfig), ConfigModule.forRoot(), RedisModule, QueueModule],
-  controllers: [AppController],
+  controllers: [AppController, HealthController],
   providers: [AppService, FormatterUtils, CampaignEventsConsumerService],
 })
 export class AppModule {}

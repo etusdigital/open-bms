@@ -10,6 +10,7 @@ import { SesService } from './events/services/ses.service';
 import { MandrillService } from './events/services/mandrill.service';
 import { PushService } from './events/services/push.service';
 import { TwilioService } from './events/services/twilio.service';
+import { WhatsappCloudService } from './events/services/whatsapp-cloud.service';
 import { InternalEventsService } from './events/services/internal-events.service';
 import { FormatterUtils } from './utils/formatter.utils';
 import { PlatformType } from './events/interfaces/push.interfaces';
@@ -29,6 +30,7 @@ describe('AppController', () => {
   const mockMandrillService = { processMandrill: jest.fn().mockResolvedValue({}) };
   const mockPushService = { processPush: jest.fn().mockResolvedValue({}) };
   const mockTwilioService = { processTwilioNotification: jest.fn().mockResolvedValue({}) };
+  const mockWhatsappCloudService = { processWhatsappCloudEvent: jest.fn().mockResolvedValue({}) };
   const mockInternalEventsService = { internalEventsProcess: jest.fn().mockResolvedValue({}) };
 
   beforeEach(async () => {
@@ -48,6 +50,7 @@ describe('AppController', () => {
         { provide: MandrillService, useValue: mockMandrillService },
         { provide: PushService, useValue: mockPushService },
         { provide: TwilioService, useValue: mockTwilioService },
+        { provide: WhatsappCloudService, useValue: mockWhatsappCloudService },
         { provide: InternalEventsService, useValue: mockInternalEventsService },
       ],
     }).compile();
@@ -85,6 +88,12 @@ describe('AppController', () => {
       await controller.twilio(VALID_TOKEN, events as any);
 
       expect(mockTwilioService.processTwilioNotification).toHaveBeenCalledWith(events);
+    });
+
+    it('whatsapp: dispatches to WhatsappCloudService', async () => {
+      const event = { wamid: 'wamid.X', event: 'delivered', accountId: 7 } as any;
+      await controller.whatsapp(VALID_TOKEN, event);
+      expect(mockWhatsappCloudService.processWhatsappCloudEvent).toHaveBeenCalledWith(event);
     });
   });
 
