@@ -32,12 +32,14 @@ describe('EventPublisherService', () => {
   it('asserts all published exchanges on bootstrap', async () => {
     const svc = new EventPublisherService();
     await svc.onModuleInit();
-    expect(ensureReadyMock).toHaveBeenCalledTimes(5);
+    expect(ensureReadyMock).toHaveBeenCalledTimes(6);
     expect(ensureReadyMock).toHaveBeenCalledWith('bms.email');
     expect(ensureReadyMock).toHaveBeenCalledWith('bms.push');
     expect(ensureReadyMock).toHaveBeenCalledWith('bms.sms');
     expect(ensureReadyMock).toHaveBeenCalledWith('bms.whatsapp');
     expect(ensureReadyMock).toHaveBeenCalledWith('bms.tags');
+    // whatsapp-webhooks publishes analytics events to bms.events
+    expect(ensureReadyMock).toHaveBeenCalledWith('bms.events');
   });
 
   it('coerces boolean header values to "true"/"false" strings', async () => {

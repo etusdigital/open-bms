@@ -62,7 +62,16 @@ export class MetaWebhookController {
       return { ok: true, skipped: 'duplicate' };
     }
 
-    await this.webhooks.processMetaEvent(body);
+    // F1: isDuplicate() already SET the body-dedup key. If processing throws
+    // (e.g. a Postgres write failed), we must release that key before
+    // propagating the 5xx — otherwise Meta's byte-identical retry would hit the
+    // still-set key and be skipped, losing the event.
+    try {
+      await this.webhooks.processMetaEvent(body);
+    } catch (err) {
+      await this.webhooks.releaseDedupKey('meta', deliveryKey);
+      throw err;
+    }
     return { ok: true };
   }
 }

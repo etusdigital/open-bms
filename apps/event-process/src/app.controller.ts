@@ -9,6 +9,7 @@ import {
   SnsEnvelope,
   SparkPostEnvelope,
   TwilioEvent,
+  WhatsappCloudEvent,
 } from './events/interfaces/events.interfaces';
 import { PushPayload, PushWebhook } from './events/interfaces/push.interfaces';
 import { PlatformType } from './events/interfaces/push.interfaces';
@@ -21,6 +22,7 @@ import { SesService } from './events/services/ses.service';
 import { MandrillService } from './events/services/mandrill.service';
 import { PushService } from './events/services/push.service';
 import { TwilioService } from './events/services/twilio.service';
+import { WhatsappCloudService } from './events/services/whatsapp-cloud.service';
 import { EventsService } from './events/services/events.service';
 import { InternalEventsService } from './events/services/internal-events.service';
 import { Webhook as SvixWebhook } from 'svix';
@@ -42,6 +44,7 @@ export class AppController {
     private readonly mandrillService: MandrillService,
     private readonly pushService: PushService,
     private readonly twilioService: TwilioService,
+    private readonly whatsappCloudService: WhatsappCloudService,
     private readonly internalEventsService: InternalEventsService,
   ) {}
 
@@ -268,6 +271,34 @@ export class AppController {
     if (!events) throw new BadRequestException('Body cannot be empty');
     return await this.eventsService.processWithIdempotency(this.idempotencyKey(events), () =>
       this.twilioService.processTwilioNotification(events),
+    );
+  }
+
+  @Post('whatsapp')
+  async whatsapp(@Headers('x-internal-token') token: string, @Body() event: WhatsappCloudEvent): Promise<any> {
+    this.assertAuth(token);
+    if (!event) throw new BadRequestException('Body cannot be empty');
+    // Idempotency keyed on wamid+event (not the whole payload) so retries with
+    // jittered timestamps still collapse to one processed marker. msgops-api
+    // already deduped at the webhook edge; this is defense-in-depth.
+    //
+    // Window divergence (F10): this idempotency marker uses the shared
+    // PROCESSED_TTL_SECONDS (1h), while the producer-side per-(wamid,status)
+    // dedup in msgops-api lives for 24h. They are intentionally NOT aligned:
+    //   - The producer's 24h key already prevents any republish of the same
+    //     (wamid,event) within 24h, so this 1h window is never the dedup of
+    //     record for normal Meta retries.
+    //   - The 1h window only matters for a MANUAL replay performed >1h later;
+    //     accepting a re-count there is far cheaper than widening the shared
+    //     PROCESSED_TTL_SECONDS (used by sendgrid/twilio/sparkpost/...) to 24h,
+    //     which would balloon Redis retention and change dedup semantics for
+    //     every other provider. Aligning is out of scope for this feature.
+    const key = crypto
+      .createHash('sha256')
+      .update(`${event.wamid ?? ''}:${event.event ?? ''}`)
+      .digest('hex');
+    return await this.eventsService.processWithIdempotency(key, () =>
+      this.whatsappCloudService.processWhatsappCloudEvent(event),
     );
   }
 

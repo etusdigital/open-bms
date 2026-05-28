@@ -36,6 +36,12 @@ export enum MsgopsServices {
   MSGOPS_SEND_BATCH_EMAIL = 'MSGOPS_SEND_BATCH_EMAIL',
   MSGOPS_SEND_BATCH_PUSH = 'MSGOPS_SEND_BATCH_PUSH',
   MSGOPS_SEND_BATCH_TWILIO = 'MSGOPS_SEND_BATCH_TWILIO',
+  // send-whatsapp publishes its tracker payload with this service value
+  // (apps/send-whatsapp/src/app.service.ts:246). Without it the tracker
+  // rejects every WhatsApp batch event with HTTP 400, the AMQP bridge
+  // ACKs the 4xx silently, and the campaign row stays at sent_contacts=NULL
+  // forever — even though the messages were actually sent to Meta.
+  MSGOPS_SEND_BATCH_WHATSAPP = 'MSGOPS_SEND_BATCH_WHATSAPP',
 }
 
 export enum StatusCampaignEnum {

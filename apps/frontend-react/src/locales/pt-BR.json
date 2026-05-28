@@ -40,6 +40,7 @@
     "configs": "Configurações",
     "labels": "Labels",
     "settings": "Configurações",
+    "settingsGeneral": "Geral",
     "superAdmin": "Super Admin",
     "superAdminAccounts": "Contas",
     "superAdminImportEnterprise": "Importar do Enterprise",
@@ -2510,6 +2511,47 @@
       "uppercase": "Deve conter pelo menos uma letra maiúscula",
       "digit": "Deve conter pelo menos um dígito",
       "mismatch": "As senhas não coincidem"
+    }
+  },
+  "account": {
+    "users": {
+      "menuTitle": "Usuários",
+      "pageTitle": "Usuários da conta",
+      "entityName": "usuário",
+      "entityNamePlural": "usuários",
+      "inviteButton": "Convidar usuário",
+      "createTitle": "Convidar usuário",
+      "editTitle": "Editar usuário",
+      "columns": {
+        "name": "Nome",
+        "email": "E-mail",
+        "role": "Função"
+      },
+      "actions": {
+        "edit": "Editar",
+        "remove": "Remover da conta"
+      },
+      "confirmRemove": {
+        "title": "Remover usuário da conta",
+        "message": "Remover {{name}} da conta {{account}}? O usuário continuará tendo acesso às outras contas onde estiver.",
+        "bulkMessage": "Remover {{count}} usuário(s) da conta {{account}}? Eles continuarão tendo acesso às outras contas onde estiverem.",
+        "confirmButton": "Remover da conta"
+      },
+      "toasts": {
+        "created": "Usuário criado com sucesso!",
+        "updated": "Usuário atualizado com sucesso!",
+        "removed": "Usuário removido da conta.",
+        "errorGeneric": "Não foi possível concluir a operação."
+      },
+      "form": {
+        "passwordLabel": "Senha",
+        "roleLabel": "Função",
+        "roleHelp": "Define o que o usuário pode fazer nesta conta."
+      },
+      "errors": {
+        "cannotPromoteSuper": "Não é possível atribuir a função super_admin.",
+        "cannotModifySelf": "Você não pode alterar sua própria função ou associação."
+      }
     }
   }
 }

@@ -40,6 +40,7 @@
     "configs": "Ajustes",
     "labels": "Etiquetas",
     "settings": "Ajustes",
+    "settingsGeneral": "General",
     "superAdmin": "Super Admin",
     "superAdminAccounts": "Cuentas",
     "superAdminImportEnterprise": "Importar de Enterprise",
@@ -2467,6 +2468,47 @@
       "uppercase": "Debe contener al menos una letra mayúscula",
       "digit": "Debe contener al menos un dígito",
       "mismatch": "Las contraseñas no coinciden"
+    }
+  },
+  "account": {
+    "users": {
+      "menuTitle": "Usuarios",
+      "pageTitle": "Usuarios de la cuenta",
+      "entityName": "usuario",
+      "entityNamePlural": "usuarios",
+      "inviteButton": "Invitar usuario",
+      "createTitle": "Invitar usuario",
+      "editTitle": "Editar usuario",
+      "columns": {
+        "name": "Nombre",
+        "email": "Correo electrónico",
+        "role": "Función"
+      },
+      "actions": {
+        "edit": "Editar",
+        "remove": "Quitar de la cuenta"
+      },
+      "confirmRemove": {
+        "title": "Quitar usuario de la cuenta",
+        "message": "¿Quitar a {{name}} de la cuenta {{account}}? El usuario seguirá teniendo acceso a las demás cuentas a las que pertenezca.",
+        "bulkMessage": "¿Quitar {{count}} usuario(s) de la cuenta {{account}}? Seguirán teniendo acceso a las demás cuentas a las que pertenezcan.",
+        "confirmButton": "Quitar de la cuenta"
+      },
+      "toasts": {
+        "created": "¡Usuario creado con éxito!",
+        "updated": "¡Usuario actualizado con éxito!",
+        "removed": "Usuario quitado de la cuenta.",
+        "errorGeneric": "No se pudo completar la operación."
+      },
+      "form": {
+        "passwordLabel": "Contraseña",
+        "roleLabel": "Función",
+        "roleHelp": "Define lo que el usuario puede hacer en esta cuenta."
+      },
+      "errors": {
+        "cannotPromoteSuper": "No se puede asignar la función super_admin.",
+        "cannotModifySelf": "No puedes cambiar tu propia función o pertenencia."
+      }
     }
   }
 }

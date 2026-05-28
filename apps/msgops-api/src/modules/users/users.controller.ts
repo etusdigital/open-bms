@@ -100,19 +100,19 @@ export class UsersController {
 
   @Post('/invite')
   @RequirePermission('account:users_invite')
-  invite(@Body() createDto: CreateUserDto) {
-    return this.userService.invite(createDto);
+  invite(@Body() createDto: CreateUserDto, @Req() req: any) {
+    return this.userService.invite(createDto, { isSuperAdmin: req?.authzContext?.isSuperAdmin === true });
   }
 
   @Post()
   @RequirePermission('account:users_invite')
-  async create(@Body() createDto: CreateUserDto) {
-    return await this.userService.create(createDto);
+  async create(@Body() createDto: CreateUserDto, @Req() req: any) {
+    return await this.userService.create(createDto, { isSuperAdmin: req?.authzContext?.isSuperAdmin === true });
   }
 
   @Get()
   @RequirePermission('account:users_view')
-  async findAll(@Query() params: PageDto, @AuthUser() authUser: any) {
+  async findAll(@Query() params: PageDto, @AuthUser() authUser: any, @Req() req: any) {
     const providerId = this.getProviderId(authUser);
     const currentUser = await this.userService.findOneByProviderId(providerId);
 
@@ -120,7 +120,10 @@ export class UsersController {
       return this.userService.findAll();
     }
 
-    return this.userService.listPaginated(params, currentUser.id);
+    // Pass the requester's active account (resolved server-side) so the list is
+    // scoped strictly to it and each row carries its account role override (F2/F12).
+    const activeAccountId = req?.authzContext?.accountId as number | undefined;
+    return this.userService.listPaginated(params, currentUser.id, activeAccountId);
   }
 
   @Get('/master')
@@ -137,10 +140,13 @@ export class UsersController {
     const providerId = this.getProviderId(authUser);
     const currentUser = await this.userService.findOneByProviderId(providerId);
 
-    // super_admin bypasses master-id scoping: orphan users (no userAccount rows) are invisible via findOneByMasterId.
+    // super_admin bypasses scoping: orphan users (no userAccount rows) are invisible to scoped fetches.
     const isSuperAdmin = req?.authzContext?.isSuperAdmin === true;
     if (!isSuperAdmin && currentUser.id !== Number(id)) {
-      return this.userService.findOneByMasterId(Number(id), currentUser.id);
+      // Account-scoped fetch (F1): an account admin (isMasterUser=false) must be able to
+      // load a user who shares their account. Scope by membership, not by master-id.
+      const activeAccountId = req?.authzContext?.accountId as number | undefined;
+      return this.userService.findOneInAccountScope(Number(id), currentUser.id, activeAccountId);
     }
 
     return this.userService.findOneById(Number(id));
@@ -154,10 +160,10 @@ export class UsersController {
 
   @Put(':id')
   @RequirePermission('account:users_update_roles')
-  async update(@Param('id') id: number, @Body() userDto: CreateUserDto, @AuthUser() authUser: any) {
+  async update(@Param('id') id: number, @Body() userDto: CreateUserDto, @AuthUser() authUser: any, @Req() req: any) {
     const providerId = this.getProviderId(authUser);
     const currentUser = await this.userService.findOneByProviderId(providerId);
-    return this.userService.update(Number(id), userDto, currentUser.id);
+    return this.userService.update(Number(id), userDto, currentUser.id, { isSuperAdmin: req?.authzContext?.isSuperAdmin === true });
   }
 
   @Put('/update-password/:id')
@@ -180,14 +186,20 @@ export class UsersController {
 
   @Put(':id/accounts/:accountId/role')
   @RequirePermission('account:users_update_roles')
-  updateAccountRole(@Param('id') id: number, @Param('accountId') accountId: number, @Body('roleOverrideCode') roleOverrideCode?: string | null) {
-    return this.userService.updateAccountRole(Number(id), Number(accountId), roleOverrideCode);
+  updateAccountRole(@Param('id') id: number, @Param('accountId') accountId: number, @Req() req: any, @Body('roleOverrideCode') roleOverrideCode?: string | null) {
+    return this.userService.updateAccountRole(Number(id), Number(accountId), roleOverrideCode, {
+      userId: req?.authzContext?.userId,
+      isSuperAdmin: req?.authzContext?.isSuperAdmin === true,
+    });
   }
 
   @Delete(':id/accounts/:accountId')
   @RequirePermission('account:users_update_roles')
-  removeAccountMembership(@Param('id') id: number, @Param('accountId') accountId: number) {
-    return this.userService.removeAccountMembership(Number(id), Number(accountId));
+  removeAccountMembership(@Param('id') id: number, @Param('accountId') accountId: number, @Req() req: any) {
+    return this.userService.removeAccountMembership(Number(id), Number(accountId), {
+      userId: req?.authzContext?.userId,
+      isSuperAdmin: req?.authzContext?.isSuperAdmin === true,
+    });
   }
 
   @Delete(':id')

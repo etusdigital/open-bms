@@ -50,9 +50,11 @@ export class AppService {
     }
 
     let provider: WhatsappCloudProvider;
+    let channelId: number;
     try {
       const built = await this.channelResolver.buildProvider(accountId);
       provider = built.provider;
+      channelId = built.channel.id;
     } catch (err: any) {
       this.logger.error(`processCampaign: ${err?.message ?? 'channel resolution failed'}`);
       return { status: 400, message: err?.message ?? 'channel resolution failed' };
@@ -87,7 +89,29 @@ export class AppService {
             languageCode: language,
             components,
           });
-          return { contactId: contact.id, providerMessageId: response.messages?.[0]?.id };
+          const wamid = response.messages?.[0]?.id;
+          if (wamid) {
+            // Persist the wamid→send mapping so delivery webhooks can correlate
+            // (msgops-api consumes whatsapp.sent.persist). Best-effort: a publish
+            // failure must not abort the send (the message already went out).
+            try {
+              await this.eventPublisher.publishWhatsappSend({
+                wamid,
+                accountId,
+                channelId,
+                contactId: contact.id,
+                messageId: message.id,
+                campaignId: campaignMessage.campaign?.id,
+                templateName: message.providerMessageId,
+                toNumber: contact.whatsapp,
+                utmCampaign: defaultUtmCampaign,
+                sentAt: new Date().toISOString(),
+              });
+            } catch (pubErr: any) {
+              this.logger.warn(`wa_send_persist_publish_failed account=${accountId} contact=${contact.id} err=${pubErr?.message ?? 'unknown'}`);
+            }
+          }
+          return { contactId: contact.id, providerMessageId: wamid };
         } catch (err: any) {
           this.logger.warn(`wa_cloud_send_contact_failed account=${accountId} contact=${contact.id} err=${err?.message ?? 'unknown'}`);
           return { contactId: contact.id, error: err?.message ?? 'send failed' };
@@ -116,9 +140,11 @@ export class AppService {
     }
 
     let provider: WhatsappCloudProvider;
+    let channelId: number;
     try {
       const built = await this.channelResolver.buildProvider(account.id);
       provider = built.provider;
+      channelId = built.channel.id;
     } catch (err: any) {
       this.logger.error(`processAutomation: ${err?.message ?? 'channel resolution failed'}`);
       return { status: 400, message: err?.message ?? 'channel resolution failed' };
@@ -134,12 +160,31 @@ export class AppService {
 
     const components = this.buildComponents({ shortCode, code: contact.code });
     try {
-      await provider.sendTemplate({
+      const response = await provider.sendTemplate({
         to: contact.whatsapp!,
         templateName: message.providerMessageId!,
         languageCode: language,
         components,
       });
+      const wamid = response.messages?.[0]?.id;
+      if (wamid) {
+        try {
+          await this.eventPublisher.publishWhatsappSend({
+            wamid,
+            accountId: account.id,
+            channelId,
+            contactId: contact.id,
+            messageId: message.id,
+            automationId: automationMessage.automationId,
+            templateName: message.providerMessageId,
+            toNumber: contact.whatsapp ?? undefined,
+            utmCampaign: defaultUtmCampaign,
+            sentAt: new Date().toISOString(),
+          });
+        } catch (pubErr: any) {
+          this.logger.warn(`wa_send_persist_publish_failed account=${account.id} contact=${contact.id} err=${pubErr?.message ?? 'unknown'}`);
+        }
+      }
     } catch (err: any) {
       this.logger.warn(`wa_cloud_send_automation_failed account=${account.id} message=${message.id} err=${err?.message ?? 'unknown'}`);
       return { status: 502, message: err?.message ?? 'send failed' };

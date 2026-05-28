@@ -4,7 +4,7 @@ import { AmqpPublisher, EXCHANGES, type ExchangeName } from '@bms/messaging';
 // Exchanges this hub publishes to. Asserted at boot via `ensureReady` so a
 // missing/down RabbitMQ trips the failure on startup instead of on the first
 // produce call (which can land 30+ minutes later, masking the misconfiguration).
-const PUBLISHED_EXCHANGES: readonly ExchangeName[] = [EXCHANGES.email, EXCHANGES.push, EXCHANGES.sms, EXCHANGES.whatsapp, EXCHANGES.tags];
+const PUBLISHED_EXCHANGES: readonly ExchangeName[] = [EXCHANGES.email, EXCHANGES.push, EXCHANGES.sms, EXCHANGES.whatsapp, EXCHANGES.tags, EXCHANGES.events];
 
 @Injectable()
 export class EventPublisherService implements OnModuleInit, OnModuleDestroy {

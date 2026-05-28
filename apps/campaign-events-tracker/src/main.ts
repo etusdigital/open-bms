@@ -1,8 +1,15 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { CampaignEventsConsumerService } from './campaign-events-consumer.service';
+import { RedisService } from './providers/redis/redis.service';
 
 const SHUTDOWN_HARD_TIMEOUT_MS = 12_000;
+// Fail loud during boot if Redis can't be reached — the previous mode
+// (ioredis retrying forever in the background) left the container marked
+// "running" but it never consumed events, so the Swarm restart policy
+// couldn't help. Exiting with code 1 makes Swarm spin up a fresh task
+// after the DNS overlay has settled.
+const REDIS_BOOT_TIMEOUT_MS = 60_000;
 
 async function bootstrap() {
   const port = process.env.PORT || 3004;
@@ -55,6 +62,29 @@ async function bootstrap() {
 
   process.once('SIGTERM', () => void shutdown('SIGTERM'));
   process.once('SIGINT', () => void shutdown('SIGINT'));
+
+  // Verify Redis is actually reachable before opening the HTTP port and
+  // attaching to RabbitMQ — otherwise the worker advertises itself as
+  // ready while every Redis op silently queues in the offline buffer.
+  // The RedisService's onModuleInit already calls connect(), but
+  // ioredis's `lazyConnect: true` + retryStrategy don't surface DNS
+  // failures as a rejected promise. A direct ping with a hard timeout
+  // does.
+  try {
+    const redis = app.get(RedisService).getClient();
+    await Promise.race([
+      redis.ping(),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`redis_boot_timeout_after_${REDIS_BOOT_TIMEOUT_MS}ms`)),
+          REDIS_BOOT_TIMEOUT_MS,
+        ),
+      ),
+    ]);
+  } catch (err) {
+    console.error('[campaign-events-tracker] redis unreachable at boot, exiting for Swarm restart:', err);
+    process.exit(1);
+  }
 
   await app.listen(port);
 

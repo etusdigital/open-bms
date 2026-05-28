@@ -26,6 +26,15 @@ const BINDINGS: QueueBinding[] = [
     queue: 'event-process.event.received.twilio',
     bridgePath: '/internal/event/twilio',
   },
+  {
+    // `#` matches zero-or-more words, so this single binding catches both
+    // `event.received.whatsapp` (delivery lifecycle) and
+    // `event.received.whatsapp.inbound` (replies). The controller branches on
+    // the envelope `event` field.
+    routingKey: 'event.received.whatsapp.#',
+    queue: 'event-process.event.received.whatsapp',
+    bridgePath: '/internal/event/whatsapp',
+  },
   { routingKey: 'event.received.push', queue: 'event-process.event.received.push', bridgePath: '/internal/event/push' },
   {
     routingKey: 'event.received.custom',

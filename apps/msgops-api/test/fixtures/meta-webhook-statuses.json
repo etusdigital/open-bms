@@ -1,0 +1,49 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "WABA_ID_123",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "5574999999999",
+              "phone_number_id": "PHONE_NUMBER_ID_1"
+            },
+            "statuses": [
+              {
+                "id": "wamid.DELIVERED1",
+                "status": "delivered",
+                "timestamp": "1716800000",
+                "recipient_id": "5574988887777",
+                "conversation": { "id": "CONV1", "origin": { "type": "marketing" } }
+              },
+              {
+                "id": "wamid.READ1",
+                "status": "read",
+                "timestamp": "1716800100",
+                "recipient_id": "5574988887777"
+              },
+              {
+                "id": "wamid.FAILED1",
+                "status": "failed",
+                "timestamp": "1716800200",
+                "recipient_id": "5574911112222",
+                "errors": [
+                  {
+                    "code": 131026,
+                    "title": "Message undeliverable",
+                    "message": "Message undeliverable",
+                    "error_data": { "details": "Message could not be delivered. The recipient is not on WhatsApp." }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

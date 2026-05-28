@@ -48,6 +48,11 @@ export const queryKeys = {
       ['automations', 'goal-stats', { automationId, startDate, endDate }] as const,
     audits: (automationId: number) => ['automations', 'audits', { automationId }] as const,
   },
+  accountUsers: {
+    all: ['account-users'] as const,
+    list: (accountId: number, params: ListSearchParams) => ['account-users', 'list', { accountId, ...params }] as const,
+    detail: (accountId: number, id: number) => ['account-users', 'detail', { accountId, id }] as const,
+  },
   superAdmin: {
     accounts: {
       all: ['super-admin', 'accounts'] as const,

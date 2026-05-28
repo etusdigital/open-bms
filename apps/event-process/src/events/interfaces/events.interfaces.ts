@@ -254,6 +254,26 @@ export enum EventsType {
   ACCOUNT_STATUS_CHANGE = 'account_status_change',
   SENT = 'sent',
   READ = 'read',
+  INBOUND = 'inbound',
+}
+
+// Envelope published by msgops-api whatsapp-webhooks (EXCHANGES.events, rk
+// event.received.whatsapp[.inbound]) and consumed by WhatsappCloudService.
+export interface WhatsappCloudEvent {
+  wamid: string;
+  // 'sent' | 'delivered' | 'read' | 'failed' | 'inbound'
+  event: string;
+  accountId: number;
+  contactId?: number;
+  campaignId?: number;
+  automationId?: number;
+  messageId?: number;
+  utmCampaign?: string;
+  // Meta timestamp normalized to epoch ms by the producer.
+  timestamp?: number;
+  errorCode?: number;
+  errorTitle?: string;
+  properties?: Record<string, any>;
 }
 
 export enum SendgridEventTypes {
