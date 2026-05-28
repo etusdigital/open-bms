@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
 import { authenticateStore } from '@/test-utils/authenticate-store';
-import { useContactHistory } from '../use-contact-history';
+import { useContactHistory, CONTACT_HISTORY_PAGE_SIZE } from '../use-contact-history';
 
 const mockGet = vi.fn();
 
@@ -22,7 +22,7 @@ describe('useContactHistory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authenticateStore();
-    mockGet.mockResolvedValue({ data: { results: historyPage1 } });
+    mockGet.mockResolvedValue({ data: { results: historyPage1, hasMore: false } });
   });
 
   it('fetches history for a contact', async () => {
@@ -35,10 +35,10 @@ describe('useContactHistory', () => {
     expect(mockGet).toHaveBeenCalledWith(
       '/contacts/history/5',
       expect.objectContaining({
-        params: expect.objectContaining({ page: 1, itemsPerPage: 10 }),
+        params: expect.objectContaining({ page: 1, itemsPerPage: CONTACT_HISTORY_PAGE_SIZE }),
       }),
     );
-    expect(result.current.data?.pages[0]).toHaveLength(2);
+    expect(result.current.data?.pages[0].results).toHaveLength(2);
   });
 
   it('does not fetch when contactId is 0', () => {
@@ -109,8 +109,32 @@ describe('useContactHistory', () => {
     );
   });
 
-  it('has next page when results are full (10 items)', async () => {
-    const fullPage = Array.from({ length: 10 }, (_, i) => ({
+  it('has next page when the API response signals hasMore=true', async () => {
+    mockGet.mockResolvedValue({ data: { results: [{ type: 'message' }], hasMore: true } });
+
+    const { result } = renderHook(() => useContactHistory(5), {
+      wrapper: createQueryWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.hasNextPage).toBe(true);
+  });
+
+  it('has no next page when the API response signals hasMore=false', async () => {
+    mockGet.mockResolvedValue({ data: { results: [{ type: 'message' }], hasMore: false } });
+
+    const { result } = renderHook(() => useContactHistory(5), {
+      wrapper: createQueryWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.hasNextPage).toBe(false);
+  });
+
+  it('falls back to the length-based heuristic when the API omits hasMore (backward compat)', async () => {
+    // No hasMore field on the response → frontend falls back to
+    // `length === CONTACT_HISTORY_PAGE_SIZE` to keep older API deploys working.
+    const fullPage = Array.from({ length: CONTACT_HISTORY_PAGE_SIZE }, (_, i) => ({
       type: 'message',
       message_title: `Msg ${i}`,
       time: '2026-01-01T00:00:00Z',
@@ -123,16 +147,5 @@ describe('useContactHistory', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.hasNextPage).toBe(true);
-  });
-
-  it('has no next page when results are less than 10', async () => {
-    mockGet.mockResolvedValue({ data: { results: [{ type: 'message' }] } });
-
-    const { result } = renderHook(() => useContactHistory(5), {
-      wrapper: createQueryWrapper(),
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.hasNextPage).toBe(false);
   });
 });

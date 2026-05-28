@@ -81,7 +81,9 @@ describe('AppService', () => {
         });
         const messageId = 'msg-456';
 
-        redisClient.del.mockResolvedValueOnce(1);
+        // Stop flag set: any of the three `exists` checks returning truthy
+        // routes us into the stop branch (lead / removeAutomation / target).
+        redisClient.exists.mockResolvedValueOnce(1);
         redisClient.del.mockResolvedValue(1);
 
         // Act
@@ -93,6 +95,62 @@ describe('AppService', () => {
         expectTrackerSendCalled(mocks.mockTrackerService, 'MSGOPS_AUTOMATION_STOPPED', {
           automation_name: 'Test Automation',
         });
+      });
+
+      // Regression coverage for PR #197 audit gap #1: when the
+      // `removeAutomation` step from another flow has set the
+      // `automation:<id>:remove_contact:<contactId>` Redis flag, message-trigger
+      // silently parks the contact's queued step. Previously no record of
+      // the cancellation reached ClickHouse, so the contact-history timeline
+      // showed the automation as still running. We now emit
+      // `automation-canceled` with reason='removed-by-automation'.
+      it('emits automation-canceled when stopped by the removeAutomation Redis flag', async () => {
+        const mockLeadStateMessage = createMockLeadStateMessage({
+          automation: {
+            id: 50,
+            type: 'email',
+            title: 'Test Automation',
+            name: 'test-automation',
+            steps: [createMockStep(StepType.EMAIL)],
+          },
+        });
+
+        // Only the remove_contact key is set; the other two return 0.
+        redisClient.exists.mockImplementation((key: string | string[]) => {
+          if (typeof key === 'string' && key.startsWith('automation:50:remove_contact:')) {
+            return Promise.resolve(1);
+          }
+          return Promise.resolve(0);
+        });
+        redisClient.del.mockResolvedValue(1);
+
+        await service.receiveMessage(mockLeadStateMessage, 'msg-removed', null);
+
+        const cancelEmits = mocks.mockQueuePublisher.sendInternalEvent.mock.calls.map(([payload]: any[]) => payload).filter((p: any) => p?.event === 'automation-canceled');
+        expect(cancelEmits).toHaveLength(1);
+        expect(cancelEmits[0].automationId).toBe(50);
+        expect(cancelEmits[0].contactId).toBe(mockLeadStateMessage.contact.id);
+        expect(cancelEmits[0].properties.reason).toBe('removed-by-automation');
+      });
+
+      it('does NOT emit automation-canceled when stopped by the target-achieved Redis flag (already emitted upstream)', async () => {
+        const mockLeadStateMessage = createMockLeadStateMessage({
+          automation: { id: 50, type: 'email', title: 'Test', name: 't', steps: [createMockStep(StepType.EMAIL)] },
+        });
+
+        // Only the target key is set.
+        redisClient.exists.mockImplementation((key: string | string[]) => {
+          if (typeof key === 'string' && key.startsWith('automation_target_contact:')) {
+            return Promise.resolve(1);
+          }
+          return Promise.resolve(0);
+        });
+        redisClient.del.mockResolvedValue(1);
+
+        await service.receiveMessage(mockLeadStateMessage, 'msg-target', null);
+
+        const cancelEmits = mocks.mockQueuePublisher.sendInternalEvent.mock.calls.map(([payload]: any[]) => payload).filter((p: any) => p?.event === 'automation-canceled');
+        expect(cancelEmits).toHaveLength(0);
       });
 
       it('should throw BadRequestException on processing error', async () => {

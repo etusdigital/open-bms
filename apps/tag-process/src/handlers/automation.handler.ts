@@ -568,7 +568,14 @@ export class AutomationHandler {
         contactId: contact.id,
         uuid: contact.uuid,
         email: contact.email,
-        properties: { logic, contactInfo: contact },
+        // `conditions` is the raw structured trigger config (one entry per
+        // configured filter step — see definedConditional's switch). Downstream
+        // (msgops-api → frontend) decodes it to render "filtered out by:
+        // email_provider matches microsoft" etc. Replaces the previous
+        // `{ logic, contactInfo }` payload which leaked the full contact and
+        // was unparseable JS source. Old historical rows still carry that
+        // shape; msgops-api strips contactInfo defensively in the response.
+        properties: { conditions: conditionals },
       });
 
       return resultLogic;

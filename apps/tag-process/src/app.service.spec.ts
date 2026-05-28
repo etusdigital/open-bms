@@ -788,6 +788,36 @@ describe('AppService', () => {
 
       expect(queuePublisher.publishAnalyticsEvent).toHaveBeenCalledWith(expect.objectContaining({ contactId: 100 }));
     });
+
+    // Regression coverage: when targetAchieved cascades the completion to
+    // multiple automations sharing the same target, every matched automation
+    // must get its own `automation-completed` event (previously only
+    // `data.automationId` got an event, so the others vanished from the
+    // contact timeline).
+    it('emits one automation-completed event per matched automation', async () => {
+      const account = createAccount();
+      msgopsService.findAccount.mockResolvedValue(account);
+      msgopsService.completeTargetedAutomations.mockResolvedValue([
+        createContactAutomation({ id: 1, contactId: 100, automationId: 10, automationTitle: 'Primary' }),
+        createContactAutomation({ id: 2, contactId: 100, automationId: 11, automationTitle: 'Cascade A' }),
+        createContactAutomation({ id: 3, contactId: 100, automationId: 12, automationTitle: 'Cascade B' }),
+      ]);
+      msgopsService.findContactsUUID.mockResolvedValue([{ id: 100, uuid: 'uuid-1', email: 'a@t.com' }]);
+
+      await appService.targetAchieved({ accountId: 1, contactId: 100, automationId: 10 });
+
+      const emits = (queuePublisher.publishAnalyticsEvent as jest.Mock).mock.calls
+        .map(([payload]) => payload)
+        .filter((p) => p?.event === `automation-${Status.completed}`);
+
+      expect(emits).toHaveLength(3);
+      expect(emits.map((e) => e.automationId).sort()).toEqual([10, 11, 12]);
+      // Discriminator: the one that triggered the target check vs cascades.
+      const byAutomationId = Object.fromEntries(emits.map((e) => [e.automationId, e.properties.triggeredBy]));
+      expect(byAutomationId[10]).toBe('target-trigger');
+      expect(byAutomationId[11]).toBe('cascade');
+      expect(byAutomationId[12]).toBe('cascade');
+    });
   });
 
   describe('getMailBoxProvider', () => {
