@@ -105,6 +105,10 @@ x-backend-env: &backend-env
   EVOLUTION_HUB_API_KEY: ${EVOLUTION_HUB_API_KEY:-}
   EVOLUTION_HUB_WEBHOOK_SECRET: ${EVOLUTION_HUB_WEBHOOK_SECRET:-}
   BMS_PUBLIC_URL: ${BMS_PUBLIC_URL:-${FRONTEND_URL:-http://localhost:8080}}
+  # Anonymous instance telemetry (LGPD-compliant). See docs/telemetry.md.
+  # Set ETUS_TELEMETRY_ENABLED=false (or DO_NOT_TRACK=1) to disable.
+  ETUS_TELEMETRY_ENABLED: ${ETUS_TELEMETRY_ENABLED:-true}
+  ETUS_TELEMETRY_ENDPOINT: ${ETUS_TELEMETRY_ENDPOINT:-https://otw.etus.dev}
 
 x-infra-deps: &infra-deps
   postgres:

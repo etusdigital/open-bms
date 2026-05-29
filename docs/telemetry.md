@@ -63,11 +63,11 @@ The official SDK enforces a strict whitelist. Even if a future contributor accid
 
 ## About the admin owner email
 
-When you create the first admin account in the setup wizard, that e-mail is stored **locally** in the `system_config.telemetry_state.account_owner_email` row. This is for **your records only** — it lets you identify which operator activated the instance. It is **never** sent to `telemetry.etus.com.br`. The privacy test enforces this.
+When you create the first admin account in the setup wizard, that e-mail is stored **locally** in the `system_config.telemetry_state.account_owner_email` row. This is for **your records only** — it lets you identify which operator activated the instance. It is **never** sent to `otw.etus.dev`. The privacy test enforces this.
 
 ## Where the data goes
 
-`https://telemetry.etus.com.br` (configurable via `ETUS_TELEMETRY_ENDPOINT`). See the [upstream privacy policy](https://github.com/etusdigital/etus-open-telemetry/blob/main/docs/04-privacy-policy.md) for the controller's stated retention and access policies.
+`https://otw.etus.dev` (configurable via `ETUS_TELEMETRY_ENDPOINT`). Aggregated, anonymized data is published publicly at [telemetry.etus.dev](https://telemetry.etus.dev). See the [privacy policy](https://telemetry.etus.dev/privacy) for the controller's stated retention and access policies.
 
 ## How it works internally
 

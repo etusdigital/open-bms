@@ -152,6 +152,31 @@ export function Step1Admin({ onComplete }: Props) {
         </Alert>
       )}
 
+      <p className="text-muted-foreground text-xs leading-relaxed">
+        Para entender a adoção do projeto, esta instância envia telemetria anônima e agregada (versão,
+        contagem de usuários/contas, ambiente) — nunca e-mails, conteúdo de mensagens ou dados de contatos.
+        Os dados agregados são públicos em{' '}
+        <a
+          href="https://telemetry.etus.dev"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline underline-offset-2"
+        >
+          telemetry.etus.dev
+        </a>
+        . Você pode desativar a qualquer momento via{' '}
+        <code className="text-foreground">ETUS_TELEMETRY_ENABLED=false</code>. Saiba mais na{' '}
+        <a
+          href="https://telemetry.etus.dev/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline underline-offset-2"
+        >
+          política de privacidade
+        </a>
+        .
+      </p>
+
       <div className="mt-2 flex justify-end">
         <Button type="submit" disabled={submitting}>
           {submitting ? 'Criando...' : 'Criar e continuar'}
