@@ -100,13 +100,19 @@ export class TelemetryService implements OnApplicationBootstrap, OnApplicationSh
 
     let status: 'ok' | 'error' = 'ok';
     try {
-      const usage = await this.collectUsage();
-      const result = await telemetry.heartbeat({
+      const [usage, features, versionMajor] = await Promise.all([this.collectUsage(), this.collectFeatures(), this.detectPgVersionMajor()]);
+      const stats: Parameters<typeof telemetry.heartbeat>[0] = {
         runtime: 'node',
         runtime_version: process.versions.node,
-        database: { engine: 'postgres', version_major: await this.detectPgVersionMajor() },
+        database: { engine: 'postgres', version_major: versionMajor },
         usage,
-      });
+      };
+      // Only attach `features` when there is something to report — avoids
+      // sending two empty arrays on a freshly-installed instance.
+      if (features.enabled.length || features.integrations.length) {
+        stats.features = features;
+      }
+      const result = await telemetry.heartbeat(stats);
       if (!result || !result.ok) status = 'error';
     } catch (e: any) {
       status = 'error';
@@ -218,17 +224,75 @@ export class TelemetryService implements OnApplicationBootstrap, OnApplicationSh
     return this.superAdminRoleIdCache;
   }
 
+  // Aggregated, anonymous instance metrics — counts only, never row content.
+  // Each metric is collected independently: a missing/renamed table in a fork
+  // (or a slow count) drops just that metric, never the whole heartbeat. The
+  // SDK's usage map accepts up to 50 keys (ADR-0004); we send a curated set.
   private async collectUsage(): Promise<Record<string, number>> {
-    try {
-      const [users, accounts] = await Promise.all([
-        this.dataSource.query(`SELECT COUNT(*)::int AS c FROM users WHERE deleted_at IS NULL`).then((r: any) => r[0]?.c ?? 0),
-        this.dataSource.query(`SELECT COUNT(*)::int AS c FROM accounts WHERE deleted_at IS NULL`).then((r: any) => r[0]?.c ?? 0),
-      ]);
-      return { active_users: users, accounts };
-    } catch (e: any) {
-      this.logger.warn(`collectUsage failed (heartbeat will report empty usage): ${e?.message}`);
-      return {};
+    // [metricKey, SQL] — COUNT(*) only. Keep keys snake_case ([a-z][a-z0-9_]*)
+    // to satisfy the SDK's METRIC_KEY regex.
+    const metrics: Array<[string, string]> = [
+      ['active_users', `SELECT COUNT(*)::int AS c FROM users WHERE deleted_at IS NULL`],
+      ['accounts', `SELECT COUNT(*)::int AS c FROM accounts WHERE deleted_at IS NULL`],
+      ['contacts', `SELECT COUNT(*)::int AS c FROM contacts`],
+      ['campaigns', `SELECT COUNT(*)::int AS c FROM campaigns`],
+      ['messages', `SELECT COUNT(*)::int AS c FROM messages`],
+      ['automations', `SELECT COUNT(*)::int AS c FROM automations`],
+      ['tags', `SELECT COUNT(*)::int AS c FROM tags`],
+      ['email_templates', `SELECT COUNT(*)::int AS c FROM emails_templates`],
+      ['whatsapp_channels', `SELECT COUNT(*)::int AS c FROM whatsapp_channels`],
+      ['whatsapp_messages_sent', `SELECT COUNT(*)::int AS c FROM whatsapp_message_sends`],
+    ];
+
+    const results = await Promise.all(
+      metrics.map(async ([key, sql]) => {
+        try {
+          const r = await this.dataSource.query(sql);
+          return [key, (r?.[0]?.c ?? 0) as number] as const;
+        } catch (e: any) {
+          // Missing table in a fork or transient error — skip this metric only.
+          this.logger.warn(`collectUsage metric '${key}' failed (skipped): ${e?.message}`);
+          return null;
+        }
+      }),
+    );
+
+    const usage: Record<string, number> = {};
+    for (const entry of results) {
+      if (entry) usage[entry[0]] = entry[1];
     }
+    return usage;
+  }
+
+  // Best-effort feature/integration detection for the heartbeat `features`
+  // block. Reads env flags + a couple of cheap DB existence checks. Never
+  // throws — returns an empty shape on any error so the heartbeat still sends.
+  private async collectFeatures(): Promise<{ enabled: string[]; integrations: string[] }> {
+    const enabled: string[] = [];
+    const integrations: string[] = [];
+    try {
+      const provider = (process.env.WHATSAPP_PROVIDER ?? '').toLowerCase();
+      if (provider) enabled.push('whatsapp_cloud');
+      if (process.env.ENTERPRISE_IMPORT_ENABLED === 'true') enabled.push('enterprise_import');
+      if (process.env.AUTH_PROVIDER === 'auth0') enabled.push('auth0');
+
+      if (process.env.EVOLUTION_HUB_ENABLED === 'true' || process.env.EVOLUTION_HUB_API_KEY) integrations.push('evolution_hub');
+      if (process.env.WHATSAPP_APP_ID) integrations.push('whatsapp_meta');
+      // SendGrid placeholder key means "not really configured" — only count a real one.
+      const sg = process.env.SENDGRID_API_KEY ?? '';
+      if (sg && !sg.startsWith('dev-placeholder')) integrations.push('sendgrid');
+
+      // At least one configured WhatsApp channel → adoption signal.
+      try {
+        const r = await this.dataSource.query(`SELECT COUNT(*)::int AS c FROM whatsapp_channels`);
+        if ((r?.[0]?.c ?? 0) > 0 && !enabled.includes('whatsapp_channels')) enabled.push('whatsapp_channels');
+      } catch {
+        // table may not exist in a fork — ignore
+      }
+    } catch (e: any) {
+      this.logger.warn(`collectFeatures failed (features omitted): ${e?.message}`);
+    }
+    return { enabled, integrations };
   }
 
   private async detectPgVersionMajor(): Promise<string> {
