@@ -41,6 +41,14 @@ function buildService(overrides: Partial<{ stateRow: any; claimAffected: number;
       if (sql.includes('INSERT INTO system_config')) return [];
       if (sql.includes('FROM users')) return [{ c: 7 }];
       if (sql.includes('FROM accounts')) return [{ c: 3 }];
+      if (sql.includes('FROM contacts')) return [{ c: 1000 }];
+      if (sql.includes('FROM campaigns')) return [{ c: 12 }];
+      if (sql.includes('FROM messages')) return [{ c: 40 }];
+      if (sql.includes('FROM automations')) return [{ c: 2 }];
+      if (sql.includes('FROM tags')) return [{ c: 9 }];
+      if (sql.includes('FROM emails_templates')) return [{ c: 4 }];
+      if (sql.includes('FROM whatsapp_channels')) return [{ c: 1 }];
+      if (sql.includes('FROM whatsapp_message_sends')) return [{ c: 5 }];
       if (sql.includes('server_version_num')) return [{ server_version_num: '160003' }];
       return [];
     }),
@@ -184,10 +192,76 @@ describe('TelemetryService', () => {
     });
 
     it('is a no-op when telemetry is disabled', async () => {
-      (mockedTelemetry.isEnabled as jest.Mock).mockReturnValue(false);
+      // Once-only: runHeartbeat checks isEnabled() at the top. Using a permanent
+      // mockReturnValue here would leak `false` into later tests (clearAllMocks
+      // clears calls, not the implementation).
+      (mockedTelemetry.isEnabled as jest.Mock).mockReturnValueOnce(false);
       const { service } = buildService();
       await service.runHeartbeat();
       expect(mockedTelemetry.heartbeat).not.toHaveBeenCalled();
+    });
+
+    it('sends the full curated usage map (counts only)', async () => {
+      const { service } = buildService();
+      await service.runHeartbeat();
+      const [stats] = (mockedTelemetry.heartbeat as jest.Mock).mock.calls[0];
+      expect(stats.usage).toEqual({
+        active_users: 7,
+        accounts: 3,
+        contacts: 1000,
+        campaigns: 12,
+        messages: 40,
+        automations: 2,
+        tags: 9,
+        email_templates: 4,
+        whatsapp_channels: 1,
+        whatsapp_messages_sent: 5,
+      });
+    });
+
+    it('drops only the failing metric, never the whole heartbeat', async () => {
+      const { service, dataSource } = buildService();
+      const original = (dataSource.query as jest.Mock).getMockImplementation()!;
+      (dataSource.query as jest.Mock).mockImplementation(async (sql: string) => {
+        if (sql.includes('FROM contacts')) throw new Error('relation "contacts" does not exist');
+        return original(sql);
+      });
+      await service.runHeartbeat();
+      const [stats] = (mockedTelemetry.heartbeat as jest.Mock).mock.calls[0];
+      expect(stats.usage).not.toHaveProperty('contacts');
+      expect(stats.usage.active_users).toBe(7); // other metrics survive
+      expect(mockedTelemetry.heartbeat).toHaveBeenCalledTimes(1);
+    });
+
+    it('attaches detected features when env flags are set', async () => {
+      process.env.WHATSAPP_PROVIDER = 'cloud';
+      process.env.EVOLUTION_HUB_ENABLED = 'true';
+      process.env.ENTERPRISE_IMPORT_ENABLED = 'true';
+      const { service } = buildService();
+      await service.runHeartbeat();
+      const [stats] = (mockedTelemetry.heartbeat as jest.Mock).mock.calls[0];
+      expect(stats.features.enabled).toEqual(expect.arrayContaining(['whatsapp_cloud', 'enterprise_import', 'whatsapp_channels']));
+      expect(stats.features.integrations).toEqual(expect.arrayContaining(['evolution_hub']));
+    });
+
+    it('omits features entirely when nothing is enabled', async () => {
+      // No WHATSAPP_PROVIDER / hub / enterprise flags, and no whatsapp channels.
+      const { service, dataSource } = buildService();
+      const original = (dataSource.query as jest.Mock).getMockImplementation()!;
+      (dataSource.query as jest.Mock).mockImplementation(async (sql: string) => {
+        if (sql.includes('FROM whatsapp_channels')) return [{ c: 0 }];
+        return original(sql);
+      });
+      delete process.env.WHATSAPP_PROVIDER;
+      delete process.env.EVOLUTION_HUB_ENABLED;
+      delete process.env.EVOLUTION_HUB_API_KEY;
+      delete process.env.ENTERPRISE_IMPORT_ENABLED;
+      delete process.env.WHATSAPP_APP_ID;
+      delete process.env.AUTH_PROVIDER;
+      process.env.SENDGRID_API_KEY = 'dev-placeholder-not-a-real-key';
+      await service.runHeartbeat();
+      const [stats] = (mockedTelemetry.heartbeat as jest.Mock).mock.calls[0];
+      expect(stats.features).toBeUndefined();
     });
   });
 
