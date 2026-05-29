@@ -46,7 +46,10 @@ export class TelemetryService implements OnApplicationBootstrap, OnApplicationSh
     const envEnabled = process.env.ETUS_TELEMETRY_ENABLED;
     // Default: opt-in unless explicitly set to 'false'.
     const optedIn = envEnabled === 'false' ? false : true;
-    const endpoint = process.env.ETUS_TELEMETRY_ENDPOINT || DEFAULT_ENDPOINT;
+    // Strip trailing slash(es): the SDK builds `${endpoint}/v1/events`, so a
+    // trailing slash would yield `//v1/events` → 404 (and telemetry failures are
+    // swallowed, so it would fail silently forever).
+    const endpoint = (process.env.ETUS_TELEMETRY_ENDPOINT || DEFAULT_ENDPOINT).replace(/\/+$/, '');
 
     try {
       const result = telemetry.init({

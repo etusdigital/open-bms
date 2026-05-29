@@ -1,6 +1,9 @@
 export const TELEMETRY_STATE_KEY = 'telemetry_state';
 
-export const DEFAULT_ENDPOINT = 'https://telemetry.etus.com.br';
+// @etus/telemetry-sdk ≥0.1.1 ships no default endpoint (init returns
+// reason='no_endpoint' → no-op when none is given), so BMS supplies its own.
+// Overridable via ETUS_TELEMETRY_ENDPOINT.
+export const DEFAULT_ENDPOINT = 'https://otw.etus.dev';
 
 export const PRODUCT_NAME = 'open-bms';
 
