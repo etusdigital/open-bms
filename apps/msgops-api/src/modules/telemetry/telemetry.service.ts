@@ -67,7 +67,13 @@ export class TelemetryService implements OnApplicationBootstrap, OnApplicationSh
   async onApplicationBootstrap(): Promise<void> {
     await this.initOnBootstrap();
     if (!telemetry.isEnabled()) return;
-    this.scheduleNextTick();
+    // Catch-up scheduling: derive the first delay from the persisted
+    // last_heartbeat_at instead of always waiting a full period. Without this,
+    // an instance that restarts more often than once a day (deploys, OOM, node
+    // drains) would reset the in-memory timer every boot and never actually
+    // emit a heartbeat. The timestamp lives in system_config (survives
+    // restarts), so the cadence is wall-clock driven, not uptime driven.
+    await this.scheduleNextTick(true);
   }
 
   onApplicationShutdown(): void {
@@ -77,20 +83,48 @@ export class TelemetryService implements OnApplicationBootstrap, OnApplicationSh
     }
   }
 
-  private nextDelayMs(): number {
+  // Steady-state delay: one period ± jitter.
+  private steadyDelayMs(): number {
     const jitter = Math.floor((Math.random() - 0.5) * 2 * HEARTBEAT_JITTER_MS);
     return HEARTBEAT_PERIOD_MS + jitter;
   }
 
-  private scheduleNextTick(): void {
+  // First-tick delay after boot. If a heartbeat is already overdue (or none was
+  // ever sent), fire soon — with a small random spread (up to the jitter
+  // window) so simultaneously-restarted replicas don't stampede the endpoint.
+  // Otherwise wait only the time remaining until the next period elapses.
+  private async firstDelayMs(): Promise<number> {
+    try {
+      const state = await this.readState();
+      const last = state?.last_heartbeat_at ? Date.parse(state.last_heartbeat_at) : NaN;
+      if (!Number.isFinite(last)) {
+        // Never emitted on this instance — fire soon, lightly spread.
+        return Math.floor(Math.random() * HEARTBEAT_JITTER_MS);
+      }
+      const elapsed = Date.now() - last;
+      if (elapsed >= HEARTBEAT_PERIOD_MS) {
+        // Overdue — fire soon, lightly spread to avoid a replica stampede.
+        return Math.floor(Math.random() * HEARTBEAT_JITTER_MS);
+      }
+      // Not due yet — wait only the remainder of the period.
+      return HEARTBEAT_PERIOD_MS - elapsed;
+    } catch (e: any) {
+      this.logger.warn(`firstDelayMs failed, falling back to steady delay: ${e?.message}`);
+      return this.steadyDelayMs();
+    }
+  }
+
+  private async scheduleNextTick(isFirst = false): Promise<void> {
     if (this.timer) clearTimeout(this.timer);
+    const delay = isFirst ? await this.firstDelayMs() : this.steadyDelayMs();
     this.timer = setTimeout(() => {
       this.runHeartbeat()
         .catch((e) => this.logger.warn(`heartbeat error: ${e?.message}`))
         .finally(() => {
-          if (telemetry.isEnabled()) this.scheduleNextTick();
+          // Subsequent ticks always use the steady period.
+          if (telemetry.isEnabled()) void this.scheduleNextTick(false);
         });
-    }, this.nextDelayMs());
+    }, delay);
     // Don't keep the event loop alive just for telemetry.
     if (typeof this.timer.unref === 'function') this.timer.unref();
   }

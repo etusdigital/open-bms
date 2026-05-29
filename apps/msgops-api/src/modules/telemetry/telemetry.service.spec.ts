@@ -1,6 +1,7 @@
 import { telemetry } from '@etus/telemetry-sdk';
 import { TelemetryService } from './telemetry.service';
 import { ROLE_CODES } from '../authz/authz.constants';
+import { HEARTBEAT_JITTER_MS, HEARTBEAT_PERIOD_MS } from './telemetry.constants';
 
 jest.mock('@etus/telemetry-sdk', () => {
   const state = { enabled: true };
@@ -262,6 +263,44 @@ describe('TelemetryService', () => {
       await service.runHeartbeat();
       const [stats] = (mockedTelemetry.heartbeat as jest.Mock).mock.calls[0];
       expect(stats.features).toBeUndefined();
+    });
+  });
+
+  describe('firstDelayMs (catch-up scheduling)', () => {
+    it('fires soon when no heartbeat was ever emitted', async () => {
+      const { service } = buildService({ stateRow: { value: {} } });
+      const delay = await (service as any).firstDelayMs();
+      // Short, lightly-spread delay within the jitter window — not a full period.
+      expect(delay).toBeGreaterThanOrEqual(0);
+      expect(delay).toBeLessThanOrEqual(HEARTBEAT_JITTER_MS);
+    });
+
+    it('fires soon when a heartbeat is overdue (> period since last)', async () => {
+      const twoDaysAgo = new Date(Date.now() - 2 * HEARTBEAT_PERIOD_MS).toISOString();
+      const { service } = buildService({ stateRow: { value: { last_heartbeat_at: twoDaysAgo } } });
+      const delay = await (service as any).firstDelayMs();
+      expect(delay).toBeGreaterThanOrEqual(0);
+      expect(delay).toBeLessThanOrEqual(HEARTBEAT_JITTER_MS);
+    });
+
+    it('waits only the remaining time when a heartbeat is recent', async () => {
+      // 1h ago → ~23h remaining of the 24h period.
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { service } = buildService({ stateRow: { value: { last_heartbeat_at: oneHourAgo } } });
+      const delay = await (service as any).firstDelayMs();
+      const remaining = HEARTBEAT_PERIOD_MS - 60 * 60 * 1000;
+      // Allow a few seconds of slack for test execution time.
+      expect(delay).toBeGreaterThan(remaining - 5000);
+      expect(delay).toBeLessThanOrEqual(remaining);
+    });
+
+    it('falls back to a steady delay when reading state throws', async () => {
+      const { service, systemConfigRepo } = buildService();
+      (systemConfigRepo.findOne as jest.Mock).mockRejectedValueOnce(new Error('db down'));
+      const delay = await (service as any).firstDelayMs();
+      // Steady delay is one period ± jitter.
+      expect(delay).toBeGreaterThanOrEqual(HEARTBEAT_PERIOD_MS - HEARTBEAT_JITTER_MS);
+      expect(delay).toBeLessThanOrEqual(HEARTBEAT_PERIOD_MS + HEARTBEAT_JITTER_MS);
     });
   });
 
