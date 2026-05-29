@@ -121,6 +121,12 @@
 #  • msgops-api roteia /api/* diretamente via Traefik com StripPrefix. SEM nginx
 #    no meio (o nginx do frontend-react tinha proxy_read_timeout 60s que matava
 #    operações longas — import enterprise, exports).
+#  • traefik.docker.network usa o NOME REAL da overlay (TRAEFIK_NETWORK_NAME,
+#    default bmsNet), NÃO o alias compose `network_public`. Com o alias, o
+#    swarm provider loga "Could not find network named network_public" e cai
+#    no fallback "first available network" — que pode ser a `internal` (IP que
+#    o Traefik não alcança), causando 504 intermitente em serviços multi-rede
+#    (msgops-api, event-receiver). Diagnóstico: dial 10s → 504, container são.
 #  • frontend-react só na network_public — sem precisar resolver msgops-api
 #    internamente (Traefik separa as rotas).
 #  • enterprise-import é um worker BullMQ que consome jobs enfileirados pelo
@@ -418,7 +424,10 @@ services:
           memory: 256M
       labels:
         - traefik.enable=true
-        - traefik.docker.network=network_public
+        # Real overlay network name (not the `network_public` compose alias) —
+        # see the bms-api service for why. Avoids the swarm provider falling
+        # back to `internal` and causing intermittent 504s.
+        - traefik.docker.network=${TRAEFIK_NETWORK_NAME:-bmsNet}
         - traefik.http.routers.bms-ch-ui.rule=Host(`${CH_UI_HOST}`)
         - traefik.http.routers.bms-ch-ui.entrypoints=websecure
         - traefik.http.routers.bms-ch-ui.tls.certresolver=letsencryptresolver
@@ -471,7 +480,14 @@ services:
         # operações longas (import, exports, bulk) usam o timeout do entrypoint
         # do Traefik (configurado em 600s no service traefik externo).
         - traefik.enable=true
-        - traefik.docker.network=network_public
+        # IMPORTANT: this must be the REAL overlay network name (e.g. bmsNet),
+        # NOT the compose alias `network_public`. The swarm provider resolves
+        # the label against Docker's actual network names; with the alias it
+        # logs "Could not find network named network_public" and falls back to
+        # "first available network" — which is non-deterministic and often picks
+        # `internal` (an IP Traefik can't reach) → intermittent 504s. See the
+        # bms_evo_internal fallback bug. Keep in sync with TRAEFIK_NETWORK_NAME.
+        - traefik.docker.network=${TRAEFIK_NETWORK_NAME:-bmsNet}
         - traefik.http.routers.bms-api.rule=Host(`${FRONTEND_HOST}`) && PathPrefix(`/api`)
         - traefik.http.routers.bms-api.entrypoints=websecure
         - traefik.http.routers.bms-api.tls.certresolver=letsencryptresolver
@@ -502,7 +518,10 @@ services:
           memory: 256M
       labels:
         - traefik.enable=true
-        - traefik.docker.network=network_public
+        # Real overlay network name (not the `network_public` compose alias).
+        # frontend-react is only on network_public, so the fallback is harmless
+        # here, but we keep it explicit and consistent with the other services.
+        - traefik.docker.network=${TRAEFIK_NETWORK_NAME:-bmsNet}
         # Catch-all do host — pega tudo que não casar com bms-api (priority 20)
         # nem bms-events (priority 30). SPA + estáticos.
         - traefik.http.routers.bms-ui.rule=Host(`${FRONTEND_HOST}`)
@@ -524,7 +543,10 @@ services:
           memory: 512M
       labels:
         - traefik.enable=true
-        - traefik.docker.network=network_public
+        # Real overlay network name (not the `network_public` compose alias) —
+        # event-receiver is also on `internal`, so the alias would let the swarm
+        # provider fall back to an unreachable internal IP → intermittent 504s.
+        - traefik.docker.network=${TRAEFIK_NETWORK_NAME:-bmsNet}
         - traefik.http.routers.bms-events.rule=Host(`${FRONTEND_HOST}`) && PathPrefix(`/bms/events`)
         - traefik.http.routers.bms-events.entrypoints=websecure
         - traefik.http.routers.bms-events.tls.certresolver=letsencryptresolver
