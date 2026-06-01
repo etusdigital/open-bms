@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useAccountId } from '../use-settings';
 import { accountPushGateway, type AccountPushSettings } from './push-account-gateway';
+import { WebPushSection } from './web-push-section';
 
 export function PushTab() {
   const { t } = useTranslation();
@@ -63,9 +64,10 @@ export function PushTab() {
   if (isLoading) return <p className="text-muted-foreground text-sm">{t('common.loading') ?? 'Carregando...'}</p>;
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="flex max-w-xl flex-col gap-4">
       <div>
-        <h3 className="text-lg font-medium">Push (Mobile + Web)</h3>
+        <h3 className="text-lg font-medium">Envio (FCM Service Account — Mobile)</h3>
         <p className="text-muted-foreground text-sm">
           {t('settings.pushDescription') ?? 'Firebase service account (JSON) desta conta. Usado para push mobile e web. Sem config, usa a credencial da plataforma.'}
         </p>
@@ -107,5 +109,7 @@ export function PushTab() {
         )}
       </div>
     </form>
+    <WebPushSection />
+    </>
   );
 }
