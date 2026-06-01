@@ -509,9 +509,10 @@ export class AccountsService {
     snippet: string;
     settings: any | null;
   }> {
-    const assetsUrl = await this.storage.getAssetsUrl();
-    const fileName = `bmspush-${createHash('sha256').update(`${accountId}`).digest('hex')}.js`;
-    const serviceWorkerUrl = assetsUrl ? `https://${assetsUrl}/bms/push/${fileName}` : null;
+    // Served by BMS itself (no public S3/CDN needed): GET /bms/push/:hash.js.
+    const accountHashForUrl = createHash('sha256').update(`${accountId}`).digest('hex');
+    const publicBase = (process.env.BMS_PUBLIC_URL || process.env.FRONTEND_URL || '').replace(/\/+$/, '');
+    const serviceWorkerUrl = publicBase ? `${publicBase}/bms/push/${accountHashForUrl}.js` : null;
 
     const [apiKeyRow, domainRow, settingsRow] = await Promise.all([
       this.findByAccountConfig(accountId, 'api_key'),
@@ -528,6 +529,9 @@ export class AccountsService {
     } catch {
       /* leave blank if not a valid URL */
     }
+    // The tracker script (bmstrk.js) is an external asset. Prefer the configured
+    // assets host if present; otherwise fall back to the known public CDN.
+    const assetsUrl = await this.storage.getAssetsUrl().catch(() => undefined);
     const trackerScriptUrl = assetsUrl ? `https://${assetsUrl}/bms/bmstrk.js` : 'https://assets.bri.us/bms/bmstrk.js';
 
     const snippet = [
@@ -556,11 +560,41 @@ export class AccountsService {
     return { ok: true };
   }
 
-  // Regenerate the account's sw.js wrapper on demand, preserving its opt-in vars.
-  async regenerateAccountServiceWorker(accountId: number): Promise<{ serviceWorkerUrl: string | null }> {
+  // Resolve a public accountHash (sha256 of the id) back to an account id.
+  // The hash isn't reversible and isn't indexed, so we hash each active account's
+  // id and match. Cheap (sha256) and the set of accounts is small; result cached.
+  private accountHashCache: Map<string, number> | null = null;
+  async resolveAccountIdByHash(hash: string): Promise<number | null> {
+    if (this.accountHashCache?.has(hash)) return this.accountHashCache.get(hash)!;
+    const accounts = await this.getAllAccountsLightweight();
+    const map = new Map<string, number>();
+    for (const a of accounts) map.set(createHash('sha256').update(`${a.id}`).digest('hex'), a.id);
+    this.accountHashCache = map;
+    return map.get(hash) ?? null;
+  }
+
+  // Renders the account's web-push service worker ON THE FLY (no S3): platform
+  // Firebase web config (from FCM system_config) + the account's opt-in vars.
+  // Served by the public route GET /bms/push/:accountHash.js. Contains only
+  // public values (web config, VAPID public key, tracker URL) — no secrets.
+  async renderAccountServiceWorker(accountId: number): Promise<string> {
+    // Platform web config lives in fcm_settings (system_config). Read it directly
+    // to avoid a cross-module dependency on AdminFcmService.
+    const fcm = await this.accountConfigRepository.manager.query(`SELECT value FROM system_config WHERE key = 'fcm_settings' LIMIT 1`).catch(() => []);
+    const webConfig = fcm?.[0]?.value?.webConfig as Record<string, string> | undefined;
     const settingsRow = await this.findByAccountConfig(accountId, 'webpush_settings');
     const contentVars = settingsRow?.value ? this.parsePushContentVars(settingsRow.value) : '';
-    await this.uploadWebPushFile(accountId, contentVars);
+    const trackerUrl = process.env.WEB_PUSH_TRACKER_URL || `${process.env.BMS_PUBLIC_URL ?? ''}/bms/events?platform=web-push`;
+    const { buildPlatformServiceWorker } = await import('../../lib/web-push-sw');
+    const core = buildPlatformServiceWorker({ webConfig, trackerUrl });
+    // Prepend the per-account opt-in vars (consumed by the on-page script).
+    return [contentVars, core].filter(Boolean).join('\n');
+  }
+
+  // With the BMS-served (generate-on-request) SW, there is nothing to "publish":
+  // the file is always rendered fresh from the latest config. This just returns
+  // the current URL so the UI can confirm. Kept for API compatibility.
+  async regenerateAccountServiceWorker(accountId: number): Promise<{ serviceWorkerUrl: string | null }> {
     const { serviceWorkerUrl } = await this.getWebPushIntegration(accountId);
     return { serviceWorkerUrl };
   }
