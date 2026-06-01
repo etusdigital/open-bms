@@ -224,7 +224,14 @@ function ProvidersTable({ providers, defaultProvider, onEdit, onDelete, onSetDef
       <TableBody>
         {providers.map((p) => (
           <TableRow key={p.name} data-testid={`provider-row-${p.name}`}>
-            <TableCell className="font-medium">{p.label}</TableCell>
+            <TableCell className="font-medium">
+              {p.label}
+              {p.fromDomain && (
+                <span className="text-muted-foreground block text-xs font-normal" data-testid={`provider-domain-${p.name}`}>
+                  {p.fromDomain}
+                </span>
+              )}
+            </TableCell>
             <TableCell>
               <Badge variant="outline" className="text-muted-foreground">Não testado</Badge>
             </TableCell>

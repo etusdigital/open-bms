@@ -28,23 +28,34 @@ describe('sendgrid-account-gateway', () => {
     mockedClient.delete.mockReset();
   });
 
-  it('get() targets the account-scoped endpoint and returns webhookUrl alongside source', async () => {
+  it('get() targets the account-scoped endpoint and returns webhookUrl + fromDomain alongside source', async () => {
     mockedClient.get.mockResolvedValueOnce({
-      data: { source: 'account', apiKeyMasked: 'SG.****...zzzz', webhookUrl: 'https://hook?account=42' },
+      data: { source: 'account', apiKeyMasked: 'SG.****...zzzz', webhookUrl: 'https://hook?account=42', fromDomain: 'mail.acme.com' },
     });
     const out = await accountSendgridGateway.get(42);
     expect(mockedClient.get).toHaveBeenCalledWith('/accounts/42/settings/sendgrid');
     expect(out.source).toBe('account');
     expect(out.webhookUrl).toBe('https://hook?account=42');
+    expect(out.fromDomain).toBe('mail.acme.com');
   });
 
-  it('save() PUTs apiKey to the account-scoped endpoint and returns the persisted view', async () => {
+  it('save() PUTs apiKey + fromDomain to the account-scoped endpoint and returns the persisted view', async () => {
     mockedClient.put.mockResolvedValueOnce({
-      data: { source: 'account', apiKeyMasked: 'SG.****...9999', webhookUrl: 'https://hook?account=42' },
+      data: { source: 'account', apiKeyMasked: 'SG.****...9999', webhookUrl: 'https://hook?account=42', fromDomain: 'mail.acme.com' },
     });
-    const out = await accountSendgridGateway.save(42, { apiKey: 'SG.client9999' });
-    expect(mockedClient.put).toHaveBeenCalledWith('/accounts/42/settings/sendgrid', { apiKey: 'SG.client9999' });
+    const out = await accountSendgridGateway.save(42, { apiKey: 'SG.client9999', fromDomain: 'mail.acme.com' });
+    expect(mockedClient.put).toHaveBeenCalledWith('/accounts/42/settings/sendgrid', { apiKey: 'SG.client9999', fromDomain: 'mail.acme.com' });
     expect(out.apiKeyMasked).toBe('SG.****...9999');
+    expect(out.fromDomain).toBe('mail.acme.com');
+  });
+
+  it('save() supports metadata-only edits (fromDomain without apiKey)', async () => {
+    mockedClient.put.mockResolvedValueOnce({
+      data: { source: 'account', apiKeyMasked: 'SG.****...9999', webhookUrl: 'https://hook?account=42', fromDomain: 'news.acme.com' },
+    });
+    const out = await accountSendgridGateway.save(42, { fromDomain: 'news.acme.com' });
+    expect(mockedClient.put).toHaveBeenCalledWith('/accounts/42/settings/sendgrid', { fromDomain: 'news.acme.com' });
+    expect(out.fromDomain).toBe('news.acme.com');
   });
 
   it('remove() DELETEs the account-scoped endpoint', async () => {

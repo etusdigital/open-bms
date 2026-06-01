@@ -1137,4 +1137,57 @@ describe('AppService (Refactored)', () => {
       });
     });
   });
+
+  // EVO-1466: fromDomain gate on the send path
+  describe('applyFromDomainGate', () => {
+    const gate = (msg: any) => (service as any).applyFromDomainGate(msg);
+
+    const buildMsg = (configs: Array<{ name: string; value: string }>, fromEmail?: string) => ({
+      messageId: 'msg-1',
+      account: { id: 7, accountConfigs: configs },
+      message: { from: fromEmail === undefined ? {} : { email: fromEmail, firstName: 'Original' } },
+    });
+
+    beforeEach(() => {
+      mailUtils.getAccountConfig.mockImplementation((configs: any, key: string) => (configs || []).find((c: any) => c.name === key)?.value);
+    });
+
+    it('is inert when no sendgrid_from_domain is configured', () => {
+      const msg = buildMsg([], 'who@other.com');
+      gate(msg);
+      expect(msg.message.from.email).toBe('who@other.com');
+    });
+
+    it('leaves the From untouched when its domain already matches (case-insensitive)', () => {
+      const msg = buildMsg([{ name: 'sendgrid_from_domain', value: 'mail.acme.com' }], 'news@MAIL.ACME.COM');
+      gate(msg);
+      expect(msg.message.from.email).toBe('news@MAIL.ACME.COM');
+    });
+
+    it('overrides a mismatched From with noreply@<verified-domain>, preserving the display name, and logs', () => {
+      const msg = buildMsg([{ name: 'sendgrid_from_domain', value: 'mail.acme.com' }], 'who@evil.com');
+      gate(msg);
+      expect(msg.message.from.email).toBe('noreply@mail.acme.com');
+      expect(msg.message.from.firstName).toBe('Original'); // display name kept
+      expect(trackerService.logInfo).toHaveBeenCalled();
+    });
+
+    it('overrides an absent From with noreply@<verified-domain>', () => {
+      const msg = buildMsg([{ name: 'sendgrid_from_domain', value: 'mail.acme.com' }], undefined);
+      gate(msg);
+      expect(msg.message.from.email).toBe('noreply@mail.acme.com');
+    });
+
+    it('synthesises the sender from the configured domain regardless of any stored default_sender_* config', () => {
+      const msg = buildMsg(
+        [
+          { name: 'sendgrid_from_domain', value: 'Mail.Acme.COM' },
+          { name: 'default_sender_email', value: 'ignored@somewhere.else' },
+        ],
+        'who@evil.com',
+      );
+      gate(msg);
+      expect(msg.message.from.email).toBe('noreply@mail.acme.com'); // domain lower-cased, stored config ignored
+    });
+  });
 });
