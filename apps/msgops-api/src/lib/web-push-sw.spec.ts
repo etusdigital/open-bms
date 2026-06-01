@@ -36,11 +36,50 @@ describe('buildWebPush', () => {
     expect(out).not.toContain(`${base}//bms`);
   });
 
-  it('retains the SDK-default Firebase config (overridden at runtime via bmsTrkOptions)', () => {
-    // We intentionally do NOT edit the bundle's hardcoded config — the snippet's
-    // window.bmsTrkOptions.firebaseConfig overrides it at runtime. The default
-    // staying present proves we did not corrupt the constructor.
+  it('retains the bri.us bundle config when no platform config is supplied', () => {
+    // Without FCM configured, the bundle defaults stay in place (web-push targets
+    // the bri.us project until Super-Admin sets it). Proves we did not corrupt the
+    // constructor and substitution is opt-in.
     expect(out).toContain('bms-push-49662');
+  });
+});
+
+describe('buildWebPush — platform Firebase substitution (single-project)', () => {
+  const base = 'https://bms.example.com';
+  const PLATFORM = {
+    webConfig: {
+      apiKey: 'AIza-bms-open-key',
+      authDomain: 'bms-open.firebaseapp.com',
+      projectId: 'bms-open',
+      storageBucket: 'bms-open.firebasestorage.app',
+      messagingSenderId: '799302104089',
+      appId: '1:799302104089:web:0a260a4b204d557dcb2688',
+      measurementId: 'G-OPEN123',
+    },
+    vapidPublicKey: 'BE_PlatformVapidKey_xyz',
+  };
+  const out = buildWebPush(base, PLATFORM);
+
+  it('substitutes the FULL platform Firebase config — project AND sender move together', () => {
+    expect(out).toContain("'bms-open'");
+    expect(out).toContain("'799302104089'");
+    expect(out).toContain("'1:799302104089:web:0a260a4b204d557dcb2688'");
+    // A mixed config (bms-open project + bri.us sender) would mint dead tokens —
+    // assert NONE of the bri.us values survive.
+    expect(out).not.toContain('bms-push-49662');
+    expect(out).not.toContain('570410747557');
+    expect(out).not.toContain('AIzaSyDCZGtCEwcA3Cp5pD1LkapMp_Nkf8XgslE');
+  });
+
+  it('substitutes the VAPID public key', () => {
+    expect(out).toContain("'BE_PlatformVapidKey_xyz'");
+    expect(out).not.toContain('BPoMGU5hsce_S3F4Uicv6zfZ_fCs09kKqMvmu66MMlKR5UpTBy7DBOZxnAzgN9BfOA1sCOvsKOpHw7uHQv8iKG0');
+  });
+
+  it('keeps the SDK body intact after substitution', () => {
+    expect(out).toContain('class bmsPush');
+    expect(out).toContain('initializeApp');
+    expect(out).not.toContain('__BMS_');
   });
 });
 

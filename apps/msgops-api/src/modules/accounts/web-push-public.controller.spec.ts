@@ -11,6 +11,7 @@ function buildController(svc: Partial<AccountsService> = {}) {
   const accountsService = {
     resolveAccountIdByHash: jest.fn(),
     renderAccountServiceWorker: jest.fn(),
+    getWebPushPlatformConfig: jest.fn().mockResolvedValue(null),
     ...svc,
   } as unknown as AccountsService;
   const controller = new WebPushPublicController(accountsService);
@@ -79,11 +80,11 @@ describe('WebPushPublicController', () => {
   });
 
   describe('serveWebPush (GET /bms/web-push.js)', () => {
-    it('serves the vendored FCM client with endpoints rewritten to this instance', () => {
+    it('serves the vendored FCM client with endpoints rewritten to this instance', async () => {
       const { controller } = buildController();
       const res = mockRes();
 
-      controller.serveWebPush(res);
+      await controller.serveWebPush(res);
 
       const sent = res.send.mock.calls[0][0] as string;
       // Vendored Firebase SDK + bmsPush class must be intact...
@@ -95,6 +96,33 @@ describe('WebPushPublicController', () => {
       expect(sent).not.toContain('in.bri.us');
       expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/javascript; charset=utf-8');
       expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'public, max-age=300');
+    });
+
+    it('substitutes the platform Firebase config when FCM is configured', async () => {
+      const { controller } = buildController({
+        // A real Firebase web config has all 7 fields (the Console generates them);
+        // every bri.us field must be replaced or a mixed config would survive.
+        getWebPushPlatformConfig: jest.fn().mockResolvedValue({
+          webConfig: {
+            apiKey: 'AIza-open',
+            authDomain: 'bms-open.firebaseapp.com',
+            projectId: 'bms-open',
+            storageBucket: 'bms-open.firebasestorage.app',
+            messagingSenderId: '799302104089',
+            appId: '1:799302104089:web:x',
+            measurementId: 'G-OPEN',
+          },
+          vapidPublicKey: 'BE_platform_vapid',
+        }),
+      } as any);
+      const res = mockRes();
+
+      await controller.serveWebPush(res);
+
+      const sent = res.send.mock.calls[0][0] as string;
+      expect(sent).toContain("'bms-open'");
+      expect(sent).toContain("'799302104089'");
+      expect(sent).not.toContain('bms-push-49662');
     });
   });
 });
