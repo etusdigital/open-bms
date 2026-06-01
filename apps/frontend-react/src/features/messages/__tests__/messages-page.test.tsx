@@ -17,6 +17,7 @@ vi.mock('../use-messages', () => ({
   useDuplicateMessage: () => ({ mutate: mockDuplicateMutate, isPending: false }),
   useSendersForSelect: () => ({ data: [], isLoading: false, isSuccess: true }),
   useAutomationsForSelect: () => ({ data: [], isLoading: false }),
+  useSyncTemplatesFromMeta: () => ({ mutate: vi.fn(), mutateAsync: vi.fn().mockResolvedValue({ created: 0, updated: 0, skipped: 0, total: 0 }), isPending: false }),
 }));
 
 function renderPage(messageType: 'email' | 'sms' | 'web-push' | 'mobile-push' | 'whatsapp' = 'email') {
