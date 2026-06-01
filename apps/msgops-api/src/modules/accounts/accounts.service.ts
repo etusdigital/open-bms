@@ -11,8 +11,6 @@ import { CustomFieldsEntity } from '../../entities/custom-fields.entity';
 import { PageDto } from '../../dtos/filters/page.dto';
 import { RedisService } from '../../providers/redis.provider';
 import { createHash, randomBytes } from 'crypto';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { S3StorageProvider } from '../../providers/s3-storage.provider';
 import { SchedulerService } from 'src/providers/queue/scheduler.service';
 import { QUEUE_BMS_USAGE } from 'src/providers/queue/queue.constants';
@@ -410,54 +408,6 @@ export class AccountsService {
     }
   }
 
-  // Platform-default Firebase web config (the legacy hardcoded bms-sw.js values).
-  // Used as fallback for accounts that have not configured their own web project.
-  // These are CLIENT-side public values (not secrets) — embedded in the SW the
-  // customer serves.
-  private platformFirebaseWebConfig(): Record<string, string> | null {
-    const raw = process.env.FIREBASE_WEB_CONFIG;
-    if (raw) {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        /* fall through */
-      }
-    }
-    return null;
-  }
-
-  // Resolves the Firebase web config + tracker URL for an account's service
-  // worker. Per-account config (firebase_web_config) wins; otherwise the platform
-  // default. Returns null when neither is set (web-push registration not possible).
-  private async resolveWebPushFirebaseConfig(accountId: number): Promise<Record<string, string> | null> {
-    const row = await this.findByAccountConfig(accountId, 'firebase_web_config');
-    if (row?.value) {
-      try {
-        return JSON.parse(row.value);
-      } catch {
-        /* fall through to platform */
-      }
-    }
-    return this.platformFirebaseWebConfig();
-  }
-
-  // Loads the SW core template (versioned in the repo) and substitutes the
-  // per-account placeholders, producing a SELF-CONTAINED service worker. We no
-  // longer importScripts a shared core from S3 — the account's own Firebase
-  // config must be baked in so the registering project matches the sending
-  // project (FCM SenderId invariant). `extraContent` carries the opt-in/popup
-  // vars (webpush_settings_replace) consumed by the on-page script.
-  private buildServiceWorkerContent(firebaseConfig: Record<string, string> | null, extraContent: string): string {
-    const corePath = join(__dirname, '../../assets/push/bms-sw-core.js');
-    const core = readFileSync(corePath, 'utf8');
-    const trackerUrl = process.env.WEB_PUSH_TRACKER_URL || `${process.env.BMS_PUBLIC_URL ?? ''}/bms/events?platform=web-push`;
-    return [
-      `// Generated ${new Date().toISOString()} — do not edit; source: assets/push/bms-sw-core.js`,
-      extraContent,
-      core.replace('__BMS_TRACKER_URL__', trackerUrl).replace('__BMS_FIREBASE_CONFIG__', JSON.stringify(firebaseConfig ?? {})),
-    ].join('\n');
-  }
-
   async uploadWebPushFile(accountId: number, content = '') {
     const assetsUrl = await this.storage.getAssetsUrl();
     const bucket = await this.storage.getDefaultBucket();
@@ -465,9 +415,12 @@ export class AccountsService {
       throw new HttpException('BMS_ASSETS_URL não configurado em /super-admin/integrations/s3 — Service Worker requer host público.', HttpStatus.SERVICE_UNAVAILABLE);
     }
 
-    const firebaseConfig = await this.resolveWebPushFirebaseConfig(accountId);
     const fileName = `bmspush-${createHash('sha256').update(`${accountId}`).digest('hex')}.js`;
-    const fileContent = `var last_updated = "${Date.now()}";\n${this.buildServiceWorkerContent(firebaseConfig, content)}`;
+    const fileContent = `
+      var last_updated = "${Date.now()}";
+      importScripts("https://${assetsUrl}/bms/bms-sw.js?t=" + last_updated);
+      ${content}
+    `;
 
     const fileDTO = {
       name: fileName,

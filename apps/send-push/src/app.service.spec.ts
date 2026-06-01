@@ -154,28 +154,12 @@ describe('AppService', () => {
     });
   });
 
-  it('definedFirebaseService uses the PLATFORM credential for web-push when the account has no firebase_web_config (still on platform service worker)', () => {
-    // account mock has firebase_service_account_app but NOT firebase_web_config →
-    // its tokens are still platform-minted, so send via platform (invariant).
+  it('definedFirebaseService uses the PLATFORM credential for web-push (web tokens are platform-minted; per-account would be a SenderId mismatch)', () => {
     const result = service.definedFirebaseService(account as never, 'web-push');
 
     expect(result).toEqual({
       service: '{"project_id":"default"}',
       firebaseApp: 'default',
-    });
-  });
-
-  it('definedFirebaseService uses the per-account project for web-push when BOTH web config and service account are set (invariant closed)', () => {
-    const accountWithWeb = {
-      ...account,
-      accountConfigs: [
-        ...account.accountConfigs,
-        { name: 'firebase_web_config', value: '{"projectId":"app","messagingSenderId":"123"}' },
-      ],
-    };
-    expect(service.definedFirebaseService(accountWithWeb as never, 'web-push')).toEqual({
-      service: '{"project_id":"app"}',
-      firebaseApp: 'web-push-account-1',
     });
   });
 
