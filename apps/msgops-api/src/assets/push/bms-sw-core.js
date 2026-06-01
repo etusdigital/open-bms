@@ -11,9 +11,9 @@
  * domain. (A legacy path can still upload it to S3, but the served route is the
  * source of truth.)
  *
- * Placeholders:
- *   __BMS_TRACKER_URL__      → events endpoint (web-push tracking)
- *   __BMS_FIREBASE_CONFIG__  → platform Firebase web config (JSON object literal)
+ * Placeholders (substituted in code below): the tracker URL and the platform
+ * Firebase web config. (Names intentionally not repeated here so the single
+ * substitution only ever hits the code.)
  */
 function sendTracker(data) {
   const currentDate = new Date();

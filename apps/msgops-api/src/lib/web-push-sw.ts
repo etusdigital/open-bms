@@ -21,7 +21,7 @@ export function buildPlatformServiceWorker(cfg: PlatformWebPushConfig): string {
   const firebaseConfig = cfg.webConfig ? JSON.stringify(cleanWebConfig(cfg.webConfig)) : '{}';
   return [
     `// Generated ${new Date().toISOString()} — source: assets/push/bms-sw-core.js; do not edit on S3.`,
-    core.replace('__BMS_TRACKER_URL__', cfg.trackerUrl).replace('__BMS_FIREBASE_CONFIG__', firebaseConfig),
+    core.replaceAll('__BMS_TRACKER_URL__', cfg.trackerUrl).replaceAll('__BMS_FIREBASE_CONFIG__', firebaseConfig),
   ].join('\n');
 }
 

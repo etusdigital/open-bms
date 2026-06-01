@@ -84,9 +84,21 @@ export function WebPushSection() {
     );
   }
 
+  // Downloads the tiny same-origin sw.js the customer hosts at their site root.
+  // It just importScripts the BMS-served worker (importScripts is cross-origin),
+  // so service-worker registration stays same-origin on the customer side.
   function downloadSw() {
     if (!data?.serviceWorkerUrl) return;
-    window.open(data.serviceWorkerUrl, '_blank', 'noopener');
+    const content = `// BMS Web-Push service worker — host this file at your site root as /sw.js\nimportScripts("${data.serviceWorkerUrl}");\n`;
+    const blob = new Blob([content], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sw.js';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
   if (isLoading) return <p className="text-muted-foreground mt-8 text-sm">{t('common.loading') ?? 'Carregando...'}</p>;
