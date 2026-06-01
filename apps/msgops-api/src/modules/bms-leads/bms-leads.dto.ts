@@ -83,3 +83,30 @@ export class WebPushSubscriptionDto {
   @JoiSchema(Joi.string().optional())
   type?: string;
 }
+
+// bmstrk.js POSTs {data: base64(JSON(...))} to /c and /bms/cs. The api key is in
+// the `api-key` header (resolved by the normal guard), so it's not in the body.
+@JoiSchemaOptions({ stripUnknown: true })
+export class BmsTrackerDataDto {
+  @JoiSchema(Joi.string().required())
+  data: string;
+}
+
+// bmstrk.js trkEvent() POSTs this to /bms/leads/update (mode:'no-cors', so the
+// client never reads the response — only the write matters).
+@JoiSchemaOptions({ stripUnknown: true })
+export class BmsLeadUpdateDto {
+  @JoiSchema(
+    Joi.object({
+      uuid: Joi.string().max(64).required(),
+      customFields: Joi.object().unknown(true).optional(),
+    }).required(),
+  )
+  contact: { uuid: string; customFields?: Record<string, unknown> };
+
+  @JoiSchema(Joi.string().allow('').max(40).optional())
+  tagName?: string;
+
+  @JoiSchema(Joi.string().required())
+  apiKey: string;
+}

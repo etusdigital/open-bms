@@ -767,6 +767,40 @@ export class ContactsService {
     return { deviceId: device.id, contactId: contact.id };
   }
 
+  // Tracker (bmstrk.js) contact resolution for POST /c. Given an email or uuid,
+  // returns the contact in the compact shape the on-page tracker expects so it can
+  // (a) write the `bmsUUID` cookie — load-bearing for linking a later web-push
+  // registration to the same contact — and (b) compute contactStats() for popup
+  // segmentation. The flags mirror Enterprise's abbreviations; `uuid`/`email` are
+  // the load-bearing fields, the rest are best-effort. Returns null when unknown.
+  async resolveTrackerContact(query: { email?: string; uuid?: string }): Promise<Record<string, unknown> | null> {
+    if (!query.email && !query.uuid) return null;
+    const contact = await this.findByProperty({ email: query.email, uuid: query.uuid });
+    if (!contact) return null;
+    return {
+      uuid: contact.uuid,
+      email: contact.email || undefined,
+      // best-effort flags consumed by contactStats() (display/segmentation only):
+      b: contact.isBlocked || undefined, // blocked
+      u: contact.isUnsubscribed || undefined, // unsubscribed
+      cd: contact.createdAt || undefined, // created date
+      lo: contact.lastOpen || undefined, // last open
+    };
+  }
+
+  // Tracker tags lookup for POST /bms/cs. Returns the names of the tags currently
+  // on the contact (used by the tracker to decide which opt-in template to show).
+  async getTrackerContactTags(query: { uuid?: string; id?: number }): Promise<string[]> {
+    const accountId = this.cls.get('accountId') as number;
+    if (!accountId || (!query.uuid && !query.id)) return [];
+    const contact = await this.findByProperty({ uuid: query.uuid, id: query.id });
+    if (!contact) return [];
+    const rows = await this.contactRepository.manager
+      .query(`SELECT t.name FROM contacts_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.contact_id = $1 AND t.account_id = $2`, [contact.id, accountId])
+      .catch(() => []);
+    return (rows as Array<{ name: string }>).map((r) => r.name).filter(Boolean);
+  }
+
   // Resolves tag names to TagEntity rows, scoped to the account. Tag names are
   // stored inconsistently — manual tags are lowercased by TagEntity
   // @BeforeInsert, but segment tags keep their original casing (createSegment

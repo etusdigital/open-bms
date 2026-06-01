@@ -100,6 +100,35 @@ describe('AccountsService.getWebPushIntegration — snippet must NOT leak platfo
     expect(snippet).not.toContain('firebaseConfig');
     expect(snippet).not.toContain('vapidKey');
   });
+
+  it('omits cookiesToSearch when not configured', async () => {
+    const { service } = build(); // webpush_cookies_to_search → null
+    const { snippet } = await service.getWebPushIntegration(7);
+    expect(snippet).not.toContain('cookiesToSearch');
+  });
+
+  function buildWithCookies(value: string) {
+    const service = Object.create(AccountsService.prototype) as AccountsService;
+    (service as any).findByAccountConfig = jest.fn().mockImplementation((_id: number, name: string) => {
+      if (name === 'api_key') return Promise.resolve({ value: 'acct-key-123' });
+      if (name === 'webpush_cookies_to_search') return Promise.resolve({ value });
+      return Promise.resolve(null);
+    });
+    (service as any).safeJsonParse = (v: string) => JSON.parse(v);
+    return { service };
+  }
+
+  it('renders cookiesToSearch from a CSV config', async () => {
+    const { service } = buildWithCookies('registeredLead, _quiz_maker_quiz');
+    const { snippet } = await service.getWebPushIntegration(7);
+    expect(snippet).toContain('cookiesToSearch: ["registeredLead","_quiz_maker_quiz"]');
+  });
+
+  it('renders cookiesToSearch from a JSON-array config', async () => {
+    const { service } = buildWithCookies('["registeredLead"]');
+    const { snippet } = await service.getWebPushIntegration(7);
+    expect(snippet).toContain('cookiesToSearch: ["registeredLead"]');
+  });
 });
 
 describe('AccountsService.getWebPushPlatformConfig', () => {
