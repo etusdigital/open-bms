@@ -152,6 +152,65 @@ func TestRollDie_Edges(t *testing.T) {
 	}
 }
 
+func TestExtractFromEmail(t *testing.T) {
+	cases := []struct {
+		name string
+		mail map[string]interface{}
+		want string
+	}{
+		{"present", map[string]interface{}{"from": map[string]interface{}{"email": "a@b.com"}}, "a@b.com"},
+		{"missing from", map[string]interface{}{}, ""},
+		{"from without email", map[string]interface{}{"from": map[string]interface{}{"name": "X"}}, ""},
+	}
+	for _, c := range cases {
+		if got := extractFromEmail(c.mail); got != c.want {
+			t.Errorf("%s: extractFromEmail = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestDomainVerified(t *testing.T) {
+	verified := []string{"mail.acme.com", "news.acme.com"}
+	cases := []struct {
+		email string
+		want  bool
+	}{
+		{"noreply@mail.acme.com", true},
+		{"someone@MAIL.ACME.COM", true}, // case-insensitive
+		{"x@news.acme.com", true},
+		{"who@evil.com", false},
+		{"who@acme.com", false}, // parent domain is not a verified subdomain
+		{"no-at-sign", false},
+		{"trailing@", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		if got := domainVerified(c.email, verified); got != c.want {
+			t.Errorf("domainVerified(%q) = %v, want %v", c.email, got, c.want)
+		}
+	}
+	if domainVerified("anything@whatever.com", nil) {
+		t.Error("domainVerified with empty allowlist should be false")
+	}
+}
+
+func TestParseDomainList(t *testing.T) {
+	cases := []struct {
+		raw  string
+		want []string
+	}{
+		{"", []string{}},
+		{"  ", []string{}},
+		{"mail.acme.com", []string{"mail.acme.com"}},
+		{"A.com, B.com ,, c.COM", []string{"a.com", "b.com", "c.com"}},
+	}
+	for _, c := range cases {
+		if got := parseDomainList(c.raw); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("parseDomainList(%q) = %v, want %v", c.raw, got, c.want)
+		}
+	}
+}
+
 func TestMergeArgs_OverrideWinsAndBaseUntouched(t *testing.T) {
 	base := map[string]interface{}{"accountId": "1", "shared": "base"}
 	override := map[string]interface{}{"contactId": "9", "shared": "override"}
