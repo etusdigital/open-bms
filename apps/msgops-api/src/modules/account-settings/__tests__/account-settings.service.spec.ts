@@ -700,9 +700,11 @@ describe('AccountSettingsService', () => {
       });
       const view = await service.getTwilio(42);
       expect(view.source).toBe('account');
+      expect(view.accountSid).toBe(SID); // identifier returned in full
       expect(view.hasSecret).toBe(true);
       expect(view.hasSms).toBe(true);
       expect(view.hasWhatsapp).toBe(false);
+      // secret is write-only — never serialized back
       expect(JSON.stringify(view)).not.toContain('secret-value-1234');
     });
 

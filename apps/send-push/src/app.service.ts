@@ -229,16 +229,24 @@ export class AppService implements OnApplicationShutdown {
     }
   }
 
-  definedFirebaseService(account: Account, _messageType: string) {
-    // Per-account config with platform fallback, for BOTH mobile-push and
-    // web-push. Previously this only applied to mobile-push, so web-push always
-    // used the platform env credential — now both honor the account's own
-    // firebase_service_account_app when present, falling back to the
-    // super-admin/platform FIREBASE_SERVICE_ACCOUNT otherwise. The Firebase app
-    // instance cache key is per-account (not per-type) so mobile and web for the
-    // same account reuse one initialized app.
-    const firebaseService = this.getAccountConfig(account.accountConfigs, 'firebase_service_account_app');
-    if (firebaseService) return { service: firebaseService, firebaseApp: `push-account-${account.id}` };
+  definedFirebaseService(account: Account, messageType: string) {
+    // INVARIANT: you can only send to an FCM token with a service account for the
+    // SAME Firebase project that minted (registered) it.
+    //
+    // - mobile-push: the device token is minted by the customer's own mobile app
+    //   (their google-services.json / own Firebase project), so the per-account
+    //   service account (firebase_service_account_app) is the correct sender,
+    //   with platform fallback for accounts that never set one.
+    // - web-push: registration today is handled by the PLATFORM bms-sw.js
+    //   (platform Firebase web config + VAPID baked into the shared service
+    //   worker), so web tokens are platform-minted. Sending them with a
+    //   per-account service account would be a SenderId mismatch. Until
+    //   per-account web registration (sw.js web config + VAPID) exists, web-push
+    //   MUST send via the platform credential.
+    if (messageType === 'mobile-push') {
+      const firebaseService = this.getAccountConfig(account.accountConfigs, 'firebase_service_account_app');
+      if (firebaseService) return { service: firebaseService, firebaseApp: `mobile-push-account-${account.id}` };
+    }
     return { service: process.env.FIREBASE_SERVICE_ACCOUNT, firebaseApp: 'default' };
   }
 

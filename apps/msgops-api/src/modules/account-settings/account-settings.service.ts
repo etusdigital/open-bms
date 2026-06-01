@@ -109,7 +109,13 @@ export interface AccountMandrillView {
 export type TwilioConfigSource = 'account' | 'none';
 export interface AccountTwilioView {
   source: TwilioConfigSource;
-  accountSidMasked: string | null;
+  // Account SID and the Messaging Service SIDs are identifiers, not secrets, so
+  // they are returned in full — the UI needs them to round-trip on edit/test.
+  // Only apiSecret / authToken are write-only (never returned).
+  accountSid: string | null;
+  apiSid: string | null;
+  smsServiceSid: string | null;
+  whatsappServiceSid: string | null;
   hasSecret: boolean;
   hasAuthToken: boolean;
   hasSms: boolean;
@@ -503,19 +509,33 @@ export class AccountSettingsService {
   // these slots via account.configByName(...) — no worker change needed.
 
   async getTwilio(accountId: number): Promise<AccountTwilioView> {
-    const [accountSid, secret, authToken, sms, whatsapp] = await Promise.all([
+    const [accountSid, apiSid, secret, authToken, sms, whatsapp] = await Promise.all([
       this.accountConfigs.getByAccountId(accountId, TWILIO_SID_ACCOUNT_NAME),
+      this.accountConfigs.getByAccountId(accountId, TWILIO_SID_NAME),
       this.accountConfigs.getByAccountId(accountId, TWILIO_SECRET_NAME),
       this.accountConfigs.getByAccountId(accountId, TWILIO_AUTH_TOKEN_NAME),
       this.accountConfigs.getByAccountId(accountId, TWILIO_SMS_SERVICE_NAME),
       this.accountConfigs.getByAccountId(accountId, TWILIO_WHATSAPP_SERVICE_NAME),
     ]);
     if (!accountSid?.value && !secret?.value) {
-      return { source: 'none', accountSidMasked: null, hasSecret: false, hasAuthToken: false, hasSms: false, hasWhatsapp: false };
+      return {
+        source: 'none',
+        accountSid: null,
+        apiSid: null,
+        smsServiceSid: null,
+        whatsappServiceSid: null,
+        hasSecret: false,
+        hasAuthToken: false,
+        hasSms: false,
+        hasWhatsapp: false,
+      };
     }
     return {
       source: 'account',
-      accountSidMasked: accountSid?.value ? (maskCredential(accountSid.value) ?? null) : null,
+      accountSid: accountSid?.value ?? null,
+      apiSid: apiSid?.value ?? null,
+      smsServiceSid: sms?.value ?? null,
+      whatsappServiceSid: whatsapp?.value ?? null,
       hasSecret: Boolean(secret?.value),
       hasAuthToken: Boolean(authToken?.value),
       hasSms: Boolean(sms?.value),
