@@ -145,7 +145,7 @@ describe('AppService', () => {
     expect(service.getHello()).toBe('Hello World!');
   });
 
-  it('definedFirebaseService should return mobile app config when message type is mobile-push', () => {
+  it('definedFirebaseService uses the per-account config for mobile-push', () => {
     const result = service.definedFirebaseService(account as never, 'mobile-push');
 
     expect(result).toEqual({
@@ -154,10 +154,21 @@ describe('AppService', () => {
     });
   });
 
-  it('definedFirebaseService should return default config for non mobile-push', () => {
+  it('definedFirebaseService uses the PLATFORM credential for web-push (web tokens are platform-minted; per-account would be a SenderId mismatch)', () => {
     const result = service.definedFirebaseService(account as never, 'web-push');
 
     expect(result).toEqual({
+      service: '{"project_id":"default"}',
+      firebaseApp: 'default',
+    });
+  });
+
+  it('definedFirebaseService falls back to the platform credential for mobile-push when the account has no config', () => {
+    const accountNoFirebaseCfg = {
+      ...account,
+      accountConfigs: account.accountConfigs.filter((cfg) => cfg.name !== 'firebase_service_account_app'),
+    };
+    expect(service.definedFirebaseService(accountNoFirebaseCfg as never, 'mobile-push')).toEqual({
       service: '{"project_id":"default"}',
       firebaseApp: 'default',
     });

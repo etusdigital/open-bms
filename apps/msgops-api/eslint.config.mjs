@@ -29,6 +29,9 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
+    // src/assets/push/*.js are browser-side TEMPLATES / vendored bundles (browser
+    // globals, non-JS __BMS_*__ placeholders, and a verbatim minified Firebase SDK
+    // in web-push-core.js) — not Node source. Never lint them.
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'src/assets/push/*.js'],
   },
 );

@@ -10,6 +10,8 @@ import { useAccountConfig, useAccountId, useTimezone, useUpdateAccountConfigs } 
 import { SETTINGS_TABS, type SettingsTab } from './types';
 import { EmailProvidersTab } from './email-providers';
 import { WhatsAppTab } from './whatsapp-providers';
+import { TwilioTab } from './twilio-providers';
+import { PushTab } from './push-providers';
 import { PoolTab } from './pool-tab';
 import { ApiKeysTab } from './api-keys-tab';
 import { usePermissions } from '@/hooks/use-permissions';
@@ -56,6 +58,8 @@ export default function SettingsPage() {
           {tab === 'email' && <EmailTab />}
           {tab === 'email_providers' && <EmailProvidersTab />}
           {tab === 'whatsapp' && <WhatsAppTab />}
+          {tab === 'twilio' && <TwilioTab />}
+          {tab === 'push' && <PushTab />}
           {tab === 'api_keys' && <ApiKeysTab />}
           {tab === 'pool' && isSuperAdmin && <PoolTab />}
         </div>

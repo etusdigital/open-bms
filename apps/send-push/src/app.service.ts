@@ -230,6 +230,19 @@ export class AppService implements OnApplicationShutdown {
   }
 
   definedFirebaseService(account: Account, messageType: string) {
+    // INVARIANT: you can only send to an FCM token with a service account for the
+    // SAME Firebase project that minted (registered) it.
+    //
+    // - mobile-push: the device token is minted by the customer's own mobile app
+    //   (their google-services.json / own Firebase project), so the per-account
+    //   service account (firebase_service_account_app) is the correct sender,
+    //   with platform fallback for accounts that never set one.
+    // - web-push: registration today is handled by the PLATFORM bms-sw.js
+    //   (platform Firebase web config + VAPID baked into the shared service
+    //   worker), so web tokens are platform-minted. Sending them with a
+    //   per-account service account would be a SenderId mismatch. Until
+    //   per-account web registration (sw.js web config + VAPID) exists, web-push
+    //   MUST send via the platform credential.
     if (messageType === 'mobile-push') {
       const firebaseService = this.getAccountConfig(account.accountConfigs, 'firebase_service_account_app');
       if (firebaseService) return { service: firebaseService, firebaseApp: `mobile-push-account-${account.id}` };

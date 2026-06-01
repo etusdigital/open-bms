@@ -7,6 +7,10 @@ import { authenticateStore } from '@/test-utils/authenticate-store';
 vi.mock('@/lib/api-client', () => ({
   apiClient: {
     put: vi.fn().mockResolvedValue({}),
+    // useUpdateAccountConfigs.onSuccess → useRefreshAccountConfigs() → GET
+    // /accounts/configs. Mock it so the post-save refresh resolves and the
+    // mutation reaches isSuccess.
+    get: vi.fn().mockResolvedValue({ data: [] }),
   },
 }));
 

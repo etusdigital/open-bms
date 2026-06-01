@@ -235,4 +235,26 @@ export class AccountsController {
   updateConfig(@Param('name') name: string, @Body() config: any) {
     return this.accountsService.updateAccountConfig(name, config);
   }
+
+  // ── Web-Push per-account integration (Phase 2 — Enterprise-style) ──
+  @RequirePermission('account:settings_view')
+  @Get('/:accountId/web-push/integration')
+  getWebPushIntegration(@Param('accountId') accountId: number, @Req() req: any) {
+    this.assertAccountScope(req, Number(accountId));
+    return this.accountsService.getWebPushIntegration(Number(accountId));
+  }
+
+  @RequirePermission('account:settings_update')
+  @Put('/:accountId/web-push/settings')
+  saveWebPushSettings(@Param('accountId') accountId: number, @Body() settings: any, @Req() req: any) {
+    this.assertAccountScope(req, Number(accountId));
+    return this.accountsService.saveWebPushSettings(Number(accountId), settings);
+  }
+
+  @RequirePermission('account:settings_update')
+  @Post('/:accountId/web-push/regenerate-sw')
+  regenerateAccountSw(@Param('accountId') accountId: number, @Req() req: any) {
+    this.assertAccountScope(req, Number(accountId));
+    return this.accountsService.regenerateAccountServiceWorker(Number(accountId));
+  }
 }

@@ -64,7 +64,22 @@ export function writeSendgridEnvFile(dto: SendgridSystemSettings): void {
 export interface FcmSystemSettings {
   // Raw Google service-account JSON. Stored in DB as a structured value but
   // serialized to a single line in the env file so workers can parse it back.
+  // SECRET — only this field goes into fcm.env (consumed by send-push).
   serviceAccountJson: string;
+  // Firebase WEB config (apiKey/authDomain/projectId/messagingSenderId/appId) and
+  // the VAPID public key. These are CLIENT-side PUBLIC values used only to
+  // (re)generate the platform web-push service worker (bms-sw.js). They are NOT
+  // written to fcm.env — send-push doesn't need them.
+  webConfig?: {
+    apiKey?: string;
+    authDomain?: string;
+    projectId?: string;
+    storageBucket?: string;
+    messagingSenderId?: string;
+    appId?: string;
+    measurementId?: string;
+  };
+  vapidPublicKey?: string;
 }
 
 export function fcmEnvFilePath(): string {
