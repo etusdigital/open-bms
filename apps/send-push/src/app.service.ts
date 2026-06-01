@@ -243,9 +243,24 @@ export class AppService implements OnApplicationShutdown {
     //   per-account service account would be a SenderId mismatch. Until
     //   per-account web registration (sw.js web config + VAPID) exists, web-push
     //   MUST send via the platform credential.
+    // mobile-push: token is minted by the customer's own mobile app, so the
+    // per-account service account is the correct sender (platform fallback when
+    // unset).
     if (messageType === 'mobile-push') {
       const firebaseService = this.getAccountConfig(account.accountConfigs, 'firebase_service_account_app');
       if (firebaseService) return { service: firebaseService, firebaseApp: `mobile-push-account-${account.id}` };
+      return { service: process.env.FIREBASE_SERVICE_ACCOUNT, firebaseApp: 'default' };
+    }
+
+    // web-push: closing the FCM SenderId invariant — the registering project
+    // (firebase_web_config baked into the account's service worker) MUST match
+    // the sending project (firebase_service_account_app). Use the account's own
+    // credential ONLY when BOTH are configured; otherwise the account is still on
+    // the platform service worker, so send via the platform credential too.
+    const webConfig = this.getAccountConfig(account.accountConfigs, 'firebase_web_config');
+    const serviceAccount = this.getAccountConfig(account.accountConfigs, 'firebase_service_account_app');
+    if (webConfig && serviceAccount) {
+      return { service: serviceAccount, firebaseApp: `web-push-account-${account.id}` };
     }
     return { service: process.env.FIREBASE_SERVICE_ACCOUNT, firebaseApp: 'default' };
   }
