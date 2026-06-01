@@ -29,8 +29,9 @@ export default tseslint.config(
     },
   },
   {
-    // bms-sw-core.js is a browser service-worker TEMPLATE (browser globals +
-    // non-JS __BMS_*__ placeholders), not Node source — never lint it.
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'src/assets/push/bms-sw-core.js', 'src/assets/push/bmstrk-core.js'],
+    // src/assets/push/*.js are browser-side TEMPLATES / vendored bundles (browser
+    // globals, non-JS __BMS_*__ placeholders, and a verbatim minified Firebase SDK
+    // in web-push-core.js) — not Node source. Never lint them.
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'src/assets/push/*.js'],
   },
 );

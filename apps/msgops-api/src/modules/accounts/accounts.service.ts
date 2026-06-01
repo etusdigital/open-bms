@@ -514,12 +514,21 @@ export class AccountsService {
     const publicBase = (process.env.BMS_PUBLIC_URL || process.env.FRONTEND_URL || '').replace(/\/+$/, '');
     const serviceWorkerUrl = publicBase ? `${publicBase}/bms/push/${accountHashForUrl}.js` : null;
 
-    const [apiKeyRow, domainRow, settingsRow] = await Promise.all([
+    const [apiKeyRow, domainRow, settingsRow, fcm] = await Promise.all([
       this.findByAccountConfig(accountId, 'api_key'),
       this.findByAccountConfig(accountId, 'default_domain'),
       this.findByAccountConfig(accountId, 'webpush_settings'),
+      // Platform Firebase web config + VAPID (single-project model) live in
+      // system_config.fcm_settings, set in Super-Admin → FCM. The account never
+      // configures Firebase — we inject the platform values into the snippet so
+      // web-push.js mints tokens against OUR project, not the bri.us default
+      // baked into the vendored SDK.
+      this.accountConfigRepository.manager.query(`SELECT value FROM system_config WHERE key = 'fcm_settings' LIMIT 1`).catch(() => []),
     ]);
     const apiKey = apiKeyRow?.value ?? '<API_KEY>';
+    const fcmSettings = fcm?.[0]?.value as { webConfig?: Record<string, string>; vapidPublicKey?: string } | undefined;
+    const firebaseConfig = fcmSettings?.webConfig && Object.keys(fcmSettings.webConfig).length ? fcmSettings.webConfig : null;
+    const vapidKey = fcmSettings?.vapidPublicKey || null;
     const accountHash = createHash('sha256').update(`${accountId}`).digest('hex');
     // cookieDomain: derive from the account's default domain (".example.com"),
     // matching the Enterprise snippet shape. Empty when no domain is set.
@@ -541,12 +550,19 @@ export class AccountsService {
       `    cookieDomain: '${cookieDomain}',`,
       '    autoRequestContact: true,',
       '    startWebPush: true,',
+      // Platform Firebase config + VAPID (single-project). The bmsPush constructor
+      // reads `e.firebaseConfig || default` / `e.vapidKey || default`, so these
+      // override the bri.us values baked into the vendored SDK at runtime.
+      firebaseConfig ? `    firebaseConfig: ${JSON.stringify(firebaseConfig)},` : null,
+      vapidKey ? `    vapidKey: '${vapidKey}',` : null,
       `    accountHash: '${accountHash}'`,
       '  };',
       '  window.bmsTrkOptions = bmsTrkOptions;',
       '</script>',
       `<script async="true" src="${trackerScriptUrl}"></script>`,
-    ].join('\n');
+    ]
+      .filter((line): line is string => line !== null)
+      .join('\n');
 
     return { serviceWorkerUrl, snippet, settings: settingsRow?.value ? this.safeJsonParse(settingsRow.value) : null };
   }

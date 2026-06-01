@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ContactsService } from '../contacts/contacts.service';
 import { ContactDto } from '../contacts/contacts.dto';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { BmsLeadDto } from './bms-leads.dto';
+import { BmsLeadDto, WebPushSubscriptionDto } from './bms-leads.dto';
 
 // Drop-in replacement for the enterprise `POST /bms/leads` endpoint used by
 // the evo-academy BMS conversion pixel (see BmsLeadService in evo-academy).
@@ -58,5 +58,31 @@ export class BmsLeadsController {
     // a minimal envelope is enough and avoids leaking contact internals to
     // an externally-configured webhook URL.
     return { ok: true };
+  }
+
+  // Web-push subscription ingestion (from web-push.js). Dedicated route so the
+  // lead-pixel DTO above stays strict. Auth is the same api-key-in-body path
+  // (BmsLeadsAuthMiddleware copies it to x-api-key). Creates/updates the
+  // contact's web-push ContactDevice so the FCM token persists.
+  @ApiOperation({ summary: 'Register a web-push subscription (token) from web-push.js' })
+  @RequirePermission('audience:contacts_view')
+  @Post('/web-push')
+  @HttpCode(201)
+  async registerWebPush(@Body() dto: WebPushSubscriptionDto): Promise<{ ok: true; deviceId: number }> {
+    const device = dto.contact.devices?.[0];
+    const { deviceId } = await this.contactsService.upsertWebPushDevice({
+      contact: { email: dto.contact.email, uuid: dto.contact.uuid },
+      device: {
+        token: device.token,
+        type: device.type,
+        os: device.os,
+        browser: device.browser,
+        browserVersion: device.browserVersion,
+        deviceType: device.deviceType,
+        resolution: device.resolution,
+        subscriptionUrl: device.subscriptionUrl,
+      },
+    });
+    return { ok: true, deviceId };
   }
 }

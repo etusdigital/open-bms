@@ -44,3 +44,42 @@ export class BmsLeadDto {
   @JoiSchema(Joi.string().trim().min(1).max(40).required())
   tagName: string;
 }
+
+// Payload from web-push.js sendTokenToServer(). The contact may be anonymous
+// (no email) — only the device token is required. apiKey arrives in the body and
+// is moved to x-api-key by BmsLeadsAuthMiddleware.
+@JoiSchemaOptions({ stripUnknown: true })
+export class WebPushSubscriptionDto {
+  @JoiSchema(
+    Joi.object({
+      email: Joi.string().email().max(256).optional(),
+      uuid: Joi.string().max(64).optional(),
+      devices: Joi.array()
+        .items(
+          Joi.object({
+            token: Joi.string().min(1).max(512).required(),
+            type: Joi.string().max(40).optional(),
+            os: Joi.string().allow('').max(60).optional(),
+            browser: Joi.string().allow('').max(50).optional(),
+            browserVersion: Joi.string().allow('').max(50).optional(),
+            deviceType: Joi.string().allow('').max(60).optional(),
+            resolution: Joi.string().allow('').max(50).optional(),
+            subscriptionUrl: Joi.string().allow('').max(400).optional(),
+          }),
+        )
+        .min(1)
+        .required(),
+    }).required(),
+  )
+  contact: {
+    email?: string;
+    uuid?: string;
+    devices: Array<{ token: string; type?: string; os?: string; browser?: string; browserVersion?: string; deviceType?: string; resolution?: string; subscriptionUrl?: string }>;
+  };
+
+  @JoiSchema(Joi.string().required())
+  apiKey: string;
+
+  @JoiSchema(Joi.string().optional())
+  type?: string;
+}
