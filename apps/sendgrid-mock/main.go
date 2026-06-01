@@ -18,36 +18,37 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
 
 type webhook struct {
-	ID                string `json:"id"`
-	Enabled           bool   `json:"enabled"`
-	URL               string `json:"url"`
-	FriendlyName      string `json:"friendly_name,omitempty"`
-	Bounce            bool   `json:"bounce"`
-	Click             bool   `json:"click"`
-	Deferred          bool   `json:"deferred"`
-	Delivered         bool   `json:"delivered"`
-	Dropped           bool   `json:"dropped"`
-	GroupResubscribe  bool   `json:"group_resubscribe"`
-	GroupUnsubscribe  bool   `json:"group_unsubscribe"`
-	Open              bool   `json:"open"`
-	Processed         bool   `json:"processed"`
-	SpamReport        bool   `json:"spam_report"`
-	Unsubscribe       bool   `json:"unsubscribe"`
-	CreatedDate       string `json:"created_date"`
-	UpdatedDate       string `json:"updated_date"`
+	ID               string `json:"id"`
+	Enabled          bool   `json:"enabled"`
+	URL              string `json:"url"`
+	FriendlyName     string `json:"friendly_name,omitempty"`
+	Bounce           bool   `json:"bounce"`
+	Click            bool   `json:"click"`
+	Deferred         bool   `json:"deferred"`
+	Delivered        bool   `json:"delivered"`
+	Dropped          bool   `json:"dropped"`
+	GroupResubscribe bool   `json:"group_resubscribe"`
+	GroupUnsubscribe bool   `json:"group_unsubscribe"`
+	Open             bool   `json:"open"`
+	Processed        bool   `json:"processed"`
+	SpamReport       bool   `json:"spam_report"`
+	Unsubscribe      bool   `json:"unsubscribe"`
+	CreatedDate      string `json:"created_date"`
+	UpdatedDate      string `json:"updated_date"`
 }
 
 type singleSend struct {
-	ID         string                 `json:"id"`
-	Name       string                 `json:"name,omitempty"`
-	Status     string                 `json:"status"`
-	SendAt     string                 `json:"send_at,omitempty"`
-	Raw        map[string]interface{} `json:"-"`
+	ID     string                 `json:"id"`
+	Name   string                 `json:"name,omitempty"`
+	Status string                 `json:"status"`
+	SendAt string                 `json:"send_at,omitempty"`
+	Raw    map[string]interface{} `json:"-"`
 }
 
 type mailRecord struct {
@@ -68,14 +69,35 @@ type store struct {
 	singleSends map[string]singleSend
 	mails       []mailRecord
 	fired       []firedEvent
+	// verifiedDomains, when non-empty, makes POST /v3/mail/send reject (403)
+	// any message whose From address is not on one of these domains — mirroring
+	// real SendGrid's "Sender Identity" check. Empty = enforcement OFF (accept
+	// every From), which is the default so unrelated sends in the stack are not
+	// blocked. Seed via MOCK_VERIFIED_DOMAINS; change at runtime via
+	// POST /__mock/verified-domains. Used to exercise the EVO-1466 fromDomain gate.
+	verifiedDomains []string
 }
 
 var (
-	st          = &store{singleSends: map[string]singleSend{}}
-	httpClient  = &http.Client{Timeout: 5 * time.Second}
-	eventDelay  = parseDelay(os.Getenv("MOCK_EVENT_DELAY_MS"), 500)
-	maxWebhooks = 2
+	st                 = &store{singleSends: map[string]singleSend{}, verifiedDomains: envVerifiedDomains}
+	httpClient         = &http.Client{Timeout: 5 * time.Second}
+	eventDelay         = parseDelay(os.Getenv("MOCK_EVENT_DELAY_MS"), 500)
+	maxWebhooks        = 2
+	envVerifiedDomains = parseDomainList(os.Getenv("MOCK_VERIFIED_DOMAINS"))
 )
+
+// parseDomainList splits a comma-separated env value into a normalised
+// (trimmed, lower-cased, non-empty) slice of domains.
+func parseDomainList(raw string) []string {
+	out := []string{}
+	for _, part := range strings.Split(raw, ",") {
+		d := strings.TrimSpace(strings.ToLower(part))
+		if d != "" {
+			out = append(out, d)
+		}
+	}
+	return out
+}
 
 // rates control the probability of each non-happy-path event. 0 = never,
 // 1 = always. Defaults preserve the original happy-path-only behavior:
@@ -390,6 +412,27 @@ func handleMailSend(w http.ResponseWriter, r *http.Request) {
 	_ = json.Unmarshal(bodyBytes, &body)
 
 	st.mu.Lock()
+	verified := append([]string(nil), st.verifiedDomains...)
+	st.mu.Unlock()
+
+	// Sender Identity check (real SendGrid 403s here when the From is on an
+	// unverified domain). Enforced only when verified domains are configured.
+	if len(verified) > 0 {
+		fromEmail := extractFromEmail(body)
+		if !domainVerified(fromEmail, verified) {
+			log.Printf("[mock] mail/send REJECTED (403): from %q not on a verified domain %v", fromEmail, verified)
+			writeJSON(w, 403, map[string]interface{}{
+				"errors": []map[string]interface{}{{
+					"message": "The from address does not match a verified Sender Identity. Mail cannot be sent until this error is resolved.",
+					"field":   "from",
+					"help":    nil,
+				}},
+			})
+			return
+		}
+	}
+
+	st.mu.Lock()
 	st.mails = append(st.mails, mailRecord{ReceivedAt: time.Now(), Body: body})
 	webhooks := append([]webhook(nil), st.webhooks...)
 	st.mu.Unlock()
@@ -481,6 +524,34 @@ type recipient struct {
 
 // extractRecipients flattens the mail body into one recipient per personalization×to.
 // Real SendGrid emits one event burst per recipient, not per /mail/send call.
+// extractFromEmail pulls the From address from a v3 mail/send body
+// (`{"from": {"email": "..."}}`). Returns "" when absent.
+func extractFromEmail(mail map[string]interface{}) string {
+	from, ok := mail["from"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	email, _ := from["email"].(string)
+	return email
+}
+
+// domainVerified reports whether email's domain is one of the verified
+// domains (exact, case-insensitive match on the part after '@'). An empty
+// or domain-less email is never verified.
+func domainVerified(email string, verified []string) bool {
+	at := strings.LastIndex(email, "@")
+	if at < 0 || at == len(email)-1 {
+		return false
+	}
+	domain := strings.ToLower(strings.TrimSpace(email[at+1:]))
+	for _, v := range verified {
+		if domain == v {
+			return true
+		}
+	}
+	return false
+}
+
 func extractRecipients(mail map[string]interface{}) []recipient {
 	personalizations, ok := mail["personalizations"].([]interface{})
 	if !ok {
@@ -716,22 +787,48 @@ func handleMockState(w http.ResponseWriter, _ *http.Request) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	writeJSON(w, 200, map[string]interface{}{
-		"webhooks":     st.webhooks,
-		"single_sends": st.singleSends,
-		"mails":        st.mails,
-		"fired":        st.fired,
+		"webhooks":         st.webhooks,
+		"single_sends":     st.singleSends,
+		"mails":            st.mails,
+		"fired":            st.fired,
+		"verified_domains": st.verifiedDomains,
 	})
 }
 
-// POST /__mock/reset
+// POST /__mock/reset — clears recorded data. Verified domains are config, not
+// data, so they are restored to the env-seeded default rather than wiped.
 func handleMockReset(w http.ResponseWriter, _ *http.Request) {
 	st.mu.Lock()
 	st.webhooks = nil
 	st.singleSends = map[string]singleSend{}
 	st.mails = nil
 	st.fired = nil
+	st.verifiedDomains = envVerifiedDomains
 	st.mu.Unlock()
 	writeJSON(w, 204, nil)
+}
+
+// POST /__mock/verified-domains — body { "domains": ["mail.acme.com", ...] }.
+// Sets the verified-domain allowlist at runtime. An empty/omitted list turns
+// the Sender Identity 403 check OFF (accept any From).
+func handleMockVerifiedDomains(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Domains []string `json:"domains"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		writeJSON(w, 400, map[string]interface{}{"error": "invalid JSON body"})
+		return
+	}
+	normalised := []string{}
+	for _, d := range body.Domains {
+		if t := strings.TrimSpace(strings.ToLower(d)); t != "" {
+			normalised = append(normalised, t)
+		}
+	}
+	st.mu.Lock()
+	st.verifiedDomains = normalised
+	st.mu.Unlock()
+	writeJSON(w, 200, map[string]interface{}{"verified_domains": normalised})
 }
 
 func main() {
@@ -755,6 +852,7 @@ func main() {
 
 	// Admin
 	mux.HandleFunc("POST /__mock/fire", handleMockFire)
+	mux.HandleFunc("POST /__mock/verified-domains", handleMockVerifiedDomains)
 	mux.HandleFunc("GET /__mock/state", handleMockState)
 	mux.HandleFunc("POST /__mock/reset", handleMockReset)
 
