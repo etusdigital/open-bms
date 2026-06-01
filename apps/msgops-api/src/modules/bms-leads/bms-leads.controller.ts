@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ContactsService } from '../contacts/contacts.service';
 import { ContactDto } from '../contacts/contacts.dto';
 import { RequirePermission } from '../authz/require-permission.decorator';
-import { BmsLeadDto, WebPushSubscriptionDto } from './bms-leads.dto';
+import { BmsLeadDto, BmsLeadUpdateDto, WebPushSubscriptionDto } from './bms-leads.dto';
 
 // Drop-in replacement for the enterprise `POST /bms/leads` endpoint used by
 // the evo-academy BMS conversion pixel (see BmsLeadService in evo-academy).
@@ -84,5 +84,39 @@ export class BmsLeadsController {
       },
     });
     return { ok: true, deviceId };
+  }
+
+  // bmstrk.js trkEvent() → update a contact's custom fields and optionally tag it.
+  // Client uses mode:'no-cors' and ignores the response, so this only needs to
+  // perform the write and return a minimal envelope.
+  @ApiOperation({ summary: 'Tracker: update contact custom fields / tag' })
+  @RequirePermission('audience:contacts_view')
+  @Post('update')
+  @HttpCode(200)
+  async update(@Body() dto: BmsLeadUpdateDto): Promise<{ ok: true }> {
+    const existing = await this.contactsService.findByProperty({ uuid: dto.contact.uuid });
+    if (existing) {
+      await this.contactsService.update(
+        {
+          email: existing.email,
+          firstName: existing.firstName ?? '',
+          lastName: existing.lastName ?? '',
+          phone: existing.phone,
+          whatsapp: existing.whatsapp,
+          tagNames: dto.tagName ? [dto.tagName] : [],
+          customFields: dto.contact.customFields,
+          city: '',
+          region: '',
+          country: '',
+          postal: '',
+          ip: undefined as unknown as string,
+          latitude: undefined as unknown as number,
+          longitude: undefined as unknown as number,
+          timezone: '',
+        } as ContactDto,
+        existing,
+      );
+    }
+    return { ok: true };
   }
 }

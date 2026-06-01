@@ -514,12 +514,18 @@ export class AccountsService {
     const publicBase = (process.env.BMS_PUBLIC_URL || process.env.FRONTEND_URL || '').replace(/\/+$/, '');
     const serviceWorkerUrl = publicBase ? `${publicBase}/bms/push/${accountHashForUrl}.js` : null;
 
-    const [apiKeyRow, domainRow, settingsRow] = await Promise.all([
+    const [apiKeyRow, domainRow, settingsRow, cookiesRow] = await Promise.all([
       this.findByAccountConfig(accountId, 'api_key'),
       this.findByAccountConfig(accountId, 'default_domain'),
       this.findByAccountConfig(accountId, 'webpush_settings'),
+      // cookiesToSearch: names of first-party cookies the tracker should inspect
+      // to find the visitor's email/uuid so a web-push registration links to the
+      // SAME contact the LP already created (no duplicate). Stored as a CSV or
+      // JSON array string in account config `webpush_cookies_to_search`.
+      this.findByAccountConfig(accountId, 'webpush_cookies_to_search'),
     ]);
     const apiKey = apiKeyRow?.value ?? '<API_KEY>';
+    const cookiesToSearch = this.parseCookiesToSearch(cookiesRow?.value);
     const accountHash = createHash('sha256').update(`${accountId}`).digest('hex');
     // cookieDomain: derive from the account's default domain (".example.com"),
     // matching the Enterprise snippet shape. Empty when no domain is set.
@@ -547,14 +553,36 @@ export class AccountsService {
       `    cookieDomain: '${cookieDomain}',`,
       '    autoRequestContact: true,',
       '    startWebPush: true,',
+      // Only emitted when configured — lets the tracker dedupe a push
+      // registration onto the contact the LP already created from a cookie.
+      cookiesToSearch.length ? `    cookiesToSearch: ${JSON.stringify(cookiesToSearch)},` : null,
       `    accountHash: '${accountHash}'`,
       '  };',
       '  window.bmsTrkOptions = bmsTrkOptions;',
       '</script>',
       `<script async="true" src="${trackerScriptUrl}"></script>`,
-    ].join('\n');
+    ]
+      .filter((line): line is string => line !== null)
+      .join('\n');
 
     return { serviceWorkerUrl, snippet, settings: settingsRow?.value ? this.safeJsonParse(settingsRow.value) : null };
+  }
+
+  // Normalizes the `webpush_cookies_to_search` account config into a string[].
+  // Accepts a JSON array (e.g. '["registeredLead","_quiz"]') or a CSV
+  // ('registeredLead, _quiz'). Returns [] when unset/blank so the snippet omits
+  // the field entirely.
+  private parseCookiesToSearch(raw: string | undefined | null): string[] {
+    if (!raw || !raw.trim()) return [];
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('[')) {
+      const parsed = this.safeJsonParse(trimmed);
+      return Array.isArray(parsed) ? parsed.filter((c): c is string => typeof c === 'string' && c.length > 0) : [];
+    }
+    return trimmed
+      .split(',')
+      .map((c) => c.trim())
+      .filter((c) => c.length > 0);
   }
 
   // Platform Firebase web config + VAPID public key (single-project model), stored

@@ -150,4 +150,26 @@ describe('BmsLeadsController', () => {
       expect(result).toEqual({ ok: true, deviceId: 7 });
     });
   });
+
+  describe('update (POST /bms/leads/update)', () => {
+    const updateDto = { contact: { uuid: 'u-1', customFields: { plan: 'pro' } }, tagName: 'engaged', apiKey: 'k' };
+
+    it('updates the contact resolved by uuid with tag + custom fields', async () => {
+      const existing = { id: 9, uuid: 'u-1', email: 'a@b.com', firstName: 'A', lastName: 'B', phone: '', whatsapp: '' };
+      const { controller, contactsService } = buildController({ existing });
+
+      const result = await controller.update(updateDto as any);
+
+      expect(contactsService.findByProperty).toHaveBeenCalledWith({ uuid: 'u-1' });
+      expect(contactsService.update).toHaveBeenCalledWith(expect.objectContaining({ email: 'a@b.com', tagNames: ['engaged'], customFields: { plan: 'pro' } }), existing);
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('is a no-op (still ok) when the uuid does not resolve', async () => {
+      const { controller, contactsService } = buildController({ existing: null });
+      const result = await controller.update(updateDto as any);
+      expect(contactsService.update).not.toHaveBeenCalled();
+      expect(result).toEqual({ ok: true });
+    });
+  });
 });
