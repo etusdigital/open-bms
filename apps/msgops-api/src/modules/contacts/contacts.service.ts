@@ -692,6 +692,81 @@ export class ContactsService {
     }
   }
 
+  // Ingests a web-push subscription from web-push.js: resolves (or creates) the
+  // contact, then upserts its ContactDevice (keyed by contact + token). Account
+  // comes from CLS (api-key middleware). Returns the device id. Used by the
+  // public /bms/leads web-push-subscription path.
+  async upsertWebPushDevice(input: {
+    contact: { email?: string; uuid?: string };
+    device: { token: string; type?: string; os?: string; browser?: string; browserVersion?: string; deviceType?: string; resolution?: string; subscriptionUrl?: string };
+  }): Promise<{ deviceId: number; contactId: number }> {
+    const accountId = this.cls.get('accountId') as number;
+    if (!accountId) throw new HttpException('Account context required', HttpStatus.UNAUTHORIZED);
+    if (!input.device?.token) throw new HttpException('device.token is required', HttpStatus.BAD_REQUEST);
+
+    // Resolve or create the contact. A web-push subscriber may be anonymous
+    // (no email yet) — fall back to a uuid-only contact so the token isn't lost.
+    let contact = await this.findByProperty({ email: input.contact?.email, uuid: input.contact?.uuid });
+    if (!contact) {
+      if (input.contact?.email) {
+        await this.create({
+          email: input.contact.email,
+          firstName: '',
+          lastName: '',
+          phone: '',
+          whatsapp: '',
+          tagNames: [],
+          city: '',
+          region: '',
+          country: '',
+          postal: '',
+          ip: undefined as unknown as string,
+          latitude: undefined as unknown as number,
+          longitude: undefined as unknown as number,
+          timezone: '',
+        });
+        contact = await this.findByProperty({ email: input.contact.email });
+      } else {
+        // Anonymous subscriber: minimal contact row so the device has an owner.
+        contact = await this.contactRepository.save(this.contactRepository.create({ accountId, hasWebPush: true } as Partial<ContactEntity>));
+      }
+    }
+    if (!contact) throw new HttpException('Could not resolve contact', HttpStatus.INTERNAL_SERVER_ERROR);
+
+    const now = new Date();
+    const existing = await this.contactDeviceRepository.findOne({ where: { accountId, contactId: contact.id, token: input.device.token } });
+    if (existing) {
+      existing.isActive = true;
+      existing.isUnsubscribed = false;
+      existing.lastSession = now;
+      await this.contactDeviceRepository.save(existing);
+      return { deviceId: existing.id, contactId: contact.id };
+    }
+
+    const device = await this.contactDeviceRepository.save(
+      this.contactDeviceRepository.create({
+        accountId,
+        contactId: contact.id,
+        type: input.device.type || 'web-push',
+        token: input.device.token,
+        isActive: true,
+        isUnsubscribed: false,
+        ip: '',
+        deviceType: input.device.deviceType || '',
+        os: input.device.os || '',
+        browser: input.device.browser || '',
+        browserVersion: input.device.browserVersion || '',
+        resolution: input.device.resolution || '',
+        subscriptionUrl: input.device.subscriptionUrl || '',
+        latestVisitedUrl: input.device.subscriptionUrl || '',
+        lastSession: now,
+      } as Partial<ContactDeviceEntity>),
+    );
+    // Flag the contact so segment queries that filter has_web_push pick it up.
+    await this.contactRepository.update({ id: contact.id, accountId }, { hasWebPush: true } as Partial<ContactEntity>).catch(() => undefined);
+    return { deviceId: device.id, contactId: contact.id };
+  }
+
   // Resolves tag names to TagEntity rows, scoped to the account. Tag names are
   // stored inconsistently — manual tags are lowercased by TagEntity
   // @BeforeInsert, but segment tags keep their original casing (createSegment

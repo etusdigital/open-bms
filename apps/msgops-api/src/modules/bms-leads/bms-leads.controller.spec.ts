@@ -1,12 +1,13 @@
 import { BmsLeadsController } from './bms-leads.controller';
-import { BmsLeadDto } from './bms-leads.dto';
+import { BmsLeadDto, WebPushSubscriptionDto } from './bms-leads.dto';
 
 describe('BmsLeadsController', () => {
-  function buildController(overrides: { existing?: any } = {}) {
+  function buildController(overrides: { existing?: any; upsertWebPushDevice?: jest.Mock } = {}) {
     const contactsService = {
       findByProperty: jest.fn().mockResolvedValue(overrides.existing ?? null),
       create: jest.fn().mockResolvedValue({ id: 1, email: 'lead@dominio.com' }),
       update: jest.fn().mockResolvedValue({ id: overrides.existing?.id ?? 1, email: 'lead@dominio.com' }),
+      upsertWebPushDevice: overrides.upsertWebPushDevice ?? jest.fn().mockResolvedValue({ deviceId: 1, contactId: 1 }),
     };
     const controller = new BmsLeadsController(contactsService as any);
     return { controller, contactsService };
@@ -89,5 +90,64 @@ describe('BmsLeadsController', () => {
 
     expect(result).toEqual({ ok: true });
     expect(Object.keys(result)).toEqual(['ok']);
+  });
+
+  describe('registerWebPush (POST /bms/leads/web-push)', () => {
+    const webPushDto: WebPushSubscriptionDto = {
+      contact: {
+        email: 'sub@dominio.com',
+        uuid: 'uuid-1',
+        devices: [
+          {
+            token: 'fcm-token-1',
+            type: 'web-push',
+            os: 'mac',
+            browser: 'chrome',
+            browserVersion: '120',
+            deviceType: 'desktop',
+            resolution: '1920x1080',
+            subscriptionUrl: 'https://shop.dominio.com/p/1',
+          },
+        ],
+      },
+      apiKey: 'irrelevant_here',
+    };
+
+    it('maps the first device into upsertWebPushDevice and returns the deviceId', async () => {
+      const upsertWebPushDevice = jest.fn().mockResolvedValue({ deviceId: 42, contactId: 9 });
+      const { controller, contactsService } = buildController({ upsertWebPushDevice });
+
+      const result = await controller.registerWebPush(webPushDto);
+
+      expect(contactsService.upsertWebPushDevice).toHaveBeenCalledWith({
+        contact: { email: 'sub@dominio.com', uuid: 'uuid-1' },
+        device: {
+          token: 'fcm-token-1',
+          type: 'web-push',
+          os: 'mac',
+          browser: 'chrome',
+          browserVersion: '120',
+          deviceType: 'desktop',
+          resolution: '1920x1080',
+          subscriptionUrl: 'https://shop.dominio.com/p/1',
+        },
+      });
+      expect(result).toEqual({ ok: true, deviceId: 42 });
+    });
+
+    it('forwards an anonymous subscription (no email) — token must not be lost', async () => {
+      const upsertWebPushDevice = jest.fn().mockResolvedValue({ deviceId: 7, contactId: 3 });
+      const { controller, contactsService } = buildController({ upsertWebPushDevice });
+
+      const result = await controller.registerWebPush({
+        ...webPushDto,
+        contact: { devices: [{ token: 'anon-token' }] },
+      } as WebPushSubscriptionDto);
+
+      expect(contactsService.upsertWebPushDevice).toHaveBeenCalledWith(
+        expect.objectContaining({ contact: { email: undefined, uuid: undefined }, device: expect.objectContaining({ token: 'anon-token' }) }),
+      );
+      expect(result).toEqual({ ok: true, deviceId: 7 });
+    });
   });
 });

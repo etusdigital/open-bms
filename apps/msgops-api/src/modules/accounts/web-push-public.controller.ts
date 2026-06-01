@@ -2,7 +2,7 @@ import { Controller, Get, Param, Res, NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
 import { PublicRoute } from '../authz/public-route.decorator';
 import { AccountsService } from './accounts.service';
-import { buildTracker } from '../../lib/web-push-sw';
+import { buildTracker, buildWebPush } from '../../lib/web-push-sw';
 
 // Serves the per-account web-push service worker from the BMS domain itself —
 // no public S3/CDN bucket required. The customer hosts a tiny same-origin sw.js
@@ -32,6 +32,16 @@ export class WebPushPublicController {
   serveTracker(@Res() res: Response): void {
     const base = (process.env.BMS_PUBLIC_URL || process.env.FRONTEND_URL || '').replace(/\/+$/, '');
     this.sendJs(res, buildTracker(base), 'public, max-age=300');
+  }
+
+  // web-push.js — the on-page FCM client (vendored Firebase SDK + bmsPush). Same
+  // for all accounts; firebaseConfig/vapid come from the snippet's bmsTrkOptions
+  // at runtime, only the endpoint base is rewritten to us. Public client code.
+  @PublicRoute()
+  @Get('web-push.js')
+  serveWebPush(@Res() res: Response): void {
+    const base = (process.env.BMS_PUBLIC_URL || process.env.FRONTEND_URL || '').replace(/\/+$/, '');
+    this.sendJs(res, buildWebPush(base), 'public, max-age=300');
   }
 
   private sendJs(res: Response, js: string, cacheControl: string): void {

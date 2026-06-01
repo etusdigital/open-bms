@@ -46,3 +46,15 @@ export function buildTracker(publicBase: string): string {
   const base = publicBase.replace(/\/+$/, '');
   return core.replaceAll('__BMS_TRACKER_BASE__', base).replaceAll('__BMS_WEBPUSH_URL__', `${base}/bms/web-push.js`);
 }
+
+// Renders web-push.js (the on-page FCM client) from the verbatim vendored asset.
+// We DO NOT touch the bundled Firebase SDK or its hardcoded bms-push config — the
+// snippet's window.bmsTrkOptions supplies firebaseConfig + vapidKey at runtime
+// (the bmsPush constructor reads `e.firebaseConfig || default`). The only thing we
+// rewrite here is the endpoint base: every fetch in the asset uses
+// __BMS_TRACKER_BASE__, which we point at THIS BMS instance instead of in.bri.us.
+export function buildWebPush(publicBase: string): string {
+  const core = readFileSync(join(__dirname, '../assets/push/web-push-core.js'), 'utf8');
+  const base = publicBase.replace(/\/+$/, '');
+  return core.replaceAll('__BMS_TRACKER_BASE__', base);
+}
