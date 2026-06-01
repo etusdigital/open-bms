@@ -23,6 +23,7 @@ vi.mock('../use-settings', () => ({
   useAccountId: () => 1,
   useTimezone: () => 'America/Sao_Paulo',
   useUpdateAccountConfigs: () => ({ mutate: mockMutate, isPending: false }),
+  useRefreshAccountConfigs: () => vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../email-providers/use-email-providers', () => ({
@@ -117,19 +118,16 @@ describe('SettingsPage', () => {
       expect(screen.getByText('Configurações')).toBeInTheDocument();
     });
 
-    it('shows general tab by default', async () => {
+    it('shows general tab by default with the default domain field', async () => {
+      // The General tab now holds timezone / unsubscribe URL / default domain.
+      // API keys moved to the dedicated "API Keys" tab.
       await renderPage();
-      expect(screen.getByDisplayValue('test-api-key')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('example.com')).toBeInTheDocument();
     });
 
-    it('shows API key tracker', async () => {
+    it('shows the unsubscribe redirect URL field', async () => {
       await renderPage();
-      expect(screen.getByDisplayValue('test-tracker-key')).toBeInTheDocument();
-    });
-
-    it('shows timezone', async () => {
-      await renderPage();
-      expect(screen.getByDisplayValue('America/Sao_Paulo')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('https://example.com/unsub')).toBeInTheDocument();
     });
 
     it('shows tab buttons', async () => {

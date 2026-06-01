@@ -22,6 +22,11 @@ vi.mock('../use-contacts', () => ({
     mutate: mockDeleteMutate,
     isPending: false,
   }),
+  useCreateContact: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn().mockResolvedValue({}),
+    isPending: false,
+  }),
 }));
 
 vi.mock('@tanstack/react-router', async () => {
