@@ -8,6 +8,8 @@ import { SaveAccountSparkpostDto, TestAccountSparkpostDto } from './dtos/sparkpo
 import { SaveAccountResendDto, TestAccountResendDto } from './dtos/resend.dto';
 import { SaveAccountSesDto, TestAccountSesDto } from './dtos/ses.dto';
 import { SaveAccountMandrillDto, TestAccountMandrillDto } from './dtos/mandrill.dto';
+import { SaveAccountTwilioDto, TestAccountTwilioDto } from './dtos/twilio.dto';
+import { SaveAccountPushDto, TestAccountPushDto } from './dtos/push.dto';
 
 @Controller('accounts/:accountId/settings')
 export class AccountSettingsController {
@@ -211,5 +213,65 @@ export class AccountSettingsController {
   async testMandrill(@Param('accountId') accountId: number, @Body() dto: TestAccountMandrillDto, @Req() req: any, @IpAddress() ip?: string) {
     this.assertAccountScope(req, Number(accountId));
     return this.service.testMandrill(dto.apiKey, ip);
+  }
+
+  // ── Twilio (WhatsApp Twilio + SMS) ──
+  @Get('twilio')
+  @RequirePermission('account:settings_view')
+  async getTwilio(@Param('accountId') accountId: number, @Req() req: any) {
+    this.assertAccountScope(req, Number(accountId));
+    return this.service.getTwilio(Number(accountId));
+  }
+
+  @Put('twilio')
+  @RequirePermission('account:settings_update')
+  async saveTwilio(@Param('accountId') accountId: number, @Body() dto: SaveAccountTwilioDto, @Req() req: any) {
+    this.assertAccountScope(req, Number(accountId));
+    return this.service.saveTwilio(Number(accountId), dto);
+  }
+
+  @Delete('twilio')
+  @RequirePermission('account:settings_update')
+  @HttpCode(204)
+  async deleteTwilio(@Param('accountId') accountId: number, @Req() req: any) {
+    this.assertAccountScope(req, Number(accountId));
+    await this.service.deleteTwilio(Number(accountId));
+  }
+
+  @Post('twilio/test')
+  @RequirePermission('account:settings_update')
+  async testTwilio(@Param('accountId') accountId: number, @Body() dto: TestAccountTwilioDto, @Req() req: any, @IpAddress() ip?: string) {
+    this.assertAccountScope(req, Number(accountId));
+    return this.service.testTwilio({ accountSid: dto.accountSid, apiSid: dto.apiSid, apiSecret: dto.apiSecret }, ip);
+  }
+
+  // ── Push (Mobile FCM + Web-Push) ──
+  @Get('push')
+  @RequirePermission('account:settings_view')
+  async getPush(@Param('accountId') accountId: number, @Req() req: any) {
+    this.assertAccountScope(req, Number(accountId));
+    return this.service.getPush(Number(accountId));
+  }
+
+  @Put('push')
+  @RequirePermission('account:settings_update')
+  async savePush(@Param('accountId') accountId: number, @Body() dto: SaveAccountPushDto, @Req() req: any) {
+    this.assertAccountScope(req, Number(accountId));
+    return this.service.savePush(Number(accountId), dto);
+  }
+
+  @Delete('push')
+  @RequirePermission('account:settings_update')
+  @HttpCode(204)
+  async deletePush(@Param('accountId') accountId: number, @Req() req: any) {
+    this.assertAccountScope(req, Number(accountId));
+    await this.service.deletePush(Number(accountId));
+  }
+
+  @Post('push/test')
+  @RequirePermission('account:settings_update')
+  async testPush(@Param('accountId') accountId: number, @Body() dto: TestAccountPushDto, @Req() req: any, @IpAddress() ip?: string) {
+    this.assertAccountScope(req, Number(accountId));
+    return this.service.testPush(dto.firebaseServiceAccount, ip);
   }
 }

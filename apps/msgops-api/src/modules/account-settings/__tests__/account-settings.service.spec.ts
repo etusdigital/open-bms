@@ -671,4 +671,104 @@ describe('AccountSettingsService', () => {
       expect(accountConfigs.deleteByAccountId).toHaveBeenCalled();
     });
   });
+
+  // ── Twilio (AC1-AC7, AC11) ──
+  describe('Twilio', () => {
+    const SID = 'AC' + 'a'.repeat(32);
+    const API_SID = 'SK' + 'b'.repeat(32);
+    const MG = 'MG' + 'c'.repeat(32);
+
+    it('saveTwilio upserts the correct account_config slots (AC1, AC3, AC4)', async () => {
+      const { service, accountConfigs } = build();
+      accountConfigs.getByAccountId.mockResolvedValue(null);
+      await service.saveTwilio(42, { accountSid: SID, apiSid: API_SID, apiSecret: 'secret-value-1234', authToken: 'auth-token-1234', smsServiceSid: MG, whatsappServiceSid: MG });
+      const written = accountConfigs.upsertByAccountId.mock.calls.map((c: any[]) => c[1]);
+      expect(written).toEqual(
+        expect.arrayContaining(['twilio_sid_account', 'twilio_sid', 'twilio_secret', 'twilio_auth_account', 'twilio_sms_service', 'twilio_whatsapp_service']),
+      );
+    });
+
+    it('getTwilio masks the SID and never returns the secret (AC2)', async () => {
+      const { service, accountConfigs } = build();
+      accountConfigs.getByAccountId.mockImplementation((_id: number, key: string) => {
+        const map: Record<string, any> = {
+          twilio_sid_account: { value: SID },
+          twilio_secret: { value: 'secret-value-1234' },
+          twilio_sms_service: { value: MG },
+        };
+        return Promise.resolve(map[key] ?? null);
+      });
+      const view = await service.getTwilio(42);
+      expect(view.source).toBe('account');
+      expect(view.hasSecret).toBe(true);
+      expect(view.hasSms).toBe(true);
+      expect(view.hasWhatsapp).toBe(false);
+      expect(JSON.stringify(view)).not.toContain('secret-value-1234');
+    });
+
+    it('getTwilio returns source=none when nothing configured', async () => {
+      const { service, accountConfigs } = build();
+      accountConfigs.getByAccountId.mockResolvedValue(null);
+      expect((await service.getTwilio(42)).source).toBe('none');
+    });
+
+    it('testTwilio returns ok=true on 2xx (AC6)', async () => {
+      const { service } = build();
+      axiosGet.mockResolvedValue({ status: 200, data: {} });
+      expect(await service.testTwilio({ accountSid: SID, apiSid: API_SID, apiSecret: 'x'.repeat(16) }, '1.1.1.1')).toEqual({ ok: true });
+    });
+
+    it('testTwilio returns ok=false (no throw) on 401 (AC5)', async () => {
+      const { service } = build();
+      axiosGet.mockResolvedValue({ status: 401, data: {} });
+      const res = await service.testTwilio({ accountSid: SID, apiSid: API_SID, apiSecret: 'x'.repeat(16) }, '1.1.1.2');
+      expect(res.ok).toBe(false);
+      expect(res.errorMessage).toBeTruthy();
+    });
+
+    it('testTwilio enforces the per-IP rate limit (AC11)', async () => {
+      const { service } = build();
+      axiosGet.mockResolvedValue({ status: 200, data: {} });
+      const ip = 'rate-test-ip';
+      for (let i = 0; i < 5; i++) await service.testTwilio({ accountSid: SID, apiSid: API_SID, apiSecret: 'x'.repeat(16) }, ip);
+      await expect(service.testTwilio({ accountSid: SID, apiSid: API_SID, apiSecret: 'x'.repeat(16) }, ip)).rejects.toBeDefined();
+    });
+  });
+
+  // ── Push (AC8, AC11) ──
+  describe('Push', () => {
+    const validSa = JSON.stringify({ project_id: 'p', private_key: '-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----', client_email: 'a@b.c' });
+
+    it('savePush writes firebase_service_account_app (AC8)', async () => {
+      const { service, accountConfigs } = build();
+      const res = await service.savePush(42, { firebaseServiceAccount: validSa });
+      expect(accountConfigs.upsertByAccountId).toHaveBeenCalledWith(42, 'firebase_service_account_app', validSa);
+      expect(res.source).toBe('account');
+    });
+
+    it('getPush returns platform when no account config but env present', async () => {
+      const { service, accountConfigs } = build();
+      accountConfigs.getByAccountId.mockResolvedValue(null);
+      const prev = process.env.FIREBASE_SERVICE_ACCOUNT;
+      process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id":"platform"}';
+      expect((await service.getPush(42)).source).toBe('platform');
+      if (prev === undefined) delete process.env.FIREBASE_SERVICE_ACCOUNT;
+      else process.env.FIREBASE_SERVICE_ACCOUNT = prev;
+    });
+
+    it('getPush returns none when neither account nor env present', async () => {
+      const { service, accountConfigs } = build();
+      accountConfigs.getByAccountId.mockResolvedValue(null);
+      const prev = process.env.FIREBASE_SERVICE_ACCOUNT;
+      delete process.env.FIREBASE_SERVICE_ACCOUNT;
+      expect((await service.getPush(42)).source).toBe('none');
+      if (prev !== undefined) process.env.FIREBASE_SERVICE_ACCOUNT = prev;
+    });
+
+    it('testPush validates the service account JSON', async () => {
+      const { service } = build();
+      expect((await service.testPush(validSa, '2.2.2.1')).ok).toBe(true);
+      expect((await service.testPush('{"project_id":"p"}', '2.2.2.2')).ok).toBe(false);
+    });
+  });
 });
