@@ -31,6 +31,6 @@ export default tseslint.config(
   {
     // bms-sw-core.js is a browser service-worker TEMPLATE (browser globals +
     // non-JS __BMS_*__ placeholders), not Node source — never lint it.
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'src/assets/push/bms-sw-core.js'],
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'src/assets/push/bms-sw-core.js', 'src/assets/push/bmstrk-core.js'],
   },
 );

@@ -529,10 +529,9 @@ export class AccountsService {
     } catch {
       /* leave blank if not a valid URL */
     }
-    // The tracker script (bmstrk.js) is an external asset. Prefer the configured
-    // assets host if present; otherwise fall back to the known public CDN.
-    const assetsUrl = await this.storage.getAssetsUrl().catch(() => undefined);
-    const trackerScriptUrl = assetsUrl ? `https://${assetsUrl}/bms/bmstrk.js` : 'https://assets.bri.us/bms/bmstrk.js';
+    // The tracker script (bmstrk.js) is now served by THIS BMS instance, with
+    // its endpoints (and the web-push.js loader) pointed at us — no in.bri.us.
+    const trackerScriptUrl = publicBase ? `${publicBase}/bms/bmstrk.js` : '/bms/bmstrk.js';
 
     const snippet = [
       '<script>',
