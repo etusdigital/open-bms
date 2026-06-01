@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SystemConfigEntity } from '../../entities/system-config.entity';
+import { S3StorageProvider } from '../../providers/s3-storage.provider';
 
 import { AdminS3Controller } from './s3/admin-s3.controller';
 import { AdminS3Service } from './s3/admin-s3.service';
@@ -24,7 +26,7 @@ import { AdminWhatsappHubService } from './whatsapp-hub/admin-whatsapp-hub.servi
 // SystemConfigCacheProvider is supplied by the global SystemConfigCacheModule
 // registered at app boot — no need to re-import here.
 @Module({
-  imports: [TypeOrmModule.forFeature([SystemConfigEntity])],
+  imports: [TypeOrmModule.forFeature([SystemConfigEntity]), HttpModule],
   controllers: [
     AdminS3Controller,
     AdminSendgridController,
@@ -37,6 +39,7 @@ import { AdminWhatsappHubService } from './whatsapp-hub/admin-whatsapp-hub.servi
     AdminWhatsappHubController,
   ],
   providers: [
+    S3StorageProvider,
     AdminS3Service,
     AdminSendgridService,
     AdminFcmService,

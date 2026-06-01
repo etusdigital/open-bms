@@ -27,12 +27,10 @@ describe('emailFormSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('requires ippool', () => {
+  it('allows an empty ippool (now optional)', () => {
+    // ippool is no longer required — the schema uses optionalString.
     const result = emailFormSchema.safeParse({ ...validEmail, ippool: '' });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0].path).toContain('ippool');
-    }
+    expect(result.success).toBe(true);
   });
 
   it('requires fromName with min 4 chars', () => {

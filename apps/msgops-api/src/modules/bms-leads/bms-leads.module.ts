@@ -11,6 +11,6 @@ export class BmsLeadsModule implements NestModule {
   // Middleware must run before PrincipalContextGuard so the api key in the
   // body is visible as `x-api-key` when the guard resolves the principal.
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(BmsLeadsAuthMiddleware).forRoutes({ path: 'bms/leads', method: RequestMethod.POST });
+    consumer.apply(BmsLeadsAuthMiddleware).forRoutes({ path: 'bms/leads', method: RequestMethod.POST }, { path: 'bms/leads/web-push', method: RequestMethod.POST });
   }
 }
