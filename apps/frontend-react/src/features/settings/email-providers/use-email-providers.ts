@@ -14,7 +14,7 @@ interface ProviderRegistration {
   hasFreeTier: boolean;
   hasWebhook: boolean;
   notes?: string;
-  get: (accountId: number) => Promise<{ source: 'account' | 'none' }>;
+  get: (accountId: number) => Promise<{ source: 'account' | 'none'; fromDomain?: string | null }>;
 }
 
 const PROVIDERS: ProviderRegistration[] = [
@@ -33,6 +33,7 @@ export interface ProviderState {
   hasFreeTier: boolean;
   hasWebhook: boolean;
   notes?: string;
+  fromDomain?: string | null;
 }
 
 export function useEmailProviders() {
@@ -59,6 +60,7 @@ export function useEmailProviders() {
       hasFreeTier: p.hasFreeTier,
       hasWebhook: p.hasWebhook,
       notes: p.notes,
+      fromDomain: data?.fromDomain ?? null,
     };
   });
 
