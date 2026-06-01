@@ -4,7 +4,11 @@ export type TwilioConfigSource = 'account' | 'none';
 
 export interface AccountTwilioSettings {
   source: TwilioConfigSource;
-  accountSidMasked: string | null;
+  // Identifiers (not secrets) — returned in full so the form round-trips on edit.
+  accountSid: string | null;
+  apiSid: string | null;
+  smsServiceSid: string | null;
+  whatsappServiceSid: string | null;
   hasSecret: boolean;
   hasAuthToken: boolean;
   hasSms: boolean;

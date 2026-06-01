@@ -31,10 +31,16 @@ export function TwilioTab() {
   const [whatsappServiceSid, setWhatsappServiceSid] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Secrets are write-only: GET never returns them. Show the masked Account SID
-  // and "configured" flags; leave secret inputs blank (only sent if filled).
+  // Identifiers (Account SID, API SID, Messaging Service SIDs) round-trip in
+  // full so edit/test re-validate. Secrets (apiSecret/authToken) are write-only:
+  // GET never returns them — leave those inputs blank, only sent if filled.
   useEffect(() => {
-    if (data) setAccountSid(data.accountSidMasked ?? '');
+    if (data) {
+      setAccountSid(data.accountSid ?? '');
+      setApiSid(data.apiSid ?? '');
+      setSmsServiceSid(data.smsServiceSid ?? '');
+      setWhatsappServiceSid(data.whatsappServiceSid ?? '');
+    }
   }, [data]);
 
   const save = useMutation({

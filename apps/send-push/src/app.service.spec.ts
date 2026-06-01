@@ -145,37 +145,30 @@ describe('AppService', () => {
     expect(service.getHello()).toBe('Hello World!');
   });
 
-  it('definedFirebaseService should use the per-account config for mobile-push', () => {
+  it('definedFirebaseService uses the per-account config for mobile-push', () => {
     const result = service.definedFirebaseService(account as never, 'mobile-push');
 
     expect(result).toEqual({
       service: '{"project_id":"app"}',
-      firebaseApp: 'push-account-1',
+      firebaseApp: 'mobile-push-account-1',
     });
   });
 
-  it('definedFirebaseService should ALSO use the per-account config for web-push (per-account with platform fallback)', () => {
-    // Previously web-push always fell back to the platform env credential. Now
-    // both push types honor the account's own firebase_service_account_app.
+  it('definedFirebaseService uses the PLATFORM credential for web-push (web tokens are platform-minted; per-account would be a SenderId mismatch)', () => {
     const result = service.definedFirebaseService(account as never, 'web-push');
 
     expect(result).toEqual({
-      service: '{"project_id":"app"}',
-      firebaseApp: 'push-account-1',
+      service: '{"project_id":"default"}',
+      firebaseApp: 'default',
     });
   });
 
-  it('definedFirebaseService should fall back to the platform credential when the account has no config', () => {
+  it('definedFirebaseService falls back to the platform credential for mobile-push when the account has no config', () => {
     const accountNoFirebaseCfg = {
       ...account,
       accountConfigs: account.accountConfigs.filter((cfg) => cfg.name !== 'firebase_service_account_app'),
     };
-    // Both push types fall back to the super-admin/platform env credential.
     expect(service.definedFirebaseService(accountNoFirebaseCfg as never, 'mobile-push')).toEqual({
-      service: '{"project_id":"default"}',
-      firebaseApp: 'default',
-    });
-    expect(service.definedFirebaseService(accountNoFirebaseCfg as never, 'web-push')).toEqual({
       service: '{"project_id":"default"}',
       firebaseApp: 'default',
     });
