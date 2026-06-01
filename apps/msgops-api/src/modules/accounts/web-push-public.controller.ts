@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import { PublicRoute } from '../authz/public-route.decorator';
 import { AccountsService } from './accounts.service';
 import { buildTracker, buildWebPush } from '../../lib/web-push-sw';
+// getWebPushPlatformConfig lives on AccountsService (reads system_config.fcm_settings).
 
 // Serves the per-account web-push service worker from the BMS domain itself —
 // no public S3/CDN bucket required. The customer hosts a tiny same-origin sw.js
@@ -35,13 +36,16 @@ export class WebPushPublicController {
   }
 
   // web-push.js — the on-page FCM client (vendored Firebase SDK + bmsPush). Same
-  // for all accounts; firebaseConfig/vapid come from the snippet's bmsTrkOptions
-  // at runtime, only the endpoint base is rewritten to us. Public client code.
+  // for all accounts. The PLATFORM Firebase config + VAPID (single-project) are
+  // substituted into the bundle here, server-side — never exposed in the page
+  // snippet (parity with Enterprise, and required because the constructor calls
+  // initializeApp() before any snippet override could apply). Public client code.
   @PublicRoute()
   @Get('web-push.js')
-  serveWebPush(@Res() res: Response): void {
+  async serveWebPush(@Res() res: Response): Promise<void> {
     const base = (process.env.BMS_PUBLIC_URL || process.env.FRONTEND_URL || '').replace(/\/+$/, '');
-    this.sendJs(res, buildWebPush(base), 'public, max-age=300');
+    const platform = await this.accountsService.getWebPushPlatformConfig();
+    this.sendJs(res, buildWebPush(base, platform ?? undefined), 'public, max-age=300');
   }
 
   private sendJs(res: Response, js: string, cacheControl: string): void {
