@@ -4,7 +4,7 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "assets": ["**/*.proto", "assets/push/bms-sw-core.js"],
+    "assets": ["**/*.proto", "assets/push/bms-sw-core.js", "assets/push/bmstrk-core.js"],
     "watchAssets": true
   }
 }

@@ -37,3 +37,12 @@ function cleanWebConfig(raw: Record<string, string | undefined>): Record<string,
 
 export const PLATFORM_SW_PATH = 'bms';
 export const PLATFORM_SW_FILENAME = 'bms-sw.js';
+
+// Renders bmstrk.js (the on-page tracker) from the repo template, pointing its
+// hardcoded endpoints at THIS BMS instance instead of in.bri.us, and the
+// web-push loader at our own route. publicBase = BMS_PUBLIC_URL.
+export function buildTracker(publicBase: string): string {
+  const core = readFileSync(join(__dirname, '../assets/push/bmstrk-core.js'), 'utf8');
+  const base = publicBase.replace(/\/+$/, '');
+  return core.replaceAll('__BMS_TRACKER_BASE__', base).replaceAll('__BMS_WEBPUSH_URL__', `${base}/bms/web-push.js`);
+}
