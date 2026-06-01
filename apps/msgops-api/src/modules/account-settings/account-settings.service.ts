@@ -15,6 +15,7 @@ import { enforceTestRateLimit } from '../../lib/test-rate-limit';
 
 const SENDGRID_KEY_NAME = 'sendgrid_key';
 const SENDGRID_WEBHOOK_NAME = 'sendgrid_webhook_url';
+const SENDGRID_FROM_DOMAIN_NAME = 'sendgrid_from_domain';
 const MAILERSEND_KEY_NAME = 'mailersend_key';
 const SPARKPOST_KEY_NAME = 'sparkpost_key';
 const DEFAULT_EMAIL_PROVIDER_NAME = 'default_email_provider';
@@ -60,6 +61,7 @@ export interface AccountSendgridView {
   source: SendgridKeySource;
   apiKeyMasked: string | null;
   webhookUrl: string | null;
+  fromDomain: string | null;
 }
 
 export type MailersendKeySource = 'account' | 'none';
@@ -135,16 +137,19 @@ export class AccountSettingsService {
     const accountKey = await this.accountConfigs.getByAccountId(accountId, SENDGRID_KEY_NAME);
     if (accountKey?.value) {
       const webhookRow = await this.accountConfigs.getByAccountId(accountId, SENDGRID_WEBHOOK_NAME);
+      const fromDomainRow = await this.accountConfigs.getByAccountId(accountId, SENDGRID_FROM_DOMAIN_NAME);
       return {
         source: 'account',
         apiKeyMasked: maskApiKey(accountKey.value),
         webhookUrl: webhookRow?.value ?? null,
+        fromDomain: fromDomainRow?.value ?? null,
       };
     }
     return {
       source: 'none',
       apiKeyMasked: null,
       webhookUrl: null,
+      fromDomain: null,
     };
   }
 
@@ -155,6 +160,25 @@ export class AccountSettingsService {
   // registration fails the key is NOT saved — a key that can send but not
   // receive events leads to silent analytics gaps.
   async saveSendgrid(accountId: number, dto: SaveAccountSendgridDto): Promise<AccountSendgridView> {
+    // Metadata-only edit (EVO-1466): when no apiKey is submitted, the caller is
+    // updating just the sender domain on an account that already has a key.
+    // Skip webhook (re-)registration entirely — re-PATCHing the SendGrid hook
+    // with the same key buys nothing — and persist only `sendgrid_from_domain`.
+    if (!dto.apiKey) {
+      const existingKey = await this.accountConfigs.getByAccountId(accountId, SENDGRID_KEY_NAME);
+      if (!existingKey?.value) {
+        throw new HttpException('Informe a API Key SendGrid: não há chave armazenada para esta conta.', HttpStatus.BAD_REQUEST);
+      }
+      await this.accountConfigs.upsertByAccountId(accountId, SENDGRID_FROM_DOMAIN_NAME, dto.fromDomain);
+      const webhookRow = await this.accountConfigs.getByAccountId(accountId, SENDGRID_WEBHOOK_NAME);
+      return {
+        source: 'account',
+        apiKeyMasked: maskApiKey(existingKey.value),
+        webhookUrl: webhookRow?.value ?? null,
+        fromDomain: dto.fromDomain,
+      };
+    }
+
     let registered: { url: string };
     try {
       registered = await this.sendgridHandler.createWebhook({ apiKey: dto.apiKey, accountId });
@@ -166,6 +190,7 @@ export class AccountSettingsService {
 
     await this.accountConfigs.upsertByAccountId(accountId, SENDGRID_KEY_NAME, dto.apiKey);
     await this.accountConfigs.upsertByAccountId(accountId, SENDGRID_WEBHOOK_NAME, registered.url);
+    await this.accountConfigs.upsertByAccountId(accountId, SENDGRID_FROM_DOMAIN_NAME, dto.fromDomain);
     this.sendgridHandler.invalidateApiKeyCache(accountId);
 
     // EVO-1462 AC14: the first configured provider becomes default silently.
@@ -179,6 +204,7 @@ export class AccountSettingsService {
       source: 'account',
       apiKeyMasked: maskApiKey(dto.apiKey),
       webhookUrl: registered.url,
+      fromDomain: dto.fromDomain,
     };
   }
 
@@ -191,6 +217,7 @@ export class AccountSettingsService {
     await this.assertNotCurrentDefault(accountId, 'sendgrid');
     await this.accountConfigs.deleteByAccountId(accountId, SENDGRID_KEY_NAME);
     await this.accountConfigs.deleteByAccountId(accountId, SENDGRID_WEBHOOK_NAME);
+    await this.accountConfigs.deleteByAccountId(accountId, SENDGRID_FROM_DOMAIN_NAME);
     this.sendgridHandler.invalidateApiKeyCache(accountId);
   }
 

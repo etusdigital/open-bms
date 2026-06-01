@@ -81,6 +81,18 @@ describe('EmailProvidersTab (EVO-1462 listing)', () => {
     expect(screen.getByTestId('default-badge-sendgrid')).toBeInTheDocument();
   });
 
+  it('shows the configured sender domain as sub-text on the provider row (EVO-1466)', () => {
+    setHook({ configuredProviders: [{ ...SENDGRID_CONFIGURED, fromDomain: 'mail.acme.com' }], defaultProvider: 'sendgrid' });
+    renderTab();
+    expect(screen.getByTestId('provider-domain-sendgrid')).toHaveTextContent('mail.acme.com');
+  });
+
+  it('omits the domain sub-text when no domain is configured', () => {
+    setHook({ configuredProviders: [SENDGRID_CONFIGURED], defaultProvider: 'sendgrid' });
+    renderTab();
+    expect(screen.queryByTestId('provider-domain-sendgrid')).not.toBeInTheDocument();
+  });
+
   it('opens the SendGrid form modal when SendGrid is selected from the type picker', () => {
     setHook({ configuredProviders: [] });
     renderTab();

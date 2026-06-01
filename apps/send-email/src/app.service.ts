@@ -183,8 +183,14 @@ export class AppService {
     const config = this.splitFeature.getConfig();
     const shouldChange = this.splitFeature.shouldChange(sendEmailMessage.automationName, sendEmailMessage.message.name, config);
     if (shouldChange) {
+      // Split-pool override WINS over the fromDomain gate (EVO-1466): when this
+      // branch sets the sender, the gate below does NOT run. Assumption: the
+      // split-pool `config.sender` lives on a SendGrid-verified domain; if not,
+      // the resulting 403 is a split-pool config bug, out of EVO-1466 scope.
       sendEmailMessage.message.from.email = config.sender;
       sendEmailMessage.message.ippool = config.pool;
+    } else {
+      this.applyFromDomainGate(sendEmailMessage);
     }
     // END Feature Test
 
@@ -380,6 +386,43 @@ export class AppService {
     }
 
     return formatedEmailContent.template;
+  }
+
+  // EVO-1466: gate the resolved From against the account's configured
+  // `sendgrid_from_domain`. SendGrid 403s any send whose From is on an
+  // unverified domain, so when the message From is absent or its domain does
+  // not match the configured one, we silently override it with the account's
+  // default sender (option (a): silent override + structured log — decided by
+  // Guilherme 2026-06-01; alternatives (b) 4xx and (c) warn-and-send discarded).
+  // The default sender is synthesised as `noreply@<sendgrid_from_domain>` so it
+  // is, by construction, on the verified domain — the only substitution that
+  // reliably prevents the 403. The original display name (firstName) is kept.
+  // Inert when no domain is configured for the account.
+  private applyFromDomainGate(sendEmailMessage: SendEmailMessage): void {
+    const accountConfigs = sendEmailMessage.account?.accountConfigs;
+    if (!accountConfigs) return;
+
+    const configuredDomain = (this.mailUtils.getAccountConfig(accountConfigs, 'sendgrid_from_domain') || '').trim().toLowerCase();
+    if (!configuredDomain) return; // feature not configured for this account
+
+    const originalFrom = sendEmailMessage.message.from?.email;
+    const originalDomain = originalFrom?.includes('@') ? originalFrom.split('@').pop()?.trim().toLowerCase() : undefined;
+    if (originalDomain && originalDomain === configuredDomain) return; // From already on the verified domain
+
+    const substitutedSender = `noreply@${configuredDomain}`;
+    this.trackerService.logInfo(
+      '[fromDomainGate] override',
+      JSON.stringify({
+        messageId: sendEmailMessage.messageId,
+        account: sendEmailMessage.account?.id,
+        originalFrom: originalFrom ?? null,
+        configuredDomain,
+        substitutedSender,
+      }),
+    );
+
+    sendEmailMessage.message.from = sendEmailMessage.message.from || ({} as any);
+    sendEmailMessage.message.from.email = substitutedSender;
   }
 
   private replaceVariables(sendEmailMessage: SendEmailMessage): SendEmailMessage {

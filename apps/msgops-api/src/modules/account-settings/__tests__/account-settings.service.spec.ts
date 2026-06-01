@@ -54,57 +54,103 @@ describe('AccountSettingsService', () => {
   });
 
   describe('getSendgrid', () => {
-    it('returns source=account with masked key when account has its own key', async () => {
+    it('returns source=account with masked key + fromDomain when account has its own key', async () => {
       const { service, accountConfigs } = build();
       accountConfigs.getByAccountId.mockImplementation((_id: number, name: string) => {
         if (name === 'sendgrid_key') return Promise.resolve({ value: 'SG.zzzzzz1234' });
         if (name === 'sendgrid_webhook_url') return Promise.resolve({ value: 'https://hook?account=42' });
+        if (name === 'sendgrid_from_domain') return Promise.resolve({ value: 'mail.acme.com' });
         return Promise.resolve(null);
       });
       const out = await service.getSendgrid(42);
-      expect(out).toEqual({ source: 'account', apiKeyMasked: 'SG.****...1234', webhookUrl: 'https://hook?account=42' });
+      expect(out).toEqual({ source: 'account', apiKeyMasked: 'SG.****...1234', webhookUrl: 'https://hook?account=42', fromDomain: 'mail.acme.com' });
+    });
+
+    it('returns fromDomain=null when key exists but domain was never set', async () => {
+      const { service, accountConfigs } = build();
+      accountConfigs.getByAccountId.mockImplementation((_id: number, name: string) =>
+        name === 'sendgrid_key' ? Promise.resolve({ value: 'SG.zzzzzz1234' }) : Promise.resolve(null),
+      );
+      const out = await service.getSendgrid(42);
+      expect(out).toEqual({ source: 'account', apiKeyMasked: 'SG.****...1234', webhookUrl: null, fromDomain: null });
     });
 
     it('returns source=none when account has no key (no platform-wide fallback exists)', async () => {
       const { service, accountConfigs } = build();
       accountConfigs.getByAccountId.mockResolvedValue(null);
-      expect(await service.getSendgrid(42)).toEqual({ source: 'none', apiKeyMasked: null, webhookUrl: null });
+      expect(await service.getSendgrid(42)).toEqual({ source: 'none', apiKeyMasked: null, webhookUrl: null, fromDomain: null });
     });
   });
 
   describe('saveSendgrid', () => {
-    it('registers webhook then persists key + webhook url + invalidates cache', async () => {
+    it('registers webhook then persists key + webhook url + fromDomain + invalidates cache', async () => {
       const { service, accountConfigs, handler } = build();
-      const out = await service.saveSendgrid(42, { apiKey: 'SG.client9999' });
+      const out = await service.saveSendgrid(42, { apiKey: 'SG.client9999', fromDomain: 'mail.acme.com' });
 
       expect(handler.createWebhook).toHaveBeenCalledWith({ apiKey: 'SG.client9999', accountId: 42 });
       expect(accountConfigs.upsertByAccountId).toHaveBeenCalledWith(42, 'sendgrid_key', 'SG.client9999');
       expect(accountConfigs.upsertByAccountId).toHaveBeenCalledWith(42, 'sendgrid_webhook_url', 'https://in.bri.us/bms/events/?platform=sendgrid&account=42');
+      expect(accountConfigs.upsertByAccountId).toHaveBeenCalledWith(42, 'sendgrid_from_domain', 'mail.acme.com');
       expect(handler.invalidateApiKeyCache).toHaveBeenCalledWith(42);
       expect(out).toEqual({
         source: 'account',
         apiKeyMasked: 'SG.****...9999',
         webhookUrl: 'https://in.bri.us/bms/events/?platform=sendgrid&account=42',
+        fromDomain: 'mail.acme.com',
       });
     });
 
     it('rejects with BAD_GATEWAY and DOES NOT save when webhook registration fails', async () => {
       const handler = makeHandler({ createWebhookOk: false });
       const { service, accountConfigs } = build({ handler });
-      await expect(service.saveSendgrid(42, { apiKey: 'SG.bad11111' })).rejects.toMatchObject({
+      await expect(service.saveSendgrid(42, { apiKey: 'SG.bad11111', fromDomain: 'mail.acme.com' })).rejects.toMatchObject({
         status: HttpStatus.BAD_GATEWAY,
       });
       expect(accountConfigs.upsertByAccountId).not.toHaveBeenCalled();
       expect(handler.invalidateApiKeyCache).not.toHaveBeenCalled();
     });
+
+    // EVO-1466: metadata-only edit — update just the domain on an account that
+    // already has a stored key, without re-registering the webhook.
+    it('metadata-only edit (no apiKey): updates only fromDomain, skips webhook registration', async () => {
+      const { service, accountConfigs, handler } = build();
+      accountConfigs.getByAccountId.mockImplementation((_id: number, name: string) => {
+        if (name === 'sendgrid_key') return Promise.resolve({ value: 'SG.stored1234' });
+        if (name === 'sendgrid_webhook_url') return Promise.resolve({ value: 'https://hook?account=42' });
+        return Promise.resolve(null);
+      });
+
+      const out = await service.saveSendgrid(42, { fromDomain: 'news.acme.com' });
+
+      expect(handler.createWebhook).not.toHaveBeenCalled();
+      expect(accountConfigs.upsertByAccountId).toHaveBeenCalledWith(42, 'sendgrid_from_domain', 'news.acme.com');
+      expect(accountConfigs.upsertByAccountId).not.toHaveBeenCalledWith(42, 'sendgrid_key', expect.anything());
+      expect(out).toEqual({
+        source: 'account',
+        apiKeyMasked: 'SG.****...1234',
+        webhookUrl: 'https://hook?account=42',
+        fromDomain: 'news.acme.com',
+      });
+    });
+
+    it('metadata-only edit (no apiKey): rejects with BAD_REQUEST when no key is stored', async () => {
+      const { service, accountConfigs, handler } = build();
+      accountConfigs.getByAccountId.mockResolvedValue(null);
+      await expect(service.saveSendgrid(42, { fromDomain: 'news.acme.com' })).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+      });
+      expect(handler.createWebhook).not.toHaveBeenCalled();
+      expect(accountConfigs.upsertByAccountId).not.toHaveBeenCalled();
+    });
   });
 
   describe('deleteSendgrid', () => {
-    it('removes both account configs and invalidates cache', async () => {
+    it('removes key + webhook + fromDomain configs and invalidates cache', async () => {
       const { service, accountConfigs, handler } = build();
       await service.deleteSendgrid(42);
       expect(accountConfigs.deleteByAccountId).toHaveBeenCalledWith(42, 'sendgrid_key');
       expect(accountConfigs.deleteByAccountId).toHaveBeenCalledWith(42, 'sendgrid_webhook_url');
+      expect(accountConfigs.deleteByAccountId).toHaveBeenCalledWith(42, 'sendgrid_from_domain');
       expect(handler.invalidateApiKeyCache).toHaveBeenCalledWith(42);
     });
   });

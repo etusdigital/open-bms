@@ -11,6 +11,7 @@ export interface AccountSendgridSettings {
   source: SendgridKeySource;
   apiKeyMasked: string | null;
   webhookUrl: string | null;
+  fromDomain: string | null;
 }
 
 export interface SendgridTestResponse {
@@ -30,7 +31,7 @@ export const accountSendgridGateway = {
     return res.data;
   },
 
-  async save(accountId: number, payload: { apiKey: string }): Promise<AccountSendgridSettings> {
+  async save(accountId: number, payload: { apiKey?: string; fromDomain: string }): Promise<AccountSendgridSettings> {
     const res = await apiClient.put<AccountSendgridSettings>(`/accounts/${accountId}/settings/sendgrid`, payload);
     return res.data;
   },
