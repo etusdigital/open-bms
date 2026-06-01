@@ -2,16 +2,14 @@
  * BMS Web-Push platform service worker — TEMPLATE.
  *
  * SINGLE-PROJECT model: there is ONE platform Firebase project for web-push (all
- * customer sites register under it). This file is the canonical source for the
- * shared service worker served at {BMS_ASSETS_URL}/bms/bms-sw.js.
+ * customer sites register under it). This is the canonical source.
  *
- * It is NOT served as-is: AdminFcmService regenerates it on save, substituting
- * the __BMS_*__ placeholders with the platform values configured in
- * Super-Admin → Integrations → FCM (firebaseConfig + tracker URL), then uploads
- * the result to S3 and purges the CDN cache.
- *
- * Per-account wrappers (bmspush-{hash}.js) still importScripts this core and add
- * their own opt-in/popup vars — the core stays single-project.
+ * It is NOT served as-is. The BMS API renders it ON REQUEST at the public route
+ * GET /bms/push/:accountHash.js, substituting the placeholders below with the
+ * platform values from Super-Admin → Integrations → FCM plus the account's
+ * opt-in vars. No public S3/CDN bucket is required — BMS serves it from its own
+ * domain. (A legacy path can still upload it to S3, but the served route is the
+ * source of truth.)
  *
  * Placeholders:
  *   __BMS_TRACKER_URL__      → events endpoint (web-push tracking)

@@ -2154,6 +2154,7 @@
     },
     "s3": {
       "endpoint": "Endpoint",
+      "endpointHelp": "Endpoint de la API S3 del proveedor (ej.: R2: https://<cuenta>.r2.cloudflarestorage.com). Es el destino de subida — no sirve archivos públicamente.",
       "region": "Región",
       "bucket": "Bucket",
       "accessKeyId": "Access Key ID",
