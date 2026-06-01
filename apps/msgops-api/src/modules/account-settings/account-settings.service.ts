@@ -9,6 +9,8 @@ import { SaveAccountSparkpostDto } from './dtos/sparkpost.dto';
 import { SaveAccountResendDto } from './dtos/resend.dto';
 import { SaveAccountSesDto } from './dtos/ses.dto';
 import { SaveAccountMandrillDto } from './dtos/mandrill.dto';
+import { SaveAccountTwilioDto } from './dtos/twilio.dto';
+import { SaveAccountPushDto } from './dtos/push.dto';
 import { maskApiKey } from '../../lib/sendgrid-mask';
 import { maskCredential } from '../../lib/geoip-config-file';
 import { enforceTestRateLimit } from '../../lib/test-rate-limit';
@@ -48,6 +50,15 @@ const SES_ACCESS_KEY_NAME = 'ses_access_key_id';
 const SES_SECRET_KEY_NAME = 'ses_secret_access_key';
 const SES_REGION_NAME = 'ses_region';
 const MANDRILL_KEY_NAME = 'mandrill_key';
+// Twilio account_configs slots (read by the twilio-messaging worker + messages.service).
+const TWILIO_SID_ACCOUNT_NAME = 'twilio_sid_account';
+const TWILIO_SID_NAME = 'twilio_sid';
+const TWILIO_SECRET_NAME = 'twilio_secret';
+const TWILIO_AUTH_TOKEN_NAME = 'twilio_auth_account';
+const TWILIO_SMS_SERVICE_NAME = 'twilio_sms_service';
+const TWILIO_WHATSAPP_SERVICE_NAME = 'twilio_whatsapp_service';
+// Push: per-account Firebase service account (shared by mobile + web push).
+const FIREBASE_SERVICE_ACCOUNT_NAME = 'firebase_service_account_app';
 const TEST_RATE_WINDOW_MS = 60_000;
 const TEST_RATE_MAX_PER_WINDOW = 5;
 
@@ -95,6 +106,25 @@ export interface AccountMandrillView {
   apiKeyMasked: string | null;
 }
 
+export type TwilioConfigSource = 'account' | 'none';
+export interface AccountTwilioView {
+  source: TwilioConfigSource;
+  accountSidMasked: string | null;
+  hasSecret: boolean;
+  hasAuthToken: boolean;
+  hasSms: boolean;
+  hasWhatsapp: boolean;
+}
+
+// Push has a platform fallback (env FIREBASE_SERVICE_ACCOUNT), so the source can
+// be 'account' (per-account JSON set), 'platform' (no account config but the
+// super-admin/platform env credential is present) or 'none'.
+export type PushConfigSource = 'account' | 'platform' | 'none';
+export interface AccountPushView {
+  source: PushConfigSource;
+  serviceAccountMasked: string | null;
+}
+
 @Injectable()
 export class AccountSettingsService {
   private readonly logger = new Logger(AccountSettingsService.name);
@@ -106,6 +136,8 @@ export class AccountSettingsService {
   private readonly resendTestHits = new Map<string, number[]>();
   private readonly sesTestHits = new Map<string, number[]>();
   private readonly mandrillTestHits = new Map<string, number[]>();
+  private readonly twilioTestHits = new Map<string, number[]>();
+  private readonly pushTestHits = new Map<string, number[]>();
 
   constructor(
     private readonly accountConfigs: AccountConfigsProvider,
@@ -462,6 +494,113 @@ export class AccountSettingsService {
       return { ok: false, errorMessage: `HTTP ${res.status}` };
     } catch (err: any) {
       return { ok: false, errorMessage: (err?.message ?? 'erro desconhecido').slice(0, 150) };
+    }
+  }
+
+  // ── Twilio (WhatsApp Twilio + SMS) ─────────────────────────────────────────
+  // One credential set per account; the SMS vs WhatsApp distinction is the
+  // Messaging Service SID. The twilio-messaging worker + messages.service read
+  // these slots via account.configByName(...) — no worker change needed.
+
+  async getTwilio(accountId: number): Promise<AccountTwilioView> {
+    const [accountSid, secret, authToken, sms, whatsapp] = await Promise.all([
+      this.accountConfigs.getByAccountId(accountId, TWILIO_SID_ACCOUNT_NAME),
+      this.accountConfigs.getByAccountId(accountId, TWILIO_SECRET_NAME),
+      this.accountConfigs.getByAccountId(accountId, TWILIO_AUTH_TOKEN_NAME),
+      this.accountConfigs.getByAccountId(accountId, TWILIO_SMS_SERVICE_NAME),
+      this.accountConfigs.getByAccountId(accountId, TWILIO_WHATSAPP_SERVICE_NAME),
+    ]);
+    if (!accountSid?.value && !secret?.value) {
+      return { source: 'none', accountSidMasked: null, hasSecret: false, hasAuthToken: false, hasSms: false, hasWhatsapp: false };
+    }
+    return {
+      source: 'account',
+      accountSidMasked: accountSid?.value ? (maskCredential(accountSid.value) ?? null) : null,
+      hasSecret: Boolean(secret?.value),
+      hasAuthToken: Boolean(authToken?.value),
+      hasSms: Boolean(sms?.value),
+      hasWhatsapp: Boolean(whatsapp?.value),
+    };
+  }
+
+  async saveTwilio(accountId: number, dto: SaveAccountTwilioDto): Promise<AccountTwilioView> {
+    await this.accountConfigs.upsertByAccountId(accountId, TWILIO_SID_ACCOUNT_NAME, dto.accountSid);
+    await this.accountConfigs.upsertByAccountId(accountId, TWILIO_SID_NAME, dto.apiSid);
+    await this.accountConfigs.upsertByAccountId(accountId, TWILIO_SECRET_NAME, dto.apiSecret);
+    if (dto.authToken !== undefined) await this.accountConfigs.upsertByAccountId(accountId, TWILIO_AUTH_TOKEN_NAME, dto.authToken);
+    if (dto.smsServiceSid !== undefined) await this.accountConfigs.upsertByAccountId(accountId, TWILIO_SMS_SERVICE_NAME, dto.smsServiceSid);
+    if (dto.whatsappServiceSid !== undefined) await this.accountConfigs.upsertByAccountId(accountId, TWILIO_WHATSAPP_SERVICE_NAME, dto.whatsappServiceSid);
+    return this.getTwilio(accountId);
+  }
+
+  async deleteTwilio(accountId: number): Promise<void> {
+    await Promise.all([
+      this.accountConfigs.deleteByAccountId(accountId, TWILIO_SID_ACCOUNT_NAME),
+      this.accountConfigs.deleteByAccountId(accountId, TWILIO_SID_NAME),
+      this.accountConfigs.deleteByAccountId(accountId, TWILIO_SECRET_NAME),
+      this.accountConfigs.deleteByAccountId(accountId, TWILIO_AUTH_TOKEN_NAME),
+      this.accountConfigs.deleteByAccountId(accountId, TWILIO_SMS_SERVICE_NAME),
+      this.accountConfigs.deleteByAccountId(accountId, TWILIO_WHATSAPP_SERVICE_NAME),
+    ]);
+  }
+
+  async testTwilio(creds: { accountSid: string; apiSid: string; apiSecret: string }, requesterIp?: string): Promise<{ ok: boolean; errorMessage?: string }> {
+    enforceTestRateLimit(this.twilioTestHits, `twilio:${requesterIp ?? 'unknown'}`, 'Twilio');
+    try {
+      // Basic Auth with API Key SID : secret — validates the SENDING credentials
+      // against the account resource (same auth model the worker uses).
+      const basic = Buffer.from(`${creds.apiSid}:${creds.apiSecret}`).toString('base64');
+      const res = await axios.get(`https://api.twilio.com/2010-04-01/Accounts/${creds.accountSid}.json`, {
+        headers: { Authorization: `Basic ${basic}` },
+        timeout: 10_000,
+        validateStatus: () => true,
+      });
+      if (res.status >= 200 && res.status < 300) return { ok: true };
+      if (res.status === 401 || res.status === 403) return { ok: false, errorMessage: 'Credenciais inválidas.' };
+      if (res.status === 404) return { ok: false, errorMessage: 'Account SID não encontrado.' };
+      return { ok: false, errorMessage: `HTTP ${res.status}` };
+    } catch (err: any) {
+      return { ok: false, errorMessage: (err?.message ?? 'erro desconhecido').slice(0, 150) };
+    }
+  }
+
+  // ── Push (Mobile FCM + Web-Push) ────────────────────────────────────────────
+  // Per-account Firebase service account with platform fallback. send-push reads
+  // firebase_service_account_app for both push types (see definedFirebaseService).
+
+  async getPush(accountId: number): Promise<AccountPushView> {
+    const row = await this.accountConfigs.getByAccountId(accountId, FIREBASE_SERVICE_ACCOUNT_NAME);
+    if (row?.value) {
+      return { source: 'account', serviceAccountMasked: maskCredential(row.value) ?? null };
+    }
+    // Platform fallback active when the super-admin env credential is present.
+    if (process.env.FIREBASE_SERVICE_ACCOUNT && process.env.FIREBASE_SERVICE_ACCOUNT.trim().length > 0) {
+      return { source: 'platform', serviceAccountMasked: null };
+    }
+    return { source: 'none', serviceAccountMasked: null };
+  }
+
+  async savePush(accountId: number, dto: SaveAccountPushDto): Promise<AccountPushView> {
+    await this.accountConfigs.upsertByAccountId(accountId, FIREBASE_SERVICE_ACCOUNT_NAME, dto.firebaseServiceAccount);
+    return { source: 'account', serviceAccountMasked: maskCredential(dto.firebaseServiceAccount) ?? null };
+  }
+
+  async deletePush(accountId: number): Promise<void> {
+    await this.accountConfigs.deleteByAccountId(accountId, FIREBASE_SERVICE_ACCOUNT_NAME);
+  }
+
+  async testPush(firebaseServiceAccount: string, requesterIp?: string): Promise<{ ok: boolean; errorMessage?: string }> {
+    enforceTestRateLimit(this.pushTestHits, `push:${requesterIp ?? 'unknown'}`, 'Push');
+    // The DTO already validated JSON shape; re-check defensively and confirm the
+    // private key looks like a PEM block (catches truncated pastes).
+    try {
+      const parsed = JSON.parse(firebaseServiceAccount);
+      const missing = ['project_id', 'private_key', 'client_email'].filter((f) => !parsed[f] || typeof parsed[f] !== 'string');
+      if (missing.length > 0) return { ok: false, errorMessage: `Campos ausentes: ${missing.join(', ')}` };
+      if (!String(parsed.private_key).includes('BEGIN PRIVATE KEY')) return { ok: false, errorMessage: 'private_key inválida (PEM esperado).' };
+      return { ok: true };
+    } catch {
+      return { ok: false, errorMessage: 'JSON inválido.' };
     }
   }
 }

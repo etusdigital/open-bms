@@ -145,19 +145,37 @@ describe('AppService', () => {
     expect(service.getHello()).toBe('Hello World!');
   });
 
-  it('definedFirebaseService should return mobile app config when message type is mobile-push', () => {
+  it('definedFirebaseService should use the per-account config for mobile-push', () => {
     const result = service.definedFirebaseService(account as never, 'mobile-push');
 
     expect(result).toEqual({
       service: '{"project_id":"app"}',
-      firebaseApp: 'mobile-push-account-1',
+      firebaseApp: 'push-account-1',
     });
   });
 
-  it('definedFirebaseService should return default config for non mobile-push', () => {
+  it('definedFirebaseService should ALSO use the per-account config for web-push (per-account with platform fallback)', () => {
+    // Previously web-push always fell back to the platform env credential. Now
+    // both push types honor the account's own firebase_service_account_app.
     const result = service.definedFirebaseService(account as never, 'web-push');
 
     expect(result).toEqual({
+      service: '{"project_id":"app"}',
+      firebaseApp: 'push-account-1',
+    });
+  });
+
+  it('definedFirebaseService should fall back to the platform credential when the account has no config', () => {
+    const accountNoFirebaseCfg = {
+      ...account,
+      accountConfigs: account.accountConfigs.filter((cfg) => cfg.name !== 'firebase_service_account_app'),
+    };
+    // Both push types fall back to the super-admin/platform env credential.
+    expect(service.definedFirebaseService(accountNoFirebaseCfg as never, 'mobile-push')).toEqual({
+      service: '{"project_id":"default"}',
+      firebaseApp: 'default',
+    });
+    expect(service.definedFirebaseService(accountNoFirebaseCfg as never, 'web-push')).toEqual({
       service: '{"project_id":"default"}',
       firebaseApp: 'default',
     });
