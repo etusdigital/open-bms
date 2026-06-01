@@ -142,14 +142,36 @@ export function WebPushSection() {
         </label>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {/* preview */}
-          <div className="bg-muted flex items-center justify-center rounded-md p-4" style={{ minHeight: 160 }}>
-            <div className="w-full max-w-sm rounded-md border bg-white p-3 shadow" style={{ backgroundColor: s.backgroundColor || '#FFFFFF' }}>
-              <p className="text-sm font-medium text-black">{s.optinTitle || (t('settings.optinTitlePlaceholder') ?? 'Título do opt-in')}</p>
-              <p className="mb-2 text-xs text-gray-600">{s.optinBody || 'Lorem ipsum dolor sit amet consectetur.'}</p>
-              <div className="flex justify-end gap-2">
-                <span className="rounded bg-gray-200 px-2 py-1 text-xs text-gray-700">{s.optinDenyLabel || (t('settings.optinDeny') ?? 'Não')}</span>
-                <span className="rounded bg-green-500 px-2 py-1 text-xs text-white">{s.optinAllowLabel || (t('settings.optinAllow') ?? 'Permitir')}</span>
+          {/* preview — a mocked website page with the opt-in popup placed per the
+              selected Position (top/center/bottom), like the Enterprise UI. */}
+          <div
+            className="relative overflow-hidden rounded-md bg-gray-100 p-3"
+            style={{ minHeight: 300, justifyContent: s.position === 'bottom' ? 'flex-end' : s.position === 'center' ? 'center' : 'flex-start', display: 'flex', flexDirection: 'column' }}
+          >
+            {/* faux page skeleton behind the popup */}
+            <div className="pointer-events-none absolute inset-3 flex flex-col gap-3 opacity-60">
+              <div className="h-24 rounded bg-gray-300" />
+              <div className="flex gap-3">
+                <div className="h-40 w-1/3 rounded bg-gray-300" />
+                <div className="flex flex-1 flex-col gap-2">
+                  <div className="h-8 rounded bg-gray-300" />
+                  <div className="h-8 rounded bg-gray-300" />
+                  <div className="h-8 rounded bg-gray-300" />
+                </div>
+              </div>
+            </div>
+            {/* the opt-in popup */}
+            <div className="relative z-10 mx-auto w-full max-w-md rounded-md border bg-white p-3 shadow-lg" style={{ backgroundColor: s.backgroundColor || '#FFFFFF' }}>
+              <div className="flex gap-3">
+                <div className="h-12 w-12 flex-shrink-0 rounded bg-gray-200" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-black">{s.optinTitle || (t('settings.optinTitlePlaceholder') ?? 'Título do opt-in')}</p>
+                  <p className="text-xs text-gray-600">{s.optinBody || 'Lorem ipsum dolor sit amet consectetur. Nunc nibh ut purus diam.'}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end gap-2">
+                <span className="rounded bg-gray-200 px-3 py-1 text-xs text-gray-600">{s.optinDenyLabel || (t('settings.optinDeny') ?? 'Não')}</span>
+                <span className="rounded bg-green-500 px-3 py-1 text-xs text-white">{s.optinAllowLabel || (t('settings.optinAllow') ?? 'Permitir')}</span>
               </div>
             </div>
           </div>
