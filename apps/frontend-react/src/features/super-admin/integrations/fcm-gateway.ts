@@ -1,13 +1,28 @@
 import { apiClient } from '@/lib/api-client';
 
+export interface FirebaseWebConfig {
+  apiKey?: string;
+  authDomain?: string;
+  projectId?: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId?: string;
+  measurementId?: string;
+}
+
 export interface FcmAdminSettings {
   projectId?: string;
   clientEmail?: string;
   hasPrivateKey: boolean;
+  // Web-push platform values (public client-side; used to generate bms-sw.js).
+  webConfig?: FirebaseWebConfig;
+  vapidPublicKey?: string;
 }
 
 export interface FcmSavePayload {
   serviceAccountJson?: string;
+  webConfig?: FirebaseWebConfig;
+  vapidPublicKey?: string;
 }
 
 export interface FcmTestPayload {
