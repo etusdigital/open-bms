@@ -65,3 +65,59 @@ describe('AccountsService.renderAccountServiceWorker + resolveAccountIdByHash', 
     expect(js).not.toContain('importScripts("https://');
   });
 });
+
+describe('AccountsService.getWebPushIntegration — single-project Firebase injection', () => {
+  // This is the make-or-break of the single-project model: the on-page snippet
+  // MUST carry the PLATFORM firebaseConfig + vapidKey (from system_config
+  // .fcm_settings) so web-push.js mints FCM tokens against OUR project. If they're
+  // missing, bmsPush silently falls back to the bri.us defaults baked into the
+  // vendored SDK and tokens land in a project we don't control.
+  function build(fcmValue: any) {
+    const service = Object.create(AccountsService.prototype) as AccountsService;
+    (service as any).findByAccountConfig = jest.fn().mockImplementation((_id: number, name: string) => {
+      if (name === 'api_key') return Promise.resolve({ value: 'acct-key-123' });
+      if (name === 'default_domain') return Promise.resolve({ value: 'https://shop.example.com' });
+      return Promise.resolve(null); // webpush_settings
+    });
+    (service as any).safeJsonParse = (v: string) => JSON.parse(v);
+    (service as any).accountConfigRepository = {
+      manager: { query: jest.fn().mockResolvedValue(fcmValue === undefined ? [] : [{ value: fcmValue }]) },
+    };
+    return { service };
+  }
+
+  const WEB_CONFIG = { apiKey: 'AIza-bms-open', authDomain: 'bms-open.firebaseapp.com', projectId: 'bms-open', messagingSenderId: '799302104089', appId: '1:799:web:abc' };
+  const VAPID = 'BPlatformVapidPublicKey123';
+
+  it('injects the platform firebaseConfig + vapidKey into the snippet when fcm_settings is set', async () => {
+    const { service } = build({ webConfig: WEB_CONFIG, vapidPublicKey: VAPID });
+    const { snippet } = await service.getWebPushIntegration(7);
+
+    expect(snippet).toContain('firebaseConfig:');
+    expect(snippet).toContain('"projectId":"bms-open"');
+    expect(snippet).toContain('"messagingSenderId":"799302104089"');
+    expect(snippet).toContain(`vapidKey: '${VAPID}'`);
+    // sanity: account api_key + startWebPush flag are present too
+    expect(snippet).toContain("apiKey: 'acct-key-123'");
+    expect(snippet).toContain('startWebPush: true');
+  });
+
+  it('omits firebaseConfig + vapidKey when fcm_settings is empty (graceful fallback path)', async () => {
+    const { service } = build(undefined); // no fcm_settings row
+    const { snippet } = await service.getWebPushIntegration(7);
+
+    expect(snippet).not.toContain('firebaseConfig:');
+    expect(snippet).not.toContain('vapidKey:');
+    // the rest of the snippet still renders (no broken JS from null lines)
+    expect(snippet).toContain('startWebPush: true');
+    expect(snippet).toContain('window.bmsTrkOptions = bmsTrkOptions;');
+  });
+
+  it('omits firebaseConfig when webConfig is an empty object (only vapid present)', async () => {
+    const { service } = build({ webConfig: {}, vapidPublicKey: VAPID });
+    const { snippet } = await service.getWebPushIntegration(7);
+
+    expect(snippet).not.toContain('firebaseConfig:');
+    expect(snippet).toContain(`vapidKey: '${VAPID}'`);
+  });
+});
