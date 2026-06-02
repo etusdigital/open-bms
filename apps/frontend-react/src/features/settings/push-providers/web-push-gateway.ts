@@ -14,7 +14,19 @@ export interface WebPushIntegration {
   serviceWorkerUrl: string | null;
   snippet: string;
   settings: Partial<WebPushSettings> | null;
+  // Drive the install snippet's cookieDomain + cookiesToSearch[]. Editable in the
+  // UI; persisted as the account configs default_domain + webpush_cookies_to_search.
+  defaultDomain?: string;
+  cookiesToSearch?: string[];
 }
+
+// Payload for saveSettings: the popup WebPushSettings plus the two snippet-driving
+// configs. The backend splits defaultDomain / cookiesToSearch off into their own
+// account configs (see saveWebPushSettings).
+export type WebPushSavePayload = WebPushSettings & {
+  defaultDomain?: string;
+  cookiesToSearch?: string[];
+};
 
 export const webPushGateway = {
   async getIntegration(accountId: number): Promise<WebPushIntegration> {
@@ -22,7 +34,7 @@ export const webPushGateway = {
     return res.data;
   },
 
-  async saveSettings(accountId: number, settings: WebPushSettings): Promise<{ ok: true }> {
+  async saveSettings(accountId: number, settings: WebPushSavePayload): Promise<{ ok: true }> {
     const res = await apiClient.put<{ ok: true }>(`/accounts/${accountId}/web-push/settings`, settings);
     return res.data;
   },

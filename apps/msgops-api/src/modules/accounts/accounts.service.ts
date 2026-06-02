@@ -508,14 +508,17 @@ export class AccountsService {
     serviceWorkerUrl: string | null;
     snippet: string;
     settings: any | null;
+    defaultDomain: string;
+    cookiesToSearch: string[];
   }> {
     // Served by BMS itself (no public S3/CDN needed): GET /bms/push/:hash.js.
     const accountHashForUrl = createHash('sha256').update(`${accountId}`).digest('hex');
     const publicBase = (process.env.BMS_PUBLIC_URL || process.env.FRONTEND_URL || '').replace(/\/+$/, '');
     const serviceWorkerUrl = publicBase ? `${publicBase}/bms/push/${accountHashForUrl}.js` : null;
 
-    const [apiKeyRow, domainRow, settingsRow, cookiesRow] = await Promise.all([
+    const [apiKeyRow, apiKeyTrackerRow, domainRow, settingsRow, cookiesRow] = await Promise.all([
       this.findByAccountConfig(accountId, 'api_key'),
+      this.findByAccountConfig(accountId, 'api_key_tracker'),
       this.findByAccountConfig(accountId, 'default_domain'),
       this.findByAccountConfig(accountId, 'webpush_settings'),
       // cookiesToSearch: names of first-party cookies the tracker should inspect
@@ -524,7 +527,12 @@ export class AccountsService {
       // JSON array string in account config `webpush_cookies_to_search`.
       this.findByAccountConfig(accountId, 'webpush_cookies_to_search'),
     ]);
-    const apiKey = apiKeyRow?.value ?? '<API_KEY>';
+    // The tracker auth validates the key against accounts_configs name IN
+    // ('api_key','api_key_tracker'). Prefer api_key; fall back to api_key_tracker
+    // (which is what most accounts actually have). An NEW-system key
+    // (accounts_api_keys, "mk_…") is NOT accepted on this public path, so never
+    // emit one here.
+    const apiKey = apiKeyRow?.value ?? apiKeyTrackerRow?.value ?? '<API_KEY>';
     const cookiesToSearch = this.parseCookiesToSearch(cookiesRow?.value);
     const accountHash = createHash('sha256').update(`${accountId}`).digest('hex');
     // cookieDomain: derive from the account's default domain (".example.com"),
@@ -565,7 +573,15 @@ export class AccountsService {
       .filter((line): line is string => line !== null)
       .join('\n');
 
-    return { serviceWorkerUrl, snippet, settings: settingsRow?.value ? this.safeJsonParse(settingsRow.value) : null };
+    return {
+      serviceWorkerUrl,
+      snippet,
+      settings: settingsRow?.value ? this.safeJsonParse(settingsRow.value) : null,
+      // Echoed back so the UI can pre-populate the editable fields that drive the
+      // snippet (cookie domain + cookies to search).
+      defaultDomain: domainRow?.value ?? '',
+      cookiesToSearch,
+    };
   }
 
   // Normalizes the `webpush_cookies_to_search` account config into a string[].
@@ -599,8 +615,26 @@ export class AccountsService {
   // Persists the web-push opt-in popup + URL filter settings (webpush_settings).
   // Reuses createOrUpdateAccountsConfigs which already regenerates the per-account
   // sw.js wrapper and pushes URL rules to Cloudflare.
+  //
+  // Optionally also persists the two configs that drive the install snippet:
+  //   - default_domain → cookieDomain (".example.com") in the snippet
+  //   - webpush_cookies_to_search → cookiesToSearch[] in the snippet
+  // The UI sends them alongside the popup settings so getWebPushIntegration()
+  // renders a complete snippet (no manual SQL per account).
   async saveWebPushSettings(accountId: number, settings: any): Promise<{ ok: true }> {
-    await this.createOrUpdateAccountsConfigs(accountId, [{ name: 'webpush_settings', value: typeof settings === 'string' ? settings : JSON.stringify(settings) }]);
+    const configs: Array<{ name: string; value: string }> = [];
+    const { defaultDomain, cookiesToSearch, ...popup } = settings ?? {};
+    configs.push({ name: 'webpush_settings', value: typeof popup === 'string' ? popup : JSON.stringify(popup) });
+    if (typeof defaultDomain === 'string') {
+      configs.push({ name: 'default_domain', value: defaultDomain.trim() });
+    }
+    if (cookiesToSearch !== undefined) {
+      // Store as a CSV (parseCookiesToSearch accepts CSV or JSON array). Accept an
+      // array from the UI or a raw string.
+      const value = Array.isArray(cookiesToSearch) ? cookiesToSearch.filter((c) => typeof c === 'string' && c.trim()).join(',') : String(cookiesToSearch ?? '').trim();
+      configs.push({ name: 'webpush_cookies_to_search', value });
+    }
+    await this.createOrUpdateAccountsConfigs(accountId, configs);
     return { ok: true };
   }
 
