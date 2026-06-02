@@ -93,6 +93,19 @@ describe('AccountsService.getWebPushIntegration — snippet must NOT leak platfo
     expect(snippet).toContain('window.bmsTrkOptions = bmsTrkOptions;');
   });
 
+  it('falls back to api_key_tracker when api_key config is absent (the key the tracker auth accepts)', async () => {
+    const service = Object.create(AccountsService.prototype) as AccountsService;
+    (service as any).findByAccountConfig = jest.fn().mockImplementation((_id: number, name: string) => {
+      // account has only api_key_tracker, not api_key (the common real case)
+      if (name === 'api_key_tracker') return Promise.resolve({ value: 'tracker-key-166' });
+      return Promise.resolve(null);
+    });
+    (service as any).safeJsonParse = (v: string) => JSON.parse(v);
+    const { snippet } = await service.getWebPushIntegration(7);
+    expect(snippet).toContain("apiKey: 'tracker-key-166'");
+    expect(snippet).not.toContain('<API_KEY>');
+  });
+
   it('does NOT expose firebaseConfig or vapidKey in the snippet', async () => {
     const { service } = build();
     const { snippet } = await service.getWebPushIntegration(7);
