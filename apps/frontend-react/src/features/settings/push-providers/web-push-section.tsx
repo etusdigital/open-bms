@@ -39,6 +39,11 @@ export function WebPushSection() {
 
   const [s, setS] = useState<WebPushSettings>(() => createDefaultWebPushSettings());
   const [device, setDevice] = useState<0 | 1>(0); // 0 = desktop, 1 = mobile
+  // Snippet-driving configs (persisted as account configs default_domain +
+  // webpush_cookies_to_search). Edited here so the generated snippet carries
+  // cookieDomain + cookiesToSearch — the contact-dedupe link with the LP.
+  const [defaultDomain, setDefaultDomain] = useState('');
+  const [cookiesToSearch, setCookiesToSearch] = useState('');
 
   useEffect(() => {
     if (data?.settings && Object.keys(data.settings).length > 1) {
@@ -46,6 +51,10 @@ export function WebPushSection() {
       // backfilled (older rows may lack pushStyle/scriptToRun), then regenerate.
       const base = createDefaultWebPushSettings();
       setS(regenerate({ ...base, ...(data.settings as WebPushSettings) }));
+    }
+    if (data) {
+      setDefaultDomain(data.defaultDomain ?? '');
+      setCookiesToSearch((data.cookiesToSearch ?? []).join(', '));
     }
   }, [data]);
 
@@ -108,7 +117,15 @@ export function WebPushSection() {
   }
 
   const save = useMutation({
-    mutationFn: () => webPushGateway.saveSettings(accountId, regenerate(s)),
+    mutationFn: () =>
+      webPushGateway.saveSettings(accountId, {
+        ...regenerate(s),
+        defaultDomain: defaultDomain.trim(),
+        cookiesToSearch: cookiesToSearch
+          .split(',')
+          .map((c) => c.trim())
+          .filter(Boolean),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['settings', 'web-push-integration', accountId] });
       toast.success(t('settings.webPushSaved'));
@@ -182,6 +199,30 @@ export function WebPushSection() {
             <Button type="button" variant="outline" size="sm" onClick={copySnippet}>{t('common.copy')}</Button>
           </div>
           <Textarea readOnly rows={12} className="font-mono text-xs" value={data?.snippet ?? ''} />
+        </div>
+
+        {/* Snippet-driving configs: cookie domain + cookies to search. Editing
+            these regenerates cookieDomain + cookiesToSearch in the snippet above
+            (after Save). This is the contact-dedupe link with the landing page. */}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Field label={t('settings.webPushCookieDomain')}>
+            <Input
+              value={defaultDomain}
+              onChange={(e) => setDefaultDomain(e.target.value)}
+              disabled={!canEdit}
+              placeholder="https://seusite.com.br"
+            />
+            <span className="text-muted-foreground text-xs">{t('settings.webPushCookieDomainHelp')}</span>
+          </Field>
+          <Field label={t('settings.webPushCookiesToSearch')}>
+            <Input
+              value={cookiesToSearch}
+              onChange={(e) => setCookiesToSearch(e.target.value)}
+              disabled={!canEdit}
+              placeholder="registeredLead, _quiz_maker_quiz"
+            />
+            <span className="text-muted-foreground text-xs">{t('settings.webPushCookiesToSearchHelp')}</span>
+          </Field>
         </div>
       </section>
 

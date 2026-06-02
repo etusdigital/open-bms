@@ -44,3 +44,19 @@ export function createCorsOptions(): CorsOptions {
     },
   };
 }
+
+// Public tracking/web-push surface (/bms/*, /c) is embedded on arbitrary customer
+// domains we can't enumerate, so the closed allowlist above can't apply. These
+// routes authenticate by api-key (not cookies), so we reflect any origin with
+// credentials:false (required — "*"/reflected origin is incompatible with
+// credentials:true) and answer preflight (OPTIONS) for the headers the tracker
+// sends. Security is the api-key, not the Origin.
+export function createPublicCorsOptions(): CorsOptions {
+  return {
+    origin: true, // reflect request origin
+    credentials: false,
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'api-key', 'x-api-key', 'Accept'],
+    maxAge: 86400,
+  };
+}
