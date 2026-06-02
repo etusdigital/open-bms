@@ -1,4 +1,4 @@
-import { isOriginAllowed } from './cors.config';
+import { isOriginAllowed, createPublicCorsOptions } from './cors.config';
 
 describe('CORS origin validation', () => {
   const ORIGINAL_CORS_ORIGINS = process.env.CORS_ORIGINS;
@@ -87,6 +87,26 @@ describe('CORS origin validation', () => {
       process.env.CORS_ORIGINS = '';
       delete process.env.CORS_CF_PAGES_PROJECT;
       expect(isOriginAllowed('https://app.example.com', 'production')).toBe(false);
+    });
+  });
+
+  describe('createPublicCorsOptions (tracking / web-push surface)', () => {
+    it('reflects any origin (customer domains are arbitrary)', () => {
+      expect(createPublicCorsOptions().origin).toBe(true);
+    });
+
+    it('disables credentials (required to reflect origin; auth is by api-key)', () => {
+      expect(createPublicCorsOptions().credentials).toBe(false);
+    });
+
+    it('allows the headers the tracker sends, incl. api-key', () => {
+      const allowed = createPublicCorsOptions().allowedHeaders as string[];
+      expect(allowed).toEqual(expect.arrayContaining(['Content-Type', 'api-key', 'x-api-key']));
+    });
+
+    it('answers POST + OPTIONS preflight', () => {
+      const methods = createPublicCorsOptions().methods as string[];
+      expect(methods).toEqual(expect.arrayContaining(['POST', 'OPTIONS']));
     });
   });
 

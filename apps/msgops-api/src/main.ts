@@ -8,7 +8,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
 import cors from 'cors';
-import { createCorsOptions } from './cors.config';
+import { createCorsOptions, createPublicCorsOptions } from './cors.config';
 import { JoiPipe } from 'nestjs-joi';
 import { TelemetryService } from './modules/telemetry/telemetry.service';
 // Sentinel committed in docker-compose.yml so `git clone && docker compose up`
@@ -81,7 +81,27 @@ async function bootstrap() {
       },
     }),
   );
+  // Browser web-push/tracker clients (web-push.js, bmstrk.js) POST with
+  // `mode: 'no-cors'`, which forces Content-Type to text/plain and the browser
+  // won't send a custom api-key header. The bodies are still JSON (with apiKey
+  // inside). Parse text/plain as JSON too so those payloads deserialize and the
+  // body-apiKey middleware can authenticate them. Bad/non-JSON text/plain bodies
+  // are ignored (body-parser leaves req.body undefined on parse failure here).
+  app.use(
+    bodyParser.json({
+      limit: '1mb',
+      type: 'text/plain',
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
   app.use(cookieParser());
+  // Public tracking/web-push routes (/bms/*, /c) get an open CORS policy first —
+  // they're called from arbitrary customer domains and auth by api-key, not the
+  // restricted allowlist. The catch-all cors below still governs the admin app.
+  const publicCors = cors(createPublicCorsOptions());
+  app.use(['/bms', '/c'], publicCors);
   app.use(cors(createCorsOptions()));
 
   app.useGlobalPipes(new JoiPipe());
