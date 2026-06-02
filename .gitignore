@@ -66,3 +66,6 @@ test-results/
 # shape so the docker-compose bind mount has a target on a fresh clone.
 data/geo/*
 !data/geo/.gitkeepapps/sendgrid-mock/sendgrid-mock
+
+# Local Enterprise reference checkout — not part of this repo
+bms-monorepo/
