@@ -1,33 +1,19 @@
 import { apiClient } from '@/lib/api-client';
+import type { WebPushSettings } from './web-push-template';
 
 // Opt-in popup + URL filter settings. Single-project model: NO Firebase/VAPID
 // here — those live in the platform FCM config. The account only sets the popup
 // behavior and which URLs it shows on.
-export interface WebPushSettings {
-  isActive?: boolean;
-  urlFilterShow?: string;
-  urlFilterHide?: string;
-  // opt-in popup builder fields:
-  optinTitle?: string;
-  optinBody?: string;
-  optinAllowLabel?: string;
-  optinDenyLabel?: string;
-  position?: 'top' | 'bottom' | 'center';
-  backgroundColor?: string;
-  // trigger: 'onload' | 'delay' | 'scroll' | 'inactivity'
-  trigger?: string;
-  triggerDelaySeconds?: number;
-  triggerScrollPercent?: number;
-  triggerInactivitySeconds?: number;
-  // mobile variant (optional overrides)
-  mobilePosition?: 'top' | 'bottom' | 'center';
-  [key: string]: unknown;
-}
+//
+// The stored shape is the FULL WebPushSettings (see web-push-template.ts),
+// including the generated html / mobileHtml / scriptToRun — those are the ONLY
+// fields web-push.js reads at runtime, so they MUST be persisted.
+export type { WebPushSettings } from './web-push-template';
 
 export interface WebPushIntegration {
   serviceWorkerUrl: string | null;
   snippet: string;
-  settings: WebPushSettings | null;
+  settings: Partial<WebPushSettings> | null;
 }
 
 export const webPushGateway = {
