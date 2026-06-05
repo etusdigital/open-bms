@@ -26,9 +26,12 @@ Guia self-contained pra subir o BMS Open Source em qualquer cluster Docker Swarm
 
 - **Docker Swarm cluster** com pelo menos 1 manager.
 - **Portainer Business/CE** instalado e conectado ao Swarm (Environment → Endpoints).
-- **DNS público** apontando 2 hostnames pro IP do manager:
+- **DNS público** apontando 3 hostnames pro IP do manager (todos **DNS only** —
+  sem o proxy laranja da Cloudflare; o cert é emitido pelo Traefik via Let's
+  Encrypt e o proxy quebraria o desafio ACME):
   - `bms-app.<seu-dominio>` — app, API, webhooks
   - `ch-ui-bms.<seu-dominio>` — console do ClickHouse
+  - `bms-link.<seu-dominio>` — short links / redirect de CTAs (serviço `tracker`)
 - **Portas 80 e 443 livres** no manager (Traefik vai escutar nelas).
 
 ### 1.2. Rede overlay externa
@@ -161,6 +164,7 @@ Cole esse bloco num terminal local (ou no manager via SSH) — ele imprime um `.
   # === Hosts (ajuste pros seus domínios) ===
   echo "FRONTEND_HOST=bms-app.exemplo.ai"
   echo "CH_UI_HOST=ch-ui-bms.exemplo.ai"
+  echo "TRACKER_HOST=bms-link.exemplo.ai"
   echo "FRONTEND_URL=https://bms-app.exemplo.ai"
   echo "CORS_ORIGINS=https://bms-app.exemplo.ai"
 
@@ -200,6 +204,7 @@ Cole esse bloco num terminal local (ou no manager via SSH) — ele imprime um `.
 | ---------------------------------- | ---------------------------------------------------------- | -------------------------- |
 | `FRONTEND_HOST`                    | seu domínio do app, ex.: `bms-app.exemplo.ai`              | ✅                         |
 | `CH_UI_HOST`                       | seu domínio do ch-ui, ex.: `ch-ui-bms.exemplo.ai`          | ✅                         |
+| `TRACKER_HOST`                     | domínio dos short links, ex.: `bms-link.exemplo.ai`        | ✅                         |
 | `FRONTEND_URL`                     | `https://${FRONTEND_HOST}`                                 | ✅                         |
 | `CORS_ORIGINS`                     | `https://${FRONTEND_HOST}` (vírgula-separado se múltiplos) | ✅                         |
 | `IMAGE_REGISTRY`                   | org no Docker Hub                                          | ✅ (default `etusdigital`) |
@@ -388,6 +393,25 @@ Diferente das envs comuns, as credenciais do WhatsApp são salvas pela UI no ban
 Guia operacional completo (troubleshoot, signature mismatch, BMS_PUBLIC_URL split, etc.):
 [`docs/operations/whatsapp-cloud.md`](../../docs/operations/whatsapp-cloud.md).
 
+### 7.5. Configurar o domínio dos short links (`shortlink_base_url`)
+
+Mensagens de WhatsApp/SMS com botão **Call to Action** não usam a URL final
+diretamente: o backend gera um short code e o serviço `tracker` resolve
+`GET /:shortCode → 302`. O prefixo desse short link vem da config da conta
+**`shortlink_base_url`**.
+
+Se essa config estiver vazia, o sync de template (`whatsapp-template-sync.service.ts`)
+usa o fallback `https://example.com/` e **esse prefixo fica cravado no template
+aprovado pela Meta** — o botão passa a redirecionar pro "Example Domain".
+
+Depois do deploy, em **cada conta** que envia WhatsApp:
+
+1. Setar a config da conta `shortlink_base_url = https://${TRACKER_HOST}/`
+   (com a **barra final** — o código monta `${baseUrl}{{1}}`).
+2. **Recriar / re-sincronizar** os templates de WhatsApp CTA. Templates já
+   aprovados na Meta com `example.com` **não** se corrigem ao setar a config —
+   o prefixo da URL é imutável depois de aprovado pela Meta.
+
 ---
 
 ## 8. Troubleshooting
@@ -563,6 +587,22 @@ docker exec -it $(docker ps -q -f name=bms_postgres) psql -U postgres -d msgops 
 ```
 
 Se não houver, sobe o `msgops-api` para forçar o `TYPEORM_MIGRATIONS_RUN=true`. Contatos novos via API/CSV já saem com `has_whatsapp=true` automaticamente (hook `BeforeInsert`).
+
+### 8.15. Botão de CTA do WhatsApp redireciona pro "Example Domain" (`example.com`)
+
+O link do botão chega ao destinatário como `https://example.com/<shortcode>`. A causa é a config da conta `shortlink_base_url` vazia: no sync do template, `whatsapp-template-sync.service.ts` cai no fallback `const baseUrl = shortlinkBaseUrl ?? 'https://example.com/'` e o prefixo `example.com` fica **cravado no template aprovado pela Meta**.
+
+**Fix (duas partes — só setar a config não basta):**
+
+1. Garanta que o serviço `tracker` está exposto em `${TRACKER_HOST}` (labels Traefik no stack) e que o DNS + TLS resolvem. O tracker é catch-all (`GET /:shortCode`), então um short code inexistente responde com redirect/404 do próprio serviço — o que importa aqui é o handshake TLS bater (cert emitido pelo Traefik) e a resposta vir do tracker, não do Traefik:
+
+```bash
+curl -sk -o /dev/null -w "HTTP=%{http_code}\n" https://${TRACKER_HOST}/ping-test
+```
+
+2. Setar a config da conta `shortlink_base_url = https://${TRACKER_HOST}/` (com barra final).
+
+3. **Recriar / re-sincronizar** os templates de WhatsApp CTA. Os templates antigos com `example.com` não se corrigem ao setar a config — o prefixo da URL é imutável depois de aprovado pela Meta, então é preciso submeter uma nova versão.
 
 ---
 

@@ -8,9 +8,13 @@
 #  PRÉ-REQUISITOS (one-time, antes de subir o stack)
 # -----------------------------------------------------------------------------
 #
-#  1) DNS público apontando 2 hostnames pro IP do manager:
+#  1) DNS público apontando 3 hostnames pro IP do manager (DNS only — sem
+#     proxy laranja da Cloudflare; o cert é emitido pelo Traefik via Let's
+#     Encrypt, e o proxy da Cloudflare conflitaria com o desafio ACME):
 #       • <FRONTEND_HOST>  ex.: bms-app.exemplo.ai      (app + API + webhooks)
 #       • <CH_UI_HOST>     ex.: ch-ui-bms.exemplo.ai    (console ClickHouse)
+#       • <TRACKER_HOST>   ex.: bms-link.exemplo.ai     (short links / redirect
+#                                                        de CTAs — WhatsApp/SMS)
 #
 #  2) Swarm configs criados via Portainer (Configs → Add config) ou via CLI.
 #     Os 3 configs precisam EXISTIR antes do deploy do stack.
@@ -41,6 +45,12 @@
 #  Hosts / imagens:
 #    FRONTEND_HOST                       ex.: bms-app.exemplo.ai
 #    CH_UI_HOST                          ex.: ch-ui-bms.exemplo.ai
+#    TRACKER_HOST                        ex.: bms-link.exemplo.ai
+#                                         Domínio público do serviço `tracker`
+#                                         (rota GET /:shortCode → 302). É o
+#                                         prefixo dos short links de CTA. Depois
+#                                         do boot, setá-lo na config da conta
+#                                         `shortlink_base_url` (ver nota abaixo).
 #    FRONTEND_URL                        ex.: https://bms-app.exemplo.ai
 #    CORS_ORIGINS                        ex.: https://bms-app.exemplo.ai
 #    IMAGE_REGISTRY                      ex.: etusdigital
@@ -95,6 +105,14 @@
 #  6) Aguardar ~2 min, verificar `Stacks → bms → Services` — todos 1/1 exceto
 #     bms-config-init e minio-bootstrap (one-shots — 0/1 é normal).
 #  7) Acessar https://<FRONTEND_HOST>/setup pro wizard.
+#  8) Setar a config da conta `shortlink_base_url = https://<TRACKER_HOST>/`
+#     (com a barra final — o código faz `${baseUrl}{{1}}`). Sem isso, os
+#     templates de WhatsApp CTA são sincronizados com o fallback
+#     `https://example.com/` cravado na Meta (whatsapp-template-sync.service.ts),
+#     e o botão redireciona pro "Example Domain" em vez do tracker.
+#     ⚠️  Templates já aprovados na Meta com example.com NÃO se corrigem ao
+#         setar a config — o prefixo é imutável. Recrie / re-sincronize o
+#         template depois de configurar o domínio.
 #
 # -----------------------------------------------------------------------------
 #  DEPLOY VIA CLI (alternativa)
@@ -696,17 +714,29 @@ services:
         limits:
           memory: 512M
 
+  # Exposto publicamente em ${TRACKER_HOST}: serve os short links de CTA
+  # (rota GET /:shortCode → 302 pra long_url resolvida do Redis/Postgres).
+  # network_public pro Traefik alcançar; internal pra falar com redis/postgres.
+  # Prereq: DNS apontando ${TRACKER_HOST} → IP do manager (DNS only).
   tracker:
     image: ${IMAGE_REGISTRY:-etusdigital}/bms-tracker:${IMAGE_TAG:?must set IMAGE_TAG}
     environment:
       <<: *backend-env
       PORT: '3000'
-    networks: [internal]
+    networks: [internal, network_public]
     deploy:
       <<: *restart-policy
       resources:
         limits:
           memory: 512M
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=${TRAEFIK_NETWORK_NAME:-bmsNet}
+        - traefik.http.routers.bms-tracker.rule=Host(`${TRACKER_HOST:?must set TRACKER_HOST}`)
+        - traefik.http.routers.bms-tracker.entrypoints=websecure
+        - traefik.http.routers.bms-tracker.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.bms-tracker.priority=20
+        - traefik.http.services.bms-tracker.loadbalancer.server.port=3000
 
   tag-process:
     image: ${IMAGE_REGISTRY:-etusdigital}/bms-tag-process:${IMAGE_TAG:?must set IMAGE_TAG}
