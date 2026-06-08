@@ -734,12 +734,21 @@ export class ContactsService {
     if (!contact) throw new HttpException('Could not resolve contact', HttpStatus.INTERNAL_SERVER_ERROR);
 
     const now = new Date();
-    const existing = await this.contactDeviceRepository.findOne({ where: { accountId, contactId: contact.id, token: input.device.token } });
+    // Upsert REAL pela chave única do banco (account_id, token) — NÃO por
+    // (accountId, contactId, token). Um token web-push é re-emitido pelo navegador e
+    // pode reaparecer sob outro contato (ex.: subscribe anônimo antes de o usuário
+    // se identificar → depois o registro com e-mail). Buscar incluindo contactId não
+    // achava o registro existente sob o contato anônimo, caía no INSERT e violava a
+    // unique (account_id, token) → 500, e o token nunca migrava p/ o contato certo.
+    // Agora: achou pela (account, token) → RE-HOME ao contato resolvido + reativa.
+    const existing = await this.contactDeviceRepository.findOne({ where: { accountId, token: input.device.token } });
     if (existing) {
+      existing.contactId = contact.id;
       existing.isActive = true;
       existing.isUnsubscribed = false;
       existing.lastSession = now;
       await this.contactDeviceRepository.save(existing);
+      await this.contactRepository.update({ id: contact.id, accountId }, { hasWebPush: true } as Partial<ContactEntity>).catch(() => undefined);
       return { deviceId: existing.id, contactId: contact.id };
     }
 
