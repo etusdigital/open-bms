@@ -131,12 +131,18 @@ export class ServicesService {
       const currentDate = new Date();
       const account: any = await this.accountService.findOne(this.cls.get('accountId'));
       const contact = await this.contactService.findByProperty({ email: sendPushMessage.email, isCompleted: true });
-      contact['contactDevices'] = JSON.parse(JSON.stringify(contact['contactsDevices']));
-      delete contact['contactsDevices'];
 
-      if (!contact || !contact.hasMobilePush) {
+      // Accept contacts that have EITHER a mobile-push (native app) OR a web-push
+      // (browser) device. This endpoint historically gated on hasMobilePush only,
+      // which rejected web-push-only contacts even though the send-push worker
+      // delivers web-push fine (platform-minted FCM tokens). The worker selects the
+      // right device by `message.type`, so a web-push caller must send type 'web-push'.
+      if (!contact || (!contact.hasMobilePush && !contact.hasWebPush)) {
         return { status: 401, message: 'Invalid contact.' };
       }
+
+      contact['contactDevices'] = JSON.parse(JSON.stringify(contact['contactsDevices']));
+      delete contact['contactsDevices'];
 
       account.accountConfigs = account.accountConfigs.reduce((acc: Record<string, string>, config: AccountConfigEntity) => {
         acc[config.name] = config.value || '';
