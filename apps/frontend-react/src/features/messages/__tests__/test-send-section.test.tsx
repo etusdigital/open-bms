@@ -78,6 +78,41 @@ describe('TestSendSection', () => {
     });
   });
 
+  it('uses live editor HTML from getEmailContent for unsaved messages', async () => {
+    // Simulate a brand-new message: form state has no content yet, but the
+    // editor resolves the current HTML.
+    const getFormData = vi.fn().mockReturnValue({
+      id: 0,
+      title: 'New Message',
+      previewText: '',
+      ippool: '',
+      subject: 'Subject',
+      replyTo: '',
+      priority: 'high',
+      content: '',
+      fromName: 'Sender',
+      fromMail: 'sender@test.com',
+    });
+    const getEmailContent = vi.fn().mockResolvedValue('<p>From editor</p>');
+
+    await renderWithRouter(
+      <TestSendSection messageType="email" getFormData={getFormData} getEmailContent={getEmailContent} />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/nome do destinatário/i), { target: { value: 'Test User' } });
+    fireEvent.change(screen.getByLabelText(/email do destinatário/i), { target: { value: 'test@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /enviar teste/i }));
+
+    await waitFor(() => {
+      expect(getEmailContent).toHaveBeenCalled();
+      expect(mockMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.objectContaining({ content: '<p>From editor</p>' }),
+        }),
+      );
+    });
+  });
+
   describe('validation', () => {
     it('shows error when name is empty', async () => {
       await renderTestSend();
