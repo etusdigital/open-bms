@@ -30,9 +30,11 @@ interface EmailContentFormProps {
   editorRef: RefObject<EditorRef | null>;
   designJson?: string;
   templateUrl?: string;
+  /** Disables editing controls, but keeps export/copy/view available. */
+  isReadOnly?: boolean;
 }
 
-export function EmailContentForm({ editorRef, designJson, templateUrl }: EmailContentFormProps) {
+export function EmailContentForm({ editorRef, designJson, templateUrl, isReadOnly }: EmailContentFormProps) {
   const { t } = useTranslation();
   const form = useFormContext<EmailFormValues>();
   const sendersQuery = useSendersForSelect();
@@ -249,6 +251,8 @@ export function EmailContentForm({ editorRef, designJson, templateUrl }: EmailCo
 
   return (
     <div className="space-y-4">
+      {/* Editing controls — locked when read-only; export/copy/view sit below, outside. */}
+      <fieldset disabled={isReadOnly} className="m-0 min-w-0 space-y-4 border-0 p-0">
       {/* Top section: sender/subject/preview fields + inbox preview side by side */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Left: form fields */}
@@ -503,9 +507,10 @@ export function EmailContentForm({ editorRef, designJson, templateUrl }: EmailCo
           )}
         />
       )}
+      </fieldset>
 
-      {/* Action Buttons */}
-      <div className="flex items-center gap-2">
+      {/* Action Buttons — only import is disabled when read-only (it loads a new design). */}
+      <div className="flex items-center gap-2 mt-4">
         <input
           ref={fileInputRef}
           type="file"
@@ -517,7 +522,7 @@ export function EmailContentForm({ editorRef, designJson, templateUrl }: EmailCo
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button type="button" variant="outline" size="icon" onClick={handleImportContent}>
+              <Button type="button" variant="outline" size="icon" onClick={handleImportContent} disabled={isReadOnly}>
                 <Upload className="h-4 w-4" />
               </Button>
             </TooltipTrigger>

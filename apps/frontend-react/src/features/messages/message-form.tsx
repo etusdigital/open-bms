@@ -96,29 +96,56 @@ export default function MessageForm({
 
   const showTestSend = messageType === 'email' || messageType === 'mobile-push';
 
+  // Email body comes from one of two surfaces: the SuperAdmin "Custom HTML"
+  // textarea (wins when edited) or the Unlayer editor. Reads the live editor,
+  // not saved `content`, so it works for unsaved messages too. Shared by save
+  // and test send.
+  const resolveEmailContent = useCallback((): Promise<{ html: string; design?: object }> => {
+    return new Promise((resolve) => {
+      const values = form.getValues();
+      const customHtml = (('content' in values ? values.content : '') as string) ?? '';
+      // The `content` field only goes dirty when someone edits the Custom HTML
+      // textarea — the visual editor is a separate iframe and never touches it.
+      const customHtmlEdited = form.getFieldState('content').isDirty;
+      if (customHtmlEdited && customHtml.trim()) {
+        resolve({ html: customHtml });
+        return;
+      }
+      const editor = emailEditorRef.current?.editor;
+      if (editor) {
+        editor.exportHtml((data: { design: object; html: string }) => {
+          resolve({ html: data.html ?? '', design: data.design });
+        });
+        return;
+      }
+      resolve({ html: customHtml });
+    });
+  }, [form]);
+
   const submitFormData = useCallback(
     (formData: MessageFormValues) => {
       if (messageType === 'email') {
-        const editor = emailEditorRef.current?.editor;
-        if (editor) {
-          editor.exportHtml((data: { design: object; html: string }) => {
-            onSubmit(
-              {
-                ...formData,
-                content: data.html,
-                content_json: JSON.stringify(data.design),
-              } as MessageFormValues,
-              selectedLabelIds,
-            );
-          });
-          return;
-        }
+        void resolveEmailContent().then(({ html, design }) => {
+          onSubmit(
+            {
+              ...formData,
+              content: html,
+              // Keep the existing design JSON when the body came from custom
+              // HTML (no design); otherwise persist the editor's design.
+              content_json: design
+                ? JSON.stringify(design)
+                : ('content_json' in formData ? (formData.content_json as string) : '') ?? '',
+            } as MessageFormValues,
+            selectedLabelIds,
+          );
+        });
+        return;
       }
       const dataWithStatus = messageType === 'whatsapp' ? { ...formData, status: statusRef.current } : formData;
       onSubmit(dataWithStatus as MessageFormValues, selectedLabelIds);
       statusRef.current = 'draft';
     },
-    [messageType, onSubmit, selectedLabelIds],
+    [messageType, onSubmit, selectedLabelIds, resolveEmailContent],
   );
 
   const handleFormSubmit = useCallback(
@@ -299,34 +326,17 @@ export default function MessageForm({
               </CardContent>
             </Card>
 
-            {/* Block 3: Content (conditional) */}
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('messages.content')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {messageType === 'email' && (
-                  <EmailContentForm
-                    editorRef={emailEditorRef}
-                    designJson={isEditing ? (defaultValues?.content_json as string) : undefined}
-                    templateUrl={templateUrl}
-                  />
-                )}
-                {messageType === 'sms' && <SmsContentForm />}
-                {messageType === 'web-push' && <WebPushContentForm />}
-                {messageType === 'mobile-push' && <MobilePushContentForm />}
-                {messageType === 'whatsapp' && <WhatsAppContentForm />}
-              </CardContent>
-            </Card>
-
-            {/* Block 4: Test Send */}
-            {showTestSend && (
+            {/* Block 3: Content. Email is rendered below, outside this fieldset. */}
+            {messageType !== 'email' && (
               <Card>
                 <CardHeader>
-                  <CardTitle>{t('messages.testSend')}</CardTitle>
+                  <CardTitle>{t('messages.content')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <TestSendSection messageType={messageType} getFormData={getFormData} />
+                  {messageType === 'sms' && <SmsContentForm />}
+                  {messageType === 'web-push' && <WebPushContentForm />}
+                  {messageType === 'mobile-push' && <MobilePushContentForm />}
+                  {messageType === 'whatsapp' && <WhatsAppContentForm />}
                 </CardContent>
               </Card>
             )}
@@ -338,6 +348,47 @@ export default function MessageForm({
               </div>
             )}
           </fieldset>
+
+          {/* Outside the fieldset so export/copy/view stay clickable when in use;
+              EmailContentForm locks its own editing controls via isReadOnly. */}
+          {messageType === 'email' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('messages.content')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <EmailContentForm
+                  editorRef={emailEditorRef}
+                  designJson={isEditing ? (defaultValues?.content_json as string) : undefined}
+                  templateUrl={templateUrl}
+                  isReadOnly={isReadOnly}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Block 4: Test Send — outside the fieldset so it works while in use. */}
+          {showTestSend && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('messages.testSend')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TestSendSection
+                  messageType={messageType}
+                  getFormData={getFormData}
+                  getEmailContent={
+                    // The editor iframe isn't disabled by the read-only fieldset,
+                    // so skip the live (editable) HTML when read-only and let the
+                    // test send fall back to the saved `content`.
+                    messageType === 'email' && !isReadOnly
+                      ? () => resolveEmailContent().then((r) => r.html)
+                      : undefined
+                  }
+                />
+              </CardContent>
+            </Card>
+          )}
 
           {/* Footer buttons */}
           <div className="flex justify-end gap-3">

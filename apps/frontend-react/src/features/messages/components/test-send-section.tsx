@@ -22,20 +22,29 @@ interface TestSendSectionProps {
     url?: string;
     expiryPushInSeconds?: string;
   };
+  /**
+   * For email, resolves the live HTML straight from the editor. A new/unsaved
+   * message has no `content` in form state yet (it's only generated on save),
+   * so the test send pulls the current editor HTML instead. Falls back to
+   * `getFormData().content` when absent.
+   */
+  getEmailContent?: () => Promise<string>;
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function TestSendSection({ messageType, getFormData }: TestSendSectionProps) {
+export function TestSendSection({ messageType, getFormData, getEmailContent }: TestSendSectionProps) {
   const { t } = useTranslation();
   const [recipientName, setRecipientName] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
   const [errors, setErrors] = useState<{ name?: string; email?: string }>({});
+  // Covers the async editor HTML export that runs before the mutation fires.
+  const [preparing, setPreparing] = useState(false);
   const sendTestEmail = useSendTestEmail();
   const sendTestMobilePush = useSendTestMobilePush();
 
   const isMobilePush = messageType === 'mobile-push';
-  const isPending = sendTestEmail.isPending || sendTestMobilePush.isPending;
+  const isPending = preparing || sendTestEmail.isPending || sendTestMobilePush.isPending;
 
   const validate = (): boolean => {
     const newErrors: { name?: string; email?: string } = {};
@@ -53,12 +62,24 @@ export function TestSendSection({ messageType, getFormData }: TestSendSectionPro
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!validate()) return;
 
     const formData = getFormData();
 
     if (messageType === 'email') {
+      // New/unsaved messages have no `content` yet — it's only generated on
+      // save. Pull the live HTML from the editor so a test send works before
+      // the first save (and reflects unsaved edits when editing).
+      let content = formData.content;
+      if (getEmailContent) {
+        setPreparing(true);
+        try {
+          content = await getEmailContent();
+        } finally {
+          setPreparing(false);
+        }
+      }
       sendTestEmail.mutate({
         contact: { email: recipientEmail.trim(), firstName: recipientName.trim() },
         message: {
@@ -69,7 +90,7 @@ export function TestSendSection({ messageType, getFormData }: TestSendSectionPro
           subject: formData.subject,
           replyTo: formData.replyTo,
           priority: formData.priority,
-          content: formData.content,
+          content,
           from: { firstName: formData.fromName, email: formData.fromMail },
         },
         loadContactFromDatabase: true,
@@ -121,7 +142,7 @@ export function TestSendSection({ messageType, getFormData }: TestSendSectionPro
         {errors.email && <p className="text-destructive text-sm">{errors.email}</p>}
       </div>
 
-      <Button type="button" variant="outline" onClick={handleSend} disabled={isPending}>
+      <Button type="button" variant="outline" onClick={() => void handleSend()} disabled={isPending}>
         {isPending ? t('common.loading') : t('messages.sendTest')}
       </Button>
     </div>
