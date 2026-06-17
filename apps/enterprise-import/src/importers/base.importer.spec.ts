@@ -11,10 +11,11 @@ class FakeRepo {
     private cols: string[],
     private pk = 'id',
     private dbNames: Record<string, string> = {},
+    private defaults: Record<string, any> = {},
   ) {}
   get metadata() {
     return {
-      columns: this.cols.map((propertyName) => ({ propertyName, databaseName: this.dbNames[propertyName] ?? propertyName })),
+      columns: this.cols.map((propertyName) => ({ propertyName, databaseName: this.dbNames[propertyName] ?? propertyName, default: this.defaults[propertyName] })),
       primaryColumns: [{ propertyName: this.pk }],
       tableName: 'tags',
     };
@@ -199,6 +200,59 @@ describe('BaseImporter', () => {
     await imp.run(ctx);
 
     expect(ctx.updateProgress).toHaveBeenCalledWith('tags', { total: 1, done: 1, page: 1 });
+  });
+
+  it('account-scope: a null source value never reaches the INSERT as an explicit NULL', async () => {
+    // Enterprise serializes legacy-nullable columns (e.g. testab_sent_after_test)
+    // as null; copying that null verbatim would write an explicit NULL and trip a
+    // NOT NULL constraint. Without a declared default the key is simply omitted.
+    const repo = new FakeRepo(['id', 'accountId', 'name', 'flag']);
+    const imp = new TestImporter();
+    imp.pages = [{ results: [{ id: 1, name: 'x', flag: null, missing: undefined }], page: 1 }];
+
+    await imp.run(makeCtx(repo, 'account'));
+
+    expect(repo.rows).toHaveLength(1);
+    expect('flag' in repo.rows[0]).toBe(false); // omitted, never an explicit NULL
+  });
+
+  it('account-scope: fills the entity-declared default for a null source value (legacy-safe, no reliance on the DB DEFAULT)', async () => {
+    // flag declares default=false. A null/absent source value must be written as
+    // the default at the application layer, so the INSERT works even on a legacy
+    // target whose column lacks the DB-level DEFAULT.
+    const repo = new FakeRepo(['id', 'accountId', 'name', 'flag'], 'id', {}, { flag: false });
+    const imp = new TestImporter();
+    imp.pages = [{ results: [{ id: 1, name: 'x', flag: null }], page: 1 }];
+
+    await imp.run(makeCtx(repo, 'account'));
+
+    expect(repo.rows).toHaveLength(1);
+    expect(repo.rows[0].flag).toBe(false); // default applied explicitly, not omitted
+  });
+
+  it('account-scope upsert: a null source value does NOT overwrite an existing value with the default', async () => {
+    // Re-import where the source dropped the field: the existing row must keep its
+    // value (defaults are insert-only, never part of the update patch).
+    const repo = new FakeRepo(['id', 'accountId', 'name', 'flag'], 'id', {}, { flag: false });
+    repo.rows.push({ id: 1, accountId: 99, name: 'x', flag: true });
+    const imp = new TestImporter();
+    imp.pages = [{ results: [{ id: 1, name: 'x', flag: null }], page: 1 }];
+
+    await imp.run(makeCtx(repo, 'account'));
+
+    expect(repo.rows).toHaveLength(1);
+    expect(repo.rows[0].flag).toBe(true); // preserved, not reset to the default
+  });
+
+  it('instance-scope: fills the entity-declared default for a null source value', async () => {
+    const repo = new FakeRepo(['id', 'accountId', 'name', 'flag'], 'id', {}, { flag: false });
+    const imp = new TestImporter();
+    imp.pages = [{ results: [{ id: 7, name: 'x', flag: null }], page: 1 }];
+
+    await imp.run(makeCtx(repo, 'instance'));
+
+    expect(repo.rows).toHaveLength(1);
+    expect(repo.rows[0].flag).toBe(false); // default reaches the raw INSERT
   });
 
   it('instance-scope: preserves the source id and does not write a mapping', async () => {

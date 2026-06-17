@@ -63,6 +63,11 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
     // unlike other endpoints that emit camelCase property names; without this,
     // every multi-word column (firstName/lastName/emailProvider/...) is dropped.
     const propByDbName = new Map(meta.columns.map((c) => [c.databaseName, c.propertyName]));
+    // Column propertyName -> entity-declared default, for columns that declare one.
+    // Used to fill absent values at the application layer instead of relying on the
+    // target DB's column DEFAULT, which a legacy/drifted schema may not carry.
+    // Function defaults (e.g. () => 'now()') are resolved at insert time.
+    const defaultByProp = new Map(meta.columns.filter((c) => c.default !== undefined).map((c) => [c.propertyName, c.default]));
     const tableName = meta.tableName;
     const pkProp = meta.primaryColumns[0]?.propertyName ?? 'id';
     const nkProp = this.naturalKey[0];
@@ -103,7 +108,11 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
         const existing = await txRepo.find({ where: { ...whereBase, [nkProp]: In(nkValues) } as any });
         const existingNk = new Set(existing.map((e: any) => String(e[nkProp])));
 
-        const toInsert = candidates.filter((c) => !existingNk.has(c.nk)).map((c) => c.row);
+        // Fill entity-declared defaults for columns the source left null/undefined
+        // (buildRow dropped them). Insert-only: the account-scope update path below
+        // keeps using c.row as-is, so a re-import never overwrites an existing value
+        // with a default.
+        const toInsert = candidates.filter((c) => !existingNk.has(c.nk)).map((c) => this.withColumnDefaults(c.row, defaultByProp));
         if (toInsert.length > 0) {
           if (ctx.scope === 'instance') {
             // Instance-scope preserves the source id (see raw-insert.util).
@@ -182,6 +191,21 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
     }
   }
 
+  // Applies entity-declared defaults for columns absent from the row (the source
+  // value was null/undefined and buildRow dropped it). Keeps the default in the
+  // application layer so an INSERT does not depend on the target DB carrying the
+  // column DEFAULT — important for legacy/drifted schemas. Columns without a
+  // declared default stay absent (the DB decides: nullable -> null, NOT NULL
+  // without default -> fails loudly).
+  private withColumnDefaults(row: Record<string, any>, defaultByProp: Map<string, any>): Record<string, any> {
+    if (defaultByProp.size === 0) return row;
+    const out = { ...row };
+    for (const [prop, def] of defaultByProp) {
+      if (out[prop] === undefined) out[prop] = typeof def === 'function' ? def() : def;
+    }
+    return out;
+  }
+
   // Copies only source properties that are entity columns; adjusts the PK
   // (drop in account-scope, preserve in instance-scope) and remaps FKs.
   // Accepts source keys as either the entity propertyName (camelCase) or the
@@ -193,6 +217,14 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
       if (!prop) continue;
       // A snake_case key must not clobber a value already set from camelCase.
       if (key !== prop && prop in row) continue;
+      // Drop null/undefined source values. Enterprise serializes legacy-nullable
+      // columns (e.g. testab_sent_after_test) as null; those map to OSS columns
+      // that are NOT NULL with a default. Writing the explicit NULL would trip the
+      // NOT NULL constraint (a DB DEFAULT only fills OMITTED columns, never an
+      // explicit NULL). Dropping them lets withColumnDefaults() supply the
+      // entity-declared default on INSERT, and lets the account-scope update path
+      // preserve the existing value instead of nulling it on re-import.
+      if (src[key] === null || src[key] === undefined) continue;
       row[prop] = src[key];
     }
     // PK: account-scope lets the sequence assign; instance-scope preserves it.
