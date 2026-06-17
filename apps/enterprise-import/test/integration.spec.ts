@@ -78,6 +78,8 @@ import { ContactTagsImporter } from '../src/importers/contact-tags.importer';
 import { ContactTagEntity } from '../src/entities/contact-tag.entity';
 import { ContactCustomFieldsImporter } from '../src/importers/contact-custom-fields.importer';
 import { ContactCustomFieldEntity } from '../src/entities/contact-custom-field.entity';
+import { CampaignsImporter } from '../src/importers/campaigns.importer';
+import { CampaignEntity } from '../src/entities/campaign.entity';
 import { ImportContext } from '../src/importers/importer.interface';
 
 import { EnterpriseImportJobEntity } from '../src/entities/enterprise-import-job.entity';
@@ -119,6 +121,50 @@ function makeTag(id: number, name: string) {
   };
 }
 
+// A campaign in the shape the Enterprise serializes. Every NOT NULL column is
+// filled EXCEPT the ones that carry a column default (testabSentAfterTest,
+// sendToAll, messageType): the Enterprise emits those legacy columns as null.
+// Against the real DDL (NOT NULL DEFAULT ...), the importer must turn that null
+// into the default instead of an explicit NULL — the EVO-1761 crash.
+function makeCampaign(id: number, name: string) {
+  const now = new Date().toISOString();
+  return {
+    id,
+    accountId: 1,
+    title: `Campaign ${name}`,
+    description: `desc ${name}`,
+    name,
+    publisher: 'pub',
+    scheduleTo: now,
+    scheduleToCloudTaskId: '',
+    status: 1,
+    spreadSending: 0,
+    sentContacts: 0,
+    sentPercentage: 0,
+    query: '',
+    steps: [],
+    tags: [],
+    type: 'regular',
+    messageType: null, // default 'email'
+    sendToAll: null, // default false
+    testabScheduleTo: now,
+    testabScheduleEnd: now,
+    testabAudiencePercent: 0,
+    testabCriteria: '',
+    testabSentAfterTest: null, // default false — the column that crashed the import
+    testabLastId: 0,
+    testabScheduleToCloudTaskId: '',
+    testabScheduleEndCloudTaskId: '',
+    recurrenceCount: 0,
+    recurrenceSettings: {},
+    isRateLimit: false,
+    runSegment: false,
+    triggers: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 d('enterprise-import integration (testcontainers + Enterprise mock)', () => {
   jest.setTimeout(120_000);
 
@@ -138,7 +184,7 @@ d('enterprise-import integration (testcontainers + Enterprise mock)', () => {
     });
     await ds.initialize();
     // Create only the tables under test, from the real metadata.
-    for (const e of [EnterpriseImportJobEntity, EnterpriseIdMappingEntity, AccountEntity, TagEntity, ContactTagEntity, ContactCustomFieldEntity]) {
+    for (const e of [EnterpriseImportJobEntity, EnterpriseIdMappingEntity, AccountEntity, TagEntity, ContactTagEntity, ContactCustomFieldEntity, CampaignEntity]) {
       await createTableFromMetadata(ds, e);
     }
 
@@ -155,6 +201,12 @@ d('enterprise-import integration (testcontainers + Enterprise mock)', () => {
       const page = Number(url.searchParams.get('page') || '1');
       if (url.pathname === '/tags') {
         const all = [makeTag(101, 'alpha'), makeTag(102, 'beta'), makeTag(103, 'gamma')];
+        const results = page === 1 ? all : [];
+        res.writeHead(200, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ results, page, totalItems: all.length }));
+      }
+      if (url.pathname === '/campaigns') {
+        const all = [makeCampaign(201, 'promo'), makeCampaign(202, 'newsletter')];
         const results = page === 1 ? all : [];
         res.writeHead(200, { 'content-type': 'application/json' });
         return res.end(JSON.stringify({ results, page, totalItems: all.length }));
@@ -199,6 +251,7 @@ d('enterprise-import integration (testcontainers + Enterprise mock)', () => {
     await ds.query('DELETE FROM contacts_custom_fields');
     await ds.query('DELETE FROM enterprise_id_mappings');
     await ds.query('DELETE FROM enterprise_import_jobs');
+    await ds.query('DELETE FROM campaigns');
   });
 
   function ctx(scope: 'account' | 'instance', jobId: string): ImportContext {
@@ -339,5 +392,31 @@ d('enterprise-import integration (testcontainers + Enterprise mock)', () => {
       { contactId: 20, customFieldId: 100 },
       { contactId: 20, customFieldId: 999 },
     ]);
+  });
+
+  // EVO-1761: against the real DDL (testab_sent_after_test boolean NOT NULL
+  // DEFAULT false), a null source value must persist as the column default
+  // instead of an explicit NULL. Before the fix this INSERT threw
+  // "null value in column ... violates not-null constraint".
+  it('11. campaigns account-scope: null source for a NOT NULL-default column imports as the default (EVO-1761)', async () => {
+    await new CampaignsImporter().run(ctx('account', 'j11'));
+
+    const campaigns = await ds.getRepository(CampaignEntity).find({ order: { name: 'ASC' } });
+    expect(campaigns.map((c) => c.name)).toEqual(['newsletter', 'promo']);
+    // The three columns the source sent as null fell back to their declared defaults.
+    expect(campaigns.every((c) => c.testabSentAfterTest === false)).toBe(true);
+    expect(campaigns.every((c) => c.sendToAll === false)).toBe(true);
+    expect(campaigns.every((c) => c.messageType === 'email')).toBe(true);
+    // A column the source actually provided is preserved verbatim.
+    expect(campaigns.every((c) => c.title.startsWith('Campaign '))).toBe(true);
+  });
+
+  it('12. campaigns instance-scope: default fill also reaches the raw INSERT (EVO-1761)', async () => {
+    await new CampaignsImporter().run(ctx('instance', 'j12'));
+
+    const campaigns = await ds.getRepository(CampaignEntity).find();
+    expect(campaigns.map((c) => c.id).sort()).toEqual([201, 202]); // source ids preserved
+    expect(campaigns.every((c) => c.testabSentAfterTest === false)).toBe(true);
+    expect(campaigns.every((c) => c.messageType === 'email')).toBe(true);
   });
 });

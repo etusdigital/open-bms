@@ -427,7 +427,7 @@ CREATE TABLE public.campaigns (
   testab_schedule_end timestamp with time zone,
   testab_audience_percent integer,
   testab_criteria character varying(255),
-  testab_sent_after_test boolean DEFAULT false,
+  testab_sent_after_test boolean DEFAULT false NOT NULL,
   testab_schedule_to_cloud_task_id character varying(255),
   testab_schedule_end_cloud_task_id character varying(255),
   testab_last_id integer,
