@@ -88,7 +88,7 @@ export class CampaignEntity {
   @Column('varchar', { name: 'testab_criteria', length: 255 })
   testabCriteria: string;
 
-  @Column('boolean', { name: 'testab_sent_after_test' })
+  @Column('boolean', { name: 'testab_sent_after_test', default: false })
   testabSentAfterTest: boolean;
 
   @Column('int', { name: 'testab_last_id' })
