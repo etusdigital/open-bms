@@ -9,7 +9,7 @@ export class MessageEntity {
   @Column('int', { name: 'account_id' })
   accountId: number;
 
-  @Column('varchar', { name: 'title', length: 255 })
+  @Column('varchar', { name: 'title', length: 255, default: '' })
   title: string;
 
   @Column('varchar', { name: 'name', length: 40 })
@@ -33,16 +33,16 @@ export class MessageEntity {
   @Column('varchar', { name: 'preview_text', length: 255 })
   previewText?: string;
 
-  @Column('text', { name: 'content' })
+  @Column('text', { name: 'content', default: '' })
   content: string;
 
-  @Column('text', { name: 'text' })
+  @Column('text', { name: 'text', default: '' })
   text: string;
 
-  @Column('varchar', { name: 'from_mail', length: 255 })
+  @Column('varchar', { name: 'from_mail', length: 255, default: '' })
   fromMail: string;
 
-  @Column('varchar', { name: 'from_name', length: 255 })
+  @Column('varchar', { name: 'from_name', length: 255, default: '' })
   fromName: string;
 
   @Column('bool', { name: 'is_tested' })
