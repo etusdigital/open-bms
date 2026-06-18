@@ -30,6 +30,7 @@ export class MessagesImporter implements ImporterStep {
     const meta = msgRepo.metadata;
     const columnProps = new Set(meta.columns.map((c) => c.propertyName));
     const pkProp = meta.primaryColumns[0]?.propertyName ?? 'id';
+    const defaultByProp = new Map(meta.columns.filter((c) => c.default !== undefined && c.propertyName !== pkProp).map((c) => [c.propertyName, c.default]));
 
     // Phase A: account messages (single paged pass).
     let page = 1;
@@ -57,10 +58,21 @@ export class MessagesImporter implements ImporterStep {
         for (const [nm, m] of byName) {
           if (idByName.has(nm)) continue;
           const row: Record<string, any> = {};
-          for (const key of Object.keys(m)) if (columnProps.has(key)) row[key] = m[key];
+          // Drop null/undefined source values (EVO-1761): writing an explicit NULL
+          // trips a NOT NULL constraint, and a DB/entity DEFAULT only fills an
+          // OMITTED column, never an explicit NULL.
+          for (const key of Object.keys(m)) {
+            if (!columnProps.has(key)) continue;
+            if (m[key] === null || m[key] === undefined) continue;
+            row[key] = m[key];
+          }
           if (ctx.scope === 'account') delete row[pkProp];
-          else if (m[pkProp] !== undefined) row[pkProp] = m[pkProp];
+          else if (m[pkProp] !== undefined && m[pkProp] !== null) row[pkProp] = m[pkProp];
           row.accountId = ctx.accountId;
+          // Backfill entity-declared defaults for columns the source left absent.
+          for (const [prop, def] of defaultByProp) {
+            if (row[prop] === undefined) row[prop] = typeof def === 'function' ? def() : def;
+          }
           toInsert.push(row);
         }
         if (toInsert.length > 0) {
