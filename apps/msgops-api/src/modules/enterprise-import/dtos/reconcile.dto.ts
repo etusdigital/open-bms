@@ -1,7 +1,11 @@
 import * as Joi from 'joi';
 import { JoiSchema, JoiSchemaOptions } from 'nestjs-joi';
 
-const CSV_MAX_BYTES = 12 * 1024 * 1024; // 12MB — comfortably above 30k+ contact rows.
+// 50MB of CSV text — real Enterprise exports reach hundreds of thousands of
+// contacts (350k ≈ 20MB). Must stay under the 64mb body-parser limit on the
+// /imports routes (main.ts) and match MAX_CSV_FILE_MB in the frontend's
+// reconcile-emails-card.tsx, which pre-checks the file before uploading.
+const CSV_MAX_BYTES = 50 * 1024 * 1024;
 
 const resolutionSchema = Joi.object({
   contactId: Joi.number().integer().positive().required(),

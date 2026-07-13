@@ -70,6 +70,21 @@ async function bootstrap() {
 
   app.getHttpAdapter().getInstance().set('query parser', 'extended');
 
+  // The email-reconcile flow (/imports/:jobId/reconcile/*) receives whole CSV
+  // exports embedded in the JSON body — 350k contacts easily exceed 20mb — so
+  // these routes get their own higher limit instead of raising the global one,
+  // which also guards public webhook endpoints. Must stay registered BEFORE
+  // the global parser (body-parser skips requests already parsed). Keep in
+  // sync with client_max_body_size in apps/frontend-react/nginx.conf.
+  app.use(
+    '/imports',
+    bodyParser.json({
+      limit: '64mb',
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
   // Captures the raw body alongside the parsed JSON. Webhook controllers
   // (e.g. POST /webhooks/meta and /webhooks/evolution-hub) need it to compute
   // HMAC-SHA256 signatures from the exact bytes the sender hashed.
