@@ -24,7 +24,6 @@ import { SuppressedsPageDto } from './dto/suppressedsPage.dto';
 import { ContactAutomationEntity } from 'src/entities/contact-automation.entity';
 import { AuditService } from './../../utils/audits/audit.service';
 import { ClickhouseProvider } from '../../providers/clickhouse.provider';
-import { maskEmail } from '../../utils/masking/email-masker';
 import { EventPublisherService } from '../../providers/messaging/event-publisher.service';
 import { EXCHANGES } from '@bms/messaging';
 import { TagEntity } from 'src/entities/tag.entity';
@@ -93,7 +92,10 @@ export class ContactsService {
 
   async findAll(): Promise<Array<ContactEntity>> {
     try {
-      const contacts = await this.contactRepository.find({
+      // Returns the stored email verbatim. Reconciled contacts carry their
+      // real address (the send flow depends on it); never re-mask on read —
+      // contacts still pending reconcile hold the masked placeholder anyway.
+      return await this.contactRepository.find({
         where: {
           accountId: this.cls.get('accountId'),
         },
@@ -101,10 +103,6 @@ export class ContactsService {
           createdAtDate: 'DESC',
         },
       });
-      return contacts.map((contact) => ({
-        ...contact,
-        email: contact.maskedEmail ?? maskEmail(contact.email),
-      })) as ContactEntity[];
     } catch (e) {
       console.error(e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
@@ -492,13 +490,10 @@ export class ContactsService {
         return csvParser.parse(contacts);
       }
 
-      const maskedResults = results.map((result) => ({
-        ...result,
-        email: maskEmail(result.email),
-      }));
-
+      // Stored email verbatim — same rationale as findAll/findOneById: the
+      // send flow and the operator need the real address after reconcile.
       return new PaginationDto<ContactEntity>({
-        results: maskedResults,
+        results,
         total: results.length,
         page: params.page,
         itemsPerPage: params.itemsPerPage,
@@ -647,10 +642,6 @@ export class ContactsService {
       Object.keys(result[0]).forEach((key) => {
         returnObject[this.snakeToCamelCase(key)] = result[0][key];
       });
-
-      if (returnObject.email) {
-        returnObject.email = maskEmail(returnObject.email);
-      }
 
       return returnObject;
     } catch (e) {
