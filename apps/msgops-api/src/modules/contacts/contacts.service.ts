@@ -29,6 +29,7 @@ import { EXCHANGES } from '@bms/messaging';
 import { TagEntity } from 'src/entities/tag.entity';
 import * as csv from 'fast-csv';
 import { toIsoTimestamp } from './export-timestamp.util';
+import { canReadRawEmail, presentEmail } from './email-visibility.util';
 const CsvParser = require('json2csv').Parser;
 
 @Injectable()
@@ -93,10 +94,7 @@ export class ContactsService {
 
   async findAll(): Promise<Array<ContactEntity>> {
     try {
-      // Returns the stored email verbatim. Reconciled contacts carry their
-      // real address (the send flow depends on it); never re-mask on read —
-      // contacts still pending reconcile hold the masked placeholder anyway.
-      return await this.contactRepository.find({
+      const contacts = await this.contactRepository.find({
         where: {
           accountId: this.cls.get('accountId'),
         },
@@ -104,6 +102,13 @@ export class ContactsService {
           createdAtDate: 'DESC',
         },
       });
+      // Privileged callers read the stored address verbatim — reconciled
+      // contacts carry the real one, and re-masking it renders exactly like
+      // the placeholder it replaced, so the reconciliation looked like a no-op.
+      // Everyone else keeps seeing the mask.
+      const canReadRaw = this.canReadRawEmail();
+      if (canReadRaw) return contacts;
+      return contacts.map((contact) => ({ ...contact, email: presentEmail(contact.email, false) })) as ContactEntity[];
     } catch (e) {
       console.error(e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
@@ -495,10 +500,11 @@ export class ContactsService {
         return csvParser.parse(contacts);
       }
 
-      // Stored email verbatim — same rationale as findAll/findOneById: the
-      // send flow and the operator need the real address after reconcile.
+      // Same visibility rule as findAll/findOneById.
+      const visibleResults = this.canReadRawEmail() ? results : results.map((result) => ({ ...result, email: presentEmail(result.email, false) }));
+
       return new PaginationDto<ContactEntity>({
-        results,
+        results: visibleResults,
         total: results.length,
         page: params.page,
         itemsPerPage: params.itemsPerPage,
@@ -647,6 +653,10 @@ export class ContactsService {
       Object.keys(result[0]).forEach((key) => {
         returnObject[this.snakeToCamelCase(key)] = result[0][key];
       });
+
+      if (returnObject.email && !this.canReadRawEmail()) {
+        returnObject.email = presentEmail(returnObject.email, false);
+      }
 
       return returnObject;
     } catch (e) {
@@ -1959,6 +1969,15 @@ export class ContactsService {
       console.error('Error in deactivateContacts:', error);
       throw new HttpException('Error deactivating contacts', HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  /**
+   * Whether the current principal may read stored addresses verbatim. Reading a
+   * raw address discloses exactly what an export does, so it answers to the
+   * export permission rather than to plain contacts_view.
+   */
+  private canReadRawEmail(): boolean {
+    return canReadRawEmail(this.cls.get('permissions'), this.cls.get('isSuperAdmin'));
   }
 
   private buildBlockedFilter(params: SuppressedsPageDto): string {
