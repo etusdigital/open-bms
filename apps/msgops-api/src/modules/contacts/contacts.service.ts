@@ -28,6 +28,7 @@ import { EventPublisherService } from '../../providers/messaging/event-publisher
 import { EXCHANGES } from '@bms/messaging';
 import { TagEntity } from 'src/entities/tag.entity';
 import * as csv from 'fast-csv';
+import { toIsoTimestamp } from './export-timestamp.util';
 const CsvParser = require('json2csv').Parser;
 
 @Injectable()
@@ -293,7 +294,11 @@ export class ContactsService {
           name: `${row.first_name}${row.last_name ? ` ${row.last_name}` : ''}`,
           email: row.email || '',
           status: this.getStatus(row),
-          created_at: row.created_at || '',
+          // ISO-8601 with the explicit UTC offset. The driver hands us a Date
+          // and fast-csv would otherwise stringify it as a locale-dependent
+          // string ("Thu Jul 09 2026 03:48:16 GMT-0300 (...)") — unstable
+          // across hosts and unusable as a timestamp by any consumer.
+          created_at: toIsoTimestamp(row.created_at),
         }),
       });
 
