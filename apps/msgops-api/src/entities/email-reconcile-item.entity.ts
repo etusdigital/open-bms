@@ -1,7 +1,11 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 export type EmailReconcileItemKind = 'auto' | 'ambiguous';
-export type EmailReconcileItemStatus = 'pending' | 'applied' | 'skipped' | 'failed';
+// `conflict` = the chosen address already belongs to another contact in the
+// account. Terminal for the automatic passes (retrying would fail identically)
+// but NOT a dead end: the operator resolves it manually, or reopens it after
+// freeing the address. `failed` stays for genuine write errors.
+export type EmailReconcileItemStatus = 'pending' | 'applied' | 'skipped' | 'failed' | 'conflict';
 
 export interface EmailReconcileStoredCandidate {
   csvRowNumber: number;
@@ -19,8 +23,8 @@ export interface EmailReconcileStoredCandidate {
 // One row per masked contact the reconcile session has an outcome for.
 //   kind=auto      → unique/confident match; new_email already decided.
 //   kind=ambiguous → operator (or bulk strategy) must pick a candidate.
-// Status walks pending → applied|skipped|failed. Contacts with no CSV match
-// get no item — they are only counted on the session row.
+// Status walks pending → applied|skipped|failed|conflict. Contacts with no CSV
+// match get no item — they are only counted on the session row.
 @Entity('email_reconcile_items')
 @Index('email_reconcile_items_job_kind_status_idx', ['jobId', 'kind', 'status'])
 @Index('email_reconcile_items_job_contact_uq', ['jobId', 'contactId'], { unique: true })

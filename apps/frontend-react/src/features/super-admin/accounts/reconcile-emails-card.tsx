@@ -301,10 +301,13 @@ function AutoSection({ jobId, progress, onProgress }: { jobId: string; progress:
   const { t } = useTranslation();
   const [chunkSize, setChunkSize] = useState(5000);
   const [running, setRunning] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const runningRef = useRef(false);
 
   const { auto } = progress;
-  const done = auto.applied + auto.failed;
+  // Conflicts are settled as far as the automatic pass goes — they count as
+  // progress, not as work left to run.
+  const done = auto.applied + auto.failed + auto.conflict;
   const pct = auto.total === 0 ? 100 : Math.round((done / auto.total) * 100);
 
   const run = async () => {
@@ -331,6 +334,24 @@ function AutoSection({ jobId, progress, onProgress }: { jobId: string; progress:
     runningRef.current = false;
   };
 
+  // Conflicting items are reopened once the operator has freed the disputed
+  // addresses (deleting the duplicate contact, for instance) — they go back to
+  // pending and the next run picks them up.
+  const reopen = async () => {
+    setReopening(true);
+    try {
+      const result = await reconcileGateway.reopenConflicts(jobId);
+      toast.success(t('superAdmin.accounts.import.reconcile.conflictsReopened', { count: result.reopened }));
+    } catch (err: any) {
+      toast.error(errorMessage(err, t, t('superAdmin.accounts.import.reconcile.applyError')));
+    } finally {
+      setReopening(false);
+      onProgress();
+    }
+  };
+
+  const conflicts = auto.conflict + progress.ambiguous.conflict;
+
   return (
     <div className="space-y-2 rounded border p-3">
       <div className="flex items-center justify-between">
@@ -341,9 +362,18 @@ function AutoSection({ jobId, progress, onProgress }: { jobId: string; progress:
             total: auto.total.toLocaleString(),
           })}
           {auto.failed > 0 && ` · ${t('superAdmin.accounts.import.reconcile.autoFailed', { failed: auto.failed.toLocaleString() })}`}
+          {auto.conflict > 0 && ` · ${t('superAdmin.accounts.import.reconcile.autoConflicts', { count: auto.conflict.toLocaleString() })}`}
         </span>
       </div>
       <Progress value={pct} />
+      {conflicts > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-muted-foreground text-xs">{t('superAdmin.accounts.import.reconcile.conflictsHint', { count: conflicts.toLocaleString() })}</p>
+          <Button size="sm" variant="outline" onClick={reopen} disabled={reopening || running}>
+            {t('superAdmin.accounts.import.reconcile.reopenConflicts')}
+          </Button>
+        </div>
+      )}
       {auto.pending === 0 ? (
         <p className="text-muted-foreground text-xs">{t('superAdmin.accounts.import.reconcile.autoDone')}</p>
       ) : (
@@ -767,7 +797,7 @@ function ItemsSection({ jobId }: { jobId: string }) {
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
   const [kind, setKind] = useState<'all' | 'auto' | 'ambiguous'>('all');
-  const [status, setStatus] = useState<'all' | 'pending' | 'applied' | 'skipped' | 'failed'>('all');
+  const [status, setStatus] = useState<'all' | 'pending' | 'applied' | 'skipped' | 'failed' | 'conflict'>('all');
   const [offset, setOffset] = useState(0);
 
   useEffect(() => {
@@ -839,6 +869,7 @@ function ItemsSection({ jobId }: { jobId: string }) {
             <SelectItem value="applied">{t('superAdmin.accounts.import.reconcile.statusApplied')}</SelectItem>
             <SelectItem value="skipped">{t('superAdmin.accounts.import.reconcile.statusSkipped')}</SelectItem>
             <SelectItem value="failed">{t('superAdmin.accounts.import.reconcile.statusFailed')}</SelectItem>
+            <SelectItem value="conflict">{t('superAdmin.accounts.import.reconcile.statusConflict')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -874,7 +905,7 @@ function ItemsSection({ jobId }: { jobId: string }) {
                   </TableCell>
                   <TableCell className="text-xs">
                     <ItemStatusBadge status={item.status} />
-                    {item.status === 'failed' && item.failureReason && (
+                    {(item.status === 'failed' || item.status === 'conflict') && item.failureReason && (
                       <div className="text-muted-foreground mt-0.5 max-w-56 truncate text-[10px]" title={item.failureReason}>
                         {item.failureReason}
                       </div>
@@ -908,7 +939,10 @@ function ItemsSection({ jobId }: { jobId: string }) {
 
 function ItemStatusBadge({ status }: { status: ReconcileItemRow['status'] }) {
   const { t } = useTranslation();
-  const variant = status === 'applied' ? 'default' : status === 'failed' ? 'destructive' : status === 'skipped' ? 'outline' : 'secondary';
+  // A conflict is not an error — it is a decision waiting to be made, so it
+  // reads as a warning rather than as a destructive failure.
+  const variant =
+    status === 'applied' ? 'default' : status === 'failed' ? 'destructive' : status === 'skipped' ? 'outline' : status === 'conflict' ? 'outline' : 'secondary';
   const label =
     status === 'applied'
       ? t('superAdmin.accounts.import.reconcile.statusApplied')
@@ -916,6 +950,8 @@ function ItemStatusBadge({ status }: { status: ReconcileItemRow['status'] }) {
         ? t('superAdmin.accounts.import.reconcile.statusFailed')
         : status === 'skipped'
           ? t('superAdmin.accounts.import.reconcile.statusSkipped')
-          : t('superAdmin.accounts.import.reconcile.statusPending');
+          : status === 'conflict'
+            ? t('superAdmin.accounts.import.reconcile.statusConflict')
+            : t('superAdmin.accounts.import.reconcile.statusPending');
   return <Badge variant={variant}>{label}</Badge>;
 }

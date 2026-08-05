@@ -13,11 +13,14 @@ import type {
   BulkResolveResult,
   ReconcileItemsPage,
   ReconcileSessionProgress,
+  ReopenConflictsResult,
   ResolveBatchResult,
 } from './email-reconcile.types';
 
 const NO_MATCH_SAMPLE_LIMIT = 50;
 const INSERT_CHUNK = 1000;
+// Ceiling for `email IN (...)` lookups — see findEmailHolders.
+const EMAIL_LOOKUP_CHUNK = 1000;
 
 /**
  * Batched reconciliation over a persisted working set.
@@ -53,32 +56,33 @@ export class EmailReconcileSessionService {
 
   async createSession(jobId: string, csv: string, ignoreColumns: string[] = []): Promise<ReconcileSessionProgress> {
     const job = await this.requireJob(jobId);
-    const computation = await this.reconcileService.computeReconciliation(csv, job.accountId!, ignoreColumns);
+    const accountId = job.accountId!;
+    const computation = await this.reconcileService.computeReconciliation(csv, accountId, ignoreColumns);
 
-    // Replace any previous working set — items cascade with the session row.
-    await this.sessionsRepo.delete({ jobId });
-    await this.sessionsRepo.insert({
-      jobId,
-      accountId: job.accountId!,
-      csvRows: computation.csvRows,
-      invalidCsvRows: computation.invalidCsvRows,
-      contactsMasked: computation.contactsMasked,
-      alreadyClean: computation.alreadyClean,
-      noMatchTotal: computation.noMatches.length,
-      noMatchSample: computation.noMatches.slice(0, NO_MATCH_SAMPLE_LIMIT),
-    });
+    // Addresses already owned by a contact in the account. An auto pick over
+    // one of those cannot be applied (per-account email uniqueness), so it is
+    // born as a conflict instead of burning an apply attempt to discover it.
+    const holders = await this.findEmailHolders(
+      accountId,
+      computation.matches.map((m) => m.newEmail),
+    );
 
     const items: Array<Partial<EmailReconcileItemEntity>> = [
-      ...computation.matches.map((m) => ({
-        jobId,
-        contactId: m.contactId,
-        currentEmail: m.currentEmail,
-        contactName: m.contactName || null,
-        kind: 'auto' as const,
-        status: 'pending' as const,
-        newEmail: m.newEmail,
-        csvRowNumber: m.csvRowNumber,
-      })),
+      ...computation.matches.map((m) => {
+        const holderId = holders.get(m.newEmail.toLowerCase());
+        const conflicting = holderId !== undefined && holderId !== m.contactId;
+        return {
+          jobId,
+          contactId: m.contactId,
+          currentEmail: m.currentEmail,
+          contactName: m.contactName || null,
+          kind: 'auto' as const,
+          status: conflicting ? ('conflict' as const) : ('pending' as const),
+          failureReason: conflicting ? `email already in use by contact #${holderId}` : null,
+          newEmail: m.newEmail,
+          csvRowNumber: m.csvRowNumber,
+        };
+      }),
       ...computation.ambiguous.map((a) => ({
         jobId,
         contactId: a.contactId,
@@ -91,12 +95,28 @@ export class EmailReconcileSessionService {
       })),
     ];
 
-    for (let i = 0; i < items.length; i += INSERT_CHUNK) {
-      await this.itemsRepo.insert(items.slice(i, i + INSERT_CHUNK));
-    }
+    // Replace the previous working set atomically: an interrupted rewrite used
+    // to leave a session header with partial (or zero) items, which reads as a
+    // perfectly valid — and silently truncated — reconciliation.
+    await this.sessionsRepo.manager.transaction(async (em) => {
+      await em.delete(EmailReconcileSessionEntity, { jobId });
+      await em.insert(EmailReconcileSessionEntity, {
+        jobId,
+        accountId,
+        csvRows: computation.csvRows,
+        invalidCsvRows: computation.invalidCsvRows,
+        contactsMasked: computation.contactsMasked,
+        alreadyClean: computation.alreadyClean,
+        noMatchTotal: computation.noMatches.length,
+        noMatchSample: computation.noMatches.slice(0, NO_MATCH_SAMPLE_LIMIT),
+      });
+      for (let i = 0; i < items.length; i += INSERT_CHUNK) {
+        await em.insert(EmailReconcileItemEntity, items.slice(i, i + INSERT_CHUNK));
+      }
+    });
 
     this.logger.log(
-      `[email-reconcile] session created jobId=${jobId} accountId=${job.accountId} auto=${computation.matches.length} ambiguous=${computation.ambiguous.length} no_match=${computation.noMatches.length}`,
+      `[email-reconcile] session created jobId=${jobId} accountId=${accountId} auto=${computation.matches.length} ambiguous=${computation.ambiguous.length} no_match=${computation.noMatches.length}`,
     );
     return this.getProgress(jobId);
   }
@@ -119,18 +139,20 @@ export class EmailReconcileSessionService {
     const auto = {
       applied: get('auto', 'applied'),
       failed: get('auto', 'failed'),
+      conflict: get('auto', 'conflict'),
       pending: get('auto', 'pending'),
       total: 0,
     };
-    auto.total = auto.applied + auto.failed + auto.pending;
+    auto.total = auto.applied + auto.failed + auto.conflict + auto.pending;
     const ambiguous = {
       applied: get('ambiguous', 'applied'),
       skipped: get('ambiguous', 'skipped'),
       pending: get('ambiguous', 'pending'),
       failed: get('ambiguous', 'failed'),
+      conflict: get('ambiguous', 'conflict'),
       total: 0,
     };
-    ambiguous.total = ambiguous.applied + ambiguous.skipped + ambiguous.pending + ambiguous.failed;
+    ambiguous.total = ambiguous.applied + ambiguous.skipped + ambiguous.pending + ambiguous.failed + ambiguous.conflict;
 
     return {
       jobId,
@@ -140,13 +162,14 @@ export class EmailReconcileSessionService {
       alreadyClean: session.alreadyClean,
       noMatches: session.noMatchTotal,
       noMatchSample: session.noMatchSample,
-      auto: { total: auto.total, applied: auto.applied, failed: auto.failed, pending: auto.pending },
+      auto: { total: auto.total, applied: auto.applied, failed: auto.failed, conflict: auto.conflict, pending: auto.pending },
       ambiguous: {
         total: ambiguous.total,
         applied: ambiguous.applied,
         skipped: ambiguous.skipped,
         pending: ambiguous.pending,
         failed: ambiguous.failed,
+        conflict: ambiguous.conflict,
       },
       createdAt: session.createdAt.toISOString(),
       updatedAt: session.updatedAt.toISOString(),
@@ -159,7 +182,9 @@ export class EmailReconcileSessionService {
       .createQueryBuilder('i')
       .where('i.job_id = :jobId', { jobId })
       .andWhere("i.kind = 'ambiguous'")
-      .andWhere("i.status = 'pending'")
+      // Conflicting items belong in the review queue: the address they wanted
+      // is taken, so a human has to pick another candidate or skip the contact.
+      .andWhere("i.status IN ('pending', 'conflict')")
       .orderBy('i.id', 'ASC')
       .skip(offset)
       .take(limit);
@@ -216,7 +241,7 @@ export class EmailReconcileSessionService {
    */
   async getItemsPage(
     jobId: string,
-    opts: { kind?: 'auto' | 'ambiguous'; status?: 'pending' | 'applied' | 'skipped' | 'failed'; q?: string; offset: number; limit: number },
+    opts: { kind?: 'auto' | 'ambiguous'; status?: 'pending' | 'applied' | 'skipped' | 'failed' | 'conflict'; q?: string; offset: number; limit: number },
   ): Promise<ReconcileItemsPage> {
     await this.requireSession(jobId);
     const qb = this.itemsRepo.createQueryBuilder('i').where('i.job_id = :jobId', { jobId }).orderBy('i.id', 'ASC').skip(opts.offset).take(opts.limit);
@@ -262,8 +287,11 @@ export class EmailReconcileSessionService {
    */
   async resolveBatch(jobId: string, resolutions: ApplyResolution[]): Promise<ResolveBatchResult> {
     const session = await this.requireSession(jobId);
+    // `conflict` items are resolvable too: the operator can pick another
+    // candidate or skip the contact. Only decided items (applied/skipped) and
+    // hard failures are out of reach here.
     const items = await this.itemsRepo.find({
-      where: { jobId, contactId: In(resolutions.map((r) => r.contactId)), kind: 'ambiguous', status: 'pending' },
+      where: { jobId, contactId: In(resolutions.map((r) => r.contactId)), kind: 'ambiguous', status: In(['pending', 'conflict']) },
     });
     const byContact = new Map(items.map((i) => [i.contactId, i]));
 
@@ -310,15 +338,35 @@ export class EmailReconcileSessionService {
 
     let applied = 0;
     let failed = 0;
+    let conflicts = 0;
     for (const item of chunk) {
       const outcome = await this.applyEmail(item, item.newEmail!, item.csvRowNumber, session.accountId);
-      if (outcome) failed++;
-      else applied++;
+      if (!outcome) applied++;
+      else if (outcome.conflict) conflicts++;
+      else failed++;
     }
 
     const remaining = await this.itemsRepo.count({ where: { jobId, kind: 'auto', status: 'pending' } });
-    this.logger.log(`[email-reconcile] auto chunk jobId=${jobId} applied=${applied} failed=${failed} remaining=${remaining}`);
-    return { applied, failed, remaining };
+    this.logger.log(`[email-reconcile] auto chunk jobId=${jobId} applied=${applied} failed=${failed} conflicts=${conflicts} remaining=${remaining}`);
+    return { applied, failed, conflicts, remaining };
+  }
+
+  /**
+   * Puts conflicting items back in the queue.
+   *
+   * A conflict means the address was taken when we tried it — usually by a
+   * duplicate contact the operator then removes, or by a pick they later
+   * changed. Reopening returns them to `pending`, where the normal passes
+   * (apply-auto for auto items, the review queue for ambiguous ones) pick them
+   * up again. Items that still conflict simply land back here, so this
+   * converges instead of looping.
+   */
+  async reopenConflicts(jobId: string): Promise<ReopenConflictsResult> {
+    await this.requireSession(jobId);
+    const result = await this.itemsRepo.update({ jobId, status: 'conflict' }, { status: 'pending', failureReason: null });
+    const reopened = result.affected ?? 0;
+    this.logger.log(`[email-reconcile] conflicts reopened jobId=${jobId} reopened=${reopened}`);
+    return { reopened, progress: await this.getProgress(jobId) };
   }
 
   /**
@@ -333,7 +381,9 @@ export class EmailReconcileSessionService {
     const session = await this.requireSession(jobId);
 
     if (strategy === 'skip-remaining') {
-      const result = await this.itemsRepo.update({ jobId, kind: 'ambiguous', status: 'pending' }, { status: 'skipped' });
+      // Clears the whole review queue, conflicts included — they are exactly
+      // the items the operator is declining to decide.
+      const result = await this.itemsRepo.update({ jobId, kind: 'ambiguous', status: In(['pending', 'conflict']) }, { status: 'skipped' });
       return { resolved: result.affected ?? 0, unresolved: 0, nextAfterId: null, remainingPending: 0 };
     }
 
@@ -351,10 +401,14 @@ export class EmailReconcileSessionService {
     // (an applied auto pick, an earlier resolution, or a clean contact). The
     // AUTOMATIC strategy must never consume those — the item stays pending in
     // the similarity queue, where only an explicit operator decision settles
-    // it. Applying here would just burn the item as failed.
-    const taken = await this.findTakenEmails(
-      session.accountId,
-      chunk.map((i) => i.candidates?.[0]?.csvEmail).filter((e): e is string => Boolean(e)),
+    // it. Applying here would just park the item as a conflict.
+    const taken = new Set(
+      (
+        await this.findEmailHolders(
+          session.accountId,
+          chunk.map((i) => i.candidates?.[0]?.csvEmail).filter((e): e is string => Boolean(e)),
+        )
+      ).keys(),
     );
 
     let resolved = 0;
@@ -400,17 +454,22 @@ export class EmailReconcileSessionService {
     newEmail: string,
     csvRowNumber: number | null,
     accountId: number,
-  ): Promise<{ contactId: number; reason: string } | null> {
+  ): Promise<{ contactId: number; reason: string; conflict?: true } | null> {
     try {
       // Friendly pre-check before the unique index does it the hard way: the
       // email may already belong to another contact in the account (a clean
       // one, or one reconciled earlier in this session). The index still
       // backs this up if a concurrent write slips through.
+      //
+      // This is a CONFLICT, not a failure: nothing is broken, two rows want the
+      // same address and only the operator can say which one is right. The item
+      // leaves the automatic queue (retrying is pointless) but stays resolvable
+      // — manually via resolve, or in bulk via reopenConflicts.
       const holder = await this.contactsRepo.findOne({ where: { accountId, email: newEmail.toLowerCase() } });
       if (holder && holder.id !== item.contactId) {
         const reason = `email already in use by contact #${holder.id}`;
-        await this.itemsRepo.update({ id: item.id }, { status: 'failed', failureReason: reason });
-        return { contactId: item.contactId, reason };
+        await this.itemsRepo.update({ id: item.id }, { status: 'conflict', failureReason: reason, newEmail, csvRowNumber });
+        return { contactId: item.contactId, reason, conflict: true };
       }
 
       await this.contactsRepo.save(this.contactsRepo.create({ id: item.contactId, email: newEmail }));
@@ -423,15 +482,23 @@ export class EmailReconcileSessionService {
     }
   }
 
-  /** Which of these emails already belong to some contact in the account (lowercased set). */
-  private async findTakenEmails(accountId: number, emails: string[]): Promise<Set<string>> {
+  /**
+   * Which of these addresses already belong to a contact in the account, mapped
+   * to the owner's id. Queried in chunks: callers hand over whole apply batches
+   * (up to 20k) or a full session's auto picks (350k on real imports), and a
+   * single IN list that size is a query planner problem, not a lookup.
+   */
+  private async findEmailHolders(accountId: number, emails: string[]): Promise<Map<string, number>> {
     const unique = [...new Set(emails.map((e) => e.toLowerCase()))];
-    if (unique.length === 0) return new Set();
-    const holders = await this.contactsRepo.find({
-      where: { accountId, email: In(unique) },
-      select: ['email'],
-    });
-    return new Set(holders.map((h) => h.email.toLowerCase()));
+    const found = new Map<string, number>();
+    for (let i = 0; i < unique.length; i += EMAIL_LOOKUP_CHUNK) {
+      const holders = await this.contactsRepo.find({
+        where: { accountId, email: In(unique.slice(i, i + EMAIL_LOOKUP_CHUNK)) },
+        select: ['id', 'email'],
+      });
+      for (const h of holders) found.set(h.email.toLowerCase(), h.id);
+    }
+    return found;
   }
 
   private async requireSession(jobId: string): Promise<EmailReconcileSessionEntity> {

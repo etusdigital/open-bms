@@ -127,9 +127,11 @@ export interface ReconcileSessionProgress {
   alreadyClean: number;
   noMatches: number;
   noMatchSample: Array<{ contactId: number; currentEmail: string }>;
-  // Quantified progress the UI renders as bars/counters.
-  auto: { total: number; applied: number; failed: number; pending: number };
-  ambiguous: { total: number; applied: number; skipped: number; pending: number; failed: number };
+  // Quantified progress the UI renders as bars/counters. `conflict` counts
+  // items whose address is already taken by another contact — they await an
+  // operator decision, they are not lost.
+  auto: { total: number; applied: number; failed: number; conflict: number; pending: number };
+  ambiguous: { total: number; applied: number; skipped: number; pending: number; failed: number; conflict: number };
   createdAt: string;
   updatedAt: string;
 }
@@ -147,7 +149,7 @@ export interface ReconcileItemRow {
   contactName: string;
   currentEmail: string;
   kind: 'auto' | 'ambiguous';
-  status: 'pending' | 'applied' | 'skipped' | 'failed';
+  status: 'pending' | 'applied' | 'skipped' | 'failed' | 'conflict';
   newEmail: string | null;
   csvRowNumber: number | null;
   failureReason: string | null;
@@ -173,7 +175,18 @@ export interface ResolveBatchResult {
 export interface ApplyAutoChunkResult {
   applied: number;
   failed: number;
+  // Items left for manual resolution because the address is already in use.
+  // Counted apart from `failed` (a write error) so the operator knows there is
+  // something to decide, not something broken.
+  conflicts: number;
   remaining: number;
+}
+
+export interface ReopenConflictsResult {
+  // Conflicting items put back in the queue for another attempt — the operator
+  // reopens them after freeing the addresses (e.g. deleting duplicate contacts).
+  reopened: number;
+  progress: ReconcileSessionProgress;
 }
 
 export interface BulkResolveResult {

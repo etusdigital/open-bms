@@ -35,8 +35,10 @@ export interface ReconcileSessionProgress {
   alreadyClean: number;
   noMatches: number;
   noMatchSample: Array<{ contactId: number; currentEmail: string }>;
-  auto: { total: number; applied: number; failed: number; pending: number };
-  ambiguous: { total: number; applied: number; skipped: number; pending: number; failed: number };
+  // `conflict` = the address is already taken by another contact; the item
+  // waits for an operator decision instead of being counted as a failure.
+  auto: { total: number; applied: number; failed: number; conflict: number; pending: number };
+  ambiguous: { total: number; applied: number; skipped: number; pending: number; failed: number; conflict: number };
   createdAt: string;
   updatedAt: string;
 }
@@ -53,7 +55,7 @@ export interface ReconcileItemRow {
   contactName: string;
   currentEmail: string;
   kind: 'auto' | 'ambiguous';
-  status: 'pending' | 'applied' | 'skipped' | 'failed';
+  status: 'pending' | 'applied' | 'skipped' | 'failed' | 'conflict';
   newEmail: string | null;
   csvRowNumber: number | null;
   failureReason: string | null;
@@ -71,7 +73,7 @@ export interface ReconcileItemsQuery {
   limit: number;
   q?: string;
   kind?: 'auto' | 'ambiguous';
-  status?: 'pending' | 'applied' | 'skipped' | 'failed';
+  status?: 'pending' | 'applied' | 'skipped' | 'failed' | 'conflict';
 }
 
 export interface ApplyResolution {
@@ -91,7 +93,14 @@ export interface ResolveBatchResult {
 export interface ApplyAutoChunkResult {
   applied: number;
   failed: number;
+  // Items parked for manual resolution because the address is already in use.
+  conflicts: number;
   remaining: number;
+}
+
+export interface ReopenConflictsResult {
+  reopened: number;
+  progress: ReconcileSessionProgress;
 }
 
 export interface BulkResolveResult {
@@ -150,6 +159,11 @@ export const reconcileGateway = {
     payload: { strategy: 'best-name'; threshold: number; limit: number; afterId?: string } | { strategy: 'skip-remaining' },
   ): Promise<BulkResolveResult> {
     const { data } = await apiClient.post<BulkResolveResult>(`/imports/${jobId}/reconcile/session/bulk-resolve`, payload, { timeout: 0 });
+    return data;
+  },
+
+  async reopenConflicts(jobId: string): Promise<ReopenConflictsResult> {
+    const { data } = await apiClient.post<ReopenConflictsResult>(`/imports/${jobId}/reconcile/session/reopen-conflicts`, {}, { timeout: 0 });
     return data;
   },
 
