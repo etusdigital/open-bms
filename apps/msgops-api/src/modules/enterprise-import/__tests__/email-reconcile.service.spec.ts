@@ -10,6 +10,21 @@ import { ContactEntity } from '../../../entities/contact.entity';
  * three matching outcomes (unique, ambiguous, no match), name-based tie-break
  * for collisions, and the apply path including operator resolutions.
  */
+// Contacts (and their CSV rows) whose masks collide 1:1 on both sides: the
+// pairing is certain, so their delta IS the export's timezone offset. Three of
+// them is the minimum the inference accepts before committing to a value.
+// Written in America/Sao_Paulo local time (UTC-3) with no offset marker.
+const OFFSET_ANCHOR_CONTACTS = [
+  { id: 90, email: 'alice***@gmail.com', firstName: 'Alice', lastName: 'Nunes', createdAt: new Date('2023-04-01T13:00:00Z') },
+  { id: 91, email: 'bruno***@gmail.com', firstName: 'Bruno', lastName: 'Reis', createdAt: new Date('2023-04-02T18:30:00Z') },
+  { id: 92, email: 'carla***@gmail.com', firstName: 'Carla', lastName: 'Dias', createdAt: new Date('2023-04-03T21:45:00Z') },
+];
+const OFFSET_ANCHOR_ROWS = [
+  'Alice Nunes,alicenunes@gmail.com,Active,2023-04-01 10:00:00',
+  'Bruno Reis,brunoreis@gmail.com,Active,2023-04-02 15:30:00',
+  'Carla Dias,carladias@gmail.com,Active,2023-04-03 18:45:00',
+];
+
 describe('EmailReconcileService', () => {
   let service: EmailReconcileService;
   let contactsRepo: {
@@ -208,14 +223,85 @@ describe('EmailReconcileService', () => {
     });
 
     it('tolerates a fixed timezone offset in offset-less timestamps', async () => {
-      setMaskedContacts([{ id: 10, email: 'lucas***@gmail.com', firstName: 'Joao', lastName: 'Pereira', createdAt: new Date('2023-04-10T14:22:31Z') }]);
+      setMaskedContacts([
+        { id: 10, email: 'lucas***@gmail.com', firstName: 'Joao', lastName: 'Pereira', createdAt: new Date('2023-04-10T14:22:31Z') },
+        // Anchors: masks colliding 1:1 on both sides, which is where the
+        // export's offset (UTC-3 here) is inferred from.
+        ...OFFSET_ANCHOR_CONTACTS,
+      ]);
 
       // Export written in America/Sao_Paulo local time (UTC-3), no offset marker.
-      const csv = ['name,email,status,created_at', 'Ana Souza,lucassilva@gmail.com,Active,2023-04-10 11:22:31', 'Rita Melo,lucasrocha@gmail.com,Active,2024-08-01 09:00:00'].join(
-        '\n',
-      );
+      const csv = [
+        'name,email,status,created_at',
+        'Ana Souza,lucassilva@gmail.com,Active,2023-04-10 11:22:31',
+        'Rita Melo,lucasrocha@gmail.com,Active,2024-08-01 09:00:00',
+        ...OFFSET_ANCHOR_ROWS,
+      ].join('\n');
 
       const out = await service.preview('job-1', csv);
+      expect(out.uniqueMatches).toBe(1 + OFFSET_ANCHOR_ROWS.length);
+      expect(out.ambiguousMatches).toBe(0);
+    });
+
+    it('does not grant exact agreement to an arbitrary offset when none was established', async () => {
+      // Same shape as the test above, minus the anchors: the CSV alone gives no
+      // evidence of its timezone, so a 3h gap is NOT an exact match. Accepting
+      // any half-hour-aligned shift per candidate (the old rule) made ~57
+      // offsets plausible and let unrelated rows claim the strongest tier.
+      setMaskedContacts([{ id: 10, email: 'lucas***@gmail.com', firstName: 'Joao', lastName: 'Pereira', createdAt: new Date('2023-04-10T14:22:31Z') }]);
+
+      const csv = [
+        'name,email,status,created_at',
+        'Ana Souza,lucassilva@gmail.com,Active,2023-04-10 11:22:31',
+        // Same calendar date, so both survive as day-level candidates and the
+        // contact goes to the operator instead of being silently decided.
+        'Rita Melo,lucasrocha@gmail.com,Active,2023-04-10 09:00:00',
+      ].join('\n');
+
+      const out = await service.preview('job-1', csv);
+      expect(out.uniqueMatches).toBe(0);
+      expect(out.ambiguousMatches).toBe(1);
+      expect(out.ambiguousSample[0]?.candidates.every((c) => c.timeMatch === 1)).toBe(true);
+    });
+
+    it('infers the offset from unambiguous pairs and applies it to the colliding ones', async () => {
+      setMaskedContacts([
+        // Two rows collide on this mask; only the one shifted by exactly the
+        // inferred offset takes the exact tier.
+        { id: 10, email: 'lucas***@gmail.com', firstName: 'Joao', lastName: 'Pereira', createdAt: new Date('2023-04-10T14:22:31Z') },
+        ...OFFSET_ANCHOR_CONTACTS,
+      ]);
+
+      const csv = [
+        'name,email,status,created_at',
+        // 11:22 local == 14:22Z under the inferred UTC-3.
+        'Ana Souza,lucassilva@gmail.com,Active,2023-04-10 11:22',
+        // 14:22 local == 17:22Z — the shift the OLD rule would have accepted
+        // as exact too (0 offset), making the pair undecidable.
+        'Rita Melo,lucasrocha@gmail.com,Active,2023-04-10 14:22',
+        ...OFFSET_ANCHOR_ROWS,
+      ].join('\n');
+
+      const out = await service.preview('job-1', csv);
+      expect(out.uniqueMatches).toBe(1 + OFFSET_ANCHOR_ROWS.length);
+      expect(out.ambiguousMatches).toBe(0);
+    });
+
+    it('parses the locale timestamp the streaming export used to emit', async () => {
+      // `Date.prototype.toString()` output — what fast-csv wrote before the
+      // exporter was pinned to ISO. CSVs in that shape are still in operator
+      // hands, and rejecting them silently killed the whole time tier.
+      setMaskedContacts([{ id: 10, email: 'lucas***@gmail.com', firstName: 'Joao', lastName: 'Pereira', createdAt: new Date('2026-07-09T07:48:16.039Z') }]);
+
+      const csv = [
+        'name,email,status,created_at',
+        'Ana Souza,lucassilva@gmail.com,Active,Thu Jul 09 2026 03:48:16 GMT-0400 (Eastern Daylight Time)',
+        'Rita Melo,lucasrocha@gmail.com,Active,Thu Jul 09 2026 05:10:00 GMT-0400 (Eastern Daylight Time)',
+      ].join('\n');
+
+      const out = await service.preview('job-1', csv);
+      // The offset is explicit in the string, so the instant is absolute — no
+      // inference needed and the second row loses on the exact tier.
       expect(out.uniqueMatches).toBe(1);
       expect(out.ambiguousMatches).toBe(0);
     });
@@ -249,7 +335,10 @@ describe('EmailReconcileService', () => {
     it('compares at minute precision, ignoring seconds and milliseconds', async () => {
       // DB keeps ms, export truncates to the minute — the instant tier must
       // still discriminate between two same-day candidates.
-      setMaskedContacts([{ id: 10, email: 'lucas***@gmail.com', firstName: 'Joao', lastName: 'Pereira', createdAt: new Date('2023-04-10T14:22:31.874Z') }]);
+      setMaskedContacts([
+        { id: 10, email: 'lucas***@gmail.com', firstName: 'Joao', lastName: 'Pereira', createdAt: new Date('2023-04-10T14:22:31.874Z') },
+        ...OFFSET_ANCHOR_CONTACTS,
+      ]);
 
       const csv = [
         'name,email,status,created_at',
@@ -257,10 +346,11 @@ describe('EmailReconcileService', () => {
         'Ana Souza,lucassilva@gmail.com,Active,2023-04-10 11:22',
         // Same day but a different minute — must lose to the row above.
         'Rita Melo,lucasrocha@gmail.com,Active,2023-04-10 09:15',
+        ...OFFSET_ANCHOR_ROWS,
       ].join('\n');
 
       const out = await service.preview('job-1', csv);
-      expect(out.uniqueMatches).toBe(1);
+      expect(out.uniqueMatches).toBe(1 + OFFSET_ANCHOR_ROWS.length);
       expect(out.ambiguousMatches).toBe(0);
     });
 
@@ -313,6 +403,29 @@ describe('EmailReconcileService', () => {
       expect(out.ambiguousMatches).toBe(1);
       expect(out.ambiguousSample[0]?.contactId).toBe(11);
       expect(out.ambiguousSample[0]?.candidates).toHaveLength(1);
+    });
+
+    it('arbitrates duplicate CSV rows carrying the same address, not just the same row number', async () => {
+      // Exports repeat addresses across rows. Arbitrating by row number let
+      // each duplicate produce its own automatic winner, and the second one
+      // then died on the per-account email uniqueness at apply time.
+      setMaskedContacts([
+        { id: 10, email: 'lucas***@gmail.com', firstName: 'Lucas', lastName: 'Silva', createdAt: new Date('2026-01-05T12:30:10Z') },
+        { id: 11, email: 'lucas***@gmail.com', firstName: 'Lucas', lastName: 'Silva', createdAt: new Date('2026-01-05T12:31:40Z') },
+      ]);
+
+      // Each contact confidently auto-picks a different ROW (the instants are
+      // explicit), but the two rows carry the SAME address.
+      const csv = [
+        'name,email,status,created_at',
+        'Lucas Silva,lucassilva@gmail.com,Active,2026-01-05T12:30:00Z',
+        'Lucas Silva,LucasSilva@gmail.com,Active,2026-01-05T12:31:00Z',
+      ].join('\n');
+
+      const out = await service.preview('job-1', csv);
+
+      expect(out.uniqueMatches).toBe(1);
+      expect(out.ambiguousMatches).toBe(1);
     });
 
     it('falls back to name-only behavior when the contact has no createdAt', async () => {

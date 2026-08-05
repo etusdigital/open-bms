@@ -5,7 +5,7 @@ import { parseString } from 'fast-csv';
 import { ContactEntity } from '../../entities/contact.entity';
 import { EnterpriseImportJobEntity } from '../../entities/enterprise-import-job.entity';
 import { maskEmail } from '../../utils/masking/email-masker';
-import { parseCsvTimestamp, timeMatchLevel } from './reconcile-timestamp.util';
+import { inferCsvOffsetMinutes, parseCsvTimestamp, timeMatchLevel } from './reconcile-timestamp.util';
 import type { AmbiguousMatch, ApplyResolution, ApplyResult, CsvRow, ReconcileComputation, ReconcileMatch, ReconcilePreview, TimeMatchLevel } from './email-reconcile.types';
 
 const AMBIGUOUS_SAMPLE_LIMIT = 100;
@@ -107,6 +107,7 @@ export class EmailReconcileService {
     const maskedContacts = await this.loadMaskedContacts(accountId);
     const maskCollisions = this.countContactsByMask(maskedContacts);
     const alreadyClean = await this.countCleanContacts(accountId);
+    const csvOffset = this.inferCsvOffset(maskedContacts, bucketsByMask, maskCollisions);
 
     const matches: ReconcileMatch[] = [];
     const ambiguous: AmbiguousMatch[] = [];
@@ -120,7 +121,7 @@ export class EmailReconcileService {
         continue;
       }
 
-      const outcome = this.matchContact(contact, candidates, maskCollisions.get(contact.email) ?? 1);
+      const outcome = this.matchContact(contact, candidates, maskCollisions.get(contact.email) ?? 1, csvOffset);
       if (outcome.kind === 'auto') {
         autoPicks.push({ contact, row: outcome.row, timeMatch: outcome.timeMatch, score: outcome.score });
         continue;
@@ -189,6 +190,7 @@ export class EmailReconcileService {
     const bucketsByMask = this.bucketByMask(validRows);
     const maskedContacts = await this.loadMaskedContacts(job.accountId);
     const maskCollisions = this.countContactsByMask(maskedContacts);
+    const csvOffset = this.inferCsvOffset(maskedContacts, bucketsByMask, maskCollisions);
     const resolutionsById = new Map(resolutions.map((r) => [r.contactId, r.csvRowNumber]));
 
     const updates: ReconcileMatch[] = [];
@@ -228,7 +230,7 @@ export class EmailReconcileService {
         skippedNoMatch++;
         continue;
       }
-      const outcome = this.matchContact(contact, candidates, maskCollisions.get(contact.email) ?? 1);
+      const outcome = this.matchContact(contact, candidates, maskCollisions.get(contact.email) ?? 1, csvOffset);
       if (outcome.kind === 'auto') {
         autoPicks.push({ contact, row: outcome.row, timeMatch: outcome.timeMatch, score: outcome.score });
         continue;
@@ -399,6 +401,7 @@ export class EmailReconcileService {
     contact: ContactEntity,
     candidates: CsvRow[],
     maskCollisions: number,
+    csvOffsetMinutes: number | null,
   ):
     | { kind: 'auto'; row: CsvRow; timeMatch: TimeMatchLevel; score: number }
     | { kind: 'ambiguous'; contactName: string; scored: Array<{ row: CsvRow; score: number; timeMatch: TimeMatchLevel }> } {
@@ -411,10 +414,10 @@ export class EmailReconcileService {
 
     if (candidates.length === 1 && maskCollisions <= 1) {
       const row = candidates[0];
-      return auto(row, timeMatchLevel(contact.createdAt, row.createdAtTs));
+      return auto(row, timeMatchLevel(contact.createdAt, row.createdAtTs, csvOffsetMinutes));
     }
 
-    const leveled = candidates.map((row) => ({ row, timeMatch: timeMatchLevel(contact.createdAt, row.createdAtTs) }));
+    const leveled = candidates.map((row) => ({ row, timeMatch: timeMatchLevel(contact.createdAt, row.createdAtTs, csvOffsetMinutes) }));
     const bestLevel = Math.max(...leveled.map((l) => l.timeMatch));
     const pool = bestLevel > 0 ? leveled.filter((l) => l.timeMatch === bestLevel) : leveled;
     if (bestLevel > 0 && pool.length === 1) return auto(pool[0].row, pool[0].timeMatch);
@@ -430,23 +433,50 @@ export class EmailReconcileService {
   }
 
   /**
-   * Email is unique per account (contact_email_unique index), so one CSV row
+   * The CSV's timezone offset, inferred once per run (see
+   * inferCsvOffsetMinutes). Samples come only from masks that collide with
+   * exactly one CSV row AND one contact: there the pairing is certain, so the
+   * delta between the two timestamps IS the export's offset. Colliding masks
+   * are deliberately left out — feeding guesses into the inference would
+   * defeat its purpose. Returns null when the CSV carries explicit offsets or
+   * the sample is too thin to commit, and matching then stops at day level.
+   */
+  private inferCsvOffset(contacts: ContactEntity[], bucketsByMask: Map<string, CsvRow[]>, maskCollisions: Map<string, number>): number | null {
+    const samples: Array<{ contactMs: number; ts: CsvRow['createdAtTs'] }> = [];
+    for (const contact of contacts) {
+      if ((maskCollisions.get(contact.email) ?? 1) > 1) continue;
+      const bucket = bucketsByMask.get(contact.email);
+      if (!bucket || bucket.length !== 1) continue;
+      if (!contact.createdAt) continue;
+      samples.push({ contactMs: contact.createdAt.getTime(), ts: bucket[0].createdAtTs });
+    }
+    return inferCsvOffsetMinutes(samples);
+  }
+
+  /**
+   * Email is unique per account (contact_email_unique index), so one address
    * can reconcile at most ONE contact. When several contacts independently
-   * auto-pick the same row, only the strongest agreement (time tier, then
+   * auto-pick the same address, only the strongest agreement (time tier, then
    * name score) keeps the auto — the rest are demoted to the ambiguous queue
    * for the operator, instead of failing later on the unique index.
+   *
+   * Arbitration is by NORMALIZED EMAIL, not by CSV row: exports repeat the same
+   * address across rows, and keying by row let each duplicate produce its own
+   * automatic winner — the second one then died on the unique index at apply
+   * time. The email is what the database enforces, so it is what we arbitrate.
    */
   private dedupeAutoPicks(picks: AutoPick[]): { winners: AutoPick[]; demoted: AutoPick[] } {
-    const byRow = new Map<number, AutoPick[]>();
+    const byEmail = new Map<string, AutoPick[]>();
     for (const p of picks) {
-      const group = byRow.get(p.row.rowNumber);
+      const key = p.row.email.toLowerCase();
+      const group = byEmail.get(key);
       if (group) group.push(p);
-      else byRow.set(p.row.rowNumber, [p]);
+      else byEmail.set(key, [p]);
     }
 
     const winners: AutoPick[] = [];
     const demoted: AutoPick[] = [];
-    for (const group of byRow.values()) {
+    for (const group of byEmail.values()) {
       if (group.length > 1) group.sort((a, b) => b.timeMatch - a.timeMatch || b.score - a.score);
       winners.push(group[0]);
       demoted.push(...group.slice(1));
