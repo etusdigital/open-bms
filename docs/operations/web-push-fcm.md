@@ -32,6 +32,25 @@ Logue como super-admin, vá em **Integrações → FCM** e preencha os três cam
 
 Ignore o botão **Testar conexão**: ele apenas faz `JSON.parse` no que você colou e devolve o `project_id`. Uma chave revogada, expirada ou de outro projeto passa verde. A primeira validação de verdade acontece quando o worker `send-push` tenta entregar.
 
+## Instalar no site do cliente
+
+Configurar o FCM habilita a instalação, mas nada registra até que dois artefatos estejam no site. Os dois saem prontos em **Configurações → Push**, na conta em questão.
+
+**O `sw.js`, na raiz do site.** O botão **Download SW** gera um arquivo de duas linhas — um shim, não o service worker inteiro:
+
+```js
+// BMS Web-Push service worker — host this file at your site root as /sw.js
+importScripts('https://<BMS_PUBLIC_URL>/bms/push/<accountHash>.js');
+```
+
+Tem que ficar na **raiz** (`https://site.com/sw.js`), porque o escopo de um service worker não sobe de diretório: servido de `/assets/sw.js`, ele só controlaria `/assets/`. O `importScripts` é que cruza a origem para buscar o worker de verdade no BMS; o registro em si continua same-origin.
+
+**O snippet, em toda página que deve registrar.** Sai pronto no mesmo lugar, com `apiKey`, `cookieDomain`, `accountHash` e `startWebPush: true`, seguido do `bmstrk.js`. Sem ele o `sw.js` não faz nada — não há o que registre o worker nem peça a permissão ao usuário.
+
+Entregue os dois juntos, com o lugar exato de cada um. Metade da instalação em produção não falha de forma visível: o site simplesmente não capta assinatura nenhuma.
+
+Antes de entregar, confira o `cookieDomain` do snippet. Ele é derivado do `default_domain` da conta, e precisa ser o domínio **do site do cliente** — se ali estiver o domínio da própria instalação do BMS, o cookie do tracker é gravado no domínio errado e a identificação do contato se perde. Para corrigir, ajuste o domínio padrão da conta e gere o snippet de novo.
+
 ## Verificar
 
 Os artefatos são públicos, então basta um `curl`. O `projectId` servido tem que ser o do seu projeto; se ainda aparecer o do bundle, a config não chegou.
