@@ -35,6 +35,12 @@ The `infra/swarm/` folder also contains the stack files and a working
 | [ClickHouse schema](./reference/clickhouse-schema.md)         | Anyone querying analytics directly |
 | [Health-check endpoint](./reference/health-check-endpoint.md) | Integrators, monitoring tooling    |
 
+## 📄 Proposals
+
+| Doc                                                                 | Audience                                          |
+| ------------------------------------------------------------------- | ------------------------------------------------- |
+| [Contacts export endpoint](./proposals/contacts-export-endpoint.md) | Revisores do contrato do export temporário legado |
+
 ## 👥 Contributing
 
 - [Contributing guide](../CONTRIBUTING.md) — workflow, conventions, review checklist
