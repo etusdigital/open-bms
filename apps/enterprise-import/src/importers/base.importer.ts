@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { EntityTarget, In, ObjectLiteral } from 'typeorm';
-import { ImportContext, ImporterStep } from './importer.interface';
+import { DiscardReason, ImportContext, ImporterStep } from './importer.interface';
 import { PagedResponse } from '../enterprise-client/enterprise.client';
 import { rawInsertPreservingPk } from '../raw-insert.util';
 
@@ -74,21 +74,39 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
 
     let page = this.resumePage(ctx);
     let totalDone = 0;
+    let totalSeen = 0;
     let totalKnown: number | undefined;
+    const discarded: Record<DiscardReason, number> = {
+      mapped_null: 0,
+      empty_natural_key: 0,
+      duplicate_in_page: 0,
+      insert_conflict: 0,
+    };
 
     while (true) {
       const resp = await this.fetchPage(ctx, page);
       if (!resp.results || resp.results.length === 0) break;
       if (resp.totalItems !== undefined) totalKnown = resp.totalItems;
+      totalSeen += resp.results.length;
 
       // Build candidate rows (dedup by natural key within the page).
       const candidates: Array<{ src: any; row: Record<string, any>; nk: string }> = [];
       const seen = new Set<string>();
       for (const src of resp.results) {
         const row = await this.buildRow(ctx, src, columnProps, propByDbName, pkProp);
-        if (row === null) continue;
+        if (row === null) {
+          discarded.mapped_null++;
+          continue;
+        }
         const nkVal = String(src[nkProp] ?? row[nkProp] ?? '');
-        if (!nkVal || seen.has(nkVal)) continue;
+        if (!nkVal) {
+          discarded.empty_natural_key++;
+          continue;
+        }
+        if (seen.has(nkVal)) {
+          discarded.duplicate_in_page++;
+          continue;
+        }
         seen.add(nkVal);
         candidates.push({ src, row, nk: nkVal });
       }
@@ -127,6 +145,12 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
               .orIgnore() // safety net; real idempotency comes from the pre-filter
               .execute();
           }
+
+          // Neither write path reports how many rows it wrote, so the swallowed
+          // conflicts only show up by counting what is there afterwards.
+          const afterCount = await txRepo.count({ where: { ...whereBase, [nkProp]: In(nkValues) } as any });
+          const gravadas = afterCount - existing.length;
+          if (gravadas < toInsert.length) discarded.insert_conflict += toInsert.length - gravadas;
         }
 
         // Account-scope upsert: refresh already-existing rows from the source so
@@ -171,7 +195,13 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
 
       totalDone += candidates.length;
       await ctx.setCheckpoint(this.name, page, ctx.accountId ?? undefined);
-      await ctx.updateProgress(this.name, { total: this.reportsTotal ? totalKnown : undefined, done: totalDone, page });
+      await ctx.updateProgress(this.name, {
+        total: this.reportsTotal ? totalKnown : undefined,
+        done: totalDone,
+        page,
+        seen: totalSeen,
+        ...this.discardPatch(discarded),
+      });
 
       if (resp.results.length < this.batchSize) break;
       page++;
@@ -184,11 +214,20 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
     // already existed (totalKnown>0) counts as done.
     if (totalDone === 0) {
       if (this.reportsTotal && totalKnown && totalKnown > 0) {
-        await ctx.updateProgress(this.name, { total: totalKnown, done: totalKnown, page });
+        await ctx.updateProgress(this.name, { total: totalKnown, done: totalKnown, page, seen: totalSeen, ...this.discardPatch(discarded) });
+      } else if (totalSeen > 0) {
+        await ctx.updateProgress(this.name, { skipped: true, reason: 'all_discarded', seen: totalSeen, ...this.discardPatch(discarded) });
       } else {
         await ctx.updateProgress(this.name, { skipped: true, reason: 'empty' });
       }
     }
+  }
+
+  private discardPatch(discarded: Record<DiscardReason, number>): { discarded?: Record<DiscardReason, number> } {
+    const total = Object.values(discarded).reduce((a, b) => a + b, 0);
+    if (total === 0) return {};
+    this.logger.warn(`${this.name}: ${total} linha(s) descartada(s) — ${JSON.stringify(discarded)}`);
+    return { discarded: { ...discarded } };
   }
 
   // Applies entity-declared defaults for columns absent from the row (the source

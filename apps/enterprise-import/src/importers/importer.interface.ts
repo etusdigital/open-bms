@@ -9,7 +9,14 @@ export interface ImportProgressEntry {
   page?: number;
   skipped?: boolean;
   reason?: string;
+  // Source rows read. The only denominator when the source reports no real
+  // total (/contacts returns the page size).
+  seen?: number;
+  // Absent when nothing was discarded.
+  discarded?: Record<DiscardReason, number>;
 }
+
+export type DiscardReason = 'mapped_null' | 'empty_natural_key' | 'duplicate_in_page' | 'insert_conflict';
 
 export type UpdateProgressFn = (entity: string, patch: ImportProgressEntry) => Promise<void>;
 export type SetCheckpointFn = (entity: string, page: number, accountId?: number) => Promise<void>;
