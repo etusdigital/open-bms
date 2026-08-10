@@ -302,7 +302,7 @@ describe('BaseImporter — contador de descartes', () => {
 
     await imp.run(ctx);
 
-    expect(ultimoProgresso(ctx).discarded).toMatchObject({ mapped_null: 1 });
+    expect(ultimoProgresso(ctx).discarded).toMatchObject({ mapper_rejected: 1, fk_unresolved: 0 });
     expect(ultimoProgresso(ctx).seen).toBe(2);
     expect(repo.rows).toHaveLength(1);
   });
@@ -315,7 +315,9 @@ describe('BaseImporter — contador de descartes', () => {
 
     await imp.run(ctx);
 
-    expect(ultimoProgresso(ctx).discarded).toMatchObject({ mapped_null: 1 });
+    // Separado do customize: FK não resolvida aponta para um passo pai que não
+    // importou, não para uma decisão de qualidade de dado sobre esta linha.
+    expect(ultimoProgresso(ctx).discarded).toMatchObject({ fk_unresolved: 1, mapper_rejected: 0 });
     expect(repo.rows).toHaveLength(0);
   });
 
@@ -421,5 +423,20 @@ describe('BaseImporter — contador de descartes', () => {
     await imp.run(ctx);
 
     expect(ultimoProgresso(ctx)).toMatchObject({ skipped: true, reason: 'all_discarded', seen: 1 });
+  });
+
+  it('all_discarded vale mesmo quando a origem informa o total', async () => {
+    // Com totalItems presente, fechar o passo em done=total marcaria como
+    // importado por inteiro um passo que não gravou nada.
+    const repo = new FakeRepo(['id', 'accountId', 'name']);
+    const imp = new ImporterQueRecusa();
+    imp.pages = [{ results: [{ id: 1, name: 'recusada' }], page: 1, totalItems: 1 }];
+    const ctx = makeCtx(repo, 'account');
+
+    await imp.run(ctx);
+
+    expect(repo.rows).toHaveLength(0);
+    expect(ultimoProgresso(ctx)).toMatchObject({ skipped: true, reason: 'all_discarded' });
+    expect(ultimoProgresso(ctx).done).toBeUndefined();
   });
 });

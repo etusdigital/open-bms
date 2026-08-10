@@ -77,7 +77,8 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
     let totalSeen = 0;
     let totalKnown: number | undefined;
     const discarded: Record<DiscardReason, number> = {
-      mapped_null: 0,
+      mapper_rejected: 0,
+      fk_unresolved: 0,
       empty_natural_key: 0,
       duplicate_in_page: 0,
       insert_conflict: 0,
@@ -93,11 +94,12 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
       const candidates: Array<{ src: any; row: Record<string, any>; nk: string }> = [];
       const seen = new Set<string>();
       for (const src of resp.results) {
-        const row = await this.buildRow(ctx, src, columnProps, propByDbName, pkProp);
-        if (row === null) {
-          discarded.mapped_null++;
+        const built = await this.buildRow(ctx, src, columnProps, propByDbName, pkProp);
+        if ('discard' in built) {
+          discarded[built.discard]++;
           continue;
         }
+        const { row } = built;
         const nkVal = String(src[nkProp] ?? row[nkProp] ?? '');
         if (!nkVal) {
           discarded.empty_natural_key++;
@@ -213,10 +215,14 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
     // nothing was imported, mark skipped(empty); a resume where everything
     // already existed (totalKnown>0) counts as done.
     if (totalDone === 0) {
-      if (this.reportsTotal && totalKnown && totalKnown > 0) {
-        await ctx.updateProgress(this.name, { total: totalKnown, done: totalKnown, page, seen: totalSeen, ...this.discardPatch(discarded) });
-      } else if (totalSeen > 0) {
+      // Rows read but none written means every one of them was discarded, and
+      // that has to be decided before the resume shortcut below: its
+      // done=totalKnown would close the step at 100% on a step that wrote
+      // nothing, which is the exact reading this counter exists to prevent.
+      if (totalSeen > 0) {
         await ctx.updateProgress(this.name, { skipped: true, reason: 'all_discarded', seen: totalSeen, ...this.discardPatch(discarded) });
+      } else if (this.reportsTotal && totalKnown && totalKnown > 0) {
+        await ctx.updateProgress(this.name, { total: totalKnown, done: totalKnown, page, seen: totalSeen, ...this.discardPatch(discarded) });
       } else {
         await ctx.updateProgress(this.name, { skipped: true, reason: 'empty' });
       }
@@ -249,7 +255,13 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
   // (drop in account-scope, preserve in instance-scope) and remaps FKs.
   // Accepts source keys as either the entity propertyName (camelCase) or the
   // column databaseName (snake_case); camelCase wins if both are present.
-  private async buildRow(ctx: ImportContext, src: any, columnProps: Set<string>, propByDbName: Map<string, string>, pkProp: string): Promise<Record<string, any> | null> {
+  private async buildRow(
+    ctx: ImportContext,
+    src: any,
+    columnProps: Set<string>,
+    propByDbName: Map<string, string>,
+    pkProp: string,
+  ): Promise<{ row: Record<string, any> } | { discard: DiscardReason }> {
     const row: Record<string, any> = {};
     for (const key of Object.keys(src ?? {})) {
       const prop = columnProps.has(key) ? key : propByDbName.get(key);
@@ -283,10 +295,11 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
       const resolved = ctx.idMapper.resolve(ctx.jobId, ctx.scope, mapEntity, srcVal);
       // In scope=account, skip the row rather than write an orphan FK if the
       // FK is not yet mapped.
-      if (ctx.scope === 'account' && resolved === null) return null;
+      if (ctx.scope === 'account' && resolved === null) return { discard: 'fk_unresolved' };
       row[prop] = ctx.scope === 'account' ? Number(resolved) : srcVal;
     }
-    return this.customize(ctx, src, row);
+    const customized = await this.customize(ctx, src, row);
+    return customized === null ? { discard: 'mapper_rejected' } : { row: customized };
   }
 
   protected resumePage(ctx: ImportContext): number {

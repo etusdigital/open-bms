@@ -16,7 +16,10 @@ export interface ImportProgressEntry {
   discarded?: Record<DiscardReason, number>;
 }
 
-export type DiscardReason = 'mapped_null' | 'empty_natural_key' | 'duplicate_in_page' | 'insert_conflict';
+// `mapper_rejected` and `fk_unresolved` are kept apart on purpose: the first is
+// a data decision the importer made, the second means a parent step did not
+// import what this row points at. Same lost row, opposite fix.
+export type DiscardReason = 'mapper_rejected' | 'fk_unresolved' | 'empty_natural_key' | 'duplicate_in_page' | 'insert_conflict';
 
 export type UpdateProgressFn = (entity: string, patch: ImportProgressEntry) => Promise<void>;
 export type SetCheckpointFn = (entity: string, page: number, accountId?: number) => Promise<void>;
