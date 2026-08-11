@@ -142,6 +142,43 @@ describe('AccountsService.getWebPushIntegration — snippet must NOT leak platfo
     const { snippet } = await service.getWebPushIntegration(7);
     expect(snippet).toContain('cookiesToSearch: ["registeredLead"]');
   });
+
+  function buildWithDomain(value: string | null) {
+    const service = Object.create(AccountsService.prototype) as AccountsService;
+    (service as any).logger = { warn: jest.fn() };
+    (service as any).findByAccountConfig = jest.fn().mockImplementation((_id: number, name: string) => {
+      if (name === 'api_key') return Promise.resolve({ value: 'acct-key-123' });
+      if (name === 'default_domain') return value === null ? Promise.resolve(null) : Promise.resolve({ value });
+      return Promise.resolve(null);
+    });
+    (service as any).safeJsonParse = (v: string) => JSON.parse(v);
+    return { service };
+  }
+
+  it('derives cookieDomain from a default_domain WITH scheme', async () => {
+    const { service } = buildWithDomain('https://www.shop.example.com');
+    const { snippet } = await service.getWebPushIntegration(7);
+    expect(snippet).toContain("cookieDomain: '.shop.example.com'");
+  });
+
+  it('derives cookieDomain from a bare default_domain (no scheme) instead of silently leaving it blank', async () => {
+    const { service } = buildWithDomain('shop.example.com');
+    const { snippet } = await service.getWebPushIntegration(7);
+    expect(snippet).toContain("cookieDomain: '.shop.example.com'");
+  });
+
+  it('leaves cookieDomain blank and logs a warning when default_domain does not parse as a URL', async () => {
+    const { service } = buildWithDomain('http://');
+    const { snippet } = await service.getWebPushIntegration(7);
+    expect(snippet).toContain("cookieDomain: '',");
+    expect((service as any).logger.warn).toHaveBeenCalledWith(expect.stringContaining('default_domain inválido'));
+  });
+
+  it('leaves cookieDomain blank when no default_domain is configured', async () => {
+    const { service } = buildWithDomain(null);
+    const { snippet } = await service.getWebPushIntegration(7);
+    expect(snippet).toContain("cookieDomain: '',");
+  });
 });
 
 describe('AccountsService.getWebPushPlatformConfig', () => {

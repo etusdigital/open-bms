@@ -1,4 +1,4 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -25,6 +25,8 @@ export const DEFAULT_ACCOUNT_TIMEZONE = 'America/Sao_Paulo';
 
 @Injectable()
 export class AccountsService {
+  private readonly logger = new Logger(AccountsService.name);
+
   constructor(
     @InjectRepository(AccountEntity)
     private readonly accountRepository: Repository<AccountEntity>,
@@ -537,11 +539,19 @@ export class AccountsService {
     const accountHash = createHash('sha256').update(`${accountId}`).digest('hex');
     // cookieDomain: derive from the account's default domain (".example.com"),
     // matching the Enterprise snippet shape. Empty when no domain is set.
+    // default_domain is documented as requiring a scheme (https://www.example.com),
+    // but accounts configured with a bare domain (www.example.com) used to throw
+    // here and fall through to an empty, host-only cookieDomain with no signal
+    // that anything was wrong. Normalize a schemeless value instead of trusting
+    // the doc alone — same http:// prefix fallback as mail.utils.ts.
     let cookieDomain = '';
-    try {
-      if (domainRow?.value) cookieDomain = `.${new URL(domainRow.value).hostname.replace(/^www\./, '')}`;
-    } catch {
-      /* leave blank if not a valid URL */
+    if (domainRow?.value) {
+      try {
+        const url = new URL(domainRow.value.includes('://') ? domainRow.value : `http://${domainRow.value}`);
+        cookieDomain = `.${url.hostname.replace(/^www\./, '')}`;
+      } catch (e: any) {
+        this.logger.warn(`accountId=${accountId} default_domain inválido, cookieDomain vazio: ${domainRow.value} (${e?.message ?? e})`);
+      }
     }
     // The tracker script (bmstrk.js) is now served by THIS BMS instance, with
     // its endpoints (and the web-push.js loader) pointed at us — no in.bri.us.
