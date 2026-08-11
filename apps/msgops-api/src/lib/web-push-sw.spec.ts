@@ -143,7 +143,8 @@ describe('buildWebPush — substitution edge cases', () => {
     // it. Substituting the other six fields but leaving G-H1Q2K5EDS0 in place
     // would attribute analytics to the wrong Firebase project — the property is
     // dropped instead.
-    const { measurementId, ...semMeasurement } = FULL;
+    const semMeasurement = { ...FULL };
+    delete (semMeasurement as Record<string, string | undefined>).measurementId;
     const out = buildWebPush(base, { webConfig: semMeasurement, vapidPublicKey: 'BE_platform_vapid' });
 
     expect(out).toContain("'platform-project'");
