@@ -51,6 +51,8 @@ Entregue os dois juntos, com o lugar exato de cada um. Metade da instalação em
 
 Antes de entregar, confira o `cookieDomain` do snippet. Ele é derivado do `default_domain` da conta, e precisa ser o domínio **do site do cliente** — se ali estiver o domínio da própria instalação do BMS, o cookie do tracker é gravado no domínio errado e a identificação do contato se perde. Para corrigir, ajuste o domínio padrão da conta e gere o snippet de novo.
 
+`default_domain` precisa ser uma **URL absoluta com esquema**, por exemplo `https://www.example.com` — não `www.example.com` nem `example.com`. Um domínio sem esquema é parseado como caminho relativo, o `cookieDomain` sai vazio e o cookie fica preso ao host que serviu a página (host-only), quebrando a identificação entre subdomínios.
+
 ## Verificar
 
 Os artefatos são públicos, então basta um `curl`. O `projectId` servido tem que ser o do seu projeto; se ainda aparecer o do bundle, a config não chegou.
@@ -62,7 +64,11 @@ curl -s http://localhost:5001/bms/web-push.js | grep -o "projectId: '[^']*'" | h
 O service worker de uma conta fica em `/bms/push/<accountHash>.js`, onde `accountHash` é o `sha256` do id da conta em hexadecimal:
 
 ```bash
+# Linux
 curl -s "http://localhost:5001/bms/push/$(printf 1 | sha256sum | cut -d' ' -f1).js" | head -5
+
+# macOS
+curl -s "http://localhost:5001/bms/push/$(printf 1 | shasum -a 256 | cut -d' ' -f1).js" | head -5
 ```
 
 A chave VAPID aparece no `web-push.js`, mas **não** no service worker. Isso é esperado: o worker recebe só a web config e a URL do tracker, enquanto o VAPID é usado no `getToken`, que roda na página.
