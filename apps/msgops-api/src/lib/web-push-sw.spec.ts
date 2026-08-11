@@ -100,28 +100,36 @@ describe('buildWebPush — substitution edge cases', () => {
     measurementId: 'G-PLATFORM',
   };
 
-  // Every literal the substitution looks for, quoted exactly as it appears in the
-  // asset. Duplicated from the source on purpose: if a re-paste of the vendored
-  // bundle changes one, the matching replaceAll silently stops matching and that
-  // field keeps serving the old project — no error, no log. Failing here forces
-  // the drift to be noticed and the constants updated deliberately.
+  const FULL_PLATFORM = { webConfig: FULL, vapidPublicKey: 'BE_platform_vapid' };
+
+  // Every literal the substitution looks for/writes, quoted exactly as it appears
+  // in the asset, checked in BOTH directions against the CONFIGURED output: if a
+  // re-paste of the vendored bundle changes a literal the code looks for, the
+  // matching replaceAll silently becomes a no-op and the platform value never
+  // appears (first assertion catches that); if the bundle's own default drifts
+  // to a different literal than BUNDLE_FIREBASE_CONFIG/BUNDLE_VAPID_KEY expect,
+  // the stale value survives the swap unnoticed (second assertion catches that).
+  // A table that only inspects the UNCONFIGURED bundle — the previous version of
+  // this test — misses that second direction entirely.
   it.each([
-    ["'AIzaSyDCZGtCEwcA3Cp5pD1LkapMp_Nkf8XgslE'", 'apiKey'],
-    ["'bms-push-49662.firebaseapp.com'", 'authDomain'],
-    ["'bms-push-49662'", 'projectId'],
-    ["'bms-push-49662.appspot.com'", 'storageBucket'],
-    ["'570410747557'", 'messagingSenderId'],
-    ["'1:570410747557:web:9a56271b512d3275876f4c'", 'appId'],
-    ["'G-H1Q2K5EDS0'", 'measurementId'],
-    ["'BPoMGU5hsce_S3F4Uicv6zfZ_fCs09kKqMvmu66MMlKR5UpTBy7DBOZxnAzgN9BfOA1sCOvsKOpHw7uHQv8iKG0'", 'vapidKey'],
-  ])('still finds the bundle literal it rewrites for %s (%s)', (literal) => {
-    expect(buildWebPush(base)).toContain(literal);
+    ['AIzaSyDCZGtCEwcA3Cp5pD1LkapMp_Nkf8XgslE', 'AIza-platform-key', 'apiKey'],
+    ['bms-push-49662.firebaseapp.com', 'platform.firebaseapp.com', 'authDomain'],
+    ['bms-push-49662', 'platform-project', 'projectId'],
+    ['bms-push-49662.appspot.com', 'platform.firebasestorage.app', 'storageBucket'],
+    ['570410747557', '111222333444', 'messagingSenderId'],
+    ['1:570410747557:web:9a56271b512d3275876f4c', '1:111222333444:web:abcdef', 'appId'],
+    ['G-H1Q2K5EDS0', 'G-PLATFORM', 'measurementId'],
+    ['BPoMGU5hsce_S3F4Uicv6zfZ_fCs09kKqMvmu66MMlKR5UpTBy7DBOZxnAzgN9BfOA1sCOvsKOpHw7uHQv8iKG0', 'BE_platform_vapid', 'vapidKey'],
+  ])('%s (bundle) → %s (platform) for %s', (bundleValue, platformValue) => {
+    const out = buildWebPush(base, FULL_PLATFORM);
+    expect(out).toContain(`'${platformValue}'`);
+    expect(out).not.toContain(`'${bundleValue}'`);
   });
 
   it.each(['apiKey', 'projectId', 'messagingSenderId', 'appId', 'authDomain', 'storageBucket'])('keeps the bundle config whole when %s is missing', (faltando) => {
     const parcial = { ...FULL };
     delete (parcial as Record<string, string>)[faltando];
-    const out = buildWebPush(base, { webConfig: parcial });
+    const out = buildWebPush(base, { webConfig: parcial, vapidPublicKey: 'BE_platform_vapid' });
 
     // All-or-nothing: no field may move, or the config becomes a mix of two
     // projects and mints tokens that never deliver.
@@ -130,33 +138,38 @@ describe('buildWebPush — substitution edge cases', () => {
     expect(out).not.toContain('platform-project');
   });
 
-  it('substitutes with measurementId absent, but then the bundle analytics id stays', () => {
-    // measurementId is not in the required set, so the gate opens without it — and
-    // the loop skips the field, leaving the previous project's analytics id behind.
+  it('drops the bundle measurementId instead of leaving its analytics id behind when the platform config omits it', () => {
+    // measurementId is not in the required set, so the gate still opens without
+    // it. Substituting the other six fields but leaving G-H1Q2K5EDS0 in place
+    // would attribute analytics to the wrong Firebase project — the property is
+    // dropped instead.
     const { measurementId, ...semMeasurement } = FULL;
-    const out = buildWebPush(base, { webConfig: semMeasurement });
+    const out = buildWebPush(base, { webConfig: semMeasurement, vapidPublicKey: 'BE_platform_vapid' });
 
     expect(out).toContain("'platform-project'");
-    expect(out).toContain("'G-H1Q2K5EDS0'");
+    expect(out).not.toContain('G-H1Q2K5EDS0');
+    expect(out).not.toContain('measurementId');
   });
 
-  it('swaps the config but keeps the bundle VAPID when no key is supplied', () => {
-    // The config gate and the VAPID swap are independent, so this state is
-    // reachable from the UI by saving the web config alone. The result is a
-    // firebaseConfig from one project paired with a VAPID key from another:
-    // getToken mints against that pair and reports success, and nothing is ever
-    // delivered. Locked here so the asymmetry is visible rather than folklore.
+  it('does NOT swap the web config when no VAPID key is supplied', () => {
+    // firebaseConfig and vapidKey must move together: saving the web config
+    // without a VAPID key used to swap the project alone, pairing it with the
+    // bundle's own VAPID — getToken mints successfully against that mismatched
+    // pair and nothing is ever delivered. All-or-nothing across the whole
+    // platform config, same reasoning as the six required webConfig fields.
     const out = buildWebPush(base, { webConfig: FULL });
 
-    expect(out).toContain("'platform-project'");
-    expect(out).toContain("'BPoMGU5hsce_S3F4Uicv6zfZ_fCs09kKqMvmu66MMlKR5UpTBy7DBOZxnAzgN9BfOA1sCOvsKOpHw7uHQv8iKG0'");
+    expect(out).toContain('bms-push-49662');
+    expect(out).not.toContain('platform-project');
+    expect(out).toContain('BPoMGU5hsce_S3F4Uicv6zfZ_fCs09kKqMvmu66MMlKR5UpTBy7DBOZxnAzgN9BfOA1sCOvsKOpHw7uHQv8iKG0');
   });
 
-  it('swaps the VAPID even with no web config at all', () => {
+  it('does NOT swap the VAPID key alone without a complete web config', () => {
     const out = buildWebPush(base, { vapidPublicKey: 'BE_platform_vapid' });
 
-    expect(out).toContain("'BE_platform_vapid'");
+    expect(out).not.toContain('BE_platform_vapid');
     expect(out).toContain('bms-push-49662');
+    expect(out).toContain('BPoMGU5hsce_S3F4Uicv6zfZ_fCs09kKqMvmu66MMlKR5UpTBy7DBOZxnAzgN9BfOA1sCOvsKOpHw7uHQv8iKG0');
   });
 });
 
