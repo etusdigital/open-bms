@@ -24,9 +24,17 @@
 #   verify-web-push-install.sh https://site.example.com --account 2 --page https://site.example.com/noticias
 #
 # Exit: 0 all checks passed, 1 something failed, 2 bad usage.
-# Requires: bash, curl, sha256sum.
+# Requires: bash, curl, and sha256sum (Linux) or shasum (macOS).
 
 set -uo pipefail
+
+sha256_hex() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | cut -d' ' -f1
+  else
+    shasum -a 256 | cut -d' ' -f1
+  fi
+}
 
 SITE=""
 ACCOUNT_ID=""
@@ -65,6 +73,9 @@ SITE="${SITE%/}"
 SW_URL="$SITE/sw.js"
 FALHAS=0
 
+TMPD="$(mktemp -d)"
+trap 'rm -rf "$TMPD"' EXIT
+
 ok() { printf '  \033[32mok\033[0m    %s\n' "$1"; }
 falha() {
   printf '  \033[31mfalha\033[0m %s\n' "$1"
@@ -79,12 +90,11 @@ echo
 echo "sw.js na raiz"
 
 # -L para seguir redirect, mas guardamos a URL final para detectar movimento.
-RESP="$(curl -sS -L -o /tmp/sw-verify.$$ -w '%{http_code}\t%{content_type}\t%{url_effective}' "$SW_URL" 2>/dev/null)"
+RESP="$(curl -sS -L -o "$TMPD/sw.js" -w '%{http_code}\t%{content_type}\t%{url_effective}' "$SW_URL" 2>/dev/null)"
 CODIGO="$(cut -f1 <<<"$RESP")"
 TIPO="$(cut -f2 <<<"$RESP" | cut -d';' -f1)"
 URL_FINAL="$(cut -f3 <<<"$RESP")"
-CORPO="$(cat /tmp/sw-verify.$$ 2>/dev/null)"
-rm -f /tmp/sw-verify.$$
+CORPO="$(cat "$TMPD/sw.js" 2>/dev/null)"
 
 if [[ "$CODIGO" == "200" ]]; then
   ok "$SW_URL responde 200"
@@ -126,7 +136,7 @@ else
     falha "a URL não tem o formato /bms/push/<accountHash>.js"
   else
     if [[ -n "$ACCOUNT_ID" ]]; then
-      HASH_ESPERADO="$(printf '%s' "$ACCOUNT_ID" | sha256sum | cut -d' ' -f1)"
+      HASH_ESPERADO="$(printf '%s' "$ACCOUNT_ID" | sha256_hex)"
       if [[ "$HASH_ENCONTRADO" == "$HASH_ESPERADO" ]]; then
         ok "accountHash confere com a conta $ACCOUNT_ID"
       else
@@ -153,19 +163,33 @@ if [[ -z "$PAGE" ]]; then
   aviso "não verificado — passe --page <url> com uma página onde o push deve ser oferecido"
 else
   HTML="$(curl -sS -L "$PAGE" 2>/dev/null)"
-  if grep -q 'bmsTrkOptions' <<<"$HTML"; then
+  # Comentado ou texto solto não conta: um snippet velho deixado em <!-- --> não
+  # registra nada, mas bateria em qualquer checagem por substring simples. Junta
+  # tudo numa linha (bash puro, sem depender de sed multi-line) para o strip de
+  # comentário cruzar quebras de linha.
+  HTML_1L="${HTML//$'\n'/$'\x01'}"
+  HTML_1L="$(sed -E 's/<!--.*-->//g' <<<"$HTML_1L")"
+  HTML_LIMPO="${HTML_1L//$'\x01'/$'\n'}"
+
+  if grep -qE 'bmsTrkOptions[[:space:]]*=[[:space:]]*\{' <<<"$HTML_LIMPO"; then
     ok "bmsTrkOptions presente"
 
-    if grep -q 'bmstrk.js' <<<"$HTML"; then
+    if grep -qE '<script[^>]+src=["'"'"'][^"'"'"']*bmstrk\.js' <<<"$HTML_LIMPO"; then
       ok "bmstrk.js carregado"
     else
       falha "bmstrk.js não é carregado na página"
     fi
 
+    # Bloco de configuração isolado: o hash tem que estar DENTRO do objeto
+    # bmsTrkOptions, não em qualquer lugar do documento — senão um hash de outra
+    # conta perdido no HTML (comentário removido acima já cobre o caso óbvio,
+    # isto cobre o resto) passaria como coincidência.
+    BLOCO_CONFIG="$(awk '/bmsTrkOptions[[:space:]]*=[[:space:]]*\{/{f=1} f{print} f&&/\}/{exit}' <<<"$HTML_LIMPO")"
+
     # Só compara o hash quando há snippet: numa página sem snippet a divergência
     # é consequência da ausência, e reportá-la sugeriria conta errada.
     if [[ -n "${HASH_ENCONTRADO:-}" ]]; then
-      if grep -q "$HASH_ENCONTRADO" <<<"$HTML"; then
+      if grep -q "$HASH_ENCONTRADO" <<<"$BLOCO_CONFIG"; then
         ok "accountHash da página bate com o do sw.js"
       else
         falha "o accountHash da página diverge do que está no sw.js — são contas diferentes"
