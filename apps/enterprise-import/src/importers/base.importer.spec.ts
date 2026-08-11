@@ -398,8 +398,37 @@ describe('BaseImporter — contador de descartes', () => {
     await imp.run(ctx);
 
     expect(ultimoProgresso(ctx).discarded).toMatchObject({ insert_conflict: 1 });
-    expect(ultimoProgresso(ctx).done).toBe(2); // done conta candidatas, não gravadas
+    expect(ultimoProgresso(ctx).done).toBe(1); // done conta linhas gravadas, não candidatas
     expect(repo.rows).toHaveLength(1);
+  });
+
+  it('quando TODAS as candidatas da página perdem para o conflito de índice único, o passo fecha em all_discarded, não em done', async () => {
+    // Simula uma página inteira colidindo contra um índice único já ocupado
+    // (nenhuma das duas linhas é pré-existente pela natural key do importer —
+    // o conflito é noutro índice, como email — então orIgnore() engole as duas).
+    const repo = new FakeRepo(['id', 'accountId', 'name', 'email']);
+    repo.rows.push({ id: 999, accountId: 99, name: 'já existe', email: 'colide@y.com' });
+    jest.spyOn(repo, 'createQueryBuilder').mockImplementation(() => ({
+      insert: () => ({ values: () => ({ updateEntity: () => ({ orIgnore: () => ({ execute: async () => {} }) }) }) }),
+    }));
+
+    const imp = new TestImporter();
+    imp.pages = [
+      {
+        results: [
+          { id: 1, name: 'a', email: 'colide@y.com' },
+          { id: 2, name: 'b', email: 'colide@y.com' },
+        ],
+        page: 1,
+      },
+    ];
+    const ctx = makeCtx(repo, 'account');
+
+    await imp.run(ctx);
+
+    expect(repo.rows).toHaveLength(1); // só a linha pré-existente
+    expect(ultimoProgresso(ctx)).toMatchObject({ skipped: true, reason: 'all_discarded', seen: 2 });
+    expect(ultimoProgresso(ctx).discarded).toMatchObject({ insert_conflict: 2 });
   });
 
   it('não emite o bloco de descartes quando nada foi descartado', async () => {

@@ -121,12 +121,18 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
       const nkValues = candidates.map((c) => c.nk);
       const whereBase: any = this.scopedByAccount ? { accountId: ctx.accountId } : {};
       const mappings: Array<{ sourceId: any; newId: any }> = [];
+      // How many of this page's candidates are actually in the target table once
+      // the transaction commits — pre-existing plus newly inserted. This, not
+      // candidates.length, is what totalDone counts: a page whose inserts all
+      // lose to orIgnore() must not report progress for rows nobody wrote.
+      let writtenThisPage = 0;
 
       await ctx.dataSource.transaction(async (em) => {
         const txRepo = em.getRepository<TEntity>(this.entity);
         // Pre-filter rows that already exist (resume idempotency).
         const existing = await txRepo.find({ where: { ...whereBase, [nkProp]: In(nkValues) } as any });
         const existingNk = new Set(existing.map((e: any) => String(e[nkProp])));
+        writtenThisPage = existing.length;
 
         // Fill entity-declared defaults for columns the source left null/undefined
         // (buildRow dropped them). Insert-only: the account-scope update path below
@@ -153,6 +159,7 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
           const afterCount = await txRepo.count({ where: { ...whereBase, [nkProp]: In(nkValues) } as any });
           const gravadas = afterCount - existing.length;
           if (gravadas < toInsert.length) discarded.insert_conflict += toInsert.length - gravadas;
+          writtenThisPage = afterCount;
         }
 
         // Account-scope upsert: refresh already-existing rows from the source so
@@ -195,7 +202,7 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
         await ctx.idMapper.record(ctx.jobId, this.name, m.sourceId, m.newId);
       }
 
-      totalDone += candidates.length;
+      totalDone += writtenThisPage;
       await ctx.setCheckpoint(this.name, page, ctx.accountId ?? undefined);
       await ctx.updateProgress(this.name, {
         total: this.reportsTotal ? totalKnown : undefined,
