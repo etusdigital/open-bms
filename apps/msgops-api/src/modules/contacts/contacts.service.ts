@@ -24,11 +24,12 @@ import { SuppressedsPageDto } from './dto/suppressedsPage.dto';
 import { ContactAutomationEntity } from 'src/entities/contact-automation.entity';
 import { AuditService } from './../../utils/audits/audit.service';
 import { ClickhouseProvider } from '../../providers/clickhouse.provider';
-import { maskEmail } from '../../utils/masking/email-masker';
 import { EventPublisherService } from '../../providers/messaging/event-publisher.service';
 import { EXCHANGES } from '@bms/messaging';
 import { TagEntity } from 'src/entities/tag.entity';
 import * as csv from 'fast-csv';
+import { toIsoTimestamp } from './export-timestamp.util';
+import { canReadRawEmail, presentEmail } from './email-visibility.util';
 const CsvParser = require('json2csv').Parser;
 
 @Injectable()
@@ -101,10 +102,13 @@ export class ContactsService {
           createdAtDate: 'DESC',
         },
       });
-      return contacts.map((contact) => ({
-        ...contact,
-        email: contact.maskedEmail ?? maskEmail(contact.email),
-      })) as ContactEntity[];
+      // Privileged callers read the stored address verbatim — reconciled
+      // contacts carry the real one, and re-masking it renders exactly like
+      // the placeholder it replaced, so the reconciliation looked like a no-op.
+      // Everyone else keeps seeing the mask.
+      const canReadRaw = this.canReadRawEmail();
+      if (canReadRaw) return contacts;
+      return contacts.map((contact) => ({ ...contact, email: presentEmail(contact.email, false) })) as ContactEntity[];
     } catch (e) {
       console.error(e);
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
@@ -295,7 +299,11 @@ export class ContactsService {
           name: `${row.first_name}${row.last_name ? ` ${row.last_name}` : ''}`,
           email: row.email || '',
           status: this.getStatus(row),
-          created_at: row.created_at || '',
+          // ISO-8601 with the explicit UTC offset. The driver hands us a Date
+          // and fast-csv would otherwise stringify it as a locale-dependent
+          // string ("Thu Jul 09 2026 03:48:16 GMT-0300 (...)") — unstable
+          // across hosts and unusable as a timestamp by any consumer.
+          created_at: toIsoTimestamp(row.created_at),
         }),
       });
 
@@ -492,13 +500,11 @@ export class ContactsService {
         return csvParser.parse(contacts);
       }
 
-      const maskedResults = results.map((result) => ({
-        ...result,
-        email: maskEmail(result.email),
-      }));
+      // Same visibility rule as findAll/findOneById.
+      const visibleResults = this.canReadRawEmail() ? results : results.map((result) => ({ ...result, email: presentEmail(result.email, false) }));
 
       return new PaginationDto<ContactEntity>({
-        results: maskedResults,
+        results: visibleResults,
         total: results.length,
         page: params.page,
         itemsPerPage: params.itemsPerPage,
@@ -648,8 +654,8 @@ export class ContactsService {
         returnObject[this.snakeToCamelCase(key)] = result[0][key];
       });
 
-      if (returnObject.email) {
-        returnObject.email = maskEmail(returnObject.email);
+      if (returnObject.email && !this.canReadRawEmail()) {
+        returnObject.email = presentEmail(returnObject.email, false);
       }
 
       return returnObject;
@@ -1963,6 +1969,15 @@ export class ContactsService {
       console.error('Error in deactivateContacts:', error);
       throw new HttpException('Error deactivating contacts', HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  /**
+   * Whether the current principal may read stored addresses verbatim. Reading a
+   * raw address discloses exactly what an export does, so it answers to the
+   * export permission rather than to plain contacts_view.
+   */
+  private canReadRawEmail(): boolean {
+    return canReadRawEmail(this.cls.get('permissions'), this.cls.get('isSuperAdmin'));
   }
 
   private buildBlockedFilter(params: SuppressedsPageDto): string {

@@ -9,31 +9,69 @@ export interface CsvRow {
   email: string;
   status: string;
   created_at: string;
+  // Parsed form of created_at — null when the raw value is empty/unparseable.
+  createdAtTs: ParsedCsvTimestamp | null;
   // Original 1-based row number in the CSV — surfaces in reports so the
   // operator can find the row in the source file.
   rowNumber: number;
 }
+
+// created_at as written in the CSV. Exports may carry no timezone offset, so
+// the epoch is computed as-if-UTC and `hasOffset` tells consumers whether it
+// is trustworthy as an absolute instant.
+export interface ParsedCsvTimestamp {
+  epochMs: number;
+  hasTime: boolean;
+  hasOffset: boolean;
+  // Date part exactly as written (YYYY-MM-DD) — the export's local calendar date.
+  dateISO: string;
+}
+
+// How strongly a candidate's created_at agrees with the contact's:
+//   2 = same minute (seconds/milliseconds ignored on both sides — exports
+//       truncate them — tolerating a fixed timezone offset)
+//   1 = same calendar date
+//   0 = no agreement / not comparable
+export type TimeMatchLevel = 0 | 1 | 2;
 
 export interface ReconcileMatch {
   contactId: number;
   currentEmail: string; // masked email already in DB (e.g., lucas***@gmail.com)
   newEmail: string; // raw email from CSV
   csvRowNumber: number;
+  // Contact's full name — persisted on session items so the operator can
+  // search matches by name, not just by email.
+  contactName?: string;
 }
 
 export interface AmbiguousCandidate {
   csvRowNumber: number;
   csvName: string;
   csvEmail: string;
+  // Jaccard token similarity between contact name and csvName (0..1).
+  // Candidates ship sorted by it, best first.
+  score: number;
+  // created_at agreement with the contact (see TimeMatchLevel). Typed as
+  // number because it round-trips through jsonb storage; optional because
+  // sessions persisted before the field existed have candidates without it.
+  timeMatch?: number;
+  // Set when this candidate's row/email was already applied to another
+  // contact in this session. Computed at read time (getAmbiguousPage), never
+  // stored — picking it again would violate the per-account email uniqueness.
+  usedByContactId?: number;
 }
 
 export interface AmbiguousMatch {
   contactId: number;
   currentEmail: string;
   contactName: string;
-  // CSV rows whose mask collides with this contact. Two or more is the
-  // ambiguous case — UI prompts the operator to pick one or skip.
+  // CSV rows whose mask collides with this contact, sorted by score desc and
+  // CAPPED — short masks over big bases collide by the thousands, and an
+  // uncapped list once produced multi-hundred-MB responses. Two or more is
+  // the ambiguous case — UI prompts the operator to pick one or skip.
   candidates: AmbiguousCandidate[];
+  // Real candidate count before the cap ("showing 20 of N").
+  candidatesTotal: number;
 }
 
 export interface ReconcilePreview {
@@ -63,4 +101,100 @@ export interface ApplyResult {
   skippedAmbiguous: number;
   skippedNoMatch: number;
   failures: Array<{ contactId: number; reason: string }>;
+}
+
+// ─── Persisted session flow (batched reconciliation) ────────────────────────
+
+// Full in-memory outcome of parsing + matching one CSV against one account.
+// preview() serves a capped view of it; the session flow persists it.
+export interface ReconcileComputation {
+  csvRows: number;
+  invalidCsvRows: number;
+  contactsMasked: number;
+  alreadyClean: number;
+  matches: ReconcileMatch[];
+  // Candidates inside each entry are already scored/sorted but NOT capped —
+  // consumers cap for transport/storage.
+  ambiguous: AmbiguousMatch[];
+  noMatches: Array<{ contactId: number; currentEmail: string }>;
+}
+
+export interface ReconcileSessionProgress {
+  jobId: string;
+  csvRows: number;
+  invalidCsvRows: number;
+  contactsMasked: number;
+  alreadyClean: number;
+  noMatches: number;
+  noMatchSample: Array<{ contactId: number; currentEmail: string }>;
+  // Quantified progress the UI renders as bars/counters. `conflict` counts
+  // items whose address is already taken by another contact — they await an
+  // operator decision, they are not lost.
+  auto: { total: number; applied: number; failed: number; conflict: number; pending: number };
+  ambiguous: { total: number; applied: number; skipped: number; pending: number; failed: number; conflict: number };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AmbiguousPageResult {
+  totalPending: number;
+  offset: number;
+  items: AmbiguousMatch[];
+}
+
+// One row of the session items table — the operator-facing "who matched what"
+// listing (auto picks, applied/failed/skipped outcomes, ambiguous queue).
+export interface ReconcileItemRow {
+  contactId: number;
+  contactName: string;
+  currentEmail: string;
+  kind: 'auto' | 'ambiguous';
+  status: 'pending' | 'applied' | 'skipped' | 'failed' | 'conflict';
+  newEmail: string | null;
+  csvRowNumber: number | null;
+  failureReason: string | null;
+  candidatesTotal: number | null;
+}
+
+export interface ReconcileItemsPage {
+  total: number;
+  offset: number;
+  items: ReconcileItemRow[];
+}
+
+export interface ResolveBatchResult {
+  applied: number;
+  skipped: number;
+  // Resolutions that referenced an unknown/already-decided item or a CSV row
+  // not among the stored candidates.
+  invalid: number;
+  failures: Array<{ contactId: number; reason: string }>;
+  progress: ReconcileSessionProgress;
+}
+
+export interface ApplyAutoChunkResult {
+  applied: number;
+  failed: number;
+  // Items left for manual resolution because the address is already in use.
+  // Counted apart from `failed` (a write error) so the operator knows there is
+  // something to decide, not something broken.
+  conflicts: number;
+  remaining: number;
+}
+
+export interface ReopenConflictsResult {
+  // Conflicting items put back in the queue for another attempt — the operator
+  // reopens them after freeing the addresses (e.g. deleting duplicate contacts).
+  reopened: number;
+  progress: ReconcileSessionProgress;
+}
+
+export interface BulkResolveResult {
+  // Items decided+applied by the strategy in this call.
+  resolved: number;
+  // Items examined but left pending (no candidate cleared the threshold).
+  unresolved: number;
+  // Cursor for the next call — null when the pending set is exhausted.
+  nextAfterId: string | null;
+  remainingPending: number;
 }
