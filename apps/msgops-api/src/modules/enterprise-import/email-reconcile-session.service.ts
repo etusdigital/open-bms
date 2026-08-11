@@ -81,6 +81,12 @@ export class EmailReconcileSessionService {
           failureReason: conflicting ? `email already in use by contact #${holderId}` : null,
           newEmail: m.newEmail,
           csvRowNumber: m.csvRowNumber,
+          // A conflicting auto item enters the SAME review queue as ambiguous
+          // items (getAmbiguousPage/resolveBatch), so it needs a candidates
+          // array to resolve against. It only ever had the one pick — this
+          // preserves it instead of leaving the item reviewable but empty.
+          candidates: conflicting ? [{ csvRowNumber: m.csvRowNumber, csvName: m.contactName || '', csvEmail: m.newEmail, score: 1 }] : null,
+          candidatesTotal: conflicting ? 1 : null,
         };
       }),
       ...computation.ambiguous.map((a) => ({
@@ -181,10 +187,13 @@ export class EmailReconcileSessionService {
     const qb = this.itemsRepo
       .createQueryBuilder('i')
       .where('i.job_id = :jobId', { jobId })
-      .andWhere("i.kind = 'ambiguous'")
-      // Conflicting items belong in the review queue: the address they wanted
-      // is taken, so a human has to pick another candidate or skip the contact.
-      .andWhere("i.status IN ('pending', 'conflict')")
+      // Conflicting items belong in the review queue regardless of kind: the
+      // address they wanted is taken, so a human has to pick another candidate
+      // or skip the contact. A conflicting auto item is the same situation as
+      // an ambiguous one, just with a single candidate (see createSession) —
+      // without this an auto conflict is unreachable outside reopenConflicts,
+      // which just retries the same losing email forever.
+      .andWhere(this.reviewQueueClause())
       .orderBy('i.id', 'ASC')
       .skip(offset)
       .take(limit);
@@ -268,6 +277,16 @@ export class EmailReconcileSessionService {
   }
 
   /**
+   * SQL for "items a human still needs to decide": every pending/conflict
+   * ambiguous item, plus conflicting auto items (which carry a single
+   * candidate — see createSession). Kept in one place so the review queue,
+   * resolveBatch, and the skip-remaining bulk action agree on membership.
+   */
+  private reviewQueueClause(): string {
+    return "((i.kind = 'ambiguous' AND i.status IN ('pending', 'conflict')) OR (i.kind = 'auto' AND i.status = 'conflict'))";
+  }
+
+  /**
    * Case-insensitive contains-search over everything the operator can see:
    * contact name, masked email, applied email, and (for ambiguous items) the
    * candidates payload — so searching a raw CSV email finds the queue entry
@@ -289,11 +308,26 @@ export class EmailReconcileSessionService {
     const session = await this.requireSession(jobId);
     // `conflict` items are resolvable too: the operator can pick another
     // candidate or skip the contact. Only decided items (applied/skipped) and
-    // hard failures are out of reach here.
+    // hard failures are out of reach here. Matches the same membership as
+    // getAmbiguousPage — a conflicting auto item is resolvable the same way,
+    // against the single candidate createSession gave it.
+    const contactIds = resolutions.map((r) => r.contactId);
     const items = await this.itemsRepo.find({
-      where: { jobId, contactId: In(resolutions.map((r) => r.contactId)), kind: 'ambiguous', status: In(['pending', 'conflict']) },
+      where: [
+        { jobId, contactId: In(contactIds), kind: 'ambiguous', status: In(['pending', 'conflict']) },
+        { jobId, contactId: In(contactIds), kind: 'auto', status: 'conflict' },
+      ],
     });
     const byContact = new Map(items.map((i) => [i.contactId, i]));
+
+    // Batch the holder lookup instead of one findOne() per resolution — see
+    // applyEmail's doc. Every candidate email of every touched item, not just
+    // the one resolution.csvRowNumber points at: cheap (bounded by the DTO)
+    // and covers whichever candidate the operator actually picked. Falls back
+    // to newEmail for auto-conflict items persisted before candidates were
+    // populated on them (older, in-flight sessions).
+    const wantedEmails = items.flatMap((item) => item.candidates?.map((c) => c.csvEmail) ?? (item.newEmail ? [item.newEmail] : []));
+    const holders = await this.findEmailHolders(session.accountId, wantedEmails);
 
     let applied = 0;
     let skipped = 0;
@@ -319,7 +353,7 @@ export class EmailReconcileSessionService {
         continue;
       }
 
-      const outcome = await this.applyEmail(item, candidate.csvEmail, candidate.csvRowNumber, session.accountId);
+      const outcome = await this.applyEmail(item, candidate.csvEmail, candidate.csvRowNumber, holders);
       if (outcome) failures.push(outcome);
       else applied++;
     }
@@ -336,11 +370,21 @@ export class EmailReconcileSessionService {
       take: limit,
     });
 
+    // ContactEntity has four eager relations, so applyEmail's old per-item
+    // findOne() turned a 5k-10k chunk into that many relation-heavy reads —
+    // the bottleneck on the 350k-contact case. One batched, relation-free
+    // lookup replaces all of them; applyEmail keeps it current in place as it
+    // writes (see its doc).
+    const holders = await this.findEmailHolders(
+      session.accountId,
+      chunk.map((i) => i.newEmail!),
+    );
+
     let applied = 0;
     let failed = 0;
     let conflicts = 0;
     for (const item of chunk) {
-      const outcome = await this.applyEmail(item, item.newEmail!, item.csvRowNumber, session.accountId);
+      const outcome = await this.applyEmail(item, item.newEmail!, item.csvRowNumber, holders);
       if (!outcome) applied++;
       else if (outcome.conflict) conflicts++;
       else failed++;
@@ -381,10 +425,14 @@ export class EmailReconcileSessionService {
     const session = await this.requireSession(jobId);
 
     if (strategy === 'skip-remaining') {
-      // Clears the whole review queue, conflicts included — they are exactly
-      // the items the operator is declining to decide.
-      const result = await this.itemsRepo.update({ jobId, kind: 'ambiguous', status: In(['pending', 'conflict']) }, { status: 'skipped' });
-      return { resolved: result.affected ?? 0, unresolved: 0, nextAfterId: null, remainingPending: 0 };
+      // Clears the whole review queue, conflicts included (both ambiguous and
+      // conflicting auto items — see reviewQueueClause) — they are exactly the
+      // items the operator is declining to decide. repo.update() takes one
+      // criteria object, so this is two statements instead of the single OR
+      // getAmbiguousPage/resolveBatch use.
+      const ambiguous = await this.itemsRepo.update({ jobId, kind: 'ambiguous', status: In(['pending', 'conflict']) }, { status: 'skipped' });
+      const autoConflict = await this.itemsRepo.update({ jobId, kind: 'auto', status: 'conflict' }, { status: 'skipped' });
+      return { resolved: (ambiguous.affected ?? 0) + (autoConflict.affected ?? 0), unresolved: 0, nextAfterId: null, remainingPending: 0 };
     }
 
     const qb = this.itemsRepo
@@ -397,18 +445,16 @@ export class EmailReconcileSessionService {
     if (afterId) qb.andWhere('i.id > :afterId', { afterId });
     const chunk = await qb.getMany();
 
-    // Emails among the chunk's best candidates that some contact already owns
-    // (an applied auto pick, an earlier resolution, or a clean contact). The
-    // AUTOMATIC strategy must never consume those — the item stays pending in
-    // the similarity queue, where only an explicit operator decision settles
-    // it. Applying here would just park the item as a conflict.
-    const taken = new Set(
-      (
-        await this.findEmailHolders(
-          session.accountId,
-          chunk.map((i) => i.candidates?.[0]?.csvEmail).filter((e): e is string => Boolean(e)),
-        )
-      ).keys(),
+    // Emails among the chunk's best candidates that some OTHER contact already
+    // owns (an applied auto pick, an earlier resolution, or a clean contact).
+    // The AUTOMATIC strategy must never consume those — the item stays pending
+    // in the similarity queue, where only an explicit operator decision settles
+    // it. Applying here would just park the item as a conflict. Also the
+    // batched holder lookup applyEmail expects — see its doc — instead of a
+    // findOne() per item.
+    const holders = await this.findEmailHolders(
+      session.accountId,
+      chunk.map((i) => i.candidates?.[0]?.csvEmail).filter((e): e is string => Boolean(e)),
     );
 
     let resolved = 0;
@@ -417,17 +463,17 @@ export class EmailReconcileSessionService {
       const best = item.candidates?.[0];
       const runner = item.candidates?.[1];
       const wins = best && best.score >= threshold && (!runner || runner.score < best.score);
-      if (!wins || taken.has(best.csvEmail.toLowerCase())) {
+      const holderId = best ? holders.get(best.csvEmail.toLowerCase()) : undefined;
+      if (!wins || (holderId !== undefined && holderId !== item.contactId)) {
         unresolved++;
         continue;
       }
-      const outcome = await this.applyEmail(item, best.csvEmail, best.csvRowNumber, session.accountId);
+      // applyEmail updates `holders` in place on success, so a later item in
+      // this same chunk that shares the same best email sees it as taken via
+      // the check above — no separate bookkeeping needed here.
+      const outcome = await this.applyEmail(item, best.csvEmail, best.csvRowNumber, holders);
       if (outcome) unresolved++;
-      else {
-        resolved++;
-        // Two chunk items may share the same best email — the win consumes it.
-        taken.add(best.csvEmail.toLowerCase());
-      }
+      else resolved++;
     }
 
     const remainingPending = await this.itemsRepo.count({ where: { jobId, kind: 'ambiguous', status: 'pending' } });
@@ -448,13 +494,20 @@ export class EmailReconcileSessionService {
    * success. save() over an entity instance (NOT repo.update, which skips
    * entity listeners) so @BeforeUpdate re-derives hashed_email/email_provider
    * from the new raw email — the SHA-256 contact lookup depends on it.
+   *
+   * `holders` is a batch-level map (newEmail.toLowerCase() -> contactId) built
+   * ONCE by the caller via findEmailHolders, not a per-item query — see
+   * applyAutoChunk. Mutated in place on a successful write so a later item in
+   * the SAME batch that wants the address just taken sees it too, matching
+   * what a per-item findOne would have seen.
    */
   private async applyEmail(
     item: EmailReconcileItemEntity,
     newEmail: string,
     csvRowNumber: number | null,
-    accountId: number,
+    holders: Map<string, number>,
   ): Promise<{ contactId: number; reason: string; conflict?: true } | null> {
+    const key = newEmail.toLowerCase();
     try {
       // Friendly pre-check before the unique index does it the hard way: the
       // email may already belong to another contact in the account (a clean
@@ -465,14 +518,15 @@ export class EmailReconcileSessionService {
       // same address and only the operator can say which one is right. The item
       // leaves the automatic queue (retrying is pointless) but stays resolvable
       // — manually via resolve, or in bulk via reopenConflicts.
-      const holder = await this.contactsRepo.findOne({ where: { accountId, email: newEmail.toLowerCase() } });
-      if (holder && holder.id !== item.contactId) {
-        const reason = `email already in use by contact #${holder.id}`;
+      const holderId = holders.get(key);
+      if (holderId !== undefined && holderId !== item.contactId) {
+        const reason = `email already in use by contact #${holderId}`;
         await this.itemsRepo.update({ id: item.id }, { status: 'conflict', failureReason: reason, newEmail, csvRowNumber });
         return { contactId: item.contactId, reason, conflict: true };
       }
 
       await this.contactsRepo.save(this.contactsRepo.create({ id: item.contactId, email: newEmail }));
+      holders.set(key, item.contactId);
       await this.itemsRepo.update({ id: item.id }, { status: 'applied', newEmail, csvRowNumber });
       return null;
     } catch (err: any) {
@@ -495,6 +549,11 @@ export class EmailReconcileSessionService {
       const holders = await this.contactsRepo.find({
         where: { accountId, email: In(unique.slice(i, i + EMAIL_LOOKUP_CHUNK)) },
         select: ['id', 'email'],
+        // ContactEntity has four eager OneToMany relations (tags, custom
+        // fields, automations, devices). find() joins and hydrates them
+        // regardless of `select` unless told not to — for a lookup that only
+        // needs id+email, that is dead weight on every single call.
+        loadEagerRelations: false,
       });
       for (const h of holders) found.set(h.email.toLowerCase(), h.id);
     }

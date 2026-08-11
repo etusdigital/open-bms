@@ -176,6 +176,37 @@ describe('EmailReconcileSessionService', () => {
       expect(items[0]).toMatchObject({ contactId: 10, status: 'conflict', failureReason: 'email already in use by contact #99' });
       expect(items[1]).toMatchObject({ contactId: 11, status: 'pending', failureReason: null });
     });
+
+    it('gives a conflicting auto item its own pick as a single candidate, so it is resolvable like an ambiguous one', async () => {
+      // Otherwise the item is a conflict with nothing to resolve it against —
+      // reachable only by reopenConflicts retrying the same losing email.
+      reconcileService.computeReconciliation.mockResolvedValue({
+        ...emptyComputation,
+        matches: [{ contactId: 10, currentEmail: 'lucas***@gmail.com', newEmail: 'lucassilva@gmail.com', csvRowNumber: 1, contactName: 'Lucas Silva' }],
+      });
+      contactsRepo.find.mockResolvedValue([{ id: 99, email: 'lucassilva@gmail.com' }]);
+
+      await service.createSession('job-1', 'csv');
+
+      const items = insertedItems();
+      expect(items[0]).toMatchObject({
+        status: 'conflict',
+        candidates: [{ csvRowNumber: 1, csvName: 'Lucas Silva', csvEmail: 'lucassilva@gmail.com', score: 1 }],
+        candidatesTotal: 1,
+      });
+    });
+
+    it('leaves candidates null on a clean auto pick (no conflict to review)', async () => {
+      reconcileService.computeReconciliation.mockResolvedValue({
+        ...emptyComputation,
+        matches: [{ contactId: 10, currentEmail: 'lucas***@gmail.com', newEmail: 'lucassilva@gmail.com', csvRowNumber: 1, contactName: 'Lucas Silva' }],
+      });
+
+      await service.createSession('job-1', 'csv');
+
+      const items = insertedItems();
+      expect(items[0]).toMatchObject({ status: 'pending', candidates: null, candidatesTotal: null });
+    });
   });
 
   describe('applyAutoChunk', () => {
@@ -196,7 +227,9 @@ describe('EmailReconcileSessionService', () => {
 
     it('parks an address already in use as a conflict, not as a failure', async () => {
       itemsRepo.find.mockResolvedValue([{ ...pendingItem }]);
-      contactsRepo.findOne.mockResolvedValue({ id: 42, email: 'lucassilva@gmail.com' });
+      // The holder lookup is batched (findEmailHolders → contactsRepo.find), not
+      // a per-item findOne() — see applyEmail's doc.
+      contactsRepo.find.mockResolvedValue([{ id: 42, email: 'lucassilva@gmail.com' }]);
 
       const result = await service.applyAutoChunk('job-1', 100);
 
@@ -220,13 +253,34 @@ describe('EmailReconcileSessionService', () => {
 
     it('leaves conflicts out of the pending set so the client loop terminates', async () => {
       itemsRepo.find.mockResolvedValue([{ ...pendingItem }]);
-      contactsRepo.findOne.mockResolvedValue({ id: 42, email: 'lucassilva@gmail.com' });
+      contactsRepo.find.mockResolvedValue([{ id: 42, email: 'lucassilva@gmail.com' }]);
       itemsRepo.count.mockResolvedValue(0);
 
       const result = await service.applyAutoChunk('job-1', 100);
 
       expect(itemsRepo.count).toHaveBeenCalledWith({ where: { jobId: 'job-1', kind: 'auto', status: 'pending' } });
       expect(result.remaining).toBe(0);
+    });
+
+    it('looks up holders in one batched call, not one findOne() per item — the fix for the 350k-contact case', async () => {
+      const chunk = Array.from({ length: 50 }, (_, i) => ({
+        id: String(i),
+        contactId: 100 + i,
+        newEmail: `contact${i}@gmail.com`,
+        csvRowNumber: i,
+        kind: 'auto',
+        status: 'pending',
+      }));
+      itemsRepo.find.mockResolvedValue(chunk);
+
+      await service.applyAutoChunk('job-1', 100);
+
+      // ContactEntity has four eager relations; a findOne() per item was the
+      // N+1 the review flagged. One find() call regardless of chunk size,
+      // with eager relations off since only id+email are needed.
+      expect(contactsRepo.findOne).not.toHaveBeenCalled();
+      expect(contactsRepo.find).toHaveBeenCalledTimes(1);
+      expect(contactsRepo.find).toHaveBeenCalledWith(expect.objectContaining({ select: ['id', 'email'], loadEagerRelations: false }));
     });
   });
 
@@ -253,13 +307,18 @@ describe('EmailReconcileSessionService', () => {
 
     it('reaches items parked in conflict, not only pending ones', async () => {
       // A conflict is a decision waiting to happen: the operator must be able
-      // to pick another candidate for it.
+      // to pick another candidate for it. Two OR'd where-clauses now: ambiguous
+      // pending/conflict, plus conflicting auto items (see reviewQueueClause).
       itemsRepo.find.mockResolvedValue([{ ...ambiguousItem, status: 'conflict' }]);
 
       await service.resolveBatch('job-1', [{ contactId: 11, csvRowNumber: 2 }]);
 
       const where = itemsRepo.find.mock.calls[0][0].where;
-      expect(where.status._value ?? where.status).toEqual(expect.arrayContaining(['pending', 'conflict']));
+      expect(Array.isArray(where)).toBe(true);
+      const ambiguousClause = where.find((w: any) => w.kind === 'ambiguous');
+      const autoConflictClause = where.find((w: any) => w.kind === 'auto');
+      expect(ambiguousClause.status._value ?? ambiguousClause.status).toEqual(expect.arrayContaining(['pending', 'conflict']));
+      expect(autoConflictClause.status).toBe('conflict');
     });
 
     it('skips the contact when the operator sends a null row', async () => {
@@ -304,12 +363,18 @@ describe('EmailReconcileSessionService', () => {
     });
 
     it('skip-remaining clears conflicts along with the pending queue', async () => {
-      itemsRepo.update.mockResolvedValue({ affected: 4 });
+      // Two statements now — repo.update() takes one criteria object, so
+      // ambiguous pending/conflict and conflicting auto items are cleared
+      // separately (see reviewQueueClause) and their affected counts summed.
+      itemsRepo.update.mockResolvedValueOnce({ affected: 3 }).mockResolvedValueOnce({ affected: 1 });
 
       const result = await service.bulkResolve('job-1', 'skip-remaining', 0.5, 100);
 
-      const where = itemsRepo.update.mock.calls[0][0];
-      expect(where.status._value ?? where.status).toEqual(expect.arrayContaining(['pending', 'conflict']));
+      const ambiguousWhere = itemsRepo.update.mock.calls[0][0];
+      const autoConflictWhere = itemsRepo.update.mock.calls[1][0];
+      expect(ambiguousWhere.kind).toBe('ambiguous');
+      expect(ambiguousWhere.status._value ?? ambiguousWhere.status).toEqual(expect.arrayContaining(['pending', 'conflict']));
+      expect(autoConflictWhere).toMatchObject({ kind: 'auto', status: 'conflict' });
       expect(result.resolved).toBe(4);
     });
   });
@@ -372,6 +437,55 @@ describe('EmailReconcileSessionService', () => {
 
       expect(page.totalPending).toBe(1);
       expect(page.items[0].candidates[0].usedByContactId).toBe(77);
+    });
+
+    it('includes a conflicting auto item — kind is not part of the membership test', async () => {
+      const autoConflictRow = {
+        contactId: 10,
+        currentEmail: 'lucas***@gmail.com',
+        contactName: 'Lucas Silva',
+        kind: 'auto',
+        status: 'conflict',
+        candidates: [{ csvRowNumber: 1, csvName: 'Lucas Silva', csvEmail: 'lucassilva@gmail.com', score: 1 }],
+        candidatesTotal: 1,
+      };
+      itemsRepo.createQueryBuilder.mockReturnValueOnce(makeQB({ getManyAndCount: jest.fn().mockResolvedValue([[autoConflictRow], 1]) })).mockReturnValueOnce(makeQB());
+
+      const page = await service.getAmbiguousPage('job-1', 0, 50);
+
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0].contactId).toBe(10);
+      expect(page.items[0].candidates[0].csvEmail).toBe('lucassilva@gmail.com');
+    });
+  });
+
+  describe('resolveBatch — conflicting auto items', () => {
+    const autoConflictItem = {
+      id: '9',
+      contactId: 10,
+      kind: 'auto',
+      status: 'conflict',
+      newEmail: 'lucassilva@gmail.com',
+      csvRowNumber: 1,
+      candidates: [{ csvRowNumber: 1, csvName: 'Lucas Silva', csvEmail: 'lucassilva@gmail.com', score: 1 }],
+    };
+
+    it('resolves a conflicting auto item against its own single candidate', async () => {
+      itemsRepo.find.mockResolvedValue([{ ...autoConflictItem }]);
+
+      const result = await service.resolveBatch('job-1', [{ contactId: 10, csvRowNumber: 1 }]);
+
+      expect(contactsRepo.save).toHaveBeenCalledWith({ id: 10, email: 'lucassilva@gmail.com' });
+      expect(result.applied).toBe(1);
+    });
+
+    it('skips a conflicting auto item, same as an ambiguous one', async () => {
+      itemsRepo.find.mockResolvedValue([{ ...autoConflictItem }]);
+
+      const result = await service.resolveBatch('job-1', [{ contactId: 10, csvRowNumber: null }]);
+
+      expect(itemsRepo.update).toHaveBeenCalledWith({ id: '9' }, { status: 'skipped' });
+      expect(result.skipped).toBe(1);
     });
   });
 });
