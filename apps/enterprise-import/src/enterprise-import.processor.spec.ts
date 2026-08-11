@@ -53,4 +53,20 @@ describe('EnterpriseImportProcessor onFailed + orphan cleanup', () => {
     await proc.onFailed(job(5, 5), new Error('failed after partial'));
     expect(dataSource.query).not.toHaveBeenCalled();
   });
+
+  it('does not delete the account when an earlier step recorded all_discarded (seen>0, done=0) and a later step fails', async () => {
+    // all_discarded means the step read source rows and every one was rejected
+    // (e.g. lost to a unique conflict) — real progress on data that existed,
+    // not an empty/never-ran job. Soft-deleting here would drop an account
+    // whose import already consumed source rows.
+    const { proc, dataSource } = make({
+      id: 'j1',
+      status: 'running',
+      scope: 'account',
+      accountId: 77,
+      progress: { contacts: { skipped: true, reason: 'all_discarded', seen: 500 } },
+    });
+    await proc.onFailed(job(5, 5), new Error('tags step failed after contacts all_discarded'));
+    expect(dataSource.query).not.toHaveBeenCalled();
+  });
 });
