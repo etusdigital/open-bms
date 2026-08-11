@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { getRouteApi } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { toast } from 'sonner';
@@ -51,6 +52,14 @@ const THRESHOLD_OPTIONS = [
 // first_name/last_name pair. Locked in the upload form.
 const ALWAYS_REQUIRED_COLUMNS = ['email', 'created_at'];
 const NAME_SIGNAL_COLUMNS = ['name', 'first_name', 'last_name'];
+
+// ItemsSection and AmbiguousSection read/write their search+filter+pagination
+// state through this route's search params (reconcileStatusSearchSchema) so a
+// reload or back/forward restores the operator's place, matching the
+// convention the other super-admin listings (accounts/users) use. Reached via
+// getRouteApi instead of threading props through SessionView — both sections
+// mount two levels under the route component.
+const routeApi = getRouteApi('/_authenticated/_layout/super-admin/accounts/import-enterprise/$jobId');
 
 function hasNameSignal(columns: string[]): boolean {
   return columns.includes('name') || (columns.includes('first_name') && columns.includes('last_name'));
@@ -492,20 +501,22 @@ function BulkSection({ jobId, progress, onProgress }: { jobId: string; progress:
 
 function AmbiguousSection({ jobId, progress, onProgress }: { jobId: string; progress: ReconcileSessionProgress; onProgress: () => void }) {
   const { t } = useTranslation();
-  const [pageSize, setPageSize] = useState(25);
-  const [offset, setOffset] = useState(0);
+  const { ambPageSize: pageSize, ambOffset: offset, ambQ: q } = routeApi.useSearch();
+  const navigate = routeApi.useNavigate();
   // contactId → csvRowNumber|null (null = skip). Cleared on every save/page move.
   const [decisions, setDecisions] = useState<Record<number, number | null>>({});
-  const [search, setSearch] = useState('');
-  // Debounced copy of `search` — the query only refires after typing settles.
-  const [q, setQ] = useState('');
+  // Local, un-debounced copy so the input feels responsive; ambQ (URL, and
+  // therefore the query key) only updates once typing settles.
+  const [search, setSearch] = useState(q);
+
+  const setOffset = (next: number) => void navigate({ search: (prev) => ({ ...prev, ambOffset: next }) });
 
   useEffect(() => {
     const id = setTimeout(() => {
-      setQ(search.trim());
-      setOffset(0);
+      void navigate({ search: (prev) => ({ ...prev, ambQ: search.trim(), ambOffset: 0 }) });
     }, 400);
     return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
   const pageQuery = useQuery({
@@ -606,8 +617,7 @@ function AmbiguousSection({ jobId, progress, onProgress }: { jobId: string; prog
         <Select
           value={String(pageSize)}
           onValueChange={(v) => {
-            setPageSize(Number(v));
-            setOffset(0);
+            void navigate({ search: (prev) => ({ ...prev, ambPageSize: Number(v), ambOffset: 0 }) });
             setDecisions({});
           }}
         >
@@ -794,19 +804,21 @@ const ITEMS_PAGE_SIZE = 25;
 // ambiguous queue above; this section exists for visibility and lookup.
 function ItemsSection({ jobId }: { jobId: string }) {
   const { t } = useTranslation();
-  const [search, setSearch] = useState('');
-  const [q, setQ] = useState('');
-  const [kind, setKind] = useState<'all' | 'auto' | 'ambiguous'>('all');
-  const [status, setStatus] = useState<'all' | 'pending' | 'applied' | 'skipped' | 'failed' | 'conflict'>('all');
-  const [offset, setOffset] = useState(0);
+  const { itemsQ: q, itemsKind: kind, itemsStatus: status, itemsOffset: offset } = routeApi.useSearch();
+  const navigate = routeApi.useNavigate();
+  // Local, un-debounced copy so the input feels responsive; itemsQ (URL, and
+  // therefore the query key) only updates once typing settles.
+  const [search, setSearch] = useState(q);
 
   useEffect(() => {
     const id = setTimeout(() => {
-      setQ(search.trim());
-      setOffset(0);
+      void navigate({ search: (prev) => ({ ...prev, itemsQ: search.trim(), itemsOffset: 0 }) });
     }, 400);
     return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
+
+  const setOffset = (next: number) => void navigate({ search: (prev) => ({ ...prev, itemsOffset: next }) });
 
   const pageQuery = useQuery({
     queryKey: ['reconcile-items', jobId, offset, q, kind, status],
@@ -839,10 +851,7 @@ function ItemsSection({ jobId }: { jobId: string }) {
         />
         <Select
           value={kind}
-          onValueChange={(v) => {
-            setKind(v as typeof kind);
-            setOffset(0);
-          }}
+          onValueChange={(v) => void navigate({ search: (prev) => ({ ...prev, itemsKind: v as typeof kind, itemsOffset: 0 }) })}
         >
           <SelectTrigger className="h-8 w-40">
             <SelectValue />
@@ -855,10 +864,7 @@ function ItemsSection({ jobId }: { jobId: string }) {
         </Select>
         <Select
           value={status}
-          onValueChange={(v) => {
-            setStatus(v as typeof status);
-            setOffset(0);
-          }}
+          onValueChange={(v) => void navigate({ search: (prev) => ({ ...prev, itemsStatus: v as typeof status, itemsOffset: 0 }) })}
         >
           <SelectTrigger className="h-8 w-40">
             <SelectValue />
