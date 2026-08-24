@@ -15,6 +15,7 @@ describe('BatchController', () => {
       campaignBatch: jest.fn(),
       automationBatch: jest.fn(),
       getRedis: jest.fn(),
+      deleteRedis: jest.fn(),
       setRedis: jest.fn(),
       publishCampaignError: jest.fn(),
     };
@@ -60,6 +61,28 @@ describe('BatchController', () => {
 
       expect(batchService.getRedis).toHaveBeenCalledWith('redis-campaign-key');
       expect(batchService.campaignBatch).toHaveBeenCalledWith(redisBatch, 'false');
+    });
+
+    it('should delete the Redis key only after the email batch is processed', async () => {
+      const compressedPayload: any = { campaignKey: 'redis-campaign-key' };
+      batchService.getRedis.mockResolvedValue({ campaign_id: 456, message: { type: 'email' } } as any);
+      batchService.campaignBatch.mockResolvedValue({ status: true, message: 'OK' } as any);
+
+      await controller.campaigns(VALID_TOKEN, compressedPayload, { debug: 'false' });
+
+      expect(batchService.deleteRedis).toHaveBeenCalledWith('redis-campaign-key');
+    });
+
+    it('should skip non-email campaigns without touching the Redis key', async () => {
+      const compressedPayload: any = { campaignKey: 'campaign-101-10-1' };
+      batchService.getRedis.mockResolvedValue({ campaign_id: 101, message: { type: 'whatsapp' } } as any);
+
+      const result = await controller.campaigns(VALID_TOKEN, compressedPayload, { debug: 'false' });
+
+      expect(result).toEqual({ skipped: 'not an email campaign' });
+      expect(batchService.campaignBatch).not.toHaveBeenCalled();
+      expect(batchService.deleteRedis).not.toHaveBeenCalled();
+      expect(batchService.publishCampaignError).not.toHaveBeenCalled();
     });
 
     it('should stop processing if campaign is in STOP_CAMPAIGNS list', async () => {
