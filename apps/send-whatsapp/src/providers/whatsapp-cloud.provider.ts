@@ -43,14 +43,15 @@ export interface MetaMessageResponse {
  * already produces. That means one provider class works for Meta direct and
  * EvoHub turnkey without any branching at the call site.
  *
- * Retries 5xx up to 3 times with exponential backoff (250ms, 500ms, 1000ms).
- * 4xx never retries — those mean we (BMS) sent something invalid or the
- * caller credentials are wrong.
+ * Retries 5xx/429 and Meta throughput errors (130429, 131056, 80007) up to
+ * 5 times with exponential backoff (500ms .. 8s). Other 4xx never retry.
  */
 @Injectable()
 export class WhatsappCloudProvider {
   private static readonly RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
-  private static readonly MAX_RETRIES = 3;
+  private static readonly RETRYABLE_META_CODES = new Set([130429, 131056, 80007]);
+  private static readonly MAX_RETRIES = 5;
+  private static readonly BASE_DELAY_MS = 500;
   private readonly logger = new Logger(WhatsappCloudProvider.name);
   private readonly http: AxiosInstance;
   private readonly phoneNumberId: string;
@@ -103,17 +104,25 @@ export class WhatsappCloudProvider {
       } catch (err) {
         const isLast = attempt === WhatsappCloudProvider.MAX_RETRIES;
         const status = (err as AxiosError)?.response?.status;
-        if (!status || !WhatsappCloudProvider.RETRYABLE_STATUSES.has(status) || isLast) {
+        if (!this.isRetryable(err as AxiosError) || isLast) {
           this.logFailure(err as AxiosError, attempt);
           throw err;
         }
-        const delay = 250 * 2 ** (attempt - 1);
+        const delay = WhatsappCloudProvider.BASE_DELAY_MS * 2 ** (attempt - 1);
         this.logger.warn(`wa_cloud_retry attempt=${attempt}/${WhatsappCloudProvider.MAX_RETRIES} status=${status} delay=${delay}ms`);
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
     // Unreachable — the loop either returns or throws — but TS needs it.
     throw new Error('WhatsappCloudProvider: exhausted retries');
+  }
+
+  private isRetryable(err: AxiosError): boolean {
+    const status = err?.response?.status;
+    if (!status) return false;
+    if (WhatsappCloudProvider.RETRYABLE_STATUSES.has(status)) return true;
+    const metaCode = (err.response?.data as { error?: { code?: number } } | undefined)?.error?.code;
+    return metaCode !== undefined && WhatsappCloudProvider.RETRYABLE_META_CODES.has(metaCode);
   }
 
   /** WhatsApp Cloud API expects E.164 without "+" and without `whatsapp:` prefix. */

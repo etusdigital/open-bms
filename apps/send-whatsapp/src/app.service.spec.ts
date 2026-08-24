@@ -160,6 +160,32 @@ describe('AppService (Wave 5 — WhatsApp Cloud)', () => {
       expect(mockProvider.sendTemplate).toHaveBeenCalledWith(expect.objectContaining({ components: [{ type: 'body', parameters: [{ type: 'text', text: '-' }] }] }));
     });
 
+    it('caps concurrent sends per page', async () => {
+      let inFlight = 0;
+      let peak = 0;
+      mockProvider.sendTemplate.mockImplementation(async () => {
+        inFlight++;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight--;
+        return { messaging_product: 'whatsapp', messages: [{ id: 'wamid.OK' }] };
+      });
+      const contacts = Array.from({ length: 40 }, (_, i) => ({ id: i + 1, hasWhatsapp: true, whatsapp: `+55119999900${i}` }));
+
+      const r = await service.processCampaign({
+        account: { id: 7, accountConfigs: [] },
+        message: { id: 1, name: 'msg', type: 'whatsapp', providerMessageId: 'order_update' },
+        contacts,
+        campaign: { id: 99, name: 'camp', type: 'simple' },
+        campaign_id: 99,
+      } as any);
+
+      expect(r.sent).toBe(40);
+      expect(mockProvider.sendTemplate).toHaveBeenCalledTimes(40);
+      expect(peak).toBeLessThanOrEqual(10);
+      mockProvider.sendTemplate.mockResolvedValue({ messaging_product: 'whatsapp', messages: [{ id: 'wamid.OK' }] });
+    });
+
     // AC1 — wamid is persisted via publishWhatsappSend after a successful send.
     it('publishes the wamid→send mapping for each successful send', async () => {
       await service.processCampaign({
