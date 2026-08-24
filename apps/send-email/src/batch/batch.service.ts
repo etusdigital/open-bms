@@ -308,8 +308,13 @@ export class BatchService {
 
   async getRedis(redisKey) {
     const redisClient = this.redisService.getOrThrow();
-    const payload = await redisClient.getdel(redisKey);
+    const payload = await redisClient.get(redisKey);
     return JSON.parse(payload);
+  }
+
+  async deleteRedis(redisKey) {
+    const redisClient = this.redisService.getOrThrow();
+    return await redisClient.del(redisKey);
   }
 
   async setRedis(redisKey, payload) {

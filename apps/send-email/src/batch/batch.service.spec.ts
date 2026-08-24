@@ -976,13 +976,15 @@ describe('BatchService', () => {
 
     describe('utility methods', () => {
       describe('getRedis', () => {
-        it('should retrieve and parse JSON from Redis using getdel', async () => {
+        it('should retrieve and parse JSON from Redis without deleting the key', async () => {
           const mockPayload = { foo: 'bar', count: 123 };
-          redisClient.getdel = jest.fn().mockResolvedValue(JSON.stringify(mockPayload));
+          redisClient.get = jest.fn().mockResolvedValue(JSON.stringify(mockPayload));
+          redisClient.getdel = jest.fn();
 
           const result = await service.getRedis('test-key');
 
-          expect(redisClient.getdel).toHaveBeenCalledWith('test-key');
+          expect(redisClient.get).toHaveBeenCalledWith('test-key');
+          expect(redisClient.getdel).not.toHaveBeenCalled();
           expect(result).toEqual(mockPayload);
         });
       });

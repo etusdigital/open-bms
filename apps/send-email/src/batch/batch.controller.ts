@@ -14,6 +14,11 @@ export class BatchController {
     }
   }
 
+  private isEmailBatch(batch: Batch): boolean {
+    const type = (batch?.message as { type?: string } | undefined)?.type;
+    return !type || type === 'email';
+  }
+
   @Post('/campaigns/send')
   async campaigns(@Headers('x-internal-token') token: string, @Body() body: Batch | CompressedCampaignPayload, @Query() { debug }: { debug: string }) {
     this.assertAuth(token);
@@ -27,12 +32,20 @@ export class BatchController {
     try {
       const batch = body as Batch;
 
+      if (!this.isEmailBatch(batch)) {
+        return { skipped: 'not an email campaign' };
+      }
+
       if (env.STOP_CAMPAIGNS?.split(',').find((id) => Number(id) === batch.campaign_id)) {
         console.log(`Stop processing campaign: ${batch.campaign_id}`);
         return {};
       }
 
-      return await this.batchService.campaignBatch(batch, debug);
+      const result = await this.batchService.campaignBatch(batch, debug);
+      if (redisKeyPayload) {
+        await this.batchService.deleteRedis(redisKeyPayload);
+      }
+      return result;
     } catch (error) {
       if (redisKeyPayload) {
         await this.batchService.setRedis(redisKeyPayload, body);
