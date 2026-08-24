@@ -6,6 +6,7 @@ import { WhatsappChannelEntity } from '../../entities/whatsapp-channel.entity';
 import { AccountConfigEntity } from '../../entities/account-config.entity';
 import { WhatsappModeResolverService } from '../whatsapp-mode-resolver/whatsapp-mode-resolver.service';
 import { MessageDto } from '../messages/messages.dto';
+import { toMetaBody } from './template-variables';
 
 const CATEGORY_AUTH = 'AUTHENTICATION';
 const CATEGORY_MARKETING = 'MARKETING';
@@ -386,7 +387,8 @@ export class WhatsappTemplateSyncService {
       components.push({ type: 'HEADER', format: 'VIDEO', url: content.headerContent });
     }
 
-    components.push({ type: 'BODY', text: content.body ?? '' });
+    const body = toMetaBody(content.body ?? '');
+    components.push(body.variables.length > 0 ? { type: 'BODY', text: body.text, example: { body_text: [body.examples] } } : { type: 'BODY', text: body.text });
 
     if (content.footer) {
       components.push({ type: 'FOOTER', text: content.footer });

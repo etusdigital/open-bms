@@ -126,6 +126,43 @@ export class ServicesService {
     }
   }
 
+  async sendTestWhatsapp(payload: { email: string; messageId: number }): Promise<{ status: string }> {
+    const message = await this.messagesService.findOneById(Number(payload.messageId));
+    if (!message || !['whatsapp', '2FA-whatsapp'].includes(message.type)) {
+      throw new HttpException('WhatsApp message not found.', HttpStatus.NOT_FOUND);
+    }
+    if (message.status !== 'approved' || !message.providerMessageId) {
+      throw new HttpException('Template must be approved by Meta before a test send.', HttpStatus.BAD_REQUEST);
+    }
+
+    const contact = await this.contactService.findByProperty({ email: payload.email, isCompleted: true });
+    if (!contact || !contact.hasWhatsapp || !contact.whatsapp) {
+      throw new HttpException('Contact not found or has no WhatsApp number.', HttpStatus.BAD_REQUEST);
+    }
+
+    const account: any = await this.accountService.findOne(this.cls.get('accountId'));
+    account.accountConfigs = (account.accountConfigs ?? []).reduce((acc: Record<string, string>, config: AccountConfigEntity) => {
+      acc[config.name] = config.value || '';
+      return acc;
+    }, {});
+    account.customFields = (account.customFields ?? []).map((customField) => customField.name);
+
+    const amqpMessage = {
+      messageId: Date.now(),
+      utmContent: 'teste',
+      utmCampaign: 'msgops_front_teste',
+      automationName: 'msgops_front_teste',
+      automationType: 'transactional',
+      automationId: 0,
+      account,
+      contact,
+      message,
+      next: {},
+    };
+    await this.eventPublisher.publish(EXCHANGES.whatsapp, 'whatsapp.send', amqpMessage, { type: 'single' });
+    return { status: 'ok' };
+  }
+
   async sendMobilePush(sendPushMessage: { email: string; message: MessageDto }): Promise<any> {
     try {
       const currentDate = new Date();

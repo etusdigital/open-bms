@@ -94,7 +94,7 @@ export default function MessageForm({
     return () => clearTimeout(timer);
   }, [title, messageType, messageId, isEditing, t]);
 
-  const showTestSend = messageType === 'email' || messageType === 'mobile-push';
+  const showTestSend = messageType === 'email' || messageType === 'mobile-push' || (isWhatsApp && isEditing && messageStatus === 'approved');
 
   // Email body comes from one of two surfaces: the SuperAdmin "Custom HTML"
   // textarea (wins when edited) or the Unlayer editor. Reads the live editor,

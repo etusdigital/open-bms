@@ -243,6 +243,57 @@ describe('ServicesService', () => {
     sendersService.findOneBySenderEmail.mockResolvedValue(mockSender);
   });
 
+  describe('sendTestWhatsapp', () => {
+    const approvedMessage = { id: 133, type: 'whatsapp', status: 'approved', providerMessageId: 'live_invite', content: 'Oi %FIRSTNAME%' };
+    const whatsappContact = { ...mockContactFromDb, whatsapp: '+5531999999999', hasWhatsapp: true };
+
+    const deps = () => ({
+      messages: (service as any).messagesService,
+      contacts: (service as any).contactService,
+      accounts: (service as any).accountService,
+      publisher: (service as any).eventPublisher,
+      cls: (service as any).cls,
+    });
+
+    it('rejects when the template is not approved yet', async () => {
+      deps().messages.findOneById = jest.fn().mockResolvedValue({ ...approvedMessage, status: 'sent_approval' });
+      await expect(service.sendTestWhatsapp({ email: 'x@y.com', messageId: 133 })).rejects.toThrow('Template must be approved');
+      expect(deps().publisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the contact has no WhatsApp number', async () => {
+      deps().messages.findOneById = jest.fn().mockResolvedValue(approvedMessage);
+      deps().contacts.findByProperty.mockResolvedValueOnce(mockContactFromDb);
+      await expect(service.sendTestWhatsapp({ email: 'x@y.com', messageId: 133 })).rejects.toThrow('no WhatsApp number');
+    });
+
+    it('publishes an automation-shaped payload on bms.whatsapp/whatsapp.send', async () => {
+      deps().messages.findOneById = jest.fn().mockResolvedValue(approvedMessage);
+      deps().contacts.findByProperty.mockResolvedValueOnce(whatsappContact);
+      deps().cls.get.mockReturnValue(1);
+      deps().accounts.findOne = jest.fn().mockResolvedValue({
+        id: 1,
+        accountConfigs: [{ name: 'default_language', value: 'pt_BR' }],
+        customFields: [{ name: 'cidade' }],
+      });
+
+      const result = await service.sendTestWhatsapp({ email: 'x@y.com', messageId: 133 });
+
+      expect(result).toEqual({ status: 'ok' });
+      expect(deps().publisher.publish).toHaveBeenCalledWith(
+        'bms.whatsapp',
+        'whatsapp.send',
+        expect.objectContaining({
+          automationType: 'transactional',
+          message: approvedMessage,
+          contact: whatsappContact,
+          account: expect.objectContaining({ accountConfigs: { default_language: 'pt_BR' }, customFields: ['cidade'] }),
+        }),
+        { type: 'single' },
+      );
+    });
+  });
+
   describe('sendEmail', () => {
     it('should successfully send an email', async () => {
       eventPublisher.publish.mockResolvedValue(undefined);

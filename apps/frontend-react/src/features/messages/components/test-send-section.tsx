@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { useSendTestEmail, useSendTestMobilePush } from '../use-messages';
+import { useSendTestEmail, useSendTestMobilePush, useSendTestWhatsApp } from '../use-messages';
 import type { MessageType, MessagePriority } from '../types';
 
 interface TestSendSectionProps {
@@ -42,14 +42,17 @@ export function TestSendSection({ messageType, getFormData, getEmailContent }: T
   const [preparing, setPreparing] = useState(false);
   const sendTestEmail = useSendTestEmail();
   const sendTestMobilePush = useSendTestMobilePush();
+  const sendTestWhatsApp = useSendTestWhatsApp();
 
   const isMobilePush = messageType === 'mobile-push';
-  const isPending = preparing || sendTestEmail.isPending || sendTestMobilePush.isPending;
+  const isWhatsApp = messageType === 'whatsapp';
+  const emailOnly = isMobilePush || isWhatsApp;
+  const isPending = preparing || sendTestEmail.isPending || sendTestMobilePush.isPending || sendTestWhatsApp.isPending;
 
   const validate = (): boolean => {
     const newErrors: { name?: string; email?: string } = {};
 
-    if (!isMobilePush && !recipientName.trim()) {
+    if (!emailOnly && !recipientName.trim()) {
       newErrors.name = t('messages.testSendNameRequired');
     }
     if (!recipientEmail.trim()) {
@@ -95,6 +98,8 @@ export function TestSendSection({ messageType, getFormData, getEmailContent }: T
         },
         loadContactFromDatabase: true,
       });
+    } else if (messageType === 'whatsapp') {
+      sendTestWhatsApp.mutate({ email: recipientEmail.trim(), messageId: formData.id ?? 0 });
     } else if (messageType === 'mobile-push') {
       sendTestMobilePush.mutate({
         email: recipientEmail.trim(),
@@ -113,7 +118,8 @@ export function TestSendSection({ messageType, getFormData, getEmailContent }: T
 
   return (
     <div className="space-y-4">
-      {!isMobilePush && (
+      {isWhatsApp && <p className="text-muted-foreground text-sm">{t('messages.testSendWhatsAppHint')}</p>}
+      {!emailOnly && (
         <div className="space-y-1">
           <Label htmlFor="recipientName">{t('messages.recipientName')}</Label>
           <Input

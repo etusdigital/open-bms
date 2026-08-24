@@ -6,6 +6,7 @@ import '@/lib/i18n';
 import { TestSendSection } from '../components/test-send-section';
 
 const mockMutate = vi.fn();
+const mockWhatsAppMutate = vi.fn();
 
 vi.mock('../use-messages', async (importOriginal) => {
   const original = await importOriginal<Record<string, unknown>>();
@@ -17,6 +18,10 @@ vi.mock('../use-messages', async (importOriginal) => {
     }),
     useSendTestMobilePush: vi.fn().mockReturnValue({
       mutate: vi.fn(),
+      isPending: false,
+    }),
+    useSendTestWhatsApp: vi.fn().mockReturnValue({
+      mutate: (...args: unknown[]) => mockWhatsAppMutate(...args),
       isPending: false,
     }),
   };
@@ -163,5 +168,16 @@ describe('TestSendSection', () => {
       fireEvent.change(screen.getByLabelText(/nome do destinatário/i), { target: { value: 'T' } });
       expect(screen.queryByText(/nome do destinatário é obrigatório/i)).not.toBeInTheDocument();
     });
+  });
+
+  it('whatsapp mode asks only for the contact email and sends messageId', async () => {
+    await renderWithRouter(<TestSendSection messageType="whatsapp" getFormData={mockGetFormData} />);
+    expect(screen.queryByLabelText(/nome do destinatário/i)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/email do destinatário/i), { target: { value: 'ana@test.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /enviar teste/i }));
+    await waitFor(() => {
+      expect(mockWhatsAppMutate).toHaveBeenCalledWith({ email: 'ana@test.com', messageId: 1 });
+    });
+    expect(mockMutate).not.toHaveBeenCalled();
   });
 });

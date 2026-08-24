@@ -33,6 +33,13 @@ export class ServicesController {
     return await this.servicesService.sendMobilePush(sendPushMessageDto);
   }
 
+  @Post('/send-whatsapp')
+  @ApiOperation({ summary: 'Send an approved WhatsApp template to a contact using send-whatsapp service' })
+  @RequirePermission('messages:test_send')
+  async sendWhatsapp(@Body() payload: { email: string; messageId: number }): Promise<any> {
+    return await this.servicesService.sendTestWhatsapp(payload);
+  }
+
   @Post('/send-transactional')
   @ApiOperation({ summary: 'Send transactional automation' })
   @RequirePermission('messages:test_send')
