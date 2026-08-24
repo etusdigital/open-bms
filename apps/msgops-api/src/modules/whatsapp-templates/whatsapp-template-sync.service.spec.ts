@@ -46,6 +46,18 @@ describe('WhatsappTemplateSyncService', () => {
       expect(payload.components).toEqual([{ type: 'BODY', text: 'Olá!' }]);
     });
 
+    it('converts %VARIABLES% into numbered Meta placeholders with examples', () => {
+      const payload = svc.buildPayload({
+        name: 'n',
+        language: 'pt_BR',
+        shortlinkBaseUrl: null,
+        messageDto: { type: 'whatsapp', content: 'Fala, %FIRSTNAME%, de %cidade%. Tchau %FIRSTNAME%' } as any,
+      });
+      expect(payload.components).toEqual([
+        { type: 'BODY', text: 'Fala, {{1}}, de {{2}}. Tchau {{1}}', example: { body_text: [['Maria', 'exemplo']] } },
+      ]);
+    });
+
     it('includes a TEXT header when headerType=text', () => {
       const payload = svc.buildPayload({
         name: 'n',

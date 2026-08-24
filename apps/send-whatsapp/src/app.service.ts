@@ -6,6 +6,7 @@ import { MsgopsService } from './msgops/msgops.service';
 import { Utils } from './utils/index.utils';
 import { WhatsappChannelResolverService } from './providers/whatsapp-channel-resolver.service';
 import { WhatsappCloudProvider } from './providers/whatsapp-cloud.provider';
+import { extractTemplateBody, extractTemplateVariables, sanitizeParameterText } from './utils/template-variables';
 
 interface CreateRedirectLinkOptions {
   url: string;
@@ -81,7 +82,8 @@ export class AppService {
             })
           : null;
 
-        const components = this.buildComponents({ shortCode, code: contact.code });
+        const bodyParameters = this.buildBodyParameters(message.content, contact, campaignMessage.account);
+        const components = this.buildComponents({ shortCode, code: contact.code, bodyParameters });
         try {
           const response = await provider.sendTemplate({
             to: contact.whatsapp,
@@ -158,7 +160,8 @@ export class AppService {
       ? await this.createRedirectLink({ url: message.url, utmsDefault: shortUtms, type: message.type ?? 'whatsapp', utmCampaign: defaultUtmCampaign, baseUrl: '', account })
       : null;
 
-    const components = this.buildComponents({ shortCode, code: contact.code });
+    const bodyParameters = this.buildBodyParameters(message.content, contact, account);
+    const components = this.buildComponents({ shortCode, code: contact.code, bodyParameters });
     try {
       const response = await provider.sendTemplate({
         to: contact.whatsapp!,
@@ -203,7 +206,7 @@ export class AppService {
    *   - 2FA-style OTP body parameter (the contact `code`)
    * Templates without parameters just go without `components` at all.
    */
-  private buildComponents(opts: { shortCode: string | null; code?: string }): unknown[] | undefined {
+  private buildComponents(opts: { shortCode: string | null; code?: string; bodyParameters?: string[] }): unknown[] | undefined {
     const components: unknown[] = [];
     if (opts.shortCode) {
       components.push({
@@ -213,13 +216,21 @@ export class AppService {
         parameters: [{ type: 'text', text: opts.shortCode }],
       });
     }
-    if (opts.code) {
+    const bodyValues = opts.code ? [opts.code] : (opts.bodyParameters ?? []);
+    if (bodyValues.length > 0) {
       components.push({
         type: 'body',
-        parameters: [{ type: 'text', text: opts.code }],
+        parameters: bodyValues.map((text) => ({ type: 'text', text })),
       });
     }
     return components.length > 0 ? components : undefined;
+  }
+
+  private buildBodyParameters(content: string | undefined, contact: Contact, account: Account): string[] {
+    const variables = extractTemplateVariables(extractTemplateBody(content));
+    if (variables.length === 0) return [];
+    const values = this.utils.mapVariables(contact, account, {}, true);
+    return variables.map((name) => sanitizeParameterText(values[name]));
   }
 
   async invalidContact(contact: Contact, automationMessage: AutomationMessage) {

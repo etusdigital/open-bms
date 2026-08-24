@@ -365,3 +365,23 @@ export function useSendTestMobilePush() {
     },
   });
 }
+
+export interface SendTestWhatsAppPayload {
+  email: string;
+  messageId: number;
+}
+
+export function useSendTestWhatsApp() {
+  return useMutation({
+    mutationFn: async (payload: SendTestWhatsAppPayload) => {
+      const { data } = await apiClient.post('/services/send-whatsapp', payload);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success(i18n.t('messages.testSendWhatsAppSuccess'));
+    },
+    onError: (error) => {
+      toast.error(extractApiErrorMessage(error) ?? i18n.t('messages.testSendWhatsAppError'));
+    },
+  });
+}
