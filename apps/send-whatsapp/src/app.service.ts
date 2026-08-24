@@ -7,6 +7,9 @@ import { Utils } from './utils/index.utils';
 import { WhatsappChannelResolverService } from './providers/whatsapp-channel-resolver.service';
 import { WhatsappCloudProvider } from './providers/whatsapp-cloud.provider';
 import { extractTemplateBody, extractTemplateVariables, sanitizeParameterText } from './utils/template-variables';
+import { mapWithConcurrency } from './utils/concurrency';
+
+const SEND_CONCURRENCY = Number(process.env.WHATSAPP_SEND_CONCURRENCY) || 10;
 
 interface CreateRedirectLinkOptions {
   url: string;
@@ -64,62 +67,60 @@ export class AppService {
     const language = this.configByName(campaignMessage.account, 'default_language') || 'pt_BR';
     const domain = this.configByName(campaignMessage.account, 'default_domain');
 
-    const sent = await Promise.all(
-      contacts.map(async (contact) => {
-        if (!contact.whatsapp || !contact.hasWhatsapp) {
-          return { contactId: contact.id, skipped: 'no whatsapp on contact' };
-        }
-        const shortUtms = `platform=whatsapp_cloud&message_type=${message.type}&type=campaign&contactId=${contact.id}&uuid=${contact.uuid}&account=${accountId}&id=${message.name}&message=${message.id}&campaign_type=${campaignMessage.campaign?.type}&campaign=${campaignMessage.campaign?.id}&domain=${domain}`;
-        const defaultUtmCampaign = `${campaignMessage.campaign?.name || campaignMessage.campaign_name}_e1_${message.id}`;
-        const shortCode = message.url
-          ? await this.createRedirectLink({
-              url: message.url,
-              utmsDefault: shortUtms,
-              type: message.type ?? 'whatsapp',
-              utmCampaign: defaultUtmCampaign,
-              baseUrl: '',
-              account: campaignMessage.account,
-            })
-          : null;
+    const sent = await mapWithConcurrency(contacts, SEND_CONCURRENCY, async (contact) => {
+      if (!contact.whatsapp || !contact.hasWhatsapp) {
+        return { contactId: contact.id, skipped: 'no whatsapp on contact' };
+      }
+      const shortUtms = `platform=whatsapp_cloud&message_type=${message.type}&type=campaign&contactId=${contact.id}&uuid=${contact.uuid}&account=${accountId}&id=${message.name}&message=${message.id}&campaign_type=${campaignMessage.campaign?.type}&campaign=${campaignMessage.campaign?.id}&domain=${domain}`;
+      const defaultUtmCampaign = `${campaignMessage.campaign?.name || campaignMessage.campaign_name}_e1_${message.id}`;
+      const shortCode = message.url
+        ? await this.createRedirectLink({
+            url: message.url,
+            utmsDefault: shortUtms,
+            type: message.type ?? 'whatsapp',
+            utmCampaign: defaultUtmCampaign,
+            baseUrl: '',
+            account: campaignMessage.account,
+          })
+        : null;
 
-        const bodyParameters = this.buildBodyParameters(message.content, contact, campaignMessage.account);
-        const components = this.buildComponents({ shortCode, code: contact.code, bodyParameters });
-        try {
-          const response = await provider.sendTemplate({
-            to: contact.whatsapp,
-            templateName: message.providerMessageId!,
-            languageCode: language,
-            components,
-          });
-          const wamid = response.messages?.[0]?.id;
-          if (wamid) {
-            // Persist the wamid→send mapping so delivery webhooks can correlate
-            // (msgops-api consumes whatsapp.sent.persist). Best-effort: a publish
-            // failure must not abort the send (the message already went out).
-            try {
-              await this.eventPublisher.publishWhatsappSend({
-                wamid,
-                accountId,
-                channelId,
-                contactId: contact.id,
-                messageId: message.id,
-                campaignId: campaignMessage.campaign?.id,
-                templateName: message.providerMessageId,
-                toNumber: contact.whatsapp,
-                utmCampaign: defaultUtmCampaign,
-                sentAt: new Date().toISOString(),
-              });
-            } catch (pubErr: any) {
-              this.logger.warn(`wa_send_persist_publish_failed account=${accountId} contact=${contact.id} err=${pubErr?.message ?? 'unknown'}`);
-            }
+      const bodyParameters = this.buildBodyParameters(message.content, contact, campaignMessage.account);
+      const components = this.buildComponents({ shortCode, code: contact.code, bodyParameters });
+      try {
+        const response = await provider.sendTemplate({
+          to: contact.whatsapp,
+          templateName: message.providerMessageId!,
+          languageCode: language,
+          components,
+        });
+        const wamid = response.messages?.[0]?.id;
+        if (wamid) {
+          // Persist the wamid→send mapping so delivery webhooks can correlate
+          // (msgops-api consumes whatsapp.sent.persist). Best-effort: a publish
+          // failure must not abort the send (the message already went out).
+          try {
+            await this.eventPublisher.publishWhatsappSend({
+              wamid,
+              accountId,
+              channelId,
+              contactId: contact.id,
+              messageId: message.id,
+              campaignId: campaignMessage.campaign?.id,
+              templateName: message.providerMessageId,
+              toNumber: contact.whatsapp,
+              utmCampaign: defaultUtmCampaign,
+              sentAt: new Date().toISOString(),
+            });
+          } catch (pubErr: any) {
+            this.logger.warn(`wa_send_persist_publish_failed account=${accountId} contact=${contact.id} err=${pubErr?.message ?? 'unknown'}`);
           }
-          return { contactId: contact.id, providerMessageId: wamid };
-        } catch (err: any) {
-          this.logger.warn(`wa_cloud_send_contact_failed account=${accountId} contact=${contact.id} err=${err?.message ?? 'unknown'}`);
-          return { contactId: contact.id, error: err?.message ?? 'send failed' };
         }
-      }),
-    );
+        return { contactId: contact.id, providerMessageId: wamid };
+      } catch (err: any) {
+        this.logger.warn(`wa_cloud_send_contact_failed account=${accountId} contact=${contact.id} err=${err?.message ?? 'unknown'}`);
+        return { contactId: contact.id, error: err?.message ?? 'send failed' };
+      }
+    });
 
     const trackerKey = campaignMessage.message.type === CampaignMessageType.WHATSAPP ? 'SENT_WHATSAPP_BATCH' : 'SENT_SMS_BATCH';
     await this.sendTracker(trackerKey, campaignMessage, sent.length);

@@ -80,7 +80,7 @@ describe('WhatsappCloudProvider', () => {
   });
 
   describe('retry on 5xx', () => {
-    it('retries 5xx 3 times then throws', async () => {
+    it('retries 5xx 5 times then throws', async () => {
       const { post } = buildHttpMock();
       const error = { isAxiosError: true, response: { status: 503, data: { error: { message: 'Service Unavailable' } } }, config: { url: '/1/messages' } } as any;
       post.mockRejectedValue(error);
@@ -94,6 +94,29 @@ describe('WhatsappCloudProvider', () => {
       });
 
       await expect(p.sendText({ to: '5511', text: 'oi' })).rejects.toBe(error);
+      expect(post).toHaveBeenCalledTimes(5);
+    });
+
+    it('retries Meta throughput errors (#130429) even though they come as HTTP 400', async () => {
+      const { post } = buildHttpMock();
+      const error = {
+        isAxiosError: true,
+        response: { status: 400, data: { error: { message: '(#130429) Rate limit hit', code: 130429 } } },
+        config: { url: '/1/messages' },
+      } as any;
+      post
+        .mockRejectedValueOnce(error)
+        .mockRejectedValueOnce(error)
+        .mockResolvedValueOnce({ data: { messaging_product: 'whatsapp', messages: [{ id: 'ok' }] } });
+
+      jest.spyOn(global, 'setTimeout').mockImplementation((cb: any) => {
+        cb();
+        return 0 as any;
+      });
+
+      const p = new WhatsappCloudProvider({ baseUrl: 'b', bearerToken: 't', phoneNumberId: '1' });
+      const result = await p.sendText({ to: '5511', text: 'oi' });
+      expect(result.messages[0].id).toBe('ok');
       expect(post).toHaveBeenCalledTimes(3);
     });
 
