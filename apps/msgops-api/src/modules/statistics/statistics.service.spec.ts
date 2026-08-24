@@ -81,3 +81,31 @@ describe('StatisticsService.sumStatisticsValues', () => {
     expect(Number.isNaN(acc.unsubscribe)).toBe(false);
   });
 });
+
+describe('StatisticsService.toIdList', () => {
+  const service = new StatisticsService(
+    null as any,
+    null as any,
+    null as any,
+    null as any,
+    null as any,
+    null as any,
+    null as any,
+    { getClient: () => ({}) } as any,
+    null as any,
+    null as any,
+    null as any,
+    null as any,
+  );
+  const toIdList = (value: unknown) => (service as any).toIdList(value);
+
+  it('turns an index-keyed object (qs arrayLimit overflow) back into an array', () => {
+    expect(toIdList({ '0': '1', '1': '2', '2': '3' })).toEqual(['1', '2', '3']);
+  });
+
+  it('keeps arrays and the "all" sentinel untouched and wraps scalars', () => {
+    expect(toIdList(['1', '2'])).toEqual(['1', '2']);
+    expect(toIdList('all')).toBe('all');
+    expect(toIdList('7')).toEqual(['7']);
+  });
+});
