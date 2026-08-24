@@ -50,6 +50,12 @@ export class StatisticsService {
     this.redisClient = this.redisService.getClient();
   }
 
+  private toIdList(value: unknown): any {
+    if (value === 'all' || Array.isArray(value)) return value;
+    if (value && typeof value === 'object') return Object.values(value);
+    return [value];
+  }
+
   async dashboard(params: DashboardStatisticsDto, mcpRequest = false) {
     try {
       if (params.groupItems && !Array.isArray(params.groupItems)) {
@@ -78,6 +84,7 @@ export class StatisticsService {
       let filters = '';
 
       if (params.campaigns) {
+        params.campaigns = this.toIdList(params.campaigns);
         if (params.afterTestAb === 'true') {
           queryParams.push(params.campaigns);
           filters += ` AND es.campaign_id = ANY($${paramIndex}::int[]) AND es.is_test_ab = false`;

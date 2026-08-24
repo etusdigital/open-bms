@@ -68,8 +68,6 @@ async function bootstrap() {
       return qs.parse(str, { arrayLimit: 200 });
     });
 
-  app.getHttpAdapter().getInstance().set('query parser', 'extended');
-
   // Captures the raw body alongside the parsed JSON. Webhook controllers
   // (e.g. POST /webhooks/meta and /webhooks/evolution-hub) need it to compute
   // HMAC-SHA256 signatures from the exact bytes the sender hashed.
