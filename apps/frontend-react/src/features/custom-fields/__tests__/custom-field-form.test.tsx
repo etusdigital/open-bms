@@ -19,11 +19,21 @@ describe('CustomFieldForm', () => {
     isPending: false,
   };
 
-  it('renders title, description, and type fields', () => {
+  it('renders title, description, and type picker', () => {
     render(<CustomFieldForm {...defaultProps} />);
     expect(screen.getByLabelText(/título/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/descrição/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/tipo/i)).toBeInTheDocument();
+    // Type is now a card picker (radiogroup) rather than a dropdown.
+    expect(screen.getByRole('radiogroup')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /texto/i })).toBeInTheDocument();
+  });
+
+  it('selects a type and reveals additional settings', () => {
+    render(<CustomFieldForm {...defaultProps} />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Lista' }));
+    expect(screen.getByRole('radio', { name: 'Lista' })).toHaveAttribute('aria-checked', 'true');
+    // List type exposes its options editor.
+    expect(screen.getByText(/opções/i)).toBeInTheDocument();
   });
 
   it('shows "Criar" button in create mode', () => {
@@ -88,7 +98,7 @@ describe('CustomFieldForm', () => {
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(
-        { title: 'Birthday', description: 'Date of birth', type: 'date' },
+        expect.objectContaining({ title: 'Birthday', description: 'Date of birth', type: 'date' }),
         expect.anything(),
       );
     });

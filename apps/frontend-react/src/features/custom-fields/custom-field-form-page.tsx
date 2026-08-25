@@ -57,12 +57,23 @@ export function CustomFieldFormPage({ customFieldId }: CustomFieldFormPageProps)
     );
   }
 
-  const defaultValues =
+  const defaultValues: CustomFieldFormValues | undefined =
     isEditing && fieldQuery.data
       ? {
           title: fieldQuery.data.title,
           description: fieldQuery.data.description ?? '',
           type: fieldQuery.data.type as CustomFieldFormValues['type'],
+          label: fieldQuery.data.label ?? undefined,
+          placeholder: fieldQuery.data.placeholder ?? undefined,
+          mask: fieldQuery.data.mask ?? undefined,
+          fieldFormat: fieldQuery.data.fieldFormat ?? undefined,
+          fieldType: fieldQuery.data.fieldType ?? undefined,
+          fileFormats: fieldQuery.data.fileFormats ?? undefined,
+          characterLimit: fieldQuery.data.characterLimit ?? undefined,
+          decimalLength: fieldQuery.data.decimalLength ?? undefined,
+          options: fieldQuery.data.options ?? undefined,
+          attributionType:
+            (fieldQuery.data.attributionType as CustomFieldFormValues['attributionType']) ?? undefined,
         }
       : undefined;
 
