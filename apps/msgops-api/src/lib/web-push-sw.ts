@@ -93,19 +93,35 @@ export function buildWebPush(publicBase: string, platform?: WebPushPlatformConfi
   // tokens. All-or-nothing is safer than a half-swap. (Firebase always emits all
   // 7 fields, so a complete config is the normal case.)
   const REQUIRED = ['apiKey', 'projectId', 'messagingSenderId', 'appId', 'authDomain', 'storageBucket'] as const;
-  if (web && REQUIRED.every((k) => web[k])) {
+  const hasCompleteWebConfig = !!web && REQUIRED.every((k) => web[k]);
+  const hasVapid = !!platform?.vapidPublicKey;
+  // The Firebase project (firebaseConfig) and the VAPID key must swap TOGETHER,
+  // not independently: they are saved as two separate form fields, so the UI can
+  // reach a state where only one was ever set. A project from one Firebase
+  // project paired with a VAPID key from another is not a startup error — getToken
+  // mints successfully against that mismatched pair and never delivers anything.
+  // Same all-or-nothing reasoning as the six required webConfig fields above,
+  // just extended across the whole platform config instead of within it.
+  if (hasCompleteWebConfig && hasVapid) {
     // The bundle is prettier-printed, so the object literal in the source uses
     // single quotes + indentation. We can't safely string-match that multi-line
     // literal, so we rewrite each scalar field by its KNOWN bri.us value →
-    // platform value. measurementId is optional (may be absent in either).
-    for (const key of ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId'] as const) {
+    // platform value.
+    for (const key of ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'] as const) {
       const from = (BUNDLE_FIREBASE_CONFIG as Record<string, string>)[key];
-      const to = web[key];
+      const to = web![key];
       if (from && to) core = core.replaceAll(`'${from}'`, `'${to}'`);
     }
-  }
-  if (platform?.vapidPublicKey) {
-    core = core.replaceAll(`'${BUNDLE_VAPID_KEY}'`, `'${platform.vapidPublicKey}'`);
+    // measurementId is optional and not in REQUIRED. When the platform config
+    // omits it, dropping the bundle's own value (rather than substituting the
+    // other six and leaving this one behind) avoids attributing analytics to
+    // the wrong Firebase project under the new config.
+    if (web!.measurementId) {
+      core = core.replaceAll(`'${BUNDLE_FIREBASE_CONFIG.measurementId}'`, `'${web!.measurementId}'`);
+    } else {
+      core = core.replaceAll(`measurementId: '${BUNDLE_FIREBASE_CONFIG.measurementId}',`, '');
+    }
+    core = core.replaceAll(`'${BUNDLE_VAPID_KEY}'`, `'${platform!.vapidPublicKey}'`);
   }
   return core;
 }
