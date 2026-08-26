@@ -28,7 +28,7 @@ export class EnterpriseImportJobEntity {
   status: EnterpriseImportStatus;
 
   @Column('jsonb', { name: 'progress', default: () => `'{}'` })
-  progress: Record<string, { total?: number; done?: number; page?: number; skipped?: boolean; reason?: string }>;
+  progress: Record<string, { total?: number; done?: number; page?: number; skipped?: boolean; reason?: string; seen?: number; discarded?: Record<string, number> }>;
 
   @Column('jsonb', { name: 'checkpoint', default: () => `'{}'` })
   checkpoint: { entity?: string; page?: number; accountId?: number };

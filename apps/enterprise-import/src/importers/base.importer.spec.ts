@@ -24,6 +24,9 @@ class FakeRepo {
     const w = Array.isArray(where) ? where[0] : where;
     return Promise.resolve(this.rows.filter((r) => Object.entries(w).every(([k, v]: any) => (v?._type === 'in' ? v._value.includes(r[k]) : r[k] === v))));
   }
+  async count(opts: any) {
+    return (await this.find(opts)).length;
+  }
   createQueryBuilder() {
     let vals: any[] = [];
     const qb: any = {
@@ -199,7 +202,7 @@ describe('BaseImporter', () => {
 
     await imp.run(ctx);
 
-    expect(ctx.updateProgress).toHaveBeenCalledWith('tags', { total: 1, done: 1, page: 1 });
+    expect(ctx.updateProgress).toHaveBeenCalledWith('tags', { total: 1, done: 1, page: 1, seen: 1 });
   });
 
   it('account-scope: a null source value never reaches the INSERT as an explicit NULL', async () => {
@@ -265,5 +268,204 @@ describe('BaseImporter', () => {
 
     expect(repo.rows[0].id).toBe(42);
     expect((ctx.idMapper as any)._recorded).toHaveLength(0);
+  });
+});
+
+describe('BaseImporter — contador de descartes', () => {
+  class ImporterComFk extends TestImporter {
+    protected readonly fkRemap = { ownerId: 'owners' };
+  }
+  class ImporterQueRecusa extends TestImporter {
+    protected async customize(_ctx: any, _src: any, mapped: any) {
+      return mapped.name === 'recusada' ? null : mapped;
+    }
+  }
+
+  function ultimoProgresso(ctx: ImportContext) {
+    const chamadas = (ctx.updateProgress as jest.Mock).mock.calls;
+    return chamadas[chamadas.length - 1][1];
+  }
+
+  it('conta a linha que o customize() recusa', async () => {
+    const repo = new FakeRepo(['id', 'accountId', 'name']);
+    const imp = new ImporterQueRecusa();
+    imp.pages = [
+      {
+        results: [
+          { id: 1, name: 'ok' },
+          { id: 2, name: 'recusada' },
+        ],
+        page: 1,
+      },
+    ];
+    const ctx = makeCtx(repo, 'account');
+
+    await imp.run(ctx);
+
+    expect(ultimoProgresso(ctx).discarded).toMatchObject({ mapper_rejected: 1, fk_unresolved: 0 });
+    expect(ultimoProgresso(ctx).seen).toBe(2);
+    expect(repo.rows).toHaveLength(1);
+  });
+
+  it('conta a linha cuja FK não resolveu em scope=account', async () => {
+    const repo = new FakeRepo(['id', 'accountId', 'name', 'ownerId']);
+    const imp = new ImporterComFk();
+    imp.pages = [{ results: [{ id: 1, name: 'a', ownerId: 55 }], page: 1 }];
+    const ctx = makeCtx(repo, 'account');
+
+    await imp.run(ctx);
+
+    // Separado do customize: FK não resolvida aponta para um passo pai que não
+    // importou, não para uma decisão de qualidade de dado sobre esta linha.
+    expect(ultimoProgresso(ctx).discarded).toMatchObject({ fk_unresolved: 1, mapper_rejected: 0 });
+    expect(repo.rows).toHaveLength(0);
+  });
+
+  it('conta a linha sem chave natural', async () => {
+    const repo = new FakeRepo(['id', 'accountId', 'name']);
+    const imp = new TestImporter();
+    imp.pages = [
+      {
+        results: [
+          { id: 1, name: 'a' },
+          { id: 2, name: '' },
+        ],
+        page: 1,
+      },
+    ];
+    const ctx = makeCtx(repo, 'account');
+
+    await imp.run(ctx);
+
+    expect(ultimoProgresso(ctx).discarded).toMatchObject({ empty_natural_key: 1 });
+  });
+
+  it('conta a linha repetida dentro da mesma página', async () => {
+    const repo = new FakeRepo(['id', 'accountId', 'name']);
+    const imp = new TestImporter();
+    imp.pages = [
+      {
+        results: [
+          { id: 1, name: 'a' },
+          { id: 2, name: 'a' },
+        ],
+        page: 1,
+      },
+    ];
+    const ctx = makeCtx(repo, 'account');
+
+    await imp.run(ctx);
+
+    expect(ultimoProgresso(ctx).discarded).toMatchObject({ duplicate_in_page: 1 });
+    expect(repo.rows).toHaveLength(1);
+  });
+
+  it('conta a linha que o ON CONFLICT engoliu no insert', async () => {
+    const repo = new FakeRepo(['id', 'accountId', 'name', 'email']);
+    const emailsUsados = new Set<string>();
+    const inserirOriginal = repo.createQueryBuilder.bind(repo);
+    jest.spyOn(repo, 'createQueryBuilder').mockImplementation(() => {
+      const qb = inserirOriginal();
+      const executeOriginal = qb.execute;
+      qb.values = ((v: any) => {
+        const linhas = (Array.isArray(v) ? v : [v]).filter((r: any) => {
+          if (emailsUsados.has(r.email)) return false; // conflito engolido
+          emailsUsados.add(r.email);
+          return true;
+        });
+        executeOriginal.call(qb);
+        return Object.assign(qb, {
+          execute: async () => {
+            for (const r of linhas) repo.rows.push({ ...r, id: repo.rows.length + 1 });
+          },
+        });
+      }) as any;
+      return qb;
+    });
+
+    const imp = new TestImporter();
+    imp.pages = [
+      {
+        results: [
+          { id: 1, name: 'a', email: 'x@y.com' },
+          { id: 2, name: 'b', email: 'x@y.com' },
+        ],
+        page: 1,
+      },
+    ];
+    const ctx = makeCtx(repo, 'account');
+
+    await imp.run(ctx);
+
+    expect(ultimoProgresso(ctx).discarded).toMatchObject({ insert_conflict: 1 });
+    expect(ultimoProgresso(ctx).done).toBe(1); // done conta linhas gravadas, não candidatas
+    expect(repo.rows).toHaveLength(1);
+  });
+
+  it('quando TODAS as candidatas da página perdem para o conflito de índice único, o passo fecha em all_discarded, não em done', async () => {
+    // Simula uma página inteira colidindo contra um índice único já ocupado
+    // (nenhuma das duas linhas é pré-existente pela natural key do importer —
+    // o conflito é noutro índice, como email — então orIgnore() engole as duas).
+    const repo = new FakeRepo(['id', 'accountId', 'name', 'email']);
+    repo.rows.push({ id: 999, accountId: 99, name: 'já existe', email: 'colide@y.com' });
+    jest.spyOn(repo, 'createQueryBuilder').mockImplementation(() => ({
+      insert: () => ({ values: () => ({ updateEntity: () => ({ orIgnore: () => ({ execute: async () => {} }) }) }) }),
+    }));
+
+    const imp = new TestImporter();
+    imp.pages = [
+      {
+        results: [
+          { id: 1, name: 'a', email: 'colide@y.com' },
+          { id: 2, name: 'b', email: 'colide@y.com' },
+        ],
+        page: 1,
+      },
+    ];
+    const ctx = makeCtx(repo, 'account');
+
+    await imp.run(ctx);
+
+    expect(repo.rows).toHaveLength(1); // só a linha pré-existente
+    expect(ultimoProgresso(ctx)).toMatchObject({ skipped: true, reason: 'all_discarded', seen: 2 });
+    expect(ultimoProgresso(ctx).discarded).toMatchObject({ insert_conflict: 2 });
+  });
+
+  it('não emite o bloco de descartes quando nada foi descartado', async () => {
+    const repo = new FakeRepo(['id', 'accountId', 'name']);
+    const imp = new TestImporter();
+    imp.pages = [{ results: [{ id: 1, name: 'a' }], page: 1 }];
+    const ctx = makeCtx(repo, 'account');
+
+    await imp.run(ctx);
+
+    expect(ultimoProgresso(ctx).discarded).toBeUndefined();
+    expect(ultimoProgresso(ctx).seen).toBe(1);
+  });
+
+  it('uma importação que leu linhas e não gravou nenhuma não é "empty"', async () => {
+    const repo = new FakeRepo(['id', 'accountId', 'name']);
+    const imp = new ImporterQueRecusa();
+    imp.pages = [{ results: [{ id: 1, name: 'recusada' }], page: 1 }];
+    const ctx = makeCtx(repo, 'account');
+
+    await imp.run(ctx);
+
+    expect(ultimoProgresso(ctx)).toMatchObject({ skipped: true, reason: 'all_discarded', seen: 1 });
+  });
+
+  it('all_discarded vale mesmo quando a origem informa o total', async () => {
+    // Com totalItems presente, fechar o passo em done=total marcaria como
+    // importado por inteiro um passo que não gravou nada.
+    const repo = new FakeRepo(['id', 'accountId', 'name']);
+    const imp = new ImporterQueRecusa();
+    imp.pages = [{ results: [{ id: 1, name: 'recusada' }], page: 1, totalItems: 1 }];
+    const ctx = makeCtx(repo, 'account');
+
+    await imp.run(ctx);
+
+    expect(repo.rows).toHaveLength(0);
+    expect(ultimoProgresso(ctx)).toMatchObject({ skipped: true, reason: 'all_discarded' });
+    expect(ultimoProgresso(ctx).done).toBeUndefined();
   });
 });

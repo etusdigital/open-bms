@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { EntityTarget, In, ObjectLiteral } from 'typeorm';
-import { ImportContext, ImporterStep } from './importer.interface';
+import { DiscardReason, ImportContext, ImporterStep } from './importer.interface';
 import { PagedResponse } from '../enterprise-client/enterprise.client';
 import { rawInsertPreservingPk } from '../raw-insert.util';
 
@@ -74,21 +74,41 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
 
     let page = this.resumePage(ctx);
     let totalDone = 0;
+    let totalSeen = 0;
     let totalKnown: number | undefined;
+    const discarded: Record<DiscardReason, number> = {
+      mapper_rejected: 0,
+      fk_unresolved: 0,
+      empty_natural_key: 0,
+      duplicate_in_page: 0,
+      insert_conflict: 0,
+    };
 
     while (true) {
       const resp = await this.fetchPage(ctx, page);
       if (!resp.results || resp.results.length === 0) break;
       if (resp.totalItems !== undefined) totalKnown = resp.totalItems;
+      totalSeen += resp.results.length;
 
       // Build candidate rows (dedup by natural key within the page).
       const candidates: Array<{ src: any; row: Record<string, any>; nk: string }> = [];
       const seen = new Set<string>();
       for (const src of resp.results) {
-        const row = await this.buildRow(ctx, src, columnProps, propByDbName, pkProp);
-        if (row === null) continue;
+        const built = await this.buildRow(ctx, src, columnProps, propByDbName, pkProp);
+        if ('discard' in built) {
+          discarded[built.discard]++;
+          continue;
+        }
+        const { row } = built;
         const nkVal = String(src[nkProp] ?? row[nkProp] ?? '');
-        if (!nkVal || seen.has(nkVal)) continue;
+        if (!nkVal) {
+          discarded.empty_natural_key++;
+          continue;
+        }
+        if (seen.has(nkVal)) {
+          discarded.duplicate_in_page++;
+          continue;
+        }
         seen.add(nkVal);
         candidates.push({ src, row, nk: nkVal });
       }
@@ -101,12 +121,18 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
       const nkValues = candidates.map((c) => c.nk);
       const whereBase: any = this.scopedByAccount ? { accountId: ctx.accountId } : {};
       const mappings: Array<{ sourceId: any; newId: any }> = [];
+      // How many of this page's candidates are actually in the target table once
+      // the transaction commits — pre-existing plus newly inserted. This, not
+      // candidates.length, is what totalDone counts: a page whose inserts all
+      // lose to orIgnore() must not report progress for rows nobody wrote.
+      let writtenThisPage = 0;
 
       await ctx.dataSource.transaction(async (em) => {
         const txRepo = em.getRepository<TEntity>(this.entity);
         // Pre-filter rows that already exist (resume idempotency).
         const existing = await txRepo.find({ where: { ...whereBase, [nkProp]: In(nkValues) } as any });
         const existingNk = new Set(existing.map((e: any) => String(e[nkProp])));
+        writtenThisPage = existing.length;
 
         // Fill entity-declared defaults for columns the source left null/undefined
         // (buildRow dropped them). Insert-only: the account-scope update path below
@@ -127,6 +153,13 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
               .orIgnore() // safety net; real idempotency comes from the pre-filter
               .execute();
           }
+
+          // Neither write path reports how many rows it wrote, so the swallowed
+          // conflicts only show up by counting what is there afterwards.
+          const afterCount = await txRepo.count({ where: { ...whereBase, [nkProp]: In(nkValues) } as any });
+          const gravadas = afterCount - existing.length;
+          if (gravadas < toInsert.length) discarded.insert_conflict += toInsert.length - gravadas;
+          writtenThisPage = afterCount;
         }
 
         // Account-scope upsert: refresh already-existing rows from the source so
@@ -169,9 +202,15 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
         await ctx.idMapper.record(ctx.jobId, this.name, m.sourceId, m.newId);
       }
 
-      totalDone += candidates.length;
+      totalDone += writtenThisPage;
       await ctx.setCheckpoint(this.name, page, ctx.accountId ?? undefined);
-      await ctx.updateProgress(this.name, { total: this.reportsTotal ? totalKnown : undefined, done: totalDone, page });
+      await ctx.updateProgress(this.name, {
+        total: this.reportsTotal ? totalKnown : undefined,
+        done: totalDone,
+        page,
+        seen: totalSeen,
+        ...this.discardPatch(discarded),
+      });
 
       if (resp.results.length < this.batchSize) break;
       page++;
@@ -183,12 +222,25 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
     // nothing was imported, mark skipped(empty); a resume where everything
     // already existed (totalKnown>0) counts as done.
     if (totalDone === 0) {
-      if (this.reportsTotal && totalKnown && totalKnown > 0) {
-        await ctx.updateProgress(this.name, { total: totalKnown, done: totalKnown, page });
+      // Rows read but none written means every one of them was discarded, and
+      // that has to be decided before the resume shortcut below: its
+      // done=totalKnown would close the step at 100% on a step that wrote
+      // nothing, which is the exact reading this counter exists to prevent.
+      if (totalSeen > 0) {
+        await ctx.updateProgress(this.name, { skipped: true, reason: 'all_discarded', seen: totalSeen, ...this.discardPatch(discarded) });
+      } else if (this.reportsTotal && totalKnown && totalKnown > 0) {
+        await ctx.updateProgress(this.name, { total: totalKnown, done: totalKnown, page, seen: totalSeen, ...this.discardPatch(discarded) });
       } else {
         await ctx.updateProgress(this.name, { skipped: true, reason: 'empty' });
       }
     }
+  }
+
+  private discardPatch(discarded: Record<DiscardReason, number>): { discarded?: Record<DiscardReason, number> } {
+    const total = Object.values(discarded).reduce((a, b) => a + b, 0);
+    if (total === 0) return {};
+    this.logger.warn(`${this.name}: ${total} linha(s) descartada(s) — ${JSON.stringify(discarded)}`);
+    return { discarded: { ...discarded } };
   }
 
   // Applies entity-declared defaults for columns absent from the row (the source
@@ -210,7 +262,13 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
   // (drop in account-scope, preserve in instance-scope) and remaps FKs.
   // Accepts source keys as either the entity propertyName (camelCase) or the
   // column databaseName (snake_case); camelCase wins if both are present.
-  private async buildRow(ctx: ImportContext, src: any, columnProps: Set<string>, propByDbName: Map<string, string>, pkProp: string): Promise<Record<string, any> | null> {
+  private async buildRow(
+    ctx: ImportContext,
+    src: any,
+    columnProps: Set<string>,
+    propByDbName: Map<string, string>,
+    pkProp: string,
+  ): Promise<{ row: Record<string, any> } | { discard: DiscardReason }> {
     const row: Record<string, any> = {};
     for (const key of Object.keys(src ?? {})) {
       const prop = columnProps.has(key) ? key : propByDbName.get(key);
@@ -244,10 +302,11 @@ export abstract class BaseImporter<TEntity extends ObjectLiteral = any> implemen
       const resolved = ctx.idMapper.resolve(ctx.jobId, ctx.scope, mapEntity, srcVal);
       // In scope=account, skip the row rather than write an orphan FK if the
       // FK is not yet mapped.
-      if (ctx.scope === 'account' && resolved === null) return null;
+      if (ctx.scope === 'account' && resolved === null) return { discard: 'fk_unresolved' };
       row[prop] = ctx.scope === 'account' ? Number(resolved) : srcVal;
     }
-    return this.customize(ctx, src, row);
+    const customized = await this.customize(ctx, src, row);
+    return customized === null ? { discard: 'mapper_rejected' } : { row: customized };
   }
 
   protected resumePage(ctx: ImportContext): number {

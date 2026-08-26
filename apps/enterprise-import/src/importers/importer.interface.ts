@@ -9,7 +9,17 @@ export interface ImportProgressEntry {
   page?: number;
   skipped?: boolean;
   reason?: string;
+  // Source rows read. The only denominator when the source reports no real
+  // total (/contacts returns the page size).
+  seen?: number;
+  // Absent when nothing was discarded.
+  discarded?: Record<DiscardReason, number>;
 }
+
+// `mapper_rejected` and `fk_unresolved` are kept apart on purpose: the first is
+// a data decision the importer made, the second means a parent step did not
+// import what this row points at. Same lost row, opposite fix.
+export type DiscardReason = 'mapper_rejected' | 'fk_unresolved' | 'empty_natural_key' | 'duplicate_in_page' | 'insert_conflict';
 
 export type UpdateProgressFn = (entity: string, patch: ImportProgressEntry) => Promise<void>;
 export type SetCheckpointFn = (entity: string, page: number, accountId?: number) => Promise<void>;

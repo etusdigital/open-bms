@@ -194,7 +194,12 @@ export class EnterpriseImportProcessor extends WorkerHost implements OnModuleIni
     // progress={}); trusting it would soft-delete an account that did import
     // data on a late 4xx. Importers write progress directly to the DB.
     const fresh = await this.jobRepo.findOne({ where: { id: entity.id } });
-    const progressed = Object.values(fresh?.progress ?? {}).some((p: any) => (p?.done ?? 0) > 0);
+    // all_discarded steps record `seen` but no `done` — every source row was read
+    // and rejected (e.g. every candidate lost to a unique conflict), which is
+    // real progress on data that existed, not an empty/never-ran step. Treating
+    // only `done > 0` as progress would soft-delete an account whose job already
+    // consumed source rows.
+    const progressed = Object.values(fresh?.progress ?? {}).some((p: any) => (p?.done ?? 0) > 0 || (p?.seen ?? 0) > 0);
     if (progressed) return;
     try {
       await this.dataSource.query(`UPDATE accounts SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL`, [entity.accountId]);
